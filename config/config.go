@@ -26,6 +26,7 @@ type DiscordConfig struct {
 	OptInChannelID   string `yaml:"opt_in_channel_id"`
 	RegisteredRoleID string `yaml:"registered_role_id"`
 	GuildID          string `yaml:"guild_id"`
+	DiscordAppID     string `yaml:"discord_app_id"`
 }
 
 // LoadConfig loads the configuration from a YAML file.
@@ -68,6 +69,7 @@ func loadConfigFromEnv() (*Config, error) {
 	cfg.Discord.OptInChannelID = os.Getenv("DISCORD_OPT_IN_CHANNEL_ID")
 	cfg.Discord.RegisteredRoleID = os.Getenv("DISCORD_REGISTERED_ROLE_ID")
 	cfg.Discord.GuildID = os.Getenv("DISCORD_GUILD_ID")
+	cfg.Discord.DiscordAppID = os.Getenv("DISCORD_APP_ID")
 
 	return &cfg, nil
 }

@@ -12,37 +12,123 @@ package mocks
 import (
 	reflect "reflect"
 
-	discord "github.com/Black-And-White-Club/discord-frolf-bot/discord"
 	discordgo "github.com/bwmarrin/discordgo"
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockDiscord is a mock of Discord interface.
-type MockDiscord struct {
+// MockSession is a mock of Session interface.
+type MockSession struct {
 	ctrl     *gomock.Controller
-	recorder *MockDiscordMockRecorder
+	recorder *MockSessionMockRecorder
 	isgomock struct{}
 }
 
-// MockDiscordMockRecorder is the mock recorder for MockDiscord.
-type MockDiscordMockRecorder struct {
-	mock *MockDiscord
+// MockSessionMockRecorder is the mock recorder for MockSession.
+type MockSessionMockRecorder struct {
+	mock *MockSession
 }
 
-// NewMockDiscord creates a new mock instance.
-func NewMockDiscord(ctrl *gomock.Controller) *MockDiscord {
-	mock := &MockDiscord{ctrl: ctrl}
-	mock.recorder = &MockDiscordMockRecorder{mock}
+// NewMockSession creates a new mock instance.
+func NewMockSession(ctrl *gomock.Controller) *MockSession {
+	mock := &MockSession{ctrl: ctrl}
+	mock.recorder = &MockSessionMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockDiscord) EXPECT() *MockDiscordMockRecorder {
+func (m *MockSession) EXPECT() *MockSessionMockRecorder {
 	return m.recorder
 }
 
+// AddHandler mocks base method.
+func (m *MockSession) AddHandler(handler any) func() {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddHandler", handler)
+	ret0, _ := ret[0].(func())
+	return ret0
+}
+
+// AddHandler indicates an expected call of AddHandler.
+func (mr *MockSessionMockRecorder) AddHandler(handler any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddHandler", reflect.TypeOf((*MockSession)(nil).AddHandler), handler)
+}
+
+// AddUserToThread mocks base method.
+func (m *MockSession) AddUserToThread(threadID, userID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddUserToThread", threadID, userID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AddUserToThread indicates an expected call of AddUserToThread.
+func (mr *MockSessionMockRecorder) AddUserToThread(threadID, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddUserToThread", reflect.TypeOf((*MockSession)(nil).AddUserToThread), threadID, userID)
+}
+
+// ApplicationCommandCreate mocks base method.
+func (m *MockSession) ApplicationCommandCreate(appID, guildID string, cmd *discordgo.ApplicationCommand, options ...discordgo.RequestOption) (*discordgo.ApplicationCommand, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{appID, guildID, cmd}
+	for _, a := range options {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ApplicationCommandCreate", varargs...)
+	ret0, _ := ret[0].(*discordgo.ApplicationCommand)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ApplicationCommandCreate indicates an expected call of ApplicationCommandCreate.
+func (mr *MockSessionMockRecorder) ApplicationCommandCreate(appID, guildID, cmd any, options ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{appID, guildID, cmd}, options...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplicationCommandCreate", reflect.TypeOf((*MockSession)(nil).ApplicationCommandCreate), varargs...)
+}
+
+// ApplicationCommandDelete mocks base method.
+func (m *MockSession) ApplicationCommandDelete(appID, guildID, cmdID string, options ...discordgo.RequestOption) error {
+	m.ctrl.T.Helper()
+	varargs := []any{appID, guildID, cmdID}
+	for _, a := range options {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ApplicationCommandDelete", varargs...)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ApplicationCommandDelete indicates an expected call of ApplicationCommandDelete.
+func (mr *MockSessionMockRecorder) ApplicationCommandDelete(appID, guildID, cmdID any, options ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{appID, guildID, cmdID}, options...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplicationCommandDelete", reflect.TypeOf((*MockSession)(nil).ApplicationCommandDelete), varargs...)
+}
+
+// ApplicationCommands mocks base method.
+func (m *MockSession) ApplicationCommands(appID, guildID string, options ...discordgo.RequestOption) ([]*discordgo.ApplicationCommand, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{appID, guildID}
+	for _, a := range options {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ApplicationCommands", varargs...)
+	ret0, _ := ret[0].([]*discordgo.ApplicationCommand)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ApplicationCommands indicates an expected call of ApplicationCommands.
+func (mr *MockSessionMockRecorder) ApplicationCommands(appID, guildID any, options ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{appID, guildID}, options...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplicationCommands", reflect.TypeOf((*MockSession)(nil).ApplicationCommands), varargs...)
+}
+
 // ChannelMessageSend mocks base method.
-func (m *MockDiscord) ChannelMessageSend(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+func (m *MockSession) ChannelMessageSend(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
 	m.ctrl.T.Helper()
 	varargs := []any{channelID, content}
 	for _, a := range options {
@@ -55,14 +141,34 @@ func (m *MockDiscord) ChannelMessageSend(channelID, content string, options ...d
 }
 
 // ChannelMessageSend indicates an expected call of ChannelMessageSend.
-func (mr *MockDiscordMockRecorder) ChannelMessageSend(channelID, content any, options ...any) *gomock.Call {
+func (mr *MockSessionMockRecorder) ChannelMessageSend(channelID, content any, options ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{channelID, content}, options...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChannelMessageSend", reflect.TypeOf((*MockDiscord)(nil).ChannelMessageSend), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChannelMessageSend", reflect.TypeOf((*MockSession)(nil).ChannelMessageSend), varargs...)
+}
+
+// ChannelMessageSendComplex mocks base method.
+func (m *MockSession) ChannelMessageSendComplex(channelID string, data *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{channelID, data}
+	for _, a := range options {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ChannelMessageSendComplex", varargs...)
+	ret0, _ := ret[0].(*discordgo.Message)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ChannelMessageSendComplex indicates an expected call of ChannelMessageSendComplex.
+func (mr *MockSessionMockRecorder) ChannelMessageSendComplex(channelID, data any, options ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{channelID, data}, options...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChannelMessageSendComplex", reflect.TypeOf((*MockSession)(nil).ChannelMessageSendComplex), varargs...)
 }
 
 // ChannelMessages mocks base method.
-func (m *MockDiscord) ChannelMessages(channelID string, limit int, beforeID, afterID, aroundID string) ([]*discordgo.Message, error) {
+func (m *MockSession) ChannelMessages(channelID string, limit int, beforeID, afterID, aroundID string) ([]*discordgo.Message, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ChannelMessages", channelID, limit, beforeID, afterID, aroundID)
 	ret0, _ := ret[0].([]*discordgo.Message)
@@ -71,13 +177,42 @@ func (m *MockDiscord) ChannelMessages(channelID string, limit int, beforeID, aft
 }
 
 // ChannelMessages indicates an expected call of ChannelMessages.
-func (mr *MockDiscordMockRecorder) ChannelMessages(channelID, limit, beforeID, afterID, aroundID any) *gomock.Call {
+func (mr *MockSessionMockRecorder) ChannelMessages(channelID, limit, beforeID, afterID, aroundID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChannelMessages", reflect.TypeOf((*MockDiscord)(nil).ChannelMessages), channelID, limit, beforeID, afterID, aroundID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChannelMessages", reflect.TypeOf((*MockSession)(nil).ChannelMessages), channelID, limit, beforeID, afterID, aroundID)
+}
+
+// Close mocks base method.
+func (m *MockSession) Close() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Close")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Close indicates an expected call of Close.
+func (mr *MockSessionMockRecorder) Close() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockSession)(nil).Close))
+}
+
+// CreateThread mocks base method.
+func (m *MockSession) CreateThread(channelID, threadName string) (*discordgo.Channel, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateThread", channelID, threadName)
+	ret0, _ := ret[0].(*discordgo.Channel)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateThread indicates an expected call of CreateThread.
+func (mr *MockSessionMockRecorder) CreateThread(channelID, threadName any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateThread", reflect.TypeOf((*MockSession)(nil).CreateThread), channelID, threadName)
 }
 
 // GetBotUser mocks base method.
-func (m *MockDiscord) GetBotUser() (*discordgo.User, error) {
+func (m *MockSession) GetBotUser() (*discordgo.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetBotUser")
 	ret0, _ := ret[0].(*discordgo.User)
@@ -86,13 +221,13 @@ func (m *MockDiscord) GetBotUser() (*discordgo.User, error) {
 }
 
 // GetBotUser indicates an expected call of GetBotUser.
-func (mr *MockDiscordMockRecorder) GetBotUser() *gomock.Call {
+func (mr *MockSessionMockRecorder) GetBotUser() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBotUser", reflect.TypeOf((*MockDiscord)(nil).GetBotUser))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBotUser", reflect.TypeOf((*MockSession)(nil).GetBotUser))
 }
 
 // GetChannel mocks base method.
-func (m *MockDiscord) GetChannel(channelID string) (*discordgo.Channel, error) {
+func (m *MockSession) GetChannel(channelID string) (*discordgo.Channel, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetChannel", channelID)
 	ret0, _ := ret[0].(*discordgo.Channel)
@@ -101,27 +236,13 @@ func (m *MockDiscord) GetChannel(channelID string) (*discordgo.Channel, error) {
 }
 
 // GetChannel indicates an expected call of GetChannel.
-func (mr *MockDiscordMockRecorder) GetChannel(channelID any) *gomock.Call {
+func (mr *MockSessionMockRecorder) GetChannel(channelID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetChannel", reflect.TypeOf((*MockDiscord)(nil).GetChannel), channelID)
-}
-
-// GetSession mocks base method.
-func (m *MockDiscord) GetSession() *discordgo.Session {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetSession")
-	ret0, _ := ret[0].(*discordgo.Session)
-	return ret0
-}
-
-// GetSession indicates an expected call of GetSession.
-func (mr *MockDiscordMockRecorder) GetSession() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSession", reflect.TypeOf((*MockDiscord)(nil).GetSession))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetChannel", reflect.TypeOf((*MockSession)(nil).GetChannel), channelID)
 }
 
 // GuildMemberRoleAdd mocks base method.
-func (m *MockDiscord) GuildMemberRoleAdd(guildID, userID, roleID string, options ...discordgo.RequestOption) error {
+func (m *MockSession) GuildMemberRoleAdd(guildID, userID, roleID string, options ...discordgo.RequestOption) error {
 	m.ctrl.T.Helper()
 	varargs := []any{guildID, userID, roleID}
 	for _, a := range options {
@@ -133,14 +254,93 @@ func (m *MockDiscord) GuildMemberRoleAdd(guildID, userID, roleID string, options
 }
 
 // GuildMemberRoleAdd indicates an expected call of GuildMemberRoleAdd.
-func (mr *MockDiscordMockRecorder) GuildMemberRoleAdd(guildID, userID, roleID any, options ...any) *gomock.Call {
+func (mr *MockSessionMockRecorder) GuildMemberRoleAdd(guildID, userID, roleID any, options ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{guildID, userID, roleID}, options...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GuildMemberRoleAdd", reflect.TypeOf((*MockDiscord)(nil).GuildMemberRoleAdd), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GuildMemberRoleAdd", reflect.TypeOf((*MockSession)(nil).GuildMemberRoleAdd), varargs...)
+}
+
+// GuildScheduledEventCreate mocks base method.
+func (m *MockSession) GuildScheduledEventCreate(guildID string, params *discordgo.GuildScheduledEventParams, options ...discordgo.RequestOption) (*discordgo.GuildScheduledEvent, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{guildID, params}
+	for _, a := range options {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GuildScheduledEventCreate", varargs...)
+	ret0, _ := ret[0].(*discordgo.GuildScheduledEvent)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GuildScheduledEventCreate indicates an expected call of GuildScheduledEventCreate.
+func (mr *MockSessionMockRecorder) GuildScheduledEventCreate(guildID, params any, options ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{guildID, params}, options...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GuildScheduledEventCreate", reflect.TypeOf((*MockSession)(nil).GuildScheduledEventCreate), varargs...)
+}
+
+// GuildScheduledEventEdit mocks base method.
+func (m *MockSession) GuildScheduledEventEdit(guildID, eventID string, params *discordgo.GuildScheduledEventParams, options ...discordgo.RequestOption) (*discordgo.GuildScheduledEvent, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{guildID, eventID, params}
+	for _, a := range options {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GuildScheduledEventEdit", varargs...)
+	ret0, _ := ret[0].(*discordgo.GuildScheduledEvent)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GuildScheduledEventEdit indicates an expected call of GuildScheduledEventEdit.
+func (mr *MockSessionMockRecorder) GuildScheduledEventEdit(guildID, eventID, params any, options ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{guildID, eventID, params}, options...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GuildScheduledEventEdit", reflect.TypeOf((*MockSession)(nil).GuildScheduledEventEdit), varargs...)
+}
+
+// InteractionRespond mocks base method.
+func (m *MockSession) InteractionRespond(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
+	m.ctrl.T.Helper()
+	varargs := []any{interaction, resp}
+	for _, a := range options {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "InteractionRespond", varargs...)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// InteractionRespond indicates an expected call of InteractionRespond.
+func (mr *MockSessionMockRecorder) InteractionRespond(interaction, resp any, options ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{interaction, resp}, options...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InteractionRespond", reflect.TypeOf((*MockSession)(nil).InteractionRespond), varargs...)
+}
+
+// InteractionResponseEdit mocks base method.
+func (m *MockSession) InteractionResponseEdit(interaction *discordgo.Interaction, newresp *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{interaction, newresp}
+	for _, a := range options {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "InteractionResponseEdit", varargs...)
+	ret0, _ := ret[0].(*discordgo.Message)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// InteractionResponseEdit indicates an expected call of InteractionResponseEdit.
+func (mr *MockSessionMockRecorder) InteractionResponseEdit(interaction, newresp any, options ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{interaction, newresp}, options...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InteractionResponseEdit", reflect.TypeOf((*MockSession)(nil).InteractionResponseEdit), varargs...)
 }
 
 // MessageReactionAdd mocks base method.
-func (m *MockDiscord) MessageReactionAdd(channelID, messageID, emojiID string) error {
+func (m *MockSession) MessageReactionAdd(channelID, messageID, emojiID string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "MessageReactionAdd", channelID, messageID, emojiID)
 	ret0, _ := ret[0].(error)
@@ -148,38 +348,63 @@ func (m *MockDiscord) MessageReactionAdd(channelID, messageID, emojiID string) e
 }
 
 // MessageReactionAdd indicates an expected call of MessageReactionAdd.
-func (mr *MockDiscordMockRecorder) MessageReactionAdd(channelID, messageID, emojiID any) *gomock.Call {
+func (mr *MockSessionMockRecorder) MessageReactionAdd(channelID, messageID, emojiID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MessageReactionAdd", reflect.TypeOf((*MockDiscord)(nil).MessageReactionAdd), channelID, messageID, emojiID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MessageReactionAdd", reflect.TypeOf((*MockSession)(nil).MessageReactionAdd), channelID, messageID, emojiID)
 }
 
-// State mocks base method.
-func (m *MockDiscord) State() discord.State {
+// Open mocks base method.
+func (m *MockSession) Open() error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "State")
-	ret0, _ := ret[0].(discord.State)
+	ret := m.ctrl.Call(m, "Open")
+	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// State indicates an expected call of State.
-func (mr *MockDiscordMockRecorder) State() *gomock.Call {
+// Open indicates an expected call of Open.
+func (mr *MockSessionMockRecorder) Open() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "State", reflect.TypeOf((*MockDiscord)(nil).State))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Open", reflect.TypeOf((*MockSession)(nil).Open))
+}
+
+// ThreadStartComplex mocks base method.
+func (m *MockSession) ThreadStartComplex(channelID string, data *discordgo.ThreadStart, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{channelID, data}
+	for _, a := range options {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ThreadStartComplex", varargs...)
+	ret0, _ := ret[0].(*discordgo.Channel)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ThreadStartComplex indicates an expected call of ThreadStartComplex.
+func (mr *MockSessionMockRecorder) ThreadStartComplex(channelID, data any, options ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{channelID, data}, options...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ThreadStartComplex", reflect.TypeOf((*MockSession)(nil).ThreadStartComplex), varargs...)
 }
 
 // UserChannelCreate mocks base method.
-func (m *MockDiscord) UserChannelCreate(userID string) (*discordgo.Channel, error) {
+func (m *MockSession) UserChannelCreate(recipientID string, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UserChannelCreate", userID)
+	varargs := []any{recipientID}
+	for _, a := range options {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "UserChannelCreate", varargs...)
 	ret0, _ := ret[0].(*discordgo.Channel)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // UserChannelCreate indicates an expected call of UserChannelCreate.
-func (mr *MockDiscordMockRecorder) UserChannelCreate(userID any) *gomock.Call {
+func (mr *MockSessionMockRecorder) UserChannelCreate(recipientID any, options ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserChannelCreate", reflect.TypeOf((*MockDiscord)(nil).UserChannelCreate), userID)
+	varargs := append([]any{recipientID}, options...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserChannelCreate", reflect.TypeOf((*MockSession)(nil).UserChannelCreate), varargs...)
 }
 
 // MockState is a mock of State interface.

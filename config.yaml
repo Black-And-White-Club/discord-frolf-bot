@@ -8,3 +8,4 @@ discord:
   opt_in_channel_id: "YOUR_OPT_IN_CHANNEL_ID" # ID of the channel with the message
   registered_role_id: "YOUR_REGISTERED_ROLE_ID" # ID of the "Registered" role
   guild_id: "YOUR_GUILD_ID" # ID of your server
+  app_id: "YOUR_APP_ID"

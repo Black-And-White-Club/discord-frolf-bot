@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 
+	cache "github.com/Black-And-White-Club/discord-frolf-bot/bigcache"
 	bot "github.com/Black-And-White-Club/discord-frolf-bot/bot"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
@@ -46,8 +47,14 @@ func main() {
 		log.Fatalf("error creating Discord session: %v", err)
 	}
 
+	// Initialize bigcache
+	cache, err := cache.NewCache(ctx)
+	if err != nil {
+		log.Fatalf("error initializing cache: %v", err)
+	}
+
 	// Create and start the Discord bot
-	discordBot, err := bot.NewDiscordBot(cfg, logger, eventBus, watermillRouter, discordSession)
+	discordBot, err := bot.NewDiscordBot(cfg, logger, eventBus, watermillRouter, discordSession, cache)
 	if err != nil {
 		log.Fatalf("error creating Discord bot: %v", err)
 	}
