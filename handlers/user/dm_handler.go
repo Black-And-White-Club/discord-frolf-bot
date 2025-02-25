@@ -1,10 +1,11 @@
 package userhandlers
 
 import (
+	"context"
 	"fmt"
 
+	discordevents "github.com/Black-And-White-Club/discord-frolf-bot/events/discord"
 	discorduserevents "github.com/Black-And-White-Club/discord-frolf-bot/events/user"
-	"github.com/Black-And-White-Club/frolf-bot-shared/events" // Import events
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	"github.com/ThreeDotsLabs/watermill/message"
 )
@@ -14,93 +15,31 @@ func (h *UserHandlers) HandleSendUserDM(msg *message.Message) ([]*message.Messag
 	msg.Metadata.Set("handler_name", "HandleSendUserDM")
 
 	var payload discorduserevents.SendUserDMPayload
-	if err := h.unmarshalPayload(msg, &payload); err != nil { // Use the helper
-		return nil, err
+	if err := h.Helper.UnmarshalPayload(msg, &payload); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal payload: %w", err)
 	}
 
 	h.Logger.Info(msg.Context(), "Sending DM", attr.UserID(payload.UserID), attr.CorrelationIDFromMsg(msg))
 
-	channel, err := h.Session.UserChannelCreate(payload.UserID)
+	sentMsg, err := h.Discord.SendDM(context.Background(), payload.UserID, payload.Message)
 	if err != nil {
-		return h.handleDMError(msg.Context(), msg, payload.UserID, discorduserevents.DMCreateError, fmt.Errorf("failed to create DM channel: %w", err))
+		h.Logger.Error(msg.Context(), "Failed to send DM", attr.Error(err), attr.UserID(payload.UserID), attr.CorrelationIDFromMsg(msg))
+
+		failureResult := h.interactionResponded(msg, payload.UserID, discordevents.StatusFail)
+		failureMsg, err := h.Helper.CreateResultMessage(msg, failureResult, discorduserevents.DMError)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create failure message: %w", err)
+		}
+		return []*message.Message{failureMsg}, nil
 	}
 
-	if _, err = h.Session.ChannelMessageSend(channel.ID, payload.Message); err != nil {
-		return h.handleDMError(msg.Context(), msg, payload.UserID, discorduserevents.DMSendError, fmt.Errorf("failed to send DM: %w", err))
-	}
+	// Use attr.DiscordMessageID to log the Discord message ID.
+	h.Logger.Info(msg.Context(), "DM sent successfully", attr.UserID(payload.UserID), attr.DiscordMessageID(sentMsg.ID), attr.DiscordChannelID(sentMsg.ChannelID), attr.CorrelationIDFromMsg(msg))
 
-	h.Logger.Info(msg.Context(), "DM sent successfully", attr.UserID(payload.UserID), attr.String("channel_id", channel.ID), attr.CorrelationIDFromMsg(msg))
-
-	successPayload := discorduserevents.DMSentPayload{
-		UserID:    payload.UserID,
-		ChannelID: channel.ID,
-		CommonMetadata: events.CommonMetadata{
-			EventName: discorduserevents.DMSent,
-			Domain:    userDomain,
-		},
-	}
-
-	successMsg, err := h.createResultMessage(msg, successPayload)
+	successResult := h.interactionResponded(msg, payload.UserID, discordevents.StatusSuccess)
+	successMsg, err := h.Helper.CreateResultMessage(msg, successResult, discorduserevents.DMSent)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create success message: %w", err)
 	}
 	return []*message.Message{successMsg}, nil
-}
-
-// HandleDMSent handles the DMSent event.
-func (h *UserHandlers) HandleDMSent(msg *message.Message) ([]*message.Message, error) {
-	msg.Metadata.Set("handler_name", "HandleDMSent")
-	var payload discorduserevents.DMSentPayload
-	if err := h.unmarshalPayload(msg, &payload); err != nil {
-		return nil, err
-	}
-
-	h.Logger.Info(msg.Context(), "DM sent successfully (confirmation received)",
-		attr.UserID(payload.UserID),
-		attr.String("channel_id", payload.ChannelID),
-		attr.CorrelationIDFromMsg(msg),
-	)
-
-	successResult := h.interactionResponded(msg, payload.UserID, interactionSuccess, "", discorduserevents.DMSent)
-	successMsg, err := h.createResultMessage(msg, successResult)
-	if err != nil {
-		return nil, err
-	}
-	return []*message.Message{successMsg}, nil
-}
-
-// HandleDMCreateError handles errors creating the DM channel.
-func (h *UserHandlers) HandleDMCreateError(msg *message.Message) ([]*message.Message, error) {
-	msg.Metadata.Set("handler_name", "HandleDMCreateError")
-	var payload discorduserevents.DMErrorPayload
-	if err := h.unmarshalPayload(msg, &payload); err != nil {
-		return nil, err
-	}
-	return h.handleDMFailure(msg, discorduserevents.DMCreateError, payload)
-}
-
-// HandleDMSendError handles errors sending the DM.
-func (h *UserHandlers) HandleDMSendError(msg *message.Message) ([]*message.Message, error) {
-	msg.Metadata.Set("handler_name", "HandleDMSendError")
-	var payload discorduserevents.DMErrorPayload
-	if err := h.unmarshalPayload(msg, &payload); err != nil {
-		return nil, err
-	}
-	// Now uses the helper function.  Much cleaner!
-	return h.handleDMFailure(msg, discorduserevents.DMSendError, payload)
-}
-
-// handleDMFailure handles both DM creation and sending failures.
-func (h *UserHandlers) handleDMFailure(msg *message.Message, eventName string, payload discorduserevents.DMErrorPayload) ([]*message.Message, error) {
-	h.Logger.Error(msg.Context(), "DM operation failed",
-		attr.Error(fmt.Errorf("%s", payload.ErrorDetail)),
-		attr.UserID(payload.UserID),
-		attr.CorrelationIDFromMsg(msg),
-	)
-	failureResult := h.interactionResponded(msg, payload.UserID, interactionFailure, payload.ErrorDetail, eventName)
-	failureMsg, err := h.createResultMessage(msg, failureResult)
-	if err != nil {
-		return nil, err
-	}
-	return []*message.Message{failureMsg}, nil
 }

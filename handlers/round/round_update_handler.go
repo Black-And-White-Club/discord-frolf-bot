@@ -1,30 +1,77 @@
 package roundhandlers
 
 import (
-	"encoding/json"
-
+	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/events/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
+	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	"github.com/ThreeDotsLabs/watermill/message"
 )
 
-// HandleRoundUpdated handles the round.schedule.update event which fires after a round is updated
-func (h *RoundHandlers) HandleRoundUpdated(msg *message.Message) error {
-	var payload roundevents.RoundScheduleUpdatePayload
-	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
-		h.logger.Error("Failed to unmarshal RoundScheduleUpdate payload", "error", err)
-		return err
+func (h *RoundHandlers) HandleRoundUpdateRequest(msg *message.Message) ([]*message.Message, error) {
+	ctx := msg.Context()
+	h.Logger.Info(ctx, "Handling round update request", attr.CorrelationIDFromMsg(msg))
+
+	var payload discordroundevents.DiscordRoundUpdateRequestPayload
+	if err := h.unmarshalPayload(msg, &payload); err != nil {
+		return nil, err
 	}
 
-	userID, err := extractUserID(msg.Metadata.Get("correlation_id"))
+	// Construct the backend payload.
+	backendPayload := roundevents.RoundUpdateRequestPayload{
+		RoundID:        payload.RoundID,
+		DiscordEventID: payload.MessageID,
+	}
+	if payload.Title != nil {
+		backendPayload.Title = payload.Title
+	}
+	if payload.Description != nil {
+		backendPayload.Description = payload.Description
+	}
+	if payload.StartTime != nil {
+		backendPayload.StartTime = payload.StartTime
+	}
+	if payload.EndTime != nil {
+		backendPayload.EndTime = payload.EndTime
+	}
+	if payload.Location != nil {
+		backendPayload.Location = payload.Location
+	}
+
+	backendMsg, err := h.createResultMessage(msg, backendPayload, roundevents.RoundUpdateRequest)
 	if err != nil {
-		h.logger.Error("Failed to extract user_id", "error", err)
-		return err
+		return nil, err
 	}
 
-	// Notify users about the schedule update
-	h.sendUserMessage(userID, "The schedule for a round has been updated.", msg.Metadata.Get("correlation_id"))
+	h.Logger.Info(ctx, "Successfully processed round update request", attr.CorrelationIDFromMsg(msg))
+	return []*message.Message{backendMsg}, nil
+}
 
-	h.logger.Info("Handled round.schedule.update event", "round_id", payload.RoundID)
+func (h *RoundHandlers) HandleRoundUpdated(msg *message.Message) ([]*message.Message, error) {
+	ctx := msg.Context()
+	h.Logger.Info(ctx, "Handling round updated event", attr.CorrelationIDFromMsg(msg))
 
-	return nil
+	var payload roundevents.RoundUpdatedPayload // From the BACKEND
+	if err := h.unmarshalPayload(msg, &payload); err != nil {
+		return nil, err
+	}
+
+	// Construct the *internal* Discord payload for the successful update.
+	discordPayload := discordroundevents.DiscordRoundUpdatedPayload{
+		RoundID:     payload.RoundID,
+		MessageID:   payload.DiscordEventID,
+		ChannelID:   payload.ChannelID,
+		Title:       payload.Title,
+		Description: payload.Description,
+		StartTime:   payload.StartTime,
+		EndTime:     payload.EndTime,
+		Location:    payload.Location,
+	}
+
+	discordMsg, err := h.createResultMessage(msg, discordPayload, discordroundevents.RoundUpdatedTopic)
+	if err != nil {
+		return nil, err
+	}
+
+	h.Logger.Info(ctx, "Successfully processed round updated", attr.CorrelationIDFromMsg(msg))
+	return []*message.Message{discordMsg}, nil
 }

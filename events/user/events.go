@@ -1,7 +1,6 @@
 package discorduserevents
 
 import (
-	"github.com/Black-And-White-Club/frolf-bot-shared/events"
 	usertypes "github.com/Black-And-White-Club/frolf-bot-shared/types/user"
 	"github.com/bwmarrin/discordgo"
 )
@@ -18,13 +17,15 @@ const (
 	SignupFailed              = "discord.signup.failed" // General signup failure (Discord side).
 	SignupSuccess             = "discord.signup.success"
 	InteractionResponded      = "discord.interaction.responded"
-	SignupFormSubmitted       = "discord.user.SignupFormSubmitted"
+	SignupFormSubmitted       = "discord.user.signupformsubmitted"
+	SignupSubmission          = "discord.user.signupsubmission"
 
 	// Discord DM events
-	SendUserDM    = "discord.user.senduserdm"
-	DMSent        = "discord.user.dmsent"
-	DMCreateError = "discord.user.dmcreateerror"
-	DMSendError   = "discord.user.dmsenderror"
+	SendUserDM = "discord.user.senduserdm" // Keep: This is the event to trigger sending a DM.
+	DMSent     = "discord.user.dmsent"     // Keep: This is for the success case.
+	// DMCreateError = "discord.user.dmcreateerror" // REMOVE: No longer needed.
+	// DMSendError   = "discord.user.dmsenderror"   // REMOVE: No longer needed
+	DMError = "discord.user.dmerror" // ADD:  A single, generic error event.
 
 	// Tag-related events (Discord-side).
 	TagNumberRequested = "discord.tag.number.requested"
@@ -49,17 +50,19 @@ const (
 
 // RoleUpdateCommandPayload defines the payload for the internal RoleUpdateCommand event.
 type RoleUpdateCommandPayload struct {
-	TargetUserID string `json:"target_user_id"` // User whose role is being changed.
+	TargetUserID string `json:"target_user_id"`
+	GuildID      string `json:"guild_id"`
 }
 
 // RoleUpdateButtonPressPayload is the payload for the RoleUpdateButtonPress event.
 type RoleUpdateButtonPressPayload struct {
-	events.CommonMetadata
-	RequesterID      string                 `json:"requester_id"`
-	TargetUserID     string                 `json:"target_user_id"`
-	SelectedRole     usertypes.UserRoleEnum `json:"selected_role"`
-	InteractionID    string                 `json:"interaction_id"`
-	InteractionToken string                 `json:"interaction_token"`
+	RequesterID         string                 `json:"requester_id"`
+	TargetUserID        string                 `json:"target_user_id"`
+	SelectedRole        usertypes.UserRoleEnum `json:"selected_role"`
+	InteractionID       string                 `json:"interaction_id"`
+	InteractionToken    string                 `json:"interaction_token"`
+	InteractionCustomID string                 `json:"custom_id"`
+	GuildID             string                 `json:"guild_id"`
 }
 
 // SendUserDMPayload defines the payload to send a DM to a user.
@@ -70,14 +73,12 @@ type SendUserDMPayload struct {
 
 // DMSentPayload is the payload for the DMSent event.
 type DMSentPayload struct {
-	events.CommonMetadata
-	UserID    string `json:"user_id"`
-	ChannelID string `json:"channel_id"`
+	UserID string `json:"user_id"`
+	//ChannelID string `json:"channel_id"` // REMOVE:  No longer needed.  The handler doesn't use this.
 }
 
 // DMErrorPayload is a common payload for DM-related errors.
 type DMErrorPayload struct {
-	events.CommonMetadata
 	UserID      string `json:"user_id"`
 	ErrorDetail string `json:"error_detail"`
 }
@@ -150,7 +151,6 @@ type SignupFailedPayload struct {
 
 // Interaction response tracking
 type InteractionRespondedPayload struct {
-	events.CommonMetadata
 	InteractionID string `json:"interaction_id"`
 	UserID        string `json:"user_id"`
 	Status        string `json:"status"`
@@ -158,7 +158,6 @@ type InteractionRespondedPayload struct {
 }
 
 type SignupFormSubmittedPayload struct {
-	events.CommonMetadata
 	UserID           string `json:"user_id"`
 	InteractionID    string `json:"interaction_id"`
 	InteractionToken string `json:"interaction_token"`

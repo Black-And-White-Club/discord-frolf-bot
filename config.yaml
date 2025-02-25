@@ -9,3 +9,12 @@ discord:
   registered_role_id: "YOUR_REGISTERED_ROLE_ID" # ID of the "Registered" role
   guild_id: "YOUR_GUILD_ID" # ID of your server
   app_id: "YOUR_APP_ID"
+
+Loki:
+  url: "http://localhost:3100"
+  enabled: true
+
+Tempo:
+  url: "http://localhost:3200"
+  username: "admin"
+  password: "admin"

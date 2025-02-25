@@ -1,8 +1,9 @@
 package discord
 
 import (
-	"log/slog"
+	"context"
 
+	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -10,18 +11,21 @@ import (
 type Session interface {
 	UserChannelCreate(recipientID string, options ...discordgo.RequestOption) (st *discordgo.Channel, err error)
 	ChannelMessageSend(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error)
+	GuildMember(guildID, userID string, options ...discordgo.RequestOption) (*discordgo.Member, error)
 	GuildMemberRoleAdd(guildID, userID, roleID string, options ...discordgo.RequestOption) error
+	GuildMemberRoleRemove(guildID, userID, roleID string, options ...discordgo.RequestOption) error
 	MessageReactionAdd(channelID, messageID, emojiID string) error
 	GetChannel(channelID string) (*discordgo.Channel, error)
-	ChannelMessages(channelID string, limit int, beforeID, afterID, aroundID string) ([]*discordgo.Message, error)
-	CreateThread(channelID, threadName string) (*discordgo.Channel, error)
-	AddUserToThread(threadID, userID string) error
+	ChannelMessages(channelID string, limit int, beforeID string, afterID string, aroundID string, options ...discordgo.RequestOption) (st []*discordgo.Message, err error)
+	MessageThreadStartComplex(channelID string, messageID string, data *discordgo.ThreadStart, options ...discordgo.RequestOption) (ch *discordgo.Channel, err error)
+	ThreadMemberAdd(threadID string, memberID string, options ...discordgo.RequestOption) error
 	GetBotUser() (*discordgo.User, error)
 	ChannelMessageSendComplex(channelID string, data *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error)
 	GuildScheduledEventCreate(guildID string, params *discordgo.GuildScheduledEventParams, options ...discordgo.RequestOption) (*discordgo.GuildScheduledEvent, error)
 	GuildScheduledEventEdit(guildID, eventID string, params *discordgo.GuildScheduledEventParams, options ...discordgo.RequestOption) (*discordgo.GuildScheduledEvent, error)
 	ThreadStartComplex(channelID string, data *discordgo.ThreadStart, options ...discordgo.RequestOption) (ch *discordgo.Channel, err error)
 	AddHandler(handler interface{}) func()
+	User(userID string, options ...discordgo.RequestOption) (st *discordgo.User, err error)
 	Open() error
 	Close() error
 	InteractionRespond(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error
@@ -42,7 +46,7 @@ type State interface {
 // DiscordSession is an implementation of the Session interface.
 type DiscordSession struct {
 	session *discordgo.Session
-	logger  *slog.Logger
+	logger  observability.Logger
 }
 
 // DiscordState is an implementation of the State interface.  Again, consider
@@ -52,7 +56,7 @@ type DiscordState struct {
 }
 
 // NewDiscordSession creates a new DiscordSession.
-func NewDiscordSession(session *discordgo.Session, logger *slog.Logger) *DiscordSession {
+func NewDiscordSession(session *discordgo.Session, logger observability.Logger) *DiscordSession {
 	return &DiscordSession{session: session, logger: logger}
 }
 
@@ -68,13 +72,13 @@ func (d *DiscordSession) AddHandler(handler interface{}) func() {
 
 // Open wraps the discordgo Open method.
 func (d *DiscordSession) Open() error {
-	d.logger.Info("Opening discord websocket connection")
+	d.logger.Info(context.Background(), "Opening discord websocket connection")
 	return d.session.Open()
 }
 
 // Close wraps the discordgo Close method.
 func (d *DiscordSession) Close() error {
-	d.logger.Info("Closing discord websocket connection")
+	d.logger.Info(context.Background(), "Closing discord websocket connection")
 	return d.session.Close()
 }
 
@@ -88,11 +92,6 @@ func (d *DiscordSession) ChannelMessageSend(channelID, content string, options .
 	return d.session.ChannelMessageSend(channelID, content, options...)
 }
 
-// GuildMemberRoleAdd adds a role to a guild member.
-func (d *DiscordSession) GuildMemberRoleAdd(guildID, userID, roleID string, options ...discordgo.RequestOption) error {
-	return d.session.GuildMemberRoleAdd(guildID, userID, roleID, options...)
-}
-
 // MessageReactionAdd handles adding a reaction to a message.
 func (d *DiscordSession) MessageReactionAdd(channelID, messageID, emojiID string) error {
 	return d.session.MessageReactionAdd(channelID, messageID, emojiID)
@@ -104,22 +103,18 @@ func (d *DiscordSession) GetChannel(channelID string) (*discordgo.Channel, error
 }
 
 // ChannelMessages fetches messages from a channel.
-func (d *DiscordSession) ChannelMessages(channelID string, limit int, beforeID, afterID, aroundID string) ([]*discordgo.Message, error) {
+func (d *DiscordSession) ChannelMessages(channelID string, limit int, beforeID string, afterID string, aroundID string, options ...discordgo.RequestOption) (st []*discordgo.Message, err error) {
 	return d.session.ChannelMessages(channelID, limit, beforeID, afterID, aroundID)
 }
 
 // CreateThread creates a new thread in a channel.
-func (d *DiscordSession) CreateThread(channelID, threadName string) (*discordgo.Channel, error) {
-	// Simplified, as your original version was incomplete.  Adjust as needed.
-	return d.session.ThreadStartComplex(channelID, &discordgo.ThreadStart{
-		Name: threadName,
-		Type: discordgo.ChannelTypeGuildPublicThread, // Or another appropriate type
-	})
+func (d *DiscordSession) MessageThreadStartComplex(channelID string, messageID string, data *discordgo.ThreadStart, options ...discordgo.RequestOption) (ch *discordgo.Channel, err error) {
+	return d.session.MessageThreadStartComplex(channelID, messageID, data)
 }
 
 // AddUserToThread adds a user to a thread.
-func (d *DiscordSession) AddUserToThread(threadID, userID string) error {
-	return d.session.ThreadMemberAdd(threadID, userID)
+func (d *DiscordSession) ThreadMemberAdd(threadID string, memberID string, options ...discordgo.RequestOption) error {
+	return d.session.ThreadMemberAdd(threadID, memberID)
 }
 
 // GetBotUser retrieves the bot user.
@@ -188,4 +183,21 @@ func (d *DiscordSession) ApplicationCommands(appID, guildID string, options ...d
 
 func (d *DiscordSession) ApplicationCommandDelete(appID, guildID, cmdID string, options ...discordgo.RequestOption) error {
 	return d.session.ApplicationCommandDelete(appID, guildID, cmdID, options...)
+}
+
+func (d *DiscordSession) User(userID string, options ...discordgo.RequestOption) (st *discordgo.User, err error) {
+	return d.session.User(userID, options...)
+}
+
+// GuildMemberRoleAdd adds a role to a guild member.
+func (d *DiscordSession) GuildMemberRoleAdd(guildID string, userID string, roleID string, options ...discordgo.RequestOption) (err error) {
+	return d.session.GuildMemberRoleAdd(guildID, userID, roleID, options...)
+}
+
+func (d *DiscordSession) GuildMember(guildID, userID string, options ...discordgo.RequestOption) (*discordgo.Member, error) {
+	return d.session.GuildMember(guildID, userID, options...)
+}
+
+func (d *DiscordSession) GuildMemberRoleRemove(guildID, userID, roleID string, options ...discordgo.RequestOption) error {
+	return d.session.GuildMemberRoleRemove(guildID, userID, roleID, options...)
 }

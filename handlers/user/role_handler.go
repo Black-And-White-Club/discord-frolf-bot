@@ -9,65 +9,30 @@ import (
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	usertypes "github.com/Black-And-White-Club/frolf-bot-shared/types/user"
 	"github.com/ThreeDotsLabs/watermill/message"
-	"github.com/bwmarrin/discordgo"
 )
 
-// allowedRoles defines the set of valid roles.  Consider moving this to a config file or constants.
-var allowedRoles = map[usertypes.UserRoleEnum]bool{
-	usertypes.UserRoleRattler: true,
-	usertypes.UserRoleEditor:  true,
-	usertypes.UserRoleAdmin:   true,
-}
-
-// HandleRoleUpdateCommand handles the /updaterole command.
+// HandleRoleUpdateCommand handles the /rolerequest command.
 func (h *UserHandlers) HandleRoleUpdateCommand(msg *message.Message) ([]*message.Message, error) {
 	ctx := msg.Context()
 	msg.Metadata.Set("handler_name", "HandleRoleUpdateCommand")
 
 	var payload discorduserevents.RoleUpdateCommandPayload
-	if err := h.unmarshalPayload(msg, &payload); err != nil {
+	if err := h.Helper.UnmarshalPayload(msg, &payload); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal payload: %w", err)
 	}
 
-	// Get interaction metadata from the *original* message (important for correlation).
 	interactionID := msg.Metadata.Get("interaction_id")
 	interactionToken := msg.Metadata.Get("interaction_token")
-	if interactionID == "" || interactionToken == "" {
+	guildID := msg.Metadata.Get("guild_id")
+	if interactionID == "" || interactionToken == "" || guildID == "" {
 		err := fmt.Errorf("interaction metadata missing")
 		h.Logger.Error(ctx, "Interaction metadata missing", attr.CorrelationIDFromMsg(msg))
 		return nil, err
 	}
 
-	// Create buttons for roles.
-	var buttons []discordgo.MessageComponent
-	for role := range allowedRoles {
-		buttons = append(buttons, discordgo.Button{
-			Label:    string(role),
-			Style:    discordgo.PrimaryButton,
-			CustomID: fmt.Sprintf("role_button_%s", role),
-		})
-	}
-	buttons = append(buttons, discordgo.Button{
-		Label:    "Cancel",
-		Style:    discordgo.DangerButton,
-		CustomID: "role_button_cancel",
-	})
-
-	h.Logger.Info(ctx, "Responding to interaction", attr.CorrelationIDFromMsg(msg))
-	// Respond to the interaction (show the buttons).
-	err := h.interactionRespond(&discordgo.Interaction{ID: interactionID, Token: interactionToken}, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{
-			Content: fmt.Sprintf("Please choose a role for <@%s>:", payload.TargetUserID),
-			Components: []discordgo.MessageComponent{
-				discordgo.ActionsRow{Components: buttons},
-			},
-			Flags: discordgo.MessageFlagsEphemeral,
-		},
-	})
-	if err != nil {
-		h.Logger.Error(ctx, "Failed to send interaction response", attr.Error(err), attr.CorrelationIDFromMsg(msg))
-		return nil, fmt.Errorf("failed to send interaction response: %w", err) // Return error, Watermill will Nack
+	if err := h.Discord.RespondToRoleRequest(ctx, interactionID, interactionToken, payload.TargetUserID); err != nil {
+		h.Logger.Error(ctx, "Failed to respond to role request", attr.Error(err), attr.CorrelationIDFromMsg(msg))
+		return nil, fmt.Errorf("failed to respond to role request: %w", err)
 	}
 
 	return nil, nil
@@ -79,46 +44,32 @@ func (h *UserHandlers) HandleRoleUpdateButtonPress(msg *message.Message) ([]*mes
 	msg.Metadata.Set("handler_name", "HandleRoleUpdateButtonPress")
 	var payload discorduserevents.RoleUpdateButtonPressPayload
 
-	// Unmarshal the payload *before* using its values.
-	if err := h.unmarshalPayload(msg, &payload); err != nil {
+	if err := h.Helper.UnmarshalPayload(msg, &payload); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal payload: %w", err)
 	}
 
-	// Parse custom ID (still needed, but simplified).
-	roleStr := strings.TrimPrefix(payload.InteractionID, "role_button_")
+	roleStr := strings.TrimPrefix(payload.InteractionCustomID, "role_button_")
 	selectedRole := usertypes.UserRoleEnum(roleStr)
 
-	// Acknowledge the interaction with a message update.
-	updateMsg := fmt.Sprintf("<@%s> has requested role '%s' for <@%s>. Request is being processed.",
-		payload.RequesterID, selectedRole, payload.TargetUserID)
-
-	//Use our interactionRespond helper
-	err := h.interactionRespond(&discordgo.Interaction{ID: payload.InteractionID, Token: payload.InteractionToken}, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseUpdateMessage,
-		Data: &discordgo.InteractionResponseData{
-			Content:    updateMsg,
-			Components: []discordgo.MessageComponent{},
-			Flags:      discordgo.MessageFlagsEphemeral,
-		},
-	})
+	err := h.Discord.RespondToRoleButtonPress(ctx, payload.InteractionID, payload.InteractionToken, payload.RequesterID, string(selectedRole), payload.TargetUserID)
 	if err != nil {
 		h.Logger.Error(ctx, "Failed to acknowledge interaction", attr.Error(err), attr.CorrelationIDFromMsg(msg))
 		return nil, fmt.Errorf("failed to acknowledge interaction: %w", err)
 	}
 
-	// Publish the event to the backend for processing.
 	backendPayload := userevents.UserRoleUpdateRequestPayload{
 		RequesterID: payload.RequesterID,
 		DiscordID:   usertypes.DiscordID(payload.TargetUserID),
 		Role:        selectedRole,
 	}
-	//Create event to publish and return
-	backendEvent, err := h.createResultMessage(msg, backendPayload)
+	backendEvent, err := h.Helper.CreateResultMessage(msg, backendPayload, userevents.UserRoleUpdateRequest)
 	if err != nil {
 		h.Logger.Error(ctx, "Failed to create result message", attr.Error(err), attr.CorrelationIDFromMsg(msg))
 		return nil, fmt.Errorf("failed to create result message: %w", err)
 	}
-	backendEvent.Metadata.Set("interaction_token", payload.InteractionToken) // Pass token for later update
+	backendEvent.Metadata.Set("interaction_token", payload.InteractionToken)
+	backendEvent.Metadata.Set("guild_id", payload.GuildID) // Pass GuildID
+
 	return []*message.Message{backendEvent}, nil
 }
 
@@ -130,30 +81,49 @@ func (h *UserHandlers) HandleRoleUpdateResult(msg *message.Message) ([]*message.
 	h.Logger.Info(ctx, "Received role update result", attr.Topic(topic), attr.CorrelationIDFromMsg(msg))
 
 	var payload userevents.UserRoleUpdateResultPayload
-	if err := h.unmarshalPayload(msg, &payload); err != nil {
+	if err := h.Helper.UnmarshalPayload(msg, &payload); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal payload: %w", err)
 	}
 
 	interactionToken := msg.Metadata.Get("interaction_token")
-	if interactionToken == "" {
-		err := fmt.Errorf("interaction_token missing from metadata")
-		h.Logger.Error(ctx, "interaction_token missing from metadata", attr.Error(err))
+	guildID := msg.Metadata.Get("guild_id") // Get Guild ID
+	if interactionToken == "" || guildID == "" {
+		err := fmt.Errorf("interaction_token or guild_id missing from metadata")
+		h.Logger.Error(ctx, "interaction_token or guild_id missing from metadata", attr.Error(err))
 		return nil, err
 	}
 
 	content := "Role update completed"
-	if topic == userevents.UserRoleUpdateFailed {
+	// Get Discord Role ID from config (or database)
+	discordRoleID, ok := h.Config.Discord.RoleMappings[string(payload.Role)]
+	if !ok {
+		err := fmt.Errorf("no Discord role mapping found for application role: %s", payload.Role)
+		h.Logger.Error(ctx, "Role mapping error", attr.Error(err))
+		content = fmt.Sprintf("Failed to update role: %s", err)
+		if err := h.Discord.EditRoleUpdateResponse(ctx, interactionToken, content); err != nil {
+			h.Logger.Error(ctx, "Failed to edit interaction response", attr.Error(err))
+			return nil, fmt.Errorf("failed to edit interaction response: %w", err)
+		}
+		return nil, err
+	}
+	if !payload.Success {
 		content = fmt.Sprintf("Failed to update role: %s", payload.Error)
+		if err := h.Discord.EditRoleUpdateResponse(ctx, interactionToken, content); err != nil {
+			h.Logger.Error(ctx, "Failed to edit interaction response", attr.Error(err))
+			return nil, fmt.Errorf("failed to edit interaction response: %w", err)
+		}
+		return nil, nil
 	}
 
-	// Edit the original interaction response - pass token directly
-	_, err := h.Session.InteractionResponseEdit(
-		&discordgo.Interaction{Token: interactionToken}, // Wrap token in Interaction struct
-		&discordgo.WebhookEdit{
-			Content: &content,
-		},
-	)
+	// Add the Discord role.
+	err := h.Discord.AddRoleToUser(ctx, guildID, string(payload.DiscordID), discordRoleID)
 	if err != nil {
+		h.Logger.Error(ctx, "Failed to add Discord role", attr.Error(err))
+		// Send a follow-up message indicating the Discord role sync failed.
+		content = fmt.Sprintf("Role updated in application, but failed to sync with Discord: %s", err)
+	}
+
+	if err := h.Discord.EditRoleUpdateResponse(ctx, interactionToken, content); err != nil {
 		h.Logger.Error(ctx, "Failed to edit interaction response", attr.Error(err))
 		return nil, fmt.Errorf("failed to edit interaction response: %w", err)
 	}

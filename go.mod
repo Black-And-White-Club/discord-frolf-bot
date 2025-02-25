@@ -3,11 +3,11 @@ module github.com/Black-And-White-Club/discord-frolf-bot
 go 1.23.5
 
 require (
+	github.com/Black-And-White-Club/frolf-bot v0.0.0-20250211235259-ba380fe320b5
 	github.com/Black-And-White-Club/frolf-bot-shared v0.0.39
 	github.com/ThreeDotsLabs/watermill v1.4.4
 	github.com/allegro/bigcache/v3 v3.1.0
 	github.com/bwmarrin/discordgo v0.28.1
-	github.com/olebedev/when v1.1.0
 	go.uber.org/mock v0.5.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -15,7 +15,6 @@ require (
 replace github.com/Black-And-White-Club/frolf-bot-shared => ../frolf-bot-shared
 
 require (
-	github.com/AlekSi/pointer v1.0.0 // indirect
 	github.com/ThreeDotsLabs/watermill-nats/v2 v2.1.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v3 v3.2.2 // indirect

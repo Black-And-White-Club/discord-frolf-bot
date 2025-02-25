@@ -1,4 +1,4 @@
-package roundrouter
+package scorerouter
 
 import (
 	"context"
@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/discord"
-	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/events/round"
-	roundhandlers "github.com/Black-And-White-Club/discord-frolf-bot/handlers/round"
+	discorduserevents "github.com/Black-And-White-Club/discord-frolf-bot/events/score"
+	scorehandlers "github.com/Black-And-White-Club/discord-frolf-bot/handlers/score"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
 	tempo "github.com/Black-And-White-Club/frolf-bot-shared/observability"
@@ -16,8 +16,8 @@ import (
 	"github.com/ThreeDotsLabs/watermill/message/router/middleware"
 )
 
-// RoundRouter handles routing for round module events.
-type RoundRouter struct {
+// ScoreRouter handles routing for score module events.
+type ScoreRouter struct {
 	logger     observability.Logger
 	Router     *message.Router
 	subscriber eventbus.EventBus
@@ -26,9 +26,9 @@ type RoundRouter struct {
 	tracer     tempo.Tracer
 }
 
-// NewRoundRouter creates a new RoundRouter.
-func NewRoundRouter(logger observability.Logger, router *message.Router, subscriber eventbus.EventBus, publisher eventbus.EventBus, session discord.Session, tracer tempo.Tracer) *RoundRouter {
-	return &RoundRouter{
+// NewScoreRouter creates a new ScoreRouter.
+func NewScoreRouter(logger observability.Logger, router *message.Router, subscriber eventbus.EventBus, publisher eventbus.EventBus, session discord.Session, tracer tempo.Tracer) *ScoreRouter {
+	return &ScoreRouter{
 		logger:     logger,
 		Router:     router,
 		subscriber: subscriber,
@@ -39,7 +39,7 @@ func NewRoundRouter(logger observability.Logger, router *message.Router, subscri
 }
 
 // Configure sets up the router.
-func (r *RoundRouter) Configure(handlers roundhandlers.Handlers, eventbus eventbus.EventBus) error {
+func (r *ScoreRouter) Configure(handlers scorehandlers.Handlers, eventbus eventbus.EventBus) error {
 	r.Router.AddMiddleware(
 		middleware.CorrelationID,
 		middleware.Recoverer,
@@ -58,7 +58,7 @@ func (r *RoundRouter) Configure(handlers roundhandlers.Handlers, eventbus eventb
 }
 
 // LokiLoggingMiddleware is the custom Watermill middleware.
-func (r *RoundRouter) LokiLoggingMiddleware(next message.HandlerFunc) message.HandlerFunc {
+func (r *ScoreRouter) LokiLoggingMiddleware(next message.HandlerFunc) message.HandlerFunc {
 	return func(msg *message.Message) ([]*message.Message, error) {
 		startTime := time.Now()
 		ctx := msg.Context()
@@ -109,25 +109,14 @@ func (r *RoundRouter) LokiLoggingMiddleware(next message.HandlerFunc) message.Ha
 }
 
 // RegisterHandlers registers event handlers.
-func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandlers.Handlers) error {
+func (r *ScoreRouter) RegisterHandlers(ctx context.Context, handlers scorehandlers.Handlers) error {
 	eventsToHandlers := map[string]message.HandlerFunc{
-		discordroundevents.CreateRoundRequestedTopic:         handlers.HandleRoundCreateRequested,
-		discordroundevents.RoundCreatedTopic:                 handlers.HandleRoundCreated,
-		discordroundevents.RoundStartedTopic:                 handlers.HandleRoundStarted,
-		discordroundevents.RoundParticipantJoinReqTopic:      handlers.HandleRoundParticipantJoinRequest,
-		discordroundevents.RoundParticipantJoinedTopic:       handlers.HandleRoundParticipantJoined,
-		discordroundevents.RoundUpdateRequestTopic:           handlers.HandleRoundUpdateRequest,
-		discordroundevents.RoundUpdatedTopic:                 handlers.HandleRoundUpdated,
-		discordroundevents.RoundDeleteRequestTopic:           handlers.HandleRoundDeleteRequest,
-		discordroundevents.RoundDeletedTopic:                 handlers.HandleRoundDeleted,
-		discordroundevents.RoundScoreUpdateRequestTopic:      handlers.HandleRoundScoreUpdateRequest,
-		discordroundevents.RoundParticipantScoreUpdatedTopic: handlers.HandleRoundParticipantScoreUpdated,
-		discordroundevents.RoundFinalizedTopic:               handlers.HandleRoundFinalized,
-		discordroundevents.RoundReminderTopic:                handlers.HandleRoundReminder,
+		discorduserevents.ScoreUpdateRequestTopic:  handlers.HandleScoreUpdateRequest,
+		discorduserevents.ScoreUpdateResponseTopic: handlers.HandleScoreUpdateResponse,
 	}
 
 	for topic, handlerFunc := range eventsToHandlers {
-		handlerName := fmt.Sprintf("discord.round.%s", topic)
+		handlerName := fmt.Sprintf("discord.score.%s", topic)
 		r.Router.AddHandler(
 			handlerName,
 			topic,
@@ -141,6 +130,6 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 }
 
 // Close stops the router.
-func (r *RoundRouter) Close() error {
+func (r *ScoreRouter) Close() error {
 	return r.Router.Close()
 }

@@ -1,79 +1,160 @@
 package roundevents
 
-import "time"
+import (
+	"time"
 
-const (
-	RoundStartCreation        = "round.start.creation"
-	RoundCreateRequest        = "round.create.request"
-	RoundTitleCollected       = "round.title.collected"
-	RoundStartTimeCollected   = "round.starttime.collected"
-	RoundLocationCollected    = "round.location.collected"
-	RoundConfirmationRequest  = "round.confirmation.request"
-	RoundConfirmed            = "round.confirmed"
-	RoundEditTitle            = "round.edit.title"
-	RoundEditStartTime        = "round.edit.starttime"
-	RoundEditLocation         = "round.edit.location"
-	RoundCreated              = "round.created"
-	RoundCreationCanceled     = "round.creation.canceled"
-	RoundTrace                = "round.trace"
-	RoundTitleResponse        = "round.title.response"
-	RoundStartTimeResponse    = "round.starttime.response"
-	RoundLocationResponse     = "round.location.response"
-	RoundDescriptionCollected = "round.description.collected"
-	RoundDescriptionResponse  = "round.description.response"
-	RoundEndTimeCollected     = "round.endtime.collected"
-	RoundEndTimeResponse      = "round.endtime.response"
+	"github.com/Black-And-White-Club/frolf-bot-shared/events"
 )
 
-// CancelRoundCreationPayload defines the payload for canceling round creation.
-type CancelRoundCreationPayload struct {
-	UserID string `json:"user_id"`
-}
+// --- Topics (for Watermill) ---
 
-// TracePayload defines the payload for trace events.
-type TracePayload struct {
-	Message string `json:"message"`
-}
-
-// RoundEventPayload is a structure to standardize the data sent in events.
-type RoundEventPayload struct {
-	UserID      string `json:"user_id"`
-	Response    string `json:"response,omitempty"`
-	Title       string `json:"title,omitempty"`
-	StartTime   string `json:"start_time,omitempty"`
-	Location    string `json:"location,omitempty"`
-	Description string `json:"description,omitempty"`
-	EndTime     string `json:"end_time,omitempty"`
-}
-
-// Constants for state names
 const (
-	StateCollectingTitle       = "CollectingTitle"
-	StateCollectingStartTime   = "CollectingStartTime"
-	StateCollectingLocation    = "CollectingLocation"
-	StateConfirmation          = "Confirmation"
-	StateCollectingDescription = "CollectingDescription"
-	StateCollectingEndTime     = "CollectingEndTime"
+	// Internal Topics (Discord bot only)
+	CreateRoundRequestedTopic         = "round.create_requested"        // From discord handler to round handler
+	RoundCreatedTopic                 = "discord.round.created"         // From round handler to discord handler
+	RoundCreationFailedTopic          = "discord.round.creation_failed" // From round handler to discord handler
+	RoundReminderTopic                = "discord.round.reminder"        // From round handler to discord handler
+	RoundStartedTopic                 = "discord.round.started"
+	RoundParticipantJoinReqTopic      = "discord.round.participant.join.request" // From discord handler to round handler
+	RoundParticipantJoinedTopic       = "discord.round.participant.joined"       // From round handler to discord
+	RoundUpdateRequestTopic           = "discord.round.update.request"           // From discord handler to round handler
+	RoundUpdatedTopic                 = "discord.round.updated"                  //From round handler to discord handler
+	RoundDeleteRequestTopic           = "discord.round.delete.request"           // From discord handler to round handler
+	RoundDeletedTopic                 = "discord.round.deleted"
+	RoundScoreUpdateRequestTopic      = "discord.round.score.update.request"      //From discord handler to round handler
+	RoundParticipantScoreUpdatedTopic = "discord.round.participant.score.updated" //From round handler to discord
+	RoundFinalizedTopic               = "discord.round.finalized"
 )
 
-// RoundCreationContext defines the context for creating a round.
-type RoundCreationContext struct {
-	UserID        string    `json:"user_id"`
-	Title         string    `json:"title"`
-	StartTime     time.Time `json:"start_time"`
-	EndTime       time.Time `json:"end_time"`
-	Description   string    `json:"description"`
-	Location      string    `json:"location"`
-	State         string    `json:"state"`
-	CorrelationID string    `json:"correlation_id"`
+// --- Internal Payloads (Discord bot only) ---
+
+// CreateRoundRequestedPayload: From discord handler (modal submit) to round handler.
+type CreateRoundRequestedPayload struct {
+	events.CommonMetadata `json:",inline"`
+	Title                 string    `json:"title"`
+	Description           string    `json:"description"`
+	StartTime             time.Time `json:"start_time"`
+	EndTime               time.Time `json:"end_time"`
+	Location              string    `json:"location"`
+	UserID                string    `json:"user_id"`
+	ChannelID             string    `json:"channel_id"`
 }
 
-// GuildScheduledEventCreatedPayload - Payload for the new event.
-type GuildScheduledEventCreatedPayload struct {
-	GuildEventID string  `json:"guild_event_id"`
-	ChannelID    string  `json:"channel_id"`
-	Title        string  `json:"title"`
-	StartTime    string  `json:"start_time"`
-	EndTime      string  `json:"end_time,omitempty"`
-	Location     *string `json:"location,omitempty"`
+// RoundCreatedPayload: From round handler to discord handler (success).
+type RoundCreatedPayload struct {
+	events.CommonMetadata `json:",inline"` // Embed the common metadata
+	RoundID               string           `json:"round_id"`
+	Title                 string           `json:"title"`
+	StartTime             time.Time        `json:"start_time"`
+	EndTime               time.Time        `json:"end_time"`
+	Location              string           `json:"location"`
+	RequesterID           string           `json:"requester_id"`
+	ChannelID             string           `json:"channel_id"`
+}
+
+// RoundCreationFailedPayload: From round handler to discord handler (failure).
+type RoundCreationFailedPayload struct {
+	events.CommonMetadata `json:",inline"`
+	UserID                string `json:"user_id"`
+	Reason                string `json:"reason"`
+}
+
+// DiscordRoundReminderPayload: From round handler to discord handler (for sending reminders).
+type DiscordRoundReminderPayload struct {
+	events.CommonMetadata `json:",inline"`
+	RoundID               string   `json:"round_id"`
+	RoundTitle            string   `json:"round_title"`
+	UserIDs               []string `json:"user_ids"`
+	ReminderType          string   `json:"reminder_type"`
+	ChannelID             string   `json:"channel_id"`
+}
+
+type DiscordRoundStartPayload struct {
+	events.CommonMetadata `json:",inline"`
+	RoundID               string     `json:"round_id"`
+	Title                 string     `json:"title"`
+	Location              *string    `json:"location"`
+	StartTime             *time.Time `json:"start_time"`
+	ChannelID             string     `json:"channel_id"`
+}
+
+type DiscordRoundParticipantJoinRequestPayload struct {
+	events.CommonMetadata `json:",inline"`
+	RoundID               string `json:"round_id"`
+	UserID                string `json:"user_id"`
+	ChannelID             string `json:"channel_id"`
+}
+
+type DiscordRoundParticipantJoinedPayload struct {
+	events.CommonMetadata `json:",inline"`
+	RoundID               string `json:"round_id"`
+	UserID                string `json:"user_id"`
+	TagNumber             int    `json:"tag_number"`
+	ChannelID             string `json:"channel_id"`
+}
+
+// --- Update Round ---
+type DiscordRoundUpdateRequestPayload struct {
+	events.CommonMetadata `json:",inline"`
+	RoundID               string     `json:"round_id"`
+	UserID                string     `json:"user_id"`
+	MessageID             string     `json:"message_id"`
+	Title                 *string    `json:"title,omitempty"`
+	Description           *string    `json:"description,omitempty"`
+	StartTime             *time.Time `json:"start_time,omitempty"`
+	EndTime               *time.Time `json:"end_time,omitempty"`
+	Location              *string    `json:"location,omitempty"`
+	ChannelID             string     `json:"channel_id"`
+}
+
+type DiscordRoundUpdatedPayload struct {
+	events.CommonMetadata `json:",inline"`
+	RoundID               string     `json:"round_id"`
+	MessageID             string     `json:"message_id"`
+	ChannelID             string     `json:"channel_id"`
+	Title                 *string    `json:"title,omitempty"`
+	Description           *string    `json:"description,omitempty"`
+	StartTime             *time.Time `json:"start_time,omitempty"`
+	EndTime               *time.Time `json:"end_time,omitempty"`
+	Location              *string    `json:"location,omitempty"`
+}
+
+type DiscordRoundDeleteRequestPayload struct {
+	events.CommonMetadata `json:",inline"`
+	RoundID               string `json:"round_id"`
+	UserID                string `json:"user_id"`
+	ChannelID             string `json:"channel_id"`
+	MessageID             string `json:"message_id"`
+}
+
+type DiscordRoundDeletedPayload struct {
+	events.CommonMetadata `json:",inline"`
+	RoundID               string `json:"round_id"`
+	ChannelID             string `json:"channel_id"`
+	MessageID             string `json:"message_id"`
+}
+
+type DiscordRoundParticipantScoreUpdatedPayload struct {
+	events.CommonMetadata `json:",inline"`
+	RoundID               string `json:"round_id"`
+	UserID                string `json:"user_id"`
+	Score                 int    `json:"score"`
+	ChannelID             string `json:"channel_id"`
+	MessageID             string `json:"message_id"`
+}
+
+type DiscordRoundScoreUpdateRequestPayload struct {
+	events.CommonMetadata `json:",inline"`
+	RoundID               string `json:"round_id"`
+	UserID                string `json:"user_id"` // The user submitting the score
+	Score                 int    `json:"score"`
+	ChannelID             string `json:"channel_id"`
+	MessageID             string `json:"message_id"`
+}
+
+type DiscordRoundFinalizedPayload struct {
+	events.CommonMetadata `json:",inline"`
+	RoundID               string `json:"round_id"`
+	ChannelID             string `json:"channel_id"`
+	MessageID             string `json:"message_id"`
 }
