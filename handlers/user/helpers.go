@@ -5,11 +5,6 @@ import (
 	"github.com/ThreeDotsLabs/watermill/message"
 )
 
-const (
-	userDomain                = "discord_user"
-	interactionRespondedTopic = "discord.interaction.responded"
-)
-
 // interactionResponded creates a payload for Discord interaction responses.
 func (h *UserHandlers) interactionResponded(msg *message.Message, userID, status string) discorduserevents.InteractionRespondedPayload {
 	interactionPayload := discorduserevents.InteractionRespondedPayload{
