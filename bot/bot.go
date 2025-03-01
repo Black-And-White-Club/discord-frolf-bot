@@ -3,108 +3,121 @@ package bot
 import (
 	"context"
 	"fmt"
-	"time"
+	"log/slog"
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/discord-frolf-bot/discord"
-	userhandlers "github.com/Black-And-White-Club/discord-frolf-bot/handlers/user"
-	userrouter "github.com/Black-And-White-Club/discord-frolf-bot/router/user"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
-	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
-	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/bwmarrin/discordgo"
 )
 
 type DiscordBot struct {
-	Session         discord.Session // Use the interface
+	Session         discord.Session
 	Logger          observability.Logger
 	Config          *config.Config
-	GatewayHandler  discord.GatewayEventHandler // Use the GatewayEventHandler
-	watermillRouter *message.Router             // Add the main Watermill router
-	eventbus        eventbus.EventBus           // Add the event bus
-
+	GatewayHandler  discord.GatewayEventHandler
+	WatermillRouter *message.Router
+	EventBus        eventbus.EventBus
 }
 
-func NewDiscordBot(session discord.Session, cfg *config.Config, gatewayHandler discord.GatewayEventHandler, logger observability.Logger, eventBus eventbus.EventBus, router *message.Router, discord discord.Operations, tracer observability.TempoTracer) (*DiscordBot, error) {
-	// Create the Watermill router *here*.
-	watermillRouter, err := message.NewRouter(message.RouterConfig{}, watermill.NopLogger{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Watermill router: %w", err)
-	}
+func NewDiscordBot(
+	session discord.Session,
+	cfg *config.Config,
+	gatewayHandler discord.GatewayEventHandler,
+	logger observability.Logger,
+	eventBus eventbus.EventBus,
+	router *message.Router,
+) (*DiscordBot, error) {
+	logger.Info(context.Background(), "Creating DiscordBot", attr.Any("GatewayHandler", gatewayHandler))
 
-	// Create domain routers, passing in the main router.
-	userRouter := userrouter.NewUserRouter(logger, watermillRouter, eventBus, eventBus, discord, cfg, utils.NewHelper(logger), &tracer)
-
-	// Call Configure AFTER initialization
-	if err := userRouter.Configure(userhandlers.NewUserHandlers(logger, cfg, utils.NewEventUtil(), utils.NewHelper(logger), discord), eventBus); err != nil {
-		return nil, fmt.Errorf("failed to configure user router: %w", err)
-	}
-	// ... add other domain routers ...
 	bot := &DiscordBot{
 		Session:         session,
 		Logger:          logger,
 		Config:          cfg,
 		GatewayHandler:  gatewayHandler,
-		watermillRouter: watermillRouter, // Store the router
-		eventbus:        eventBus,
+		WatermillRouter: router,
+		EventBus:        eventBus,
 	}
 
 	return bot, nil
 }
 
 func (bot *DiscordBot) Run(ctx context.Context) error {
-	// Register the gateway event handlers.
-	bot.GatewayHandler.RegisterHandlers()
-	bot.Session.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
+	slog.Info("Entering bot.Run()...")
+	bot.Logger.Info(ctx, "Entering bot.Run()...")
+
+	discordgoSession := bot.Session.(*discord.DiscordSession).GetUnderlyingSession()
+	fmt.Printf("bot.go discordgoSession address: %p\n", discordgoSession)
+
+	// Register slash commands BEFORE opening the session
+	err := discord.RegisterCommands(bot.Session, bot.Logger, bot.Config.Discord.GuildID)
+	if err != nil {
+		bot.Logger.Error(ctx, "Failed to register slash commands", attr.Error(err))
+		return err
+	}
+	bot.Logger.Info(ctx, "Slash commands registered successfully.")
+
+	// Debug: Check if handlers are being registered
+	fmt.Printf("Registering MessageReactionAdd: %p\n", bot.GatewayHandler.MessageReactionAdd)
+	fmt.Printf("Registering InteractionCreate: %p\n", bot.GatewayHandler.InteractionCreate)
+
+	// Register handlers
+	discordgoSession.AddHandler(func(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
+		fmt.Println("MessageReactionAdd handler triggered!") // Debug
+		bot.GatewayHandler.MessageReactionAdd(s, r)
+	})
+
+	discordgoSession.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		fmt.Println("InteractionCreate handler triggered!") // Debug
+		bot.GatewayHandler.InteractionCreate(s, i)
+	})
+
+	// Bot Ready Handler
+	discordgoSession.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
+		fmt.Println("Bot is ready!") // Debug
 		bot.Logger.Info(ctx, "Discord bot is connected and ready.")
 	})
-	// Open a websocket connection to Discord.
-	err := bot.Session.Open()
+
+	// Open Discord session
+	err = bot.Session.Open()
 	if err != nil {
-		return fmt.Errorf("error opening discord connection: %w", err)
+		bot.Logger.Error(ctx, "Error opening discord connection", attr.Error(err))
+		return err
 	}
 
+	slog.Info("Discord bot is now running.")
 	bot.Logger.Info(ctx, "Discord bot is now running.")
 
-	// Run the Watermill router (in a goroutine).
+	// Graceful shutdown
 	go func() {
-		if err := bot.watermillRouter.Run(ctx); err != nil && err != context.Canceled {
-			bot.Logger.Error(ctx, "Watermill router error", attr.Error(err))
-			// Consider how to handle router errors.  You might want to panic,
-			// or send a signal to shut down the entire application.
-		}
+		<-ctx.Done()
+		bot.Logger.Info(ctx, "Shutting down Discord bot...")
+		bot.Close()
 	}()
-	// Wait for the main router to start running
-	bot.Logger.Info(ctx, "Waiting for main router to start running")
-	select {
-	case <-bot.watermillRouter.Running():
-		bot.Logger.Info(ctx, "Main router started and running")
-	case <-time.After(time.Second * 5): // Increased timeout
-		bot.Logger.Error(ctx, "Timeout waiting for main router to start")
-		return fmt.Errorf("timeout waiting for main router to start")
-	}
-	// Block until the context is cancelled (e.g., by a signal).
-	<-ctx.Done()
-	bot.Logger.Info(ctx, "Shutting down Discord bot...")
-
-	// Cleanly close the Discord session.
-	if err := bot.Session.Close(); err != nil {
-		bot.Logger.Error(ctx, "Failed to close discord session", attr.Error(err))
-	}
 
 	return nil
 }
 
-// Close closes the bot's resources
 func (b *DiscordBot) Close() {
 	b.Logger.Info(context.Background(), "Closing bot")
+
 	// Close the Watermill router.
-	if b.watermillRouter != nil {
-		if err := b.watermillRouter.Close(); err != nil {
+	if b.WatermillRouter != nil {
+		if err := b.WatermillRouter.Close(); err != nil {
 			b.Logger.Error(context.Background(), "Failed to close Watermill router", attr.Error(err))
 		}
+	}
+
+	// Close the Discord session.
+	if err := b.Session.Close(); err != nil {
+		b.Logger.Error(context.Background(), "Failed to close Discord session", attr.Error(err))
+	}
+
+	// Close the EventBus.
+	if err := b.EventBus.Close(); err != nil {
+		b.Logger.Error(context.Background(), "Failed to close EventBus", attr.Error(err))
 	}
 }

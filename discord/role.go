@@ -3,8 +3,9 @@ package discord
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
-	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr" // Correct path
+	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -98,39 +99,34 @@ func (d *discordOperations) RespondToRoleButtonPress(ctx context.Context, intera
 
 // EditRoleUpdateResponse edits the original interaction response with the result of the role update.
 func (d *discordOperations) EditRoleUpdateResponse(ctx context.Context, interactionToken, content string) error {
-	d.logger.Info(ctx, "Editing role update response",
+	slog.Info("📢 Attempting to update follow-up message",
 		attr.String("interaction_token", interactionToken),
 	)
 
-	_, err := d.session.InteractionResponseEdit(
-		&discordgo.Interaction{Token: interactionToken}, // Wrap token
-		&discordgo.WebhookEdit{
-			Content: &content,
-		},
-	)
+	// ✅ Use FollowupMessageEdit instead of InteractionResponseEdit
+	_, err := d.session.FollowupMessageEdit(&discordgo.Interaction{Token: interactionToken}, "@original", &discordgo.WebhookEdit{
+		Content: &content,
+	})
+
 	if err != nil {
-		d.logger.Error(ctx, "Failed to edit role update response",
-			attr.String("interaction_token", interactionToken),
-			attr.Error(err),
-		)
-		return fmt.Errorf("failed to edit role update response: %w", err)
+		slog.Error("❌ Failed to edit follow-up message", attr.Error(err))
+		return fmt.Errorf("failed to edit follow-up message: %w", err)
 	}
 
-	d.logger.Debug(ctx, "Successfully edited role update response",
-		attr.String("interaction_token", interactionToken),
-	)
+	slog.Info("✅ Successfully updated follow-up message")
 	return nil
 }
 
 func (d *discordOperations) AddRoleToUser(ctx context.Context, guildID, userID, roleID string) error {
-	d.logger.Info(ctx, "Adding role to user",
+	slog.Info("Adding role to user",
 		attr.String("guild_id", guildID),
 		attr.String("user_id", userID),
 		attr.String("role_id", roleID),
 	)
+
 	err := d.session.GuildMemberRoleAdd(guildID, userID, roleID)
 	if err != nil {
-		d.logger.Error(ctx, "Failed to add role to user",
+		slog.Error("Failed to add role to user",
 			attr.String("guild_id", guildID),
 			attr.String("user_id", userID),
 			attr.String("role_id", roleID),
@@ -138,10 +134,39 @@ func (d *discordOperations) AddRoleToUser(ctx context.Context, guildID, userID, 
 		)
 		return fmt.Errorf("failed to add role %s to user %s in guild %s: %w", roleID, userID, guildID, err)
 	}
-	d.logger.Debug(ctx, "Successfully added role to user",
+
+	member, err := d.session.GuildMember(guildID, userID)
+	if err != nil {
+		slog.Error("Failed to fetch user after adding role",
+			attr.String("guild_id", guildID),
+			attr.String("user_id", userID),
+			attr.Error(err),
+		)
+		return fmt.Errorf("failed to fetch user %s after adding role: %w", userID, err)
+	}
+
+	roleAdded := false
+	for _, r := range member.Roles {
+		if r == roleID {
+			roleAdded = true
+			break
+		}
+	}
+
+	if !roleAdded {
+		slog.Error("Role was not successfully added to user",
+			attr.String("guild_id", guildID),
+			attr.String("user_id", userID),
+			attr.String("role_id", roleID),
+		)
+		return fmt.Errorf("role %s was not added to user %s", roleID, userID)
+	}
+
+	slog.Info("Successfully added role to user",
 		attr.String("guild_id", guildID),
 		attr.String("user_id", userID),
 		attr.String("role_id", roleID),
 	)
+
 	return nil
 }

@@ -15,12 +15,13 @@ func (h *RoundHandlers) HandleRoundFinalized(msg *message.Message) ([]*message.M
 	if err := h.unmarshalPayload(msg, &payload); err != nil {
 		return nil, err // unmarshalPayload already logs
 	}
-
+	channelID := msg.Metadata.Get("channel_id")
+	messageID := msg.Metadata.Get("message_id")
 	// Construct the *internal* Discord payload
 	discordPayload := discordroundevents.DiscordRoundFinalizedPayload{
 		RoundID:   payload.RoundID,
-		ChannelID: payload.ChannelID,
-		MessageID: payload.MessageID,
+		ChannelID: channelID,
+		MessageID: messageID,
 	}
 
 	discordMsg, err := h.createResultMessage(msg, discordPayload, discordroundevents.RoundFinalizedTopic) // Define this constant

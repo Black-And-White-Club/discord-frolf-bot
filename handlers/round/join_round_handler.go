@@ -40,13 +40,13 @@ func (h *RoundHandlers) HandleRoundParticipantJoined(msg *message.Message) ([]*m
 	if err := h.unmarshalPayload(msg, &payload); err != nil {
 		return nil, err
 	}
-
+	channelID := msg.Metadata.Get("channel_id")
 	// Construct the *internal* Discord payload for successful join
 	discordPayload := discordroundevents.DiscordRoundParticipantJoinedPayload{
 		RoundID:   payload.RoundID,
 		UserID:    payload.Participant,
 		TagNumber: payload.TagNumber,
-		ChannelID: payload.ChannelID,
+		ChannelID: channelID,
 	}
 
 	discordMsg, err := h.createResultMessage(msg, discordPayload, discordroundevents.RoundParticipantJoinedTopic)

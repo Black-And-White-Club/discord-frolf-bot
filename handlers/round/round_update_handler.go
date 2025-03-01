@@ -30,9 +30,7 @@ func (h *RoundHandlers) HandleRoundUpdateRequest(msg *message.Message) ([]*messa
 	if payload.StartTime != nil {
 		backendPayload.StartTime = payload.StartTime
 	}
-	if payload.EndTime != nil {
-		backendPayload.EndTime = payload.EndTime
-	}
+
 	if payload.Location != nil {
 		backendPayload.Location = payload.Location
 	}
@@ -63,7 +61,6 @@ func (h *RoundHandlers) HandleRoundUpdated(msg *message.Message) ([]*message.Mes
 		Title:       payload.Title,
 		Description: payload.Description,
 		StartTime:   payload.StartTime,
-		EndTime:     payload.EndTime,
 		Location:    payload.Location,
 	}
 

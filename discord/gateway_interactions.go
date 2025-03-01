@@ -4,6 +4,7 @@ package discord
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 
@@ -15,41 +16,68 @@ import (
 )
 
 // interactionCreate handles the InteractionCreate event.
-func (h *gatewayEventHandler) interactionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
+// Update the interactionCreate function
+func (h *gatewayEventHandler) InteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	ctx := context.Background()
 
-	switch i.Type {
-	case discordgo.InteractionApplicationCommand:
-		if i.ApplicationCommandData().Name == "rolerequest" {
-			h.handleRoleRequestCommand(ctx, i)
-		}
-	// ... other command handlers ...
+	// Log the interaction type for debugging
+	slog.Info("InteractionCreate handler triggered!", attr.Int("interaction_type", int(i.Type)))
 
-	case discordgo.InteractionMessageComponent:
-		if strings.HasPrefix(i.MessageComponentData().CustomID, "role_button_") {
-			if i.MessageComponentData().CustomID == "role_button_cancel" {
-				h.handleRoleCancelButton(ctx, i)
-			} else {
-				h.handleRoleButtonPress(ctx, i)
-			}
-		} else if i.MessageComponentData().CustomID == "signup_button" {
-			h.handleSignupButtonPress(ctx, i)
+	switch i.Type {
+
+	// Slash Command Handling
+	case discordgo.InteractionApplicationCommand:
+		commandName := i.ApplicationCommandData().Name
+		slog.Info("Handling ApplicationCommand", attr.String("command_name", commandName))
+
+		switch commandName {
+		case "updaterole":
+			h.HandleRoleRequestCommand(ctx, i)
+		case "createround":
+			h.HandleCreateRoundCommand(ctx, i)
 		}
-		// ... other component handlers ...
+
+	// Button / Component Handling
+	case discordgo.InteractionMessageComponent:
+		customID := i.MessageComponentData().CustomID
+		slog.Info("Handling MessageComponent interaction", attr.String("custom_id", customID))
+
+		switch {
+		case strings.HasPrefix(customID, "role_button_"):
+			if customID == "role_button_cancel" {
+				h.HandleRoleCancelButton(ctx, i)
+			} else {
+				h.HandleRoleButtonPress(ctx, i)
+			}
+		case strings.HasPrefix(customID, "signup_button|"):
+			slog.Info("✅ Calling HandleSignupButtonPress...")
+			h.HandleSignupButtonPress(ctx, i)
+		case strings.HasPrefix(customID, "retry_create_round"):
+			slog.Info("🔄 Retrying Create Round...")
+			h.HandleRetryCreateRound(ctx, i)
+		}
+
+	// Modal Submission Handling
 	case discordgo.InteractionModalSubmit:
-		if i.ModalSubmitData().CustomID == "signup_modal" {
-			h.handleSignupModalSubmit(ctx, i)
+		customID := i.ModalSubmitData().CustomID
+		slog.Info("Handling ModalSubmit", attr.String("custom_id", customID))
+
+		switch customID {
+		case "signup_modal":
+			h.HandleSignupModalSubmit(ctx, i)
+		case "create_round_modal":
+			h.HandleCreateRoundModalSubmit(ctx, i)
 		}
 	}
 }
 
 // handleRoleRequestCommand handles the /rolerequest command.
-func (h *gatewayEventHandler) handleRoleRequestCommand(ctx context.Context, i *discordgo.InteractionCreate) {
-	h.logger.Info(ctx, "Handling /rolerequest command", attr.String("interaction_id", i.ID))
+func (h *gatewayEventHandler) HandleRoleRequestCommand(ctx context.Context, i *discordgo.InteractionCreate) {
+	slog.Info("Handling /updaterole command", attr.String("interaction_id", i.ID))
 
 	user, err := h.session.User(i.ApplicationCommandData().Options[0].UserValue(nil).ID)
 	if err != nil {
-		h.logger.Error(ctx, "Failed to get user", attr.Error(err))
+		slog.Error("Failed to get user", attr.Error(err))
 		return
 	}
 
@@ -57,9 +85,9 @@ func (h *gatewayEventHandler) handleRoleRequestCommand(ctx context.Context, i *d
 		TargetUserID: user.ID,
 		GuildID:      i.GuildID,
 	}
-	msg, err := h.createEvent(ctx, discorduserevents.RoleUpdateCommand, payload)
+	msg, err := h.createEvent(ctx, discorduserevents.RoleUpdateCommand, payload, i)
 	if err != nil {
-		h.logger.Error(ctx, "Failed to create event", attr.Error(err))
+		slog.Error("Failed to create event", attr.Error(err))
 		return
 	}
 
@@ -68,14 +96,14 @@ func (h *gatewayEventHandler) handleRoleRequestCommand(ctx context.Context, i *d
 	msg.Metadata.Set("guild_id", i.GuildID)
 
 	if err := h.publisher.Publish(discorduserevents.RoleUpdateCommand, msg); err != nil {
-		h.logger.Error(ctx, "Failed to publish event", attr.Error(err), attr.String("interaction_id", i.ID))
+		slog.Error("Failed to publish event", attr.Error(err), attr.String("interaction_id", i.ID))
 		return
 	}
 }
 
 // handleRoleButtonPress handles role button presses.
-func (h *gatewayEventHandler) handleRoleButtonPress(ctx context.Context, i *discordgo.InteractionCreate) {
-	h.logger.Info(ctx, "Handling role button press", attr.String("interaction_id", i.ID))
+func (h *gatewayEventHandler) HandleRoleButtonPress(ctx context.Context, i *discordgo.InteractionCreate) {
+	slog.Info("Handling role button press", attr.String("interaction_id", i.ID))
 
 	roleStr := strings.TrimPrefix(i.MessageComponentData().CustomID, "role_button_")
 	payload := discorduserevents.RoleUpdateButtonPressPayload{
@@ -88,9 +116,9 @@ func (h *gatewayEventHandler) handleRoleButtonPress(ctx context.Context, i *disc
 		GuildID:             i.GuildID,
 	}
 
-	msg, err := h.createEvent(ctx, discorduserevents.RoleUpdateButtonPress, payload)
+	msg, err := h.createEvent(ctx, discorduserevents.RoleUpdateButtonPress, payload, i)
 	if err != nil {
-		h.logger.Error(ctx, "Failed to create event", attr.Error(err))
+		slog.Error("Failed to create event", attr.Error(err))
 		return
 	}
 	msg.Metadata.Set("interaction_id", i.Interaction.ID)
@@ -98,13 +126,13 @@ func (h *gatewayEventHandler) handleRoleButtonPress(ctx context.Context, i *disc
 	msg.Metadata.Set("guild_id", i.GuildID)
 
 	if err := h.publisher.Publish(discorduserevents.RoleUpdateButtonPress, msg); err != nil {
-		h.logger.Error(ctx, "Failed to publish event", attr.Error(err), attr.String("interaction_id", i.ID))
+		slog.Error("Failed to publish event", attr.Error(err), attr.String("interaction_id", i.ID))
 		return
 	}
 }
 
-func (h *gatewayEventHandler) handleRoleCancelButton(ctx context.Context, i *discordgo.InteractionCreate) {
-	h.logger.Info(ctx, "Handling role cancel button", attr.String("interaction_id", i.ID))
+func (h *gatewayEventHandler) HandleRoleCancelButton(ctx context.Context, i *discordgo.InteractionCreate) {
+	slog.Info("Handling role cancel button", attr.String("interaction_id", i.ID))
 	err := h.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseUpdateMessage,
 		Data: &discordgo.InteractionResponseData{
@@ -114,144 +142,169 @@ func (h *gatewayEventHandler) handleRoleCancelButton(ctx context.Context, i *dis
 		},
 	})
 	if err != nil {
-		h.logger.Error(ctx, "Failed to cancel interaction", attr.Error(err), attr.String("interaction_id", i.ID))
+		slog.Error("Failed to cancel interaction", attr.Error(err), attr.String("interaction_id", i.ID))
 	}
 }
 
 // messageReactionAdd handles MessageReactionAdd events.
-func (h *gatewayEventHandler) messageReactionAdd(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
-	// Configuration for the signup channel and message ID.
+func (h *gatewayEventHandler) MessageReactionAdd(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
+	slog.Info("GatewayHandler.MessageReactionAdd called", attr.UserID(r.UserID))
+
 	signupChannelID := h.config.Discord.SignupChannelID
 	signupMessageID := h.config.Discord.SignupMessageID
+	signupEmoji := h.config.Discord.SignupEmoji
 
-	if r.ChannelID != signupChannelID || r.MessageID != signupMessageID {
-		return // Ignore reactions on other messages.
-	}
-	botUser, err := h.session.GetBotUser()
-	if err != nil {
-		h.logger.Error(context.Background(), "Failed to get bot user", attr.Error(err))
-		return // Critical error: Can't proceed without bot user ID.
-	}
-	//Ignore reactions from the bot
-	if r.UserID == botUser.ID {
+	if r.ChannelID != signupChannelID || r.MessageID != signupMessageID || r.Emoji.Name != signupEmoji {
+		slog.Info("Reaction mismatch",
+			attr.UserID(r.UserID),
+			attr.String("channel_id", r.ChannelID),
+			attr.String("message_id", r.MessageID),
+			attr.Any("emoji", r.Emoji.Name))
 		return
 	}
 
-	h.handleSignupReactionAdd(context.Background(), r)
+	slog.Info("Valid reaction detected, processing signup.")
+
+	botUser, err := h.session.GetBotUser()
+	if err != nil {
+		slog.Error("Failed to get bot user", attr.Error(err))
+		return
+	}
+
+	if r.UserID == botUser.ID {
+		slog.Info("Ignoring bot's own reaction.")
+		return
+	}
+
+	slog.Info("Publishing signup reaction event...")
+	h.HandleSignupReactionAdd(context.Background(), r)
 }
 
 // handleSignupReactionAdd sends the signup modal.
-func (h *gatewayEventHandler) handleSignupReactionAdd(ctx context.Context, r *discordgo.MessageReactionAdd) {
-	h.logger.Info(ctx, "Handling signup reaction", attr.UserID(r.UserID))
+func (h *gatewayEventHandler) HandleSignupReactionAdd(ctx context.Context, r *discordgo.MessageReactionAdd) {
+	slog.Info("Handling signup reaction", attr.UserID(r.UserID))
 
-	// Attempt to create a DM channel.
-	_, err := h.session.UserChannelCreate(r.UserID)
+	// ✅ Verify guild ID
+	if r.GuildID != h.config.Discord.GuildID {
+		slog.Warn("Reaction from wrong guild", attr.UserID(r.UserID), attr.String("guildID", r.GuildID))
+		return
+	}
+
+	slog.Info("Attempting to create DM channel...")
+
+	// ✅ Attempt to create a DM channel
+	dmChannel, err := h.session.UserChannelCreate(r.UserID)
 	if err != nil {
-		h.logger.Error(ctx, "Failed to create DM channel for signup", attr.UserID(r.UserID), attr.Error(err))
-		return // Exit; we can't send the modal.  Error is logged.
+		slog.Error("Failed to create DM channel for signup", attr.UserID(r.UserID), attr.Error(err))
+		return
 	}
 
-	// Check if r.Member is nil
-	if r.Member == nil {
-		h.logger.Error(ctx, "r.Member is nil in handleSignupReactionAdd", attr.UserID(r.UserID))
-		return // Exit; we can't get the user information.
-	}
+	slog.Info("DM channel created", attr.String("dm_channel_id", dmChannel.ID))
 
-	//We know we have the channel
-	//Create the interaction
-	i := &discordgo.Interaction{
-		Type:      discordgo.InteractionMessageComponent,
-		Token:     "signup_token_" + r.UserID, // Generate a unique token
-		Member:    r.Member,
-		User:      r.Member.User,
-		GuildID:   r.GuildID,
-		ID:        "signup_id_" + r.UserID, // Generate a unique interaction id
-		ChannelID: r.ChannelID,
-	}
-	err = h.discord.SendSignupModal(ctx, i)
+	// ✅ Store a placeholder identifier + user ID in `CustomID`
+	metadataStr := fmt.Sprintf("signup_button|%s", r.UserID)
+
+	// ✅ Send the ephemeral message with the "Signup" button
+	_, err = h.session.ChannelMessageSendComplex(dmChannel.ID, &discordgo.MessageSend{
+		Content: "Click the button below to start signup:",
+		Components: []discordgo.MessageComponent{
+			discordgo.ActionsRow{
+				Components: []discordgo.MessageComponent{
+					discordgo.Button{
+						Label:    "Signup",
+						Style:    discordgo.PrimaryButton,
+						CustomID: metadataStr, // ✅ Store placeholder + user ID
+					},
+				},
+			},
+		},
+	})
+
 	if err != nil {
-		h.logger.Error(ctx, "Failed to send signup modal", attr.UserID(r.UserID), attr.Error(err))
-		// Log the error.  Consider additional error handling (retry, etc.)
+		slog.Error("Failed to send ephemeral signup message", attr.UserID(r.UserID), attr.Error(err))
+	} else {
+		slog.Info("Ephemeral signup message successfully sent!", attr.UserID(r.UserID))
 	}
 }
 
 // New handler for the button press
-func (h *gatewayEventHandler) handleSignupButtonPress(ctx context.Context, i *discordgo.InteractionCreate) {
-	h.logger.Info(ctx, "Sending signup modal", attr.UserID(i.Member.User.ID))
+func (h *gatewayEventHandler) HandleSignupButtonPress(ctx context.Context, i *discordgo.InteractionCreate) {
+	slog.Info("✅ Signup button clicked!", attr.String("custom_id", i.MessageComponentData().CustomID))
+
+	var userID string
+	if i.Member != nil {
+		userID = i.Member.User.ID
+	} else {
+		userID = i.User.ID
+	}
+
+	// ✅ Send the signup modal and log if it fails
 	err := h.discord.SendSignupModal(ctx, i.Interaction)
 	if err != nil {
-		h.logger.Error(ctx, "Failed to send signup modal", attr.UserID(i.Member.User.ID), attr.Error(err))
-		// Handle the error - e.g., send an ephemeral message in the signup channel.
+		slog.Error("❌ Failed to send signup modal", attr.Error(err))
+		h.tokenStore.Get(userID) //remove on error.
+	} else {
+		slog.Info("✅ Signup modal successfully sent!")
 	}
 }
 
-func (h *gatewayEventHandler) handleSignupModalSubmit(ctx context.Context, i *discordgo.InteractionCreate) {
-	h.logger.Info(ctx, "Handling signup modal submission", attr.UserID(i.Member.User.ID))
+func (h *gatewayEventHandler) HandleSignupModalSubmit(ctx context.Context, i *discordgo.InteractionCreate) {
+	slog.Info("Handling ModalSubmit", attr.String("custom_id", i.ModalSubmitData().CustomID))
 
-	data := i.ModalSubmitData()
-
-	// Use the existing extractTagNumber helper
-	tagNumberPtr, err := h.extractTagNumber(&data)
-	if err != nil {
-		h.logger.Warn(ctx, "Invalid tag number", attr.UserID(i.Member.User.ID), attr.Error(err))
-		// Respond with an error message
-		h.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: fmt.Sprintf("<@%s> Invalid tag number format.", i.Member.User.ID),
-				Flags:   discordgo.MessageFlagsEphemeral,
-			},
-		})
-		return
-	}
-	// Create the event payload.
-	payload := userevents.UserSignupRequestPayload{
-		DiscordID: usertypes.DiscordID(i.Member.User.ID),
-		TagNumber: tagNumberPtr,
-	}
-
-	// Create the Watermill message.
-	msg, err := h.createEvent(ctx, userevents.UserSignupRequest, payload)
-	if err != nil {
-		h.logger.Error(ctx, "Failed to create event", attr.Error(err))
-		// Respond with an error message
-		h.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: fmt.Sprintf("<@%s> An internal error has occurred.", i.Member.User.ID),
-				Flags:   discordgo.MessageFlagsEphemeral,
-			},
-		})
-		return
-	}
-
-	msg.Metadata.Set("interaction_id", i.Interaction.ID)
-	msg.Metadata.Set("interaction_token", i.Interaction.Token)
-	msg.Metadata.Set("guild_id", i.GuildID)
-
-	// Publish the event.
-	if err := h.publisher.Publish(userevents.UserSignupRequest, msg); err != nil {
-		h.logger.Error(ctx, "Failed to publish event", attr.Error(err))
-		// Respond with an error message
-		h.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: fmt.Sprintf("<@%s> An internal error has occurred.", i.Member.User.ID),
-				Flags:   discordgo.MessageFlagsEphemeral,
-			},
-		})
-		return
-	}
-	// Acknowledge the interaction (IMMEDIATELY - within 3 seconds).
-	err = h.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+	// ✅ 1️⃣ Acknowledge interaction immediately with a confirmation message
+	err := h.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Flags: discordgo.MessageFlagsEphemeral,
+			Content: "✅ Signup request submitted successfully! Processing...",
+			Flags:   discordgo.MessageFlagsEphemeral, // Make it ephemeral
 		},
 	})
 	if err != nil {
-		h.logger.Error(ctx, "failed to acknowledge signup modal interaction", attr.Error(err), attr.UserID(i.Member.User.ID))
+		slog.Error("❌ Failed to acknowledge modal submission", attr.Error(err))
+		return
 	}
+
+	// ✅ 2️⃣ Get user ID
+	var userID string
+	if i.Member != nil {
+		userID = i.Member.User.ID
+	} else {
+		userID = i.User.ID
+	}
+
+	// ✅ 3️⃣ Process form submission
+	data := i.ModalSubmitData()
+	tagNumberPtr, err := h.extractTagNumber(&data)
+	if err != nil {
+		slog.Warn("⚠️ Invalid tag number", attr.Error(err))
+		// Backend will handle error DM
+		return
+	}
+
+	// ✅ 4️⃣ Create event payload
+	payload := userevents.UserSignupRequestPayload{
+		DiscordID: usertypes.DiscordID(userID),
+		TagNumber: tagNumberPtr,
+	}
+
+	slog.Info("📝 Creating event", attr.String("user_id", userID))
+
+	// ✅ 5️⃣ Create event message
+	msg, err := h.createEvent(ctx, userevents.UserSignupRequest, payload, i)
+	if err != nil {
+		slog.Error("❌ Failed to create event", attr.Error(err))
+		// Backend will handle error DM
+		return
+	}
+
+	// ✅ 6️⃣ Publish event to backend
+	slog.Info("🚀 Publishing signup form submitted event")
+	if err := h.publisher.Publish(userevents.UserSignupRequest, msg); err != nil {
+		slog.Error("❌ Failed to publish event", attr.Error(err))
+		return
+	}
+
+	slog.Info("✅ Signup form event published successfully")
 }
 
 // extractTagNumber extracts the tag number from the modal submission data.

@@ -16,6 +16,7 @@ type Session interface {
 	GuildMemberRoleRemove(guildID, userID, roleID string, options ...discordgo.RequestOption) error
 	MessageReactionAdd(channelID, messageID, emojiID string) error
 	GetChannel(channelID string) (*discordgo.Channel, error)
+	WebhookExecute(webhookID string, token string, wait bool, data *discordgo.WebhookParams, options ...discordgo.RequestOption) (st *discordgo.Message, err error)
 	ChannelMessages(channelID string, limit int, beforeID string, afterID string, aroundID string, options ...discordgo.RequestOption) (st []*discordgo.Message, err error)
 	MessageThreadStartComplex(channelID string, messageID string, data *discordgo.ThreadStart, options ...discordgo.RequestOption) (ch *discordgo.Channel, err error)
 	ThreadMemberAdd(threadID string, memberID string, options ...discordgo.RequestOption) error
@@ -26,13 +27,17 @@ type Session interface {
 	ThreadStartComplex(channelID string, data *discordgo.ThreadStart, options ...discordgo.RequestOption) (ch *discordgo.Channel, err error)
 	AddHandler(handler interface{}) func()
 	User(userID string, options ...discordgo.RequestOption) (st *discordgo.User, err error)
+	FollowupMessageCreate(interaction *discordgo.Interaction, wait bool, data *discordgo.WebhookParams, options ...discordgo.RequestOption) (*discordgo.Message, error)
+	FollowupMessageEdit(interaction *discordgo.Interaction, messageID string, data *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error)
 	Open() error
 	Close() error
 	InteractionRespond(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error
 	InteractionResponseEdit(interaction *discordgo.Interaction, newresp *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error)
+	ApplicationCommandPermissionsEdit(appID string, guildID string, cmdID string, permissions *discordgo.ApplicationCommandPermissionsList, options ...discordgo.RequestOption) (err error)
 	ApplicationCommandCreate(appID, guildID string, cmd *discordgo.ApplicationCommand, options ...discordgo.RequestOption) (*discordgo.ApplicationCommand, error)
 	ApplicationCommands(appID, guildID string, options ...discordgo.RequestOption) ([]*discordgo.ApplicationCommand, error)
 	ApplicationCommandDelete(appID, guildID, cmdID string, options ...discordgo.RequestOption) error
+	WebhookMessageEdit(webhookID string, token string, messageID string, data *discordgo.WebhookEdit, options ...discordgo.RequestOption) (st *discordgo.Message, err error)
 }
 
 // State defines an interface that provides access to the Discord state.
@@ -49,10 +54,26 @@ type DiscordSession struct {
 	logger  observability.Logger
 }
 
+func (d *DiscordSession) GetUnderlyingSession() *discordgo.Session {
+	return d.session
+}
+
 // DiscordState is an implementation of the State interface.  Again, consider
 // removing this if you can.
 type DiscordState struct {
 	state *discordgo.State
+}
+
+func (d *DiscordSession) ApplicationCommandPermissionsEdit(appID string, guildID string, cmdID string, permissions *discordgo.ApplicationCommandPermissionsList, options ...discordgo.RequestOption) (err error) {
+	return d.session.ApplicationCommandPermissionsEdit(appID, guildID, cmdID, permissions, options...)
+}
+
+func (d *DiscordSession) FollowupMessageCreate(interaction *discordgo.Interaction, wait bool, data *discordgo.WebhookParams, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+	return d.session.FollowupMessageCreate(interaction, wait, data, options...)
+}
+
+func (d *DiscordSession) WebhookExecute(webhookID string, token string, wait bool, data *discordgo.WebhookParams, options ...discordgo.RequestOption) (st *discordgo.Message, err error) {
+	return d.session.WebhookExecute("", token, wait, data, options...)
 }
 
 // NewDiscordSession creates a new DiscordSession.
@@ -200,4 +221,12 @@ func (d *DiscordSession) GuildMember(guildID, userID string, options ...discordg
 
 func (d *DiscordSession) GuildMemberRoleRemove(guildID, userID, roleID string, options ...discordgo.RequestOption) error {
 	return d.session.GuildMemberRoleRemove(guildID, userID, roleID, options...)
+}
+
+func (d *DiscordSession) FollowupMessageEdit(interaction *discordgo.Interaction, messageID string, data *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+	return d.session.FollowupMessageEdit(interaction, messageID, data, options...)
+}
+
+func (d *DiscordSession) WebhookMessageEdit(webhookID string, token string, messageID string, data *discordgo.WebhookEdit, options ...discordgo.RequestOption) (st *discordgo.Message, err error) {
+	return d.session.WebhookMessageEdit(webhookID, token, messageID, data, options...)
 }

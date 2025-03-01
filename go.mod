@@ -1,12 +1,11 @@
 module github.com/Black-And-White-Club/discord-frolf-bot
 
-go 1.23.5
+go 1.24.0
 
 require (
 	github.com/Black-And-White-Club/frolf-bot v0.0.0-20250211235259-ba380fe320b5
 	github.com/Black-And-White-Club/frolf-bot-shared v0.0.39
 	github.com/ThreeDotsLabs/watermill v1.4.4
-	github.com/allegro/bigcache/v3 v3.1.0
 	github.com/bwmarrin/discordgo v0.28.1
 	go.uber.org/mock v0.5.0
 	gopkg.in/yaml.v3 v3.0.1

@@ -58,7 +58,7 @@ func (h *UserHandlers) HandleRoleUpdateButtonPress(msg *message.Message) ([]*mes
 	}
 
 	backendPayload := userevents.UserRoleUpdateRequestPayload{
-		RequesterID: payload.RequesterID,
+		RequesterID: usertypes.DiscordID(payload.RequesterID),
 		DiscordID:   usertypes.DiscordID(payload.TargetUserID),
 		Role:        selectedRole,
 	}
@@ -67,6 +67,7 @@ func (h *UserHandlers) HandleRoleUpdateButtonPress(msg *message.Message) ([]*mes
 		h.Logger.Error(ctx, "Failed to create result message", attr.Error(err), attr.CorrelationIDFromMsg(msg))
 		return nil, fmt.Errorf("failed to create result message: %w", err)
 	}
+
 	backendEvent.Metadata.Set("interaction_token", payload.InteractionToken)
 	backendEvent.Metadata.Set("guild_id", payload.GuildID) // Pass GuildID
 
@@ -85,48 +86,52 @@ func (h *UserHandlers) HandleRoleUpdateResult(msg *message.Message) ([]*message.
 		return nil, fmt.Errorf("failed to unmarshal payload: %w", err)
 	}
 
-	interactionToken := msg.Metadata.Get("interaction_token")
-	guildID := msg.Metadata.Get("guild_id") // Get Guild ID
-	if interactionToken == "" || guildID == "" {
-		err := fmt.Errorf("interaction_token or guild_id missing from metadata")
-		h.Logger.Error(ctx, "interaction_token or guild_id missing from metadata", attr.Error(err))
-		return nil, err
-	}
+	// Extract the Discord ID from the payload
+	discordID := string(payload.DiscordID)
 
-	content := "Role update completed"
 	// Get Discord Role ID from config (or database)
 	discordRoleID, ok := h.Config.Discord.RoleMappings[string(payload.Role)]
 	if !ok {
 		err := fmt.Errorf("no Discord role mapping found for application role: %s", payload.Role)
 		h.Logger.Error(ctx, "Role mapping error", attr.Error(err))
-		content = fmt.Sprintf("Failed to update role: %s", err)
-		if err := h.Discord.EditRoleUpdateResponse(ctx, interactionToken, content); err != nil {
-			h.Logger.Error(ctx, "Failed to edit interaction response", attr.Error(err))
-			return nil, fmt.Errorf("failed to edit interaction response: %w", err)
+		// Send DM to user about the failure
+		dmMsg, dmErr := h.createDMMessage(ctx, discordID, fmt.Sprintf("Failed to update role: %s", err))
+		if dmErr != nil {
+			h.Logger.Error(ctx, "Failed to create DM message", attr.Error(dmErr))
+			return nil, fmt.Errorf("failed to create DM message: %w", dmErr)
 		}
-		return nil, err
-	}
-	if !payload.Success {
-		content = fmt.Sprintf("Failed to update role: %s", payload.Error)
-		if err := h.Discord.EditRoleUpdateResponse(ctx, interactionToken, content); err != nil {
-			h.Logger.Error(ctx, "Failed to edit interaction response", attr.Error(err))
-			return nil, fmt.Errorf("failed to edit interaction response: %w", err)
-		}
-		return nil, nil
+		return []*message.Message{dmMsg}, nil // Return the DM message
 	}
 
-	// Add the Discord role.
-	err := h.Discord.AddRoleToUser(ctx, guildID, string(payload.DiscordID), discordRoleID)
+	if !payload.Success {
+		// Send DM to user about the failure
+		dmMsg, dmErr := h.createDMMessage(ctx, discordID, fmt.Sprintf("Failed to update role: %s", payload.Error))
+		if dmErr != nil {
+			h.Logger.Error(ctx, "Failed to create DM message", attr.Error(dmErr))
+			return nil, fmt.Errorf("failed to create DM message: %w", dmErr)
+		}
+		return []*message.Message{dmMsg}, nil // Return the DM message
+	}
+
+	// Add the Discord role (if the update was successful)
+	err := h.Discord.AddRoleToUser(ctx, msg.Metadata.Get("guild_id"), discordID, discordRoleID)
 	if err != nil {
 		h.Logger.Error(ctx, "Failed to add Discord role", attr.Error(err))
-		// Send a follow-up message indicating the Discord role sync failed.
-		content = fmt.Sprintf("Role updated in application, but failed to sync with Discord: %s", err)
+		// Send a DM indicating the Discord role sync failed.
+		dmMsg, dmErr := h.createDMMessage(ctx, discordID, fmt.Sprintf("Role updated in application, but failed to sync with Discord: %s", err))
+		if dmErr != nil {
+			h.Logger.Error(ctx, "Failed to create DM message", attr.Error(dmErr))
+			return nil, fmt.Errorf("failed to create DM message: %w", dmErr)
+		}
+		return []*message.Message{dmMsg}, nil // Return the DM message
 	}
 
-	if err := h.Discord.EditRoleUpdateResponse(ctx, interactionToken, content); err != nil {
-		h.Logger.Error(ctx, "Failed to edit interaction response", attr.Error(err))
-		return nil, fmt.Errorf("failed to edit interaction response: %w", err)
+	// Send DM to user about the success
+	dmMsg, dmErr := h.createDMMessage(ctx, discordID, "Role update completed")
+	if dmErr != nil {
+		h.Logger.Error(ctx, "Failed to create DM message", attr.Error(dmErr))
+		return nil, fmt.Errorf("failed to create DM message: %w", dmErr)
 	}
 
-	return nil, nil
+	return []*message.Message{dmMsg}, nil
 }

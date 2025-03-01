@@ -22,14 +22,14 @@ func (h *RoundHandlers) HandleRoundReminder(msg *message.Message) ([]*message.Me
 	}
 
 	h.Logger.Info(ctx, "Preparing round reminder", attr.String("round_id", payload.RoundID), attr.String("reminder_type", payload.ReminderType), attr.CorrelationIDFromMsg(msg))
-
+	channelID := msg.Metadata.Get("channel_id")
 	// Construct the Discord-specific payload
 	discordPayload := discordroundevents.DiscordRoundReminderPayload{
 		RoundID:      payload.RoundID,
 		RoundTitle:   payload.RoundTitle,
 		UserIDs:      payload.UserIDs,
 		ReminderType: payload.ReminderType,
-		ChannelID:    payload.ChannelID,
+		ChannelID:    channelID,
 	}
 
 	discordMsg, err := h.createResultMessage(msg, discordPayload, discordroundevents.RoundReminderTopic) // Use the helper

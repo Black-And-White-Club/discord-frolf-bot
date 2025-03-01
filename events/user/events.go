@@ -8,28 +8,28 @@ import (
 // Event names (constants) - grouped by related functionality for better readability.
 const (
 	// Signup-related events (Discord-side).
-	SignupStarted             = "discord.signup.started"
-	SignupTagAsk              = "discord.signup.tag.ask"
-	SignupTagSkip             = "discord.signup.tag.skip"
-	SignupTagIncludeRequested = "discord.signup.tag.include.requested"
-	SignupTagPromptSent       = "discord.signup.tag.prompt.sent"
-	SignupCanceled            = "discord.signup.canceled"
-	SignupFailed              = "discord.signup.failed" // General signup failure (Discord side).
-	SignupSuccess             = "discord.signup.success"
-	InteractionResponded      = "discord.interaction.responded"
+	SignupStarted             = "discord.user.signup.started"
+	SignupTagAsk              = "discord.user.signup.tag.ask"
+	SignupTagSkip             = "discord.user.signup.tag.skip"
+	SignupTagIncludeRequested = "discord.user.signup.tag.include.requested"
+	SignupTagPromptSent       = "discord.user.signup.tag.prompt.sent"
+	SignupCanceled            = "discord.user.signup.canceled"
+	SignupFailed              = "discord.user.signup.failed" // General signup failure (Discord side).
+	SignupSuccess             = "discord.user.signup.success"
+	InteractionResponded      = "discord.user.interaction.responded"
 	SignupFormSubmitted       = "discord.user.signupformsubmitted"
 	SignupSubmission          = "discord.user.signupsubmission"
 
 	// Discord DM events
-	SendUserDM = "discord.user.senduserdm" // Keep: This is the event to trigger sending a DM.
-	DMSent     = "discord.user.dmsent"     // Keep: This is for the success case.
+	SendUserDM = "discord.send.dm"     // Keep: This is the event to trigger sending a DM.
+	DMSent     = "discord.user.dmsent" // Keep: This is for the success case.
 	// DMCreateError = "discord.user.dmcreateerror" // REMOVE: No longer needed.
 	// DMSendError   = "discord.user.dmsenderror"   // REMOVE: No longer needed
 	DMError = "discord.user.dmerror" // ADD:  A single, generic error event.
 
 	// Tag-related events (Discord-side).
-	TagNumberRequested = "discord.tag.number.requested"
-	TagNumberResponse  = "discord.tag.number.response" // Payload from the user.
+	TagNumberRequested = "discord.user.tag.number.requested"
+	TagNumberResponse  = "discord.user.tag.number.response" // Payload from the user.
 
 	// Role Update events (Discord-side).
 	RoleUpdateCommand     = "discord.user.roleupdatecommand" // From command handler.
@@ -37,13 +37,14 @@ const (
 	RoleUpdateTimeout     = "discord.user.roleupdateyimeout"
 	RoleOptionsRequested  = "discord.user.roleoptionsrequested"
 	RoleResponse          = "discord.user.roleresponse"
+	RoleResponseFailed    = "discord.user.roleresponsefailed"
 
 	// Trace events, keeping these, I guess.
-	SignupResponseTrace     = "discord.signup.response.trace"
-	RoleUpdateResponseTrace = "discord.role.update.response.trace"
+	SignupResponseTrace     = "discord.user.signup.response.trace"
+	RoleUpdateResponseTrace = "discord.user.role.update.response.trace"
 
 	// Generic Trace event
-	DiscordEventTrace = "discord.event.trace"
+	DiscordEventTrace = "discord.user.event.trace"
 )
 
 // --- Payload Structs ---
@@ -69,18 +70,6 @@ type RoleUpdateButtonPressPayload struct {
 type SendUserDMPayload struct {
 	UserID  string `json:"user_id"`
 	Message string `json:"message"`
-}
-
-// DMSentPayload is the payload for the DMSent event.
-type DMSentPayload struct {
-	UserID string `json:"user_id"`
-	//ChannelID string `json:"channel_id"` // REMOVE:  No longer needed.  The handler doesn't use this.
-}
-
-// DMErrorPayload is a common payload for DM-related errors.
-type DMErrorPayload struct {
-	UserID      string `json:"user_id"`
-	ErrorDetail string `json:"error_detail"`
 }
 
 // ---  Payloads below this probably aren't needed anymore ---
@@ -147,14 +136,6 @@ type SignupFailedPayload struct {
 	Detail        string `json:"detail"`
 	UserID        string `json:"user_id"`
 	CorrelationID string `json:"correlation_id"`
-}
-
-// Interaction response tracking
-type InteractionRespondedPayload struct {
-	InteractionID string `json:"interaction_id"`
-	UserID        string `json:"user_id"`
-	Status        string `json:"status"`
-	ErrorDetail   string `json:"error_detail"`
 }
 
 type SignupFormSubmittedPayload struct {

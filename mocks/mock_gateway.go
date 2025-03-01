@@ -10,8 +10,10 @@
 package mocks
 
 import (
+	context "context"
 	reflect "reflect"
 
+	discordgo "github.com/bwmarrin/discordgo"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -39,14 +41,98 @@ func (m *MockGatewayEventHandler) EXPECT() *MockGatewayEventHandlerMockRecorder 
 	return m.recorder
 }
 
-// RegisterHandlers mocks base method.
-func (m *MockGatewayEventHandler) RegisterHandlers() {
+// HandleRoleButtonPress mocks base method.
+func (m *MockGatewayEventHandler) HandleRoleButtonPress(ctx context.Context, i *discordgo.InteractionCreate) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "RegisterHandlers")
+	m.ctrl.Call(m, "HandleRoleButtonPress", ctx, i)
 }
 
-// RegisterHandlers indicates an expected call of RegisterHandlers.
-func (mr *MockGatewayEventHandlerMockRecorder) RegisterHandlers() *gomock.Call {
+// HandleRoleButtonPress indicates an expected call of HandleRoleButtonPress.
+func (mr *MockGatewayEventHandlerMockRecorder) HandleRoleButtonPress(ctx, i any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterHandlers", reflect.TypeOf((*MockGatewayEventHandler)(nil).RegisterHandlers))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleRoleButtonPress", reflect.TypeOf((*MockGatewayEventHandler)(nil).HandleRoleButtonPress), ctx, i)
+}
+
+// HandleRoleCancelButton mocks base method.
+func (m *MockGatewayEventHandler) HandleRoleCancelButton(ctx context.Context, i *discordgo.InteractionCreate) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "HandleRoleCancelButton", ctx, i)
+}
+
+// HandleRoleCancelButton indicates an expected call of HandleRoleCancelButton.
+func (mr *MockGatewayEventHandlerMockRecorder) HandleRoleCancelButton(ctx, i any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleRoleCancelButton", reflect.TypeOf((*MockGatewayEventHandler)(nil).HandleRoleCancelButton), ctx, i)
+}
+
+// HandleRoleRequestCommand mocks base method.
+func (m *MockGatewayEventHandler) HandleRoleRequestCommand(ctx context.Context, i *discordgo.InteractionCreate) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "HandleRoleRequestCommand", ctx, i)
+}
+
+// HandleRoleRequestCommand indicates an expected call of HandleRoleRequestCommand.
+func (mr *MockGatewayEventHandlerMockRecorder) HandleRoleRequestCommand(ctx, i any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleRoleRequestCommand", reflect.TypeOf((*MockGatewayEventHandler)(nil).HandleRoleRequestCommand), ctx, i)
+}
+
+// HandleSignupButtonPress mocks base method.
+func (m *MockGatewayEventHandler) HandleSignupButtonPress(ctx context.Context, i *discordgo.InteractionCreate) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "HandleSignupButtonPress", ctx, i)
+}
+
+// HandleSignupButtonPress indicates an expected call of HandleSignupButtonPress.
+func (mr *MockGatewayEventHandlerMockRecorder) HandleSignupButtonPress(ctx, i any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleSignupButtonPress", reflect.TypeOf((*MockGatewayEventHandler)(nil).HandleSignupButtonPress), ctx, i)
+}
+
+// HandleSignupModalSubmit mocks base method.
+func (m *MockGatewayEventHandler) HandleSignupModalSubmit(ctx context.Context, i *discordgo.InteractionCreate) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "HandleSignupModalSubmit", ctx, i)
+}
+
+// HandleSignupModalSubmit indicates an expected call of HandleSignupModalSubmit.
+func (mr *MockGatewayEventHandlerMockRecorder) HandleSignupModalSubmit(ctx, i any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleSignupModalSubmit", reflect.TypeOf((*MockGatewayEventHandler)(nil).HandleSignupModalSubmit), ctx, i)
+}
+
+// HandleSignupReactionAdd mocks base method.
+func (m *MockGatewayEventHandler) HandleSignupReactionAdd(ctx context.Context, r *discordgo.MessageReactionAdd) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "HandleSignupReactionAdd", ctx, r)
+}
+
+// HandleSignupReactionAdd indicates an expected call of HandleSignupReactionAdd.
+func (mr *MockGatewayEventHandlerMockRecorder) HandleSignupReactionAdd(ctx, r any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleSignupReactionAdd", reflect.TypeOf((*MockGatewayEventHandler)(nil).HandleSignupReactionAdd), ctx, r)
+}
+
+// InteractionCreate mocks base method.
+func (m *MockGatewayEventHandler) InteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "InteractionCreate", s, i)
+}
+
+// InteractionCreate indicates an expected call of InteractionCreate.
+func (mr *MockGatewayEventHandlerMockRecorder) InteractionCreate(s, i any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InteractionCreate", reflect.TypeOf((*MockGatewayEventHandler)(nil).InteractionCreate), s, i)
+}
+
+// MessageReactionAdd mocks base method.
+func (m *MockGatewayEventHandler) MessageReactionAdd(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "MessageReactionAdd", s, r)
+}
+
+// MessageReactionAdd indicates an expected call of MessageReactionAdd.
+func (mr *MockGatewayEventHandlerMockRecorder) MessageReactionAdd(s, r any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MessageReactionAdd", reflect.TypeOf((*MockGatewayEventHandler)(nil).MessageReactionAdd), s, r)
 }

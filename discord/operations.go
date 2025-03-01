@@ -15,8 +15,10 @@ type Operations interface {
 	RespondToRoleButtonPress(ctx context.Context, interactionID, interactionToken, requesterID, selectedRole, targetUserID string) error
 	EditRoleUpdateResponse(ctx context.Context, interactionToken, content string) error
 	AddRoleToUser(ctx context.Context, guildID, userID, roleID string) error
-	SendEphemeralSignupModal(ctx context.Context, userID, guildID string, i *discordgo.Interaction) error
 	SendSignupModal(ctx context.Context, i *discordgo.Interaction) error
+	SendSignupAcknowledgment(interactionToken string)
+	SendSignupResult(interactionToken string, success bool)
+	SendCreateRoundModal(ctx context.Context, i *discordgo.Interaction) error
 }
 
 // DiscordOperations implements the Operations interface.

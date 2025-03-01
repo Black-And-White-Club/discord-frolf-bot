@@ -112,18 +112,16 @@ func (mr *MockOperationsMockRecorder) SendDM(ctx, userID, message any) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendDM", reflect.TypeOf((*MockOperations)(nil).SendDM), ctx, userID, message)
 }
 
-// SendEphemeralSignupModal mocks base method.
-func (m *MockOperations) SendEphemeralSignupModal(ctx context.Context, userID, guildID string, i *discordgo.Interaction) error {
+// SendSignupAcknowledgment mocks base method.
+func (m *MockOperations) SendSignupAcknowledgment(interactionToken string) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SendEphemeralSignupModal", ctx, userID, guildID, i)
-	ret0, _ := ret[0].(error)
-	return ret0
+	m.ctrl.Call(m, "SendSignupAcknowledgment", interactionToken)
 }
 
-// SendEphemeralSignupModal indicates an expected call of SendEphemeralSignupModal.
-func (mr *MockOperationsMockRecorder) SendEphemeralSignupModal(ctx, userID, guildID, i any) *gomock.Call {
+// SendSignupAcknowledgment indicates an expected call of SendSignupAcknowledgment.
+func (mr *MockOperationsMockRecorder) SendSignupAcknowledgment(interactionToken any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendEphemeralSignupModal", reflect.TypeOf((*MockOperations)(nil).SendEphemeralSignupModal), ctx, userID, guildID, i)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendSignupAcknowledgment", reflect.TypeOf((*MockOperations)(nil).SendSignupAcknowledgment), interactionToken)
 }
 
 // SendSignupModal mocks base method.
@@ -138,4 +136,16 @@ func (m *MockOperations) SendSignupModal(ctx context.Context, i *discordgo.Inter
 func (mr *MockOperationsMockRecorder) SendSignupModal(ctx, i any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendSignupModal", reflect.TypeOf((*MockOperations)(nil).SendSignupModal), ctx, i)
+}
+
+// SendSignupResult mocks base method.
+func (m *MockOperations) SendSignupResult(interactionToken string, success bool) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SendSignupResult", interactionToken, success)
+}
+
+// SendSignupResult indicates an expected call of SendSignupResult.
+func (mr *MockOperationsMockRecorder) SendSignupResult(interactionToken, success any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendSignupResult", reflect.TypeOf((*MockOperations)(nil).SendSignupResult), interactionToken, success)
 }

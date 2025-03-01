@@ -1,4 +1,4 @@
-package userrouter
+package discordrouter
 
 import (
 	"context"
@@ -7,8 +7,8 @@ import (
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/discord-frolf-bot/discord"
-	discorduserevents "github.com/Black-And-White-Club/discord-frolf-bot/events/user"
-	userhandlers "github.com/Black-And-White-Club/discord-frolf-bot/handlers/user"
+	discordevents "github.com/Black-And-White-Club/discord-frolf-bot/events/discord"
+	discordhandlers "github.com/Black-And-White-Club/discord-frolf-bot/handlers/discord"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
@@ -16,8 +16,8 @@ import (
 	"github.com/ThreeDotsLabs/watermill/message/router/middleware"
 )
 
-// UserRouter handles routing for user module events.
-type UserRouter struct {
+// DiscordRouter handles routing for user module events.
+type DiscordRouter struct {
 	logger           observability.Logger
 	Router           *message.Router
 	subscriber       eventbus.EventBus
@@ -29,9 +29,9 @@ type UserRouter struct {
 	middlewareHelper utils.MiddlewareHelpers
 }
 
-// NewUserRouter creates a new UserRouter.
-func NewUserRouter(logger observability.Logger, router *message.Router, subscriber eventbus.EventBus, publisher eventbus.EventBus, discord discord.Operations, config *config.Config, helper utils.Helpers, tracer observability.Tracer) *UserRouter {
-	return &UserRouter{
+// NewDiscordRouter creates a new DiscordRouter.
+func NewDiscordRouter(logger observability.Logger, router *message.Router, subscriber eventbus.EventBus, publisher eventbus.EventBus, discord discord.Operations, config *config.Config, helper utils.Helpers, tracer observability.Tracer) *DiscordRouter {
+	return &DiscordRouter{
 		logger:           logger,
 		Router:           router,
 		subscriber:       subscriber,
@@ -45,10 +45,10 @@ func NewUserRouter(logger observability.Logger, router *message.Router, subscrib
 }
 
 // Configure sets up the router.
-func (r *UserRouter) Configure(handlers userhandlers.Handlers, eventbus eventbus.EventBus) error {
+func (r *DiscordRouter) Configure(handlers discordhandlers.Handlers, eventbus eventbus.EventBus) error {
 	r.Router.AddMiddleware(
 		middleware.CorrelationID,
-		r.middlewareHelper.CommonMetadataMiddleware("user"),
+		r.middlewareHelper.CommonMetadataMiddleware("discord-internal"),
 		r.middlewareHelper.DiscordMetadataMiddleware(),
 		r.middlewareHelper.RoutingMetadataMiddleware(),
 		middleware.Recoverer,
@@ -65,19 +65,13 @@ func (r *UserRouter) Configure(handlers userhandlers.Handlers, eventbus eventbus
 }
 
 // RegisterHandlers registers event handlers.
-func (r *UserRouter) RegisterHandlers(ctx context.Context, handlers userhandlers.Handlers) error {
+func (r *DiscordRouter) RegisterHandlers(ctx context.Context, handlers discordhandlers.Handlers) error {
 	eventsToHandlers := map[string]message.HandlerFunc{
-		discorduserevents.RoleResponse:          handlers.HandleRoleUpdateResult,
-		discorduserevents.RoleResponseFailed:    handlers.HandleRoleUpdateResult,
-		discorduserevents.SignupSuccess:         handlers.HandleUserCreated,
-		discorduserevents.SignupFailed:          handlers.HandleUserCreationFailed,
-		discorduserevents.RoleUpdateCommand:     handlers.HandleRoleUpdateCommand,
-		discorduserevents.RoleUpdateButtonPress: handlers.HandleRoleUpdateButtonPress,
-		discorduserevents.SignupFormSubmitted:   handlers.HandleUserSignupRequest,
+		discordevents.SendDM: handlers.HandleSendDM,
 	}
 
 	for topic, handlerFunc := range eventsToHandlers {
-		handlerName := fmt.Sprintf("discord-user.%s", topic)
+		handlerName := fmt.Sprintf("discord-internal.%s", topic)
 
 		r.Router.AddHandler(
 			handlerName,
@@ -118,6 +112,6 @@ func (r *UserRouter) RegisterHandlers(ctx context.Context, handlers userhandlers
 }
 
 // Close stops the router.
-func (r *UserRouter) Close() error {
+func (r *DiscordRouter) Close() error {
 	return r.Router.Close()
 }

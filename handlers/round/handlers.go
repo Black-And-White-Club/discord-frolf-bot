@@ -28,16 +28,16 @@ type Handlers interface {
 // RoundHandlers handles round-related events.
 type RoundHandlers struct {
 	Logger    observability.Logger
-	Session   discord.Session
+	Discord   discord.Operations
 	Config    *config.Config
 	EventUtil utils.EventUtil
 }
 
 // NewRoundHandlers creates a new RoundHandlers.
-func NewRoundHandlers(logger observability.Logger, session discord.Session, config *config.Config, eventUtil utils.EventUtil) Handlers {
+func NewRoundHandlers(logger observability.Logger, discord discord.Operations, config *config.Config, eventUtil utils.EventUtil) Handlers {
 	return &RoundHandlers{
 		Logger:    logger,
-		Session:   session,
+		Discord:   discord,
 		Config:    config,
 		EventUtil: eventUtil,
 	}

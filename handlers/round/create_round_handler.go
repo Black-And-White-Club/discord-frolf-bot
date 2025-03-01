@@ -35,25 +35,11 @@ func (h *RoundHandlers) HandleRoundCreateRequested(msg *message.Message) ([]*mes
 		return []*message.Message{errorMsg}, nil // Ack
 	}
 
-	if payload.EndTime.Before(payload.StartTime) {
-		h.Logger.Warn(ctx, "End time is before start time", attr.CorrelationIDFromMsg(msg), attr.UserID(payload.UserID))
-		errorPayload := discordroundevents.RoundCreationFailedPayload{
-			UserID: payload.UserID,
-			Reason: "End time must be after start time.",
-		}
-		errorMsg, err := h.createResultMessage(msg, errorPayload, discordroundevents.RoundCreationFailedTopic) // Use helper
-		if err != nil {
-			return nil, err
-		}
-		return []*message.Message{errorMsg}, nil // Ack
-	}
-
 	// --- Construct Backend Payload ---
 	backendPayload := roundevents.RoundCreateRequestPayload{
 		Title:       payload.Title,
 		Description: &payload.Description,
-		StartTime:   payload.StartTime,
-		EndTime:     payload.EndTime,
+		StartTime:   &payload.StartTime,
 		Location:    &payload.Location,
 		UserID:      payload.UserID,
 		ChannelID:   payload.ChannelID, // Include ChannelID
@@ -82,14 +68,33 @@ func (h *RoundHandlers) HandleRoundCreated(msg *message.Message) ([]*message.Mes
 		RoundID:     payload.RoundID,
 		Title:       payload.Title,
 		StartTime:   payload.StartTime,
-		EndTime:     payload.EndTime,
 		RequesterID: payload.UserID,
 		ChannelID:   payload.ChannelID,
 	}
-	internalMsg, err := h.createResultMessage(msg, internalPayload, discordroundevents.RoundCreatedTopic) // Use helper
+	internalMsg, err := h.createResultMessage(msg, internalPayload, discordroundevents.RoundCreatedTopic)
 	if err != nil {
 		return nil, err
 	}
 	h.Logger.Info(ctx, "Successfully processed round created event", attr.CorrelationIDFromMsg(msg))
 	return []*message.Message{internalMsg}, nil
+}
+
+func (h *RoundHandlers) HandleRoundValidationFailed(msg *message.Message) ([]*message.Message, error) {
+	ctx := msg.Context()
+
+	var payload roundevents.RoundValidationFailedPayload
+	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
+		h.Logger.Error(ctx, "Failed to unmarshal payload", attr.CorrelationIDFromMsg(msg), attr.Error(err))
+		return nil, fmt.Errorf("failed to unmarshal payload: %w", err)
+	}
+
+	userID := payload.UserID
+	errorMessage := payload.ErrorMessage
+
+	h.Logger.Warn(ctx, "Round validation failed", attr.UserID(userID), attr.String("error", errorMessage))
+
+	// Send an ephemeral message to the user
+	h.Discord.SendDM(ctx, userID, "❌ "+errorMessage+" Please try again.")
+
+	return []*message.Message{errorMessage}, nil
 }

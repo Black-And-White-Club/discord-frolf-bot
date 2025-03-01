@@ -1,11 +1,11 @@
-package userhandlers
+package discordhandlers
 
 import (
 	"errors"
 	"testing"
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
-	discorduserevents "github.com/Black-And-White-Club/discord-frolf-bot/events/user"
+	discordevents "github.com/Black-And-White-Club/discord-frolf-bot/events/discord"
 	"github.com/Black-And-White-Club/discord-frolf-bot/mocks"
 	util_mocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
@@ -14,7 +14,7 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-func TestUserHandlers_HandleSendUserDM(t *testing.T) {
+func TestDiscordHandlers_HandleSendDM(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -56,14 +56,14 @@ func TestUserHandlers_HandleSendUserDM(t *testing.T) {
 			},
 			wantErr: false,
 			setup: func() {
-				expectedPayload := discorduserevents.SendUserDMPayload{
+				expectedPayload := discordevents.SendDMPayload{
 					UserID:  "123",
 					Message: "Hello",
 				}
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discorduserevents.SendUserDMPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discordevents.SendDMPayload{})).
 					DoAndReturn(func(_ *message.Message, v interface{}) error {
-						*v.(*discorduserevents.SendUserDMPayload) = expectedPayload
+						*v.(*discordevents.SendDMPayload) = expectedPayload
 						return nil
 					}).
 					Times(1)
@@ -110,14 +110,14 @@ func TestUserHandlers_HandleSendUserDM(t *testing.T) {
 			},
 			wantErr: false,
 			setup: func() {
-				expectedPayload := discorduserevents.SendUserDMPayload{
+				expectedPayload := discordevents.SendDMPayload{
 					UserID:  "123",
 					Message: "Hello",
 				}
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discorduserevents.SendUserDMPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discordevents.SendDMPayload{})).
 					DoAndReturn(func(_ *message.Message, v interface{}) error {
-						*v.(*discorduserevents.SendUserDMPayload) = expectedPayload
+						*v.(*discordevents.SendDMPayload) = expectedPayload
 						return nil
 					}).
 					Times(1)
@@ -145,14 +145,14 @@ func TestUserHandlers_HandleSendUserDM(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 			setup: func() {
-				expectedPayload := discorduserevents.SendUserDMPayload{
+				expectedPayload := discordevents.SendDMPayload{
 					UserID:  "123",
 					Message: "Hello",
 				}
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discorduserevents.SendUserDMPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discordevents.SendDMPayload{})).
 					DoAndReturn(func(_ *message.Message, v interface{}) error {
-						*v.(*discorduserevents.SendUserDMPayload) = expectedPayload
+						*v.(*discordevents.SendDMPayload) = expectedPayload
 						return nil
 					}).
 					Times(1)
@@ -180,14 +180,14 @@ func TestUserHandlers_HandleSendUserDM(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 			setup: func() {
-				expectedPayload := discorduserevents.SendUserDMPayload{
+				expectedPayload := discordevents.SendDMPayload{
 					UserID:  "123",
 					Message: "Hello",
 				}
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discorduserevents.SendUserDMPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discordevents.SendDMPayload{})).
 					DoAndReturn(func(_ *message.Message, v interface{}) error {
-						*v.(*discorduserevents.SendUserDMPayload) = expectedPayload
+						*v.(*discordevents.SendDMPayload) = expectedPayload
 						return nil
 					}).
 					Times(1)
@@ -208,19 +208,19 @@ func TestUserHandlers_HandleSendUserDM(t *testing.T) {
 			if tt.setup != nil {
 				tt.setup()
 			}
-			h := &UserHandlers{
+			h := &DiscordHandlers{
 				Config:  tt.fields.Config,
 				Helper:  tt.fields.Helper,
 				Discord: tt.fields.Discord,
 				Logger:  tt.fields.Logger,
 			}
-			got, err := h.HandleSendUserDM(tt.args.msg)
+			got, err := h.HandleSendDM(tt.args.msg)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("UserHandlers.HandleSendUserDM() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("DiscordHandlers.HandleSendDM() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if len(got) != len(tt.want) {
-				t.Errorf("UserHandlers.HandleSendUserDM() returned %d messages, want %d", len(got), len(tt.want))
+				t.Errorf("DiscordHandlers.HandleSendDM() returned %d messages, want %d", len(got), len(tt.want))
 				return
 			}
 

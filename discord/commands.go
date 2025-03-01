@@ -35,5 +35,15 @@ func RegisterCommands(s Session, logger observability.Logger, guildID string) er
 	}
 	logger.Info(context.Background(), "registered command: /updaterole")
 
+	_, err = s.ApplicationCommandCreate(appID.ID, guildID, &discordgo.ApplicationCommand{
+		Name:        "createround",
+		Description: "Create A Round",
+	})
+	if err != nil {
+		logger.Error(context.Background(), "Failed to create '/createround' command", attr.Error(err))
+		return fmt.Errorf("failed to create '/createround' command: %w", err)
+	}
+	logger.Info(context.Background(), "registered command: /createround")
+
 	return nil
 }

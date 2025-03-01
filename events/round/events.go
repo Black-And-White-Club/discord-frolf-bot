@@ -34,7 +34,6 @@ type CreateRoundRequestedPayload struct {
 	Title                 string    `json:"title"`
 	Description           string    `json:"description"`
 	StartTime             time.Time `json:"start_time"`
-	EndTime               time.Time `json:"end_time"`
 	Location              string    `json:"location"`
 	UserID                string    `json:"user_id"`
 	ChannelID             string    `json:"channel_id"`
@@ -46,7 +45,6 @@ type RoundCreatedPayload struct {
 	RoundID               string           `json:"round_id"`
 	Title                 string           `json:"title"`
 	StartTime             time.Time        `json:"start_time"`
-	EndTime               time.Time        `json:"end_time"`
 	Location              string           `json:"location"`
 	RequesterID           string           `json:"requester_id"`
 	ChannelID             string           `json:"channel_id"`
@@ -102,7 +100,6 @@ type DiscordRoundUpdateRequestPayload struct {
 	Title                 *string    `json:"title,omitempty"`
 	Description           *string    `json:"description,omitempty"`
 	StartTime             *time.Time `json:"start_time,omitempty"`
-	EndTime               *time.Time `json:"end_time,omitempty"`
 	Location              *string    `json:"location,omitempty"`
 	ChannelID             string     `json:"channel_id"`
 }
@@ -115,7 +112,6 @@ type DiscordRoundUpdatedPayload struct {
 	Title                 *string    `json:"title,omitempty"`
 	Description           *string    `json:"description,omitempty"`
 	StartTime             *time.Time `json:"start_time,omitempty"`
-	EndTime               *time.Time `json:"end_time,omitempty"`
 	Location              *string    `json:"location,omitempty"`
 }
 
