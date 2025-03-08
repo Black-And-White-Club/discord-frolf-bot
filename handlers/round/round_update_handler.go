@@ -10,12 +10,10 @@ import (
 func (h *RoundHandlers) HandleRoundUpdateRequest(msg *message.Message) ([]*message.Message, error) {
 	ctx := msg.Context()
 	h.Logger.Info(ctx, "Handling round update request", attr.CorrelationIDFromMsg(msg))
-
 	var payload discordroundevents.DiscordRoundUpdateRequestPayload
 	if err := h.unmarshalPayload(msg, &payload); err != nil {
 		return nil, err
 	}
-
 	// Construct the backend payload.
 	backendPayload := roundevents.RoundUpdateRequestPayload{
 		RoundID:        payload.RoundID,
@@ -30,29 +28,23 @@ func (h *RoundHandlers) HandleRoundUpdateRequest(msg *message.Message) ([]*messa
 	if payload.StartTime != nil {
 		backendPayload.StartTime = payload.StartTime
 	}
-
 	if payload.Location != nil {
 		backendPayload.Location = payload.Location
 	}
-
 	backendMsg, err := h.createResultMessage(msg, backendPayload, roundevents.RoundUpdateRequest)
 	if err != nil {
 		return nil, err
 	}
-
 	h.Logger.Info(ctx, "Successfully processed round update request", attr.CorrelationIDFromMsg(msg))
 	return []*message.Message{backendMsg}, nil
 }
-
 func (h *RoundHandlers) HandleRoundUpdated(msg *message.Message) ([]*message.Message, error) {
 	ctx := msg.Context()
 	h.Logger.Info(ctx, "Handling round updated event", attr.CorrelationIDFromMsg(msg))
-
 	var payload roundevents.RoundUpdatedPayload // From the BACKEND
 	if err := h.unmarshalPayload(msg, &payload); err != nil {
 		return nil, err
 	}
-
 	// Construct the *internal* Discord payload for the successful update.
 	discordPayload := discordroundevents.DiscordRoundUpdatedPayload{
 		RoundID:     payload.RoundID,
@@ -63,12 +55,10 @@ func (h *RoundHandlers) HandleRoundUpdated(msg *message.Message) ([]*message.Mes
 		StartTime:   payload.StartTime,
 		Location:    payload.Location,
 	}
-
 	discordMsg, err := h.createResultMessage(msg, discordPayload, discordroundevents.RoundUpdatedTopic)
 	if err != nil {
 		return nil, err
 	}
-
 	h.Logger.Info(ctx, "Successfully processed round updated", attr.CorrelationIDFromMsg(msg))
 	return []*message.Message{discordMsg}, nil
 }

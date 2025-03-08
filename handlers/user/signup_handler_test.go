@@ -16,13 +16,11 @@ import (
 func TestUserHandlers_HandleUserSignupRequest(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-
 	mockConfig := &config.Config{}
 	mockHelper := util_mocks.NewMockHelpers(ctrl)
 	mockDiscord := mocks.NewMockOperations(ctrl)
 	mockLogger := observability.NewNoOpLogger()
 	tagNumber := 456
-
 	type fields struct {
 		Config  *config.Config
 		Helper  *util_mocks.MockHelpers
@@ -122,7 +120,6 @@ func TestUserHandlers_HandleUserSignupRequest(t *testing.T) {
 			},
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.setup != nil {
@@ -146,7 +143,6 @@ func TestUserHandlers_HandleUserSignupRequest(t *testing.T) {
 				t.Errorf("UserHandlers.HandleUserSignupRequest() returned %d messages, want %d", len(got), len(tt.want))
 				return
 			}
-
 			for i := range got {
 				if got[i].UUID != tt.want[i].UUID || string(got[i].Payload) != string(tt.want[i].Payload) {
 					t.Errorf("Message mismatch at index %d:\nGot:  %s\nWant: %s", i, string(got[i].Payload), string(tt.want[i].Payload))
@@ -159,7 +155,6 @@ func TestUserHandlers_HandleUserSignupRequest(t *testing.T) {
 func TestUserHandlers_HandleUserCreated(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-
 	mockConfig := &config.Config{
 		Discord: config.DiscordConfig{
 			GuildID:          "guild_123",
@@ -170,7 +165,6 @@ func TestUserHandlers_HandleUserCreated(t *testing.T) {
 	mockDiscord := mocks.NewMockOperations(ctrl)
 	mockLogger := observability.NewNoOpLogger()
 	tagNumber := 456
-
 	type fields struct {
 		Config  *config.Config
 		Helper  *util_mocks.MockHelpers
@@ -306,7 +300,6 @@ func TestUserHandlers_HandleUserCreated(t *testing.T) {
 			},
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.setup != nil {
@@ -330,7 +323,6 @@ func TestUserHandlers_HandleUserCreated(t *testing.T) {
 				t.Errorf("UserHandlers.HandleUserCreated() returned %d messages, want %d", len(got), len(tt.want))
 				return
 			}
-
 			for i := range got {
 				if string(got[i].Payload) != string(tt.want[i].Payload) {
 					t.Errorf("Message payload mismatch at index %d:\nGot:  %s\nWant: %s", i, string(got[i].Payload), string(tt.want[i].Payload))
@@ -343,12 +335,10 @@ func TestUserHandlers_HandleUserCreated(t *testing.T) {
 func TestUserHandlers_HandleUserCreationFailed(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-
 	mockConfig := &config.Config{}
 	mockHelper := util_mocks.NewMockHelpers(ctrl)
 	mockDiscord := mocks.NewMockOperations(ctrl)
 	mockLogger := observability.NewNoOpLogger()
-
 	type fields struct {
 		Logger  observability.Logger
 		Config  *config.Config
@@ -416,7 +406,6 @@ func TestUserHandlers_HandleUserCreationFailed(t *testing.T) {
 			},
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.setup != nil {
@@ -437,7 +426,6 @@ func TestUserHandlers_HandleUserCreationFailed(t *testing.T) {
 				t.Errorf("UserHandlers.HandleUserCreationFailed() returned %d messages, want %d", len(got), len(tt.want))
 				return
 			}
-
 			for i := range got {
 				if string(got[i].Payload) != string(tt.want[i].Payload) {
 					t.Errorf("Message mismatch at index %d:\nGot:  %s\nWant: %s", i, string(got[i].Payload), string(tt.want[i].Payload))

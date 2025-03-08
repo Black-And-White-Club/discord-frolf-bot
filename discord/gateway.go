@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/discord-frolf-bot/storage"
@@ -29,17 +30,21 @@ type GatewayEventHandler interface {
 	HandleSignupModalSubmit(ctx context.Context, i *discordgo.InteractionCreate)
 	HandleCreateRoundCommand(ctx context.Context, i *discordgo.InteractionCreate)
 	HandleCreateRoundModalSubmit(ctx context.Context, i *discordgo.InteractionCreate)
+	UpdateInteractionResponse(ctx context.Context, correlationID, message string, edit ...*discordgo.WebhookEdit) error
+	UpdateInteractionResponseWithRetryButton(ctx context.Context, correlationID, message string) error
 	HandleRetryCreateRound(ctx context.Context, i *discordgo.InteractionCreate)
+	SendRoundEventEmbed(channelID, eventID, title, description string, startTime time.Time, location, creator string) (*discordgo.Message, error)
+	HandleRoundResponse(ctx context.Context, i *discordgo.InteractionCreate, response string)
 }
 
 type gatewayEventHandler struct {
-	publisher  eventbus.EventBus
-	logger     observability.Logger
-	helper     utils.Helpers
-	config     *config.Config
-	session    Session
-	discord    Operations
-	tokenStore *storage.TokenStore
+	publisher        eventbus.EventBus
+	logger           observability.Logger
+	helper           utils.Helpers
+	config           *config.Config
+	session          Session
+	discord          Operations
+	interactionStore *storage.InteractionStore
 }
 
 // NewGatewayEventHandler creates a new GatewayEventHandler.
@@ -51,13 +56,13 @@ func NewGatewayEventHandler(publisher eventbus.EventBus, logger observability.Lo
 		attr.Any("discordOps", discord),
 	)
 	return &gatewayEventHandler{
-		publisher:  publisher,
-		logger:     logger,
-		helper:     helper,
-		config:     config,
-		session:    session,
-		discord:    discord,
-		tokenStore: storage.NewTokenStore(),
+		publisher:        publisher,
+		logger:           logger,
+		helper:           helper,
+		config:           config,
+		session:          session,
+		discord:          discord,
+		interactionStore: storage.NewInteractionStore(),
 	}
 }
 
@@ -65,21 +70,17 @@ func NewGatewayEventHandler(publisher eventbus.EventBus, logger observability.Lo
 // discord/gateway_interactions.go
 func (h *gatewayEventHandler) createEvent(ctx context.Context, topic string, payload interface{}, i *discordgo.InteractionCreate) (*message.Message, error) { // Add i *discordgo.InteractionCreate
 	newEvent := message.NewMessage(watermill.NewUUID(), nil)
-
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		h.logger.Error(ctx, "Failed to marshal payload in CreateResultMessage", attr.Error(err))
 		return nil, fmt.Errorf("failed to marshal payload: %w", err)
 	}
 	newEvent.Payload = payloadBytes
-
 	newEvent.Metadata.Set("handler_name", "Create Original Discord Message to Backend")
 	newEvent.Metadata.Set("topic", topic)
 	newEvent.Metadata.Set("domain", "discord")
-
 	newEvent.Metadata.Set("interaction_id", i.Interaction.ID)
 	newEvent.Metadata.Set("interaction_token", i.Interaction.Token)
 	newEvent.Metadata.Set("guild_id", h.config.Discord.GuildID)
-
 	return newEvent, nil
 }

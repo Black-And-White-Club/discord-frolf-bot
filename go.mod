@@ -7,6 +7,7 @@ require (
 	github.com/Black-And-White-Club/frolf-bot-shared v0.0.39
 	github.com/ThreeDotsLabs/watermill v1.4.4
 	github.com/bwmarrin/discordgo v0.28.1
+	github.com/google/uuid v1.6.0
 	go.uber.org/mock v0.5.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -29,7 +30,6 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/grafana/loki-client-go v0.0.0-20230116142646-e7494d0ef70c // indirect
 	github.com/grafana/regexp v0.0.0-20220304095617-2e8d9baf4ac2 // indirect

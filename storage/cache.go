@@ -8,37 +8,58 @@ import (
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 )
 
-// TokenStore manages short-lived interaction tokens
-type TokenStore struct {
+// InteractionStore manages short-lived interaction tokens
+type InteractionStore struct {
 	store sync.Map
+	mu    sync.Mutex // Mutex to protect access to the store
 }
 
-// NewTokenStore initializes a new TokenStore
-func NewTokenStore() *TokenStore {
-	return &TokenStore{}
+// NewInteractionStore initializes a new InteractionStore
+func NewInteractionStore() *InteractionStore {
+	return &InteractionStore{}
 }
 
 // Set stores an interaction token with an auto-expiring timer
-func (ts *TokenStore) Set(interactionID, token string, ttl time.Duration) {
-	slog.Info("TokenStore: Storing token", attr.String("interaction_id", interactionID))
-	ts.store.Store(interactionID, token)
+func (ts *InteractionStore) Set(correlationID string, interaction interface{}, ttl time.Duration) {
+	slog.Info("InteractionStore: Storing interaction", attr.String("correlation_id", correlationID))
+	ts.store.Store(correlationID, interaction)
 
 	// 🔥 Auto-remove token after TTL expires
 	time.AfterFunc(ttl, func() {
-		slog.Info("TokenStore: Deleting token (TTL expired)", attr.String("interaction_id", interactionID))
-		ts.store.Delete(interactionID)
+		slog.Info("InteractionStore: Deleting interaction (TTL expired)", attr.String("correlation_id", correlationID))
+		ts.mu.Lock()
+		defer ts.mu.Unlock()
+		if _, exists := ts.store.Load(correlationID); exists {
+			ts.store.Delete(correlationID)
+			slog.Info("InteractionStore: Interaction deleted due to TTL expiration", attr.String("correlation_id", correlationID))
+		} else {
+			slog.Info("InteractionStore: Interaction already deleted", attr.String("correlation_id", correlationID))
+		}
 	})
 }
 
-// Get retrieves and deletes the token (one-time use)
-func (ts *TokenStore) Get(interactionID string) (string, bool) {
-	slog.Info("TokenStore: Retrieving token", attr.String("interaction_id", interactionID))
-	value, exists := ts.store.Load(interactionID)
-	if !exists {
-		slog.Info("TokenStore: Token not found", attr.String("interaction_id", interactionID))
-		return "", false
+// Delete removes the token associated with the given correlation ID.
+func (ts *InteractionStore) Delete(correlationID string) {
+	ts.mu.Lock() // Lock to ensure safe access
+	defer ts.mu.Unlock()
+	slog.Info("InteractionStore: Deleting interaction", attr.String("correlation_id", correlationID))
+	if _, exists := ts.store.Load(correlationID); !exists {
+		slog.Info("InteractionStore: Interaction not found", attr.String("correlation_id", correlationID))
+		return // Token not found, nothing to delete
 	}
-	ts.store.Delete(interactionID) // 🔥 Remove token after retrieval (one-time use)
-	slog.Info("TokenStore: Token retrieved and deleted", attr.String("interaction_id", interactionID))
-	return value.(string), true
+	ts.store.Delete(correlationID)
+	slog.Info("InteractionStore: Interaction deleted successfully", attr.String("correlation_id", correlationID))
+}
+
+// Get retrieves the token (one-time use)
+func (ts *InteractionStore) Get(correlationID string) (interface{}, bool) {
+	ts.mu.Lock() // Lock to ensure safe access
+	defer ts.mu.Unlock()
+	slog.Info("InteractionStore: Retrieving interaction", attr.String("correlation_id", correlationID))
+	value, exists := ts.store.Load(correlationID)
+	if !exists {
+		slog.Info("InteractionStore: Interaction not found", attr.String("correlation_id", correlationID))
+		return nil, false
+	}
+	return value, true
 }

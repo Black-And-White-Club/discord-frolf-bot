@@ -15,7 +15,6 @@ func (d *discordOperations) RespondToRoleRequest(ctx context.Context, interactio
 		attr.String("interaction_id", interactionID),
 		attr.String("target_user_id", targetUserID),
 	)
-
 	var buttons []discordgo.MessageComponent
 	// Iterate over the role mappings from the config
 	for role, _ := range d.config.Discord.RoleMappings {
@@ -30,7 +29,6 @@ func (d *discordOperations) RespondToRoleRequest(ctx context.Context, interactio
 		Style:    discordgo.DangerButton,
 		CustomID: "role_button_cancel",
 	})
-
 	err := d.session.InteractionRespond(&discordgo.Interaction{ID: interactionID, Token: interactionToken}, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
@@ -49,7 +47,6 @@ func (d *discordOperations) RespondToRoleRequest(ctx context.Context, interactio
 		)
 		return fmt.Errorf("failed to respond to role request: %w", err)
 	}
-
 	d.logger.Debug(ctx, "Successfully responded to role request",
 		attr.String("interaction_id", interactionID),
 		attr.String("target_user_id", targetUserID),
@@ -65,10 +62,8 @@ func (d *discordOperations) RespondToRoleButtonPress(ctx context.Context, intera
 		attr.String("selected_role", selectedRole),
 		attr.String("target_user_id", targetUserID),
 	)
-
 	updateMsg := fmt.Sprintf("<@%s> has requested role '%s' for <@%s>. Request is being processed.",
 		requesterID, selectedRole, targetUserID)
-
 	err := d.session.InteractionRespond(&discordgo.Interaction{ID: interactionID, Token: interactionToken}, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseUpdateMessage,
 		Data: &discordgo.InteractionResponseData{
@@ -87,7 +82,6 @@ func (d *discordOperations) RespondToRoleButtonPress(ctx context.Context, intera
 		)
 		return fmt.Errorf("failed to acknowledge role button press: %w", err)
 	}
-
 	d.logger.Debug(ctx, "Successfully acknowledged role button press",
 		attr.String("interaction_id", interactionID),
 		attr.String("requester_id", requesterID),
@@ -102,17 +96,14 @@ func (d *discordOperations) EditRoleUpdateResponse(ctx context.Context, interact
 	slog.Info("📢 Attempting to update follow-up message",
 		attr.String("interaction_token", interactionToken),
 	)
-
 	// ✅ Use FollowupMessageEdit instead of InteractionResponseEdit
 	_, err := d.session.FollowupMessageEdit(&discordgo.Interaction{Token: interactionToken}, "@original", &discordgo.WebhookEdit{
 		Content: &content,
 	})
-
 	if err != nil {
 		slog.Error("❌ Failed to edit follow-up message", attr.Error(err))
 		return fmt.Errorf("failed to edit follow-up message: %w", err)
 	}
-
 	slog.Info("✅ Successfully updated follow-up message")
 	return nil
 }
@@ -123,7 +114,6 @@ func (d *discordOperations) AddRoleToUser(ctx context.Context, guildID, userID, 
 		attr.String("user_id", userID),
 		attr.String("role_id", roleID),
 	)
-
 	err := d.session.GuildMemberRoleAdd(guildID, userID, roleID)
 	if err != nil {
 		slog.Error("Failed to add role to user",
@@ -134,7 +124,6 @@ func (d *discordOperations) AddRoleToUser(ctx context.Context, guildID, userID, 
 		)
 		return fmt.Errorf("failed to add role %s to user %s in guild %s: %w", roleID, userID, guildID, err)
 	}
-
 	member, err := d.session.GuildMember(guildID, userID)
 	if err != nil {
 		slog.Error("Failed to fetch user after adding role",
@@ -144,7 +133,6 @@ func (d *discordOperations) AddRoleToUser(ctx context.Context, guildID, userID, 
 		)
 		return fmt.Errorf("failed to fetch user %s after adding role: %w", userID, err)
 	}
-
 	roleAdded := false
 	for _, r := range member.Roles {
 		if r == roleID {
@@ -152,7 +140,6 @@ func (d *discordOperations) AddRoleToUser(ctx context.Context, guildID, userID, 
 			break
 		}
 	}
-
 	if !roleAdded {
 		slog.Error("Role was not successfully added to user",
 			attr.String("guild_id", guildID),
@@ -161,12 +148,10 @@ func (d *discordOperations) AddRoleToUser(ctx context.Context, guildID, userID, 
 		)
 		return fmt.Errorf("role %s was not added to user %s", roleID, userID)
 	}
-
 	slog.Info("Successfully added role to user",
 		attr.String("guild_id", guildID),
 		attr.String("user_id", userID),
 		attr.String("role_id", roleID),
 	)
-
 	return nil
 }

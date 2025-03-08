@@ -10,23 +10,19 @@ import (
 func (h *RoundHandlers) HandleRoundParticipantJoinRequest(msg *message.Message) ([]*message.Message, error) {
 	ctx := msg.Context()
 	h.Logger.Info(ctx, "Handling round participant join request", attr.CorrelationIDFromMsg(msg))
-
 	var payload discordroundevents.DiscordRoundParticipantJoinRequestPayload
 	if err := h.unmarshalPayload(msg, &payload); err != nil {
 		return nil, err
 	}
-
 	// Construct the backend payload
 	backendPayload := roundevents.ParticipantJoinRequestPayload{
-		RoundID:     payload.RoundID,
-		Participant: payload.UserID,
+		RoundID:   payload.RoundID,
+		DiscordID: payload.UserID,
 	}
-
 	backendMsg, err := h.createResultMessage(msg, backendPayload, roundevents.RoundParticipantJoinRequest)
 	if err != nil {
 		return nil, err
 	}
-
 	h.Logger.Info(ctx, "Successfully processed participant join request", attr.CorrelationIDFromMsg(msg))
 	return []*message.Message{backendMsg}, nil
 }
@@ -35,7 +31,6 @@ func (h *RoundHandlers) HandleRoundParticipantJoinRequest(msg *message.Message) 
 func (h *RoundHandlers) HandleRoundParticipantJoined(msg *message.Message) ([]*message.Message, error) {
 	ctx := msg.Context()
 	h.Logger.Info(ctx, "Handling participant joined", attr.CorrelationIDFromMsg(msg))
-
 	var payload roundevents.ParticipantJoinedPayload
 	if err := h.unmarshalPayload(msg, &payload); err != nil {
 		return nil, err
@@ -48,13 +43,10 @@ func (h *RoundHandlers) HandleRoundParticipantJoined(msg *message.Message) ([]*m
 		TagNumber: payload.TagNumber,
 		ChannelID: channelID,
 	}
-
 	discordMsg, err := h.createResultMessage(msg, discordPayload, discordroundevents.RoundParticipantJoinedTopic)
 	if err != nil {
 		return nil, err
 	}
-
 	h.Logger.Info(ctx, "Successfully processed participant joined", attr.CorrelationIDFromMsg(msg))
-
 	return []*message.Message{discordMsg}, nil
 }

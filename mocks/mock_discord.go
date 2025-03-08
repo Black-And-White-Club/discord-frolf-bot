@@ -93,6 +93,25 @@ func (mr *MockSessionMockRecorder) ApplicationCommandDelete(appID, guildID, cmdI
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplicationCommandDelete", reflect.TypeOf((*MockSession)(nil).ApplicationCommandDelete), varargs...)
 }
 
+// ApplicationCommandPermissionsEdit mocks base method.
+func (m *MockSession) ApplicationCommandPermissionsEdit(appID, guildID, cmdID string, permissions *discordgo.ApplicationCommandPermissionsList, options ...discordgo.RequestOption) error {
+	m.ctrl.T.Helper()
+	varargs := []any{appID, guildID, cmdID, permissions}
+	for _, a := range options {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ApplicationCommandPermissionsEdit", varargs...)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ApplicationCommandPermissionsEdit indicates an expected call of ApplicationCommandPermissionsEdit.
+func (mr *MockSessionMockRecorder) ApplicationCommandPermissionsEdit(appID, guildID, cmdID, permissions any, options ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{appID, guildID, cmdID, permissions}, options...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplicationCommandPermissionsEdit", reflect.TypeOf((*MockSession)(nil).ApplicationCommandPermissionsEdit), varargs...)
+}
+
 // ApplicationCommands mocks base method.
 func (m *MockSession) ApplicationCommands(appID, guildID string, options ...discordgo.RequestOption) ([]*discordgo.ApplicationCommand, error) {
 	m.ctrl.T.Helper()
@@ -111,6 +130,26 @@ func (mr *MockSessionMockRecorder) ApplicationCommands(appID, guildID any, optio
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{appID, guildID}, options...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplicationCommands", reflect.TypeOf((*MockSession)(nil).ApplicationCommands), varargs...)
+}
+
+// ChannelMessageEditEmbed mocks base method.
+func (m *MockSession) ChannelMessageEditEmbed(channelID, messageID string, embed *discordgo.MessageEmbed, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{channelID, messageID, embed}
+	for _, a := range options {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ChannelMessageEditEmbed", varargs...)
+	ret0, _ := ret[0].(*discordgo.Message)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ChannelMessageEditEmbed indicates an expected call of ChannelMessageEditEmbed.
+func (mr *MockSessionMockRecorder) ChannelMessageEditEmbed(channelID, messageID, embed any, options ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{channelID, messageID, embed}, options...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChannelMessageEditEmbed", reflect.TypeOf((*MockSession)(nil).ChannelMessageEditEmbed), varargs...)
 }
 
 // ChannelMessageSend mocks base method.

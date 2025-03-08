@@ -3,38 +3,45 @@ package roundrouter
 import (
 	"context"
 	"fmt"
-	"time"
+	"log/slog"
 
+	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/discord-frolf-bot/discord"
 	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/events/round"
 	roundhandlers "github.com/Black-And-White-Club/discord-frolf-bot/handlers/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
+	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
-	tempo "github.com/Black-And-White-Club/frolf-bot-shared/observability"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
+	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/message/router/middleware"
 )
 
 // RoundRouter handles routing for round module events.
 type RoundRouter struct {
-	logger     observability.Logger
-	Router     *message.Router
-	subscriber eventbus.EventBus
-	publisher  eventbus.EventBus
-	session    discord.Session
-	tracer     tempo.Tracer
+	logger           observability.Logger
+	Router           *message.Router
+	subscriber       eventbus.EventBus
+	publisher        eventbus.EventBus
+	session          discord.Session
+	config           *config.Config
+	tracer           observability.Tracer
+	middlewareHelper utils.MiddlewareHelpers
 }
 
 // NewRoundRouter creates a new RoundRouter.
-func NewRoundRouter(logger observability.Logger, router *message.Router, subscriber eventbus.EventBus, publisher eventbus.EventBus, session discord.Session, tracer tempo.Tracer) *RoundRouter {
+
+func NewRoundRouter(logger observability.Logger, router *message.Router, subscriber eventbus.EventBus, publisher eventbus.EventBus, session discord.Session, config *config.Config, tracer observability.Tracer) *RoundRouter {
 	return &RoundRouter{
-		logger:     logger,
-		Router:     router,
-		subscriber: subscriber,
-		publisher:  publisher,
-		session:    session,
-		tracer:     tracer,
+		logger:           logger,
+		Router:           router,
+		subscriber:       subscriber,
+		publisher:        publisher,
+		session:          session,
+		config:           config,
+		tracer:           tracer,
+		middlewareHelper: utils.NewMiddlewareHelper(),
 	}
 }
 
@@ -42,76 +49,24 @@ func NewRoundRouter(logger observability.Logger, router *message.Router, subscri
 func (r *RoundRouter) Configure(handlers roundhandlers.Handlers, eventbus eventbus.EventBus) error {
 	r.Router.AddMiddleware(
 		middleware.CorrelationID,
+		middleware.Retry{MaxRetries: 3}.Middleware,
+		r.middlewareHelper.CommonMetadataMiddleware("discord-round"),
+		r.middlewareHelper.DiscordMetadataMiddleware(),
+		r.middlewareHelper.RoutingMetadataMiddleware(),
 		middleware.Recoverer,
-		middleware.Retry{
-			MaxRetries: 3,
-		}.Middleware,
 		r.tracer.TraceHandler,
-		r.LokiLoggingMiddleware,
+		observability.LokiLoggingMiddleware(r.logger),
 	)
-
 	if err := r.RegisterHandlers(context.Background(), handlers); err != nil {
 		return fmt.Errorf("failed to register handlers: %w", err)
 	}
-
 	return nil
-}
-
-// LokiLoggingMiddleware is the custom Watermill middleware.
-func (r *RoundRouter) LokiLoggingMiddleware(next message.HandlerFunc) message.HandlerFunc {
-	return func(msg *message.Message) ([]*message.Message, error) {
-		startTime := time.Now()
-		ctx := msg.Context()
-
-		handlerName := msg.Metadata.Get("handler_name")
-		domain := msg.Metadata.Get("domain")
-
-		r.logger.Info(ctx, "Received message",
-			attr.CorrelationIDFromMsg(msg),
-			attr.Topic(msg.Metadata.Get("topic")),
-			attr.MessageID(msg),
-			attr.String("handler", handlerName),
-			attr.String("domain", domain),
-		)
-
-		for key, value := range msg.Metadata {
-			r.logger.Info(ctx, "Message metadata", attr.String(key, value))
-		}
-
-		producedMessages, err := next(msg)
-
-		duration := time.Since(startTime)
-
-		if err != nil {
-			r.logger.Error(ctx, "Error processing message",
-				attr.CorrelationIDFromMsg(msg),
-				attr.Topic(msg.Metadata.Get("topic")),
-				attr.MessageID(msg),
-				attr.Duration("duration", duration),
-				attr.String("handler", handlerName),
-				attr.String("domain", domain),
-				attr.Error(err),
-			)
-		} else {
-			r.logger.Info(ctx, "Message processed successfully",
-				attr.CorrelationIDFromMsg(msg),
-				attr.Topic(msg.Metadata.Get("topic")),
-				attr.MessageID(msg),
-				attr.Duration("duration", duration),
-				attr.String("handler", handlerName),
-				attr.String("domain", domain),
-			)
-		}
-
-		return producedMessages, err
-
-	}
 }
 
 // RegisterHandlers registers event handlers.
 func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandlers.Handlers) error {
 	eventsToHandlers := map[string]message.HandlerFunc{
-		discordroundevents.CreateRoundRequestedTopic:         handlers.HandleRoundCreateRequested,
+		discordroundevents.RoundCreateModalSubmit:            handlers.HandleRoundCreateRequested,
 		discordroundevents.RoundCreatedTopic:                 handlers.HandleRoundCreated,
 		discordroundevents.RoundStartedTopic:                 handlers.HandleRoundStarted,
 		discordroundevents.RoundParticipantJoinReqTopic:      handlers.HandleRoundParticipantJoinRequest,
@@ -124,17 +79,43 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 		discordroundevents.RoundParticipantScoreUpdatedTopic: handlers.HandleRoundParticipantScoreUpdated,
 		discordroundevents.RoundFinalizedTopic:               handlers.HandleRoundFinalized,
 		discordroundevents.RoundReminderTopic:                handlers.HandleRoundReminder,
+		discordroundevents.RoundValidationFailed:             handlers.HandleRoundValidationFailed,
+		roundevents.RoundCreationFailed:                      handlers.HandleRoundCreationFailed,
 	}
-
 	for topic, handlerFunc := range eventsToHandlers {
-		handlerName := fmt.Sprintf("discord.round.%s", topic)
+		handlerName := fmt.Sprintf("discord-round.%s", topic)
 		r.Router.AddHandler(
 			handlerName,
 			topic,
 			r.subscriber,
-			topic,
-			r.publisher,
-			handlerFunc,
+			"",  // ❌ No direct publish topic
+			nil, // ❌ No manual publisher
+			func(msg *message.Message) ([]*message.Message, error) {
+				messages, err := handlerFunc(msg)
+				if err != nil {
+					// Log the error and return it to trigger the retry logic
+					slog.Error("Error processing message", slog.String("message_id", msg.UUID), attr.Error(err))
+					return nil, err
+				}
+				// Automatically publish messages based on metadata
+				for _, m := range messages {
+					publishTopic := m.Metadata.Get("topic")
+					if publishTopic != "" {
+						slog.Info("🚀 Auto-publishing message",
+							slog.String("message_id", m.UUID),
+							slog.String("topic", publishTopic),
+						)
+						if err := r.publisher.Publish(publishTopic, m); err != nil {
+							return nil, fmt.Errorf("failed to publish to %s: %w", publishTopic, err)
+						}
+					} else {
+						slog.Warn("⚠️ Message missing topic metadata, dropping.",
+							slog.String("message_id", m.UUID),
+						)
+					}
+				}
+				return nil, nil // ✅ No messages returned, they're published instead
+			},
 		)
 	}
 	return nil

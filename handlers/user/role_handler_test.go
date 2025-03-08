@@ -18,12 +18,10 @@ import (
 func TestUserHandlers_HandleRoleUpdateCommand(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-
 	mockConfig := &config.Config{}
 	mockHelper := util_mocks.NewMockHelpers(ctrl)
 	mockDiscord := mocks.NewMockOperations(ctrl)
 	mockLogger := observability.NewNoOpLogger()
-
 	type fields struct {
 		Config  *config.Config
 		Helper  *util_mocks.MockHelpers
@@ -119,7 +117,6 @@ func TestUserHandlers_HandleRoleUpdateCommand(t *testing.T) {
 			},
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.setup != nil {
@@ -143,7 +140,6 @@ func TestUserHandlers_HandleRoleUpdateCommand(t *testing.T) {
 				t.Errorf("UserHandlers.HandleRoleUpdateCommand() returned %d messages, want %d", len(got), len(tt.want))
 				return
 			}
-
 			for i := range got {
 				if got[i].UUID != tt.want[i].UUID || string(got[i].Payload) != string(tt.want[i].Payload) {
 					t.Errorf("Message mismatch at index %d:\nGot:  %s\nWant: %s", i, string(got[i].Payload), string(tt.want[i].Payload))
@@ -156,12 +152,10 @@ func TestUserHandlers_HandleRoleUpdateCommand(t *testing.T) {
 func TestUserHandlers_HandleRoleUpdateButtonPress(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-
 	mockConfig := &config.Config{}
 	mockHelper := util_mocks.NewMockHelpers(ctrl)
 	mockDiscord := mocks.NewMockOperations(ctrl)
 	mockLogger := observability.NewNoOpLogger()
-
 	type fields struct {
 		Config  *config.Config
 		Helper  *util_mocks.MockHelpers
@@ -312,7 +306,6 @@ func TestUserHandlers_HandleRoleUpdateButtonPress(t *testing.T) {
 			},
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.setup != nil {
@@ -333,7 +326,6 @@ func TestUserHandlers_HandleRoleUpdateButtonPress(t *testing.T) {
 				t.Errorf("UserHandlers.HandleRoleUpdateButtonPress() returned %d messages, want %d", len(got), len(tt.want))
 				return
 			}
-
 			for i := range got {
 				if got[i].UUID != tt.want[i].UUID || string(got[i].Payload) != string(tt.want[i].Payload) {
 					t.Errorf("Message mismatch at index %d:\nGot:  %s\nWant: %s", i, string(got[i].Payload), string(tt.want[i].Payload))
@@ -346,7 +338,6 @@ func TestUserHandlers_HandleRoleUpdateButtonPress(t *testing.T) {
 func TestUserHandlers_HandleRoleUpdateResult(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-
 	mockConfig := &config.Config{
 		Discord: config.DiscordConfig{
 			RoleMappings: map[string]string{
@@ -357,7 +348,6 @@ func TestUserHandlers_HandleRoleUpdateResult(t *testing.T) {
 	mockHelper := util_mocks.NewMockHelpers(ctrl)
 	mockDiscord := mocks.NewMockOperations(ctrl)
 	mockLogger := observability.NewNoOpLogger()
-
 	type fields struct {
 		Config  *config.Config
 		Helper  *util_mocks.MockHelpers
@@ -501,7 +491,6 @@ func TestUserHandlers_HandleRoleUpdateResult(t *testing.T) {
 			},
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.setup != nil {
@@ -525,7 +514,6 @@ func TestUserHandlers_HandleRoleUpdateResult(t *testing.T) {
 				t.Errorf("UserHandlers.HandleRoleUpdateResult() returned %d messages, want %d", len(got), len(tt.want))
 				return
 			}
-
 			for i := range got {
 				if got[i].UUID != tt.want[i].UUID || string(got[i].Payload) != string(tt.want[i].Payload) {
 					t.Errorf("Message mismatch at index %d:\nGot:  %s\nWant: %s", i, string(got[i].Payload), string(tt.want[i].Payload))

@@ -27,6 +27,7 @@ type LeaderboardRouter struct {
 }
 
 // NewLeaderboardRouter creates a new LeaderboardRouter.
+
 func NewLeaderboardRouter(logger observability.Logger, router *message.Router, subscriber eventbus.EventBus, publisher eventbus.EventBus, session discord.Session, tracer observability.Tracer) *LeaderboardRouter {
 	return &LeaderboardRouter{
 		logger:           logger,
@@ -50,11 +51,9 @@ func (r *LeaderboardRouter) Configure(handlers leaderboardhandlers.Handlers, eve
 		r.tracer.TraceHandler,
 		observability.LokiLoggingMiddleware(r.logger),
 	)
-
 	if err := r.RegisterHandlers(context.Background(), handlers); err != nil {
 		return fmt.Errorf("failed to register handlers: %w", err)
 	}
-
 	return nil
 }
 
@@ -73,7 +72,6 @@ func (r *LeaderboardRouter) RegisterHandlers(ctx context.Context, handlers leade
 		discordleaderboardevents.LeaderboardTagSwappedTopic:              handlers.HandleTagSwappedResponse,
 		discordleaderboardevents.LeaderboardTagSwapFailedTopic:           handlers.HandleTagSwapFailedResponse,
 	}
-
 	for topic, handlerFunc := range eventsToHandlers {
 		handlerName := fmt.Sprintf("discord.leaderboard.%s", topic)
 		r.Router.AddHandler(

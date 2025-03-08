@@ -38,6 +38,7 @@ type Session interface {
 	ApplicationCommands(appID, guildID string, options ...discordgo.RequestOption) ([]*discordgo.ApplicationCommand, error)
 	ApplicationCommandDelete(appID, guildID, cmdID string, options ...discordgo.RequestOption) error
 	WebhookMessageEdit(webhookID string, token string, messageID string, data *discordgo.WebhookEdit, options ...discordgo.RequestOption) (st *discordgo.Message, err error)
+	ChannelMessageEditEmbed(channelID string, messageID string, embed *discordgo.MessageEmbed, options ...discordgo.RequestOption) (*discordgo.Message, error)
 }
 
 // State defines an interface that provides access to the Discord state.
@@ -67,11 +68,9 @@ type DiscordState struct {
 func (d *DiscordSession) ApplicationCommandPermissionsEdit(appID string, guildID string, cmdID string, permissions *discordgo.ApplicationCommandPermissionsList, options ...discordgo.RequestOption) (err error) {
 	return d.session.ApplicationCommandPermissionsEdit(appID, guildID, cmdID, permissions, options...)
 }
-
 func (d *DiscordSession) FollowupMessageCreate(interaction *discordgo.Interaction, wait bool, data *discordgo.WebhookParams, options ...discordgo.RequestOption) (*discordgo.Message, error) {
 	return d.session.FollowupMessageCreate(interaction, wait, data, options...)
 }
-
 func (d *DiscordSession) WebhookExecute(webhookID string, token string, wait bool, data *discordgo.WebhookParams, options ...discordgo.RequestOption) (st *discordgo.Message, err error) {
 	return d.session.WebhookExecute("", token, wait, data, options...)
 }
@@ -143,6 +142,10 @@ func (d *DiscordSession) GetBotUser() (*discordgo.User, error) {
 	return d.session.User("@me")
 }
 
+func (d *DiscordSession) ChannelMessageEditEmbed(channelID string, messageID string, embed *discordgo.MessageEmbed, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+	return d.session.ChannelMessageEditEmbed(channelID, messageID, embed, options...)
+}
+
 // ChannelMessageSendComplex sends a complex message to a channel.
 func (d *DiscordSession) ChannelMessageSendComplex(channelID string, data *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error) {
 	return d.session.ChannelMessageSendComplex(channelID, data, options...)
@@ -197,15 +200,12 @@ func (d *DiscordSession) InteractionResponseEdit(interaction *discordgo.Interact
 func (d *DiscordSession) ApplicationCommandCreate(appID, guildID string, cmd *discordgo.ApplicationCommand, options ...discordgo.RequestOption) (*discordgo.ApplicationCommand, error) {
 	return d.session.ApplicationCommandCreate(appID, guildID, cmd, options...)
 }
-
 func (d *DiscordSession) ApplicationCommands(appID, guildID string, options ...discordgo.RequestOption) ([]*discordgo.ApplicationCommand, error) {
 	return d.session.ApplicationCommands(appID, guildID, options...)
 }
-
 func (d *DiscordSession) ApplicationCommandDelete(appID, guildID, cmdID string, options ...discordgo.RequestOption) error {
 	return d.session.ApplicationCommandDelete(appID, guildID, cmdID, options...)
 }
-
 func (d *DiscordSession) User(userID string, options ...discordgo.RequestOption) (st *discordgo.User, err error) {
 	return d.session.User(userID, options...)
 }
@@ -214,19 +214,15 @@ func (d *DiscordSession) User(userID string, options ...discordgo.RequestOption)
 func (d *DiscordSession) GuildMemberRoleAdd(guildID string, userID string, roleID string, options ...discordgo.RequestOption) (err error) {
 	return d.session.GuildMemberRoleAdd(guildID, userID, roleID, options...)
 }
-
 func (d *DiscordSession) GuildMember(guildID, userID string, options ...discordgo.RequestOption) (*discordgo.Member, error) {
 	return d.session.GuildMember(guildID, userID, options...)
 }
-
 func (d *DiscordSession) GuildMemberRoleRemove(guildID, userID, roleID string, options ...discordgo.RequestOption) error {
 	return d.session.GuildMemberRoleRemove(guildID, userID, roleID, options...)
 }
-
 func (d *DiscordSession) FollowupMessageEdit(interaction *discordgo.Interaction, messageID string, data *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
 	return d.session.FollowupMessageEdit(interaction, messageID, data, options...)
 }
-
 func (d *DiscordSession) WebhookMessageEdit(webhookID string, token string, messageID string, data *discordgo.WebhookEdit, options ...discordgo.RequestOption) (st *discordgo.Message, err error) {
 	return d.session.WebhookMessageEdit(webhookID, token, messageID, data, options...)
 }

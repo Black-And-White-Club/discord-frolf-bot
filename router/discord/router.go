@@ -30,6 +30,7 @@ type DiscordRouter struct {
 }
 
 // NewDiscordRouter creates a new DiscordRouter.
+
 func NewDiscordRouter(logger observability.Logger, router *message.Router, subscriber eventbus.EventBus, publisher eventbus.EventBus, discord discord.Operations, config *config.Config, helper utils.Helpers, tracer observability.Tracer) *DiscordRouter {
 	return &DiscordRouter{
 		logger:           logger,
@@ -56,11 +57,9 @@ func (r *DiscordRouter) Configure(handlers discordhandlers.Handlers, eventbus ev
 		r.tracer.TraceHandler,
 		observability.LokiLoggingMiddleware(r.logger),
 	)
-
 	if err := r.RegisterHandlers(context.Background(), handlers); err != nil {
 		return fmt.Errorf("failed to register handlers: %w", err)
 	}
-
 	return nil
 }
 
@@ -69,10 +68,8 @@ func (r *DiscordRouter) RegisterHandlers(ctx context.Context, handlers discordha
 	eventsToHandlers := map[string]message.HandlerFunc{
 		discordevents.SendDM: handlers.HandleSendDM,
 	}
-
 	for topic, handlerFunc := range eventsToHandlers {
 		handlerName := fmt.Sprintf("discord-internal.%s", topic)
-
 		r.Router.AddHandler(
 			handlerName,
 			topic,
@@ -84,7 +81,6 @@ func (r *DiscordRouter) RegisterHandlers(ctx context.Context, handlers discordha
 				if err != nil {
 					return nil, err
 				}
-
 				// Automatically publish messages based on metadata
 				for _, m := range messages {
 					publishTopic := m.Metadata.Get("topic")
@@ -102,12 +98,10 @@ func (r *DiscordRouter) RegisterHandlers(ctx context.Context, handlers discordha
 						)
 					}
 				}
-
 				return nil, nil // ✅ No messages returned, they're published instead
 			},
 		)
 	}
-
 	return nil
 }
 

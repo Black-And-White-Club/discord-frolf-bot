@@ -3,6 +3,7 @@ package roundhandlers
 import (
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/discord-frolf-bot/discord"
+	"github.com/Black-And-White-Club/discord-frolf-bot/storage"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"github.com/ThreeDotsLabs/watermill/message"
@@ -23,22 +24,30 @@ type Handlers interface {
 	HandleRoundDeleted(msg *message.Message) ([]*message.Message, error)
 	HandleRoundCreateRequested(msg *message.Message) ([]*message.Message, error)
 	HandleRoundCreated(msg *message.Message) ([]*message.Message, error)
+	HandleRoundValidationFailed(msg *message.Message) ([]*message.Message, error)
+	HandleRoundCreationFailed(msg *message.Message) ([]*message.Message, error)
 }
 
 // RoundHandlers handles round-related events.
 type RoundHandlers struct {
-	Logger    observability.Logger
-	Discord   discord.Operations
-	Config    *config.Config
-	EventUtil utils.EventUtil
+	Logger           observability.Logger
+	Discord          discord.Operations
+	Config           *config.Config
+	EventUtil        utils.EventUtil
+	Gateway          discord.GatewayEventHandler
+	Helpers          utils.Helpers
+	interactionStore *storage.InteractionStore
 }
 
 // NewRoundHandlers creates a new RoundHandlers.
-func NewRoundHandlers(logger observability.Logger, discord discord.Operations, config *config.Config, eventUtil utils.EventUtil) Handlers {
+func NewRoundHandlers(logger observability.Logger, discord discord.Operations, config *config.Config, eventUtil utils.EventUtil, gateway discord.GatewayEventHandler, helpers utils.Helpers, interactionStore *storage.InteractionStore) Handlers {
 	return &RoundHandlers{
-		Logger:    logger,
-		Discord:   discord,
-		Config:    config,
-		EventUtil: eventUtil,
+		Logger:           logger,
+		Discord:          discord,
+		Config:           config,
+		EventUtil:        eventUtil,
+		Gateway:          gateway,
+		Helpers:          helpers,
+		interactionStore: interactionStore,
 	}
 }

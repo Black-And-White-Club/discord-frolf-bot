@@ -27,6 +27,7 @@ type ScoreRouter struct {
 }
 
 // NewScoreRouter creates a new ScoreRouter.
+
 func NewScoreRouter(logger observability.Logger, router *message.Router, subscriber eventbus.EventBus, publisher eventbus.EventBus, session discord.Session, tracer tempo.Tracer) *ScoreRouter {
 	return &ScoreRouter{
 		logger:     logger,
@@ -49,11 +50,9 @@ func (r *ScoreRouter) Configure(handlers scorehandlers.Handlers, eventbus eventb
 		r.tracer.TraceHandler,
 		r.LokiLoggingMiddleware,
 	)
-
 	if err := r.RegisterHandlers(context.Background(), handlers); err != nil {
 		return fmt.Errorf("failed to register handlers: %w", err)
 	}
-
 	return nil
 }
 
@@ -62,10 +61,8 @@ func (r *ScoreRouter) LokiLoggingMiddleware(next message.HandlerFunc) message.Ha
 	return func(msg *message.Message) ([]*message.Message, error) {
 		startTime := time.Now()
 		ctx := msg.Context()
-
 		handlerName := msg.Metadata.Get("handler_name")
 		domain := msg.Metadata.Get("domain")
-
 		r.logger.Info(ctx, "Received message",
 			attr.CorrelationIDFromMsg(msg),
 			attr.Topic(msg.Metadata.Get("topic")),
@@ -73,15 +70,11 @@ func (r *ScoreRouter) LokiLoggingMiddleware(next message.HandlerFunc) message.Ha
 			attr.String("handler", handlerName),
 			attr.String("domain", domain),
 		)
-
 		for key, value := range msg.Metadata {
 			r.logger.Info(ctx, "Message metadata", attr.String(key, value))
 		}
-
 		producedMessages, err := next(msg)
-
 		duration := time.Since(startTime)
-
 		if err != nil {
 			r.logger.Error(ctx, "Error processing message",
 				attr.CorrelationIDFromMsg(msg),
@@ -102,9 +95,7 @@ func (r *ScoreRouter) LokiLoggingMiddleware(next message.HandlerFunc) message.Ha
 				attr.String("domain", domain),
 			)
 		}
-
 		return producedMessages, err
-
 	}
 }
 
@@ -114,7 +105,6 @@ func (r *ScoreRouter) RegisterHandlers(ctx context.Context, handlers scorehandle
 		discorduserevents.ScoreUpdateRequestTopic:  handlers.HandleScoreUpdateRequest,
 		discorduserevents.ScoreUpdateResponseTopic: handlers.HandleScoreUpdateResponse,
 	}
-
 	for topic, handlerFunc := range eventsToHandlers {
 		handlerName := fmt.Sprintf("discord.score.%s", topic)
 		r.Router.AddHandler(

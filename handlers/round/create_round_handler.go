@@ -1,8 +1,9 @@
 package roundhandlers
 
 import (
-	"encoding/json"
 	"fmt"
+	"log/slog"
+	"strings"
 	"time"
 
 	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/events/round"
@@ -12,89 +13,135 @@ import (
 )
 
 func (h *RoundHandlers) HandleRoundCreateRequested(msg *message.Message) ([]*message.Message, error) {
-	ctx := msg.Context()
-	h.Logger.Info(ctx, "Handling round create requested", attr.CorrelationIDFromMsg(msg))
-
+	slog.Info("Handling round create requested", attr.CorrelationIDFromMsg(msg))
 	var payload discordroundevents.CreateRoundRequestedPayload
-	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
-		h.Logger.Error(ctx, "Failed to unmarshal payload", attr.CorrelationIDFromMsg(msg), attr.Error(err))
-		return nil, fmt.Errorf("failed to unmarshal payload: %w", err)
+	if err := h.Helpers.UnmarshalPayload(msg, &payload); err != nil {
+		slog.Error("Failed to unmarshal payload", attr.CorrelationIDFromMsg(msg), attr.Error(err))
+		if err := h.Gateway.UpdateInteractionResponseWithRetryButton(msg.Context(), msg.Metadata.Get("correlation_id"), "Failed to unmarshal payload: "+err.Error()); err != nil {
+			return nil, err
+		}
+		return nil, nil
 	}
 
-	// --- Domain/Business Logic Validation ---
-	if time.Now().After(payload.StartTime) {
-		h.Logger.Warn(ctx, "Start time is in the past", attr.CorrelationIDFromMsg(msg), attr.UserID(payload.UserID))
-		errorPayload := discordroundevents.RoundCreationFailedPayload{
-			UserID: payload.UserID,
-			Reason: "Start time must be in the future.",
-		}
-		errorMsg, err := h.createResultMessage(msg, errorPayload, discordroundevents.RoundCreationFailedTopic) // Use helper
-		if err != nil {
-			return nil, err // createResultMessage logs
-		}
-		return []*message.Message{errorMsg}, nil // Ack
-	}
-
-	// --- Construct Backend Payload ---
-	backendPayload := roundevents.RoundCreateRequestPayload{
-		Title:       payload.Title,
-		Description: &payload.Description,
-		StartTime:   &payload.StartTime,
-		Location:    &payload.Location,
-		UserID:      payload.UserID,
-		ChannelID:   payload.ChannelID, // Include ChannelID
-	}
-	backendMsg, err := h.createResultMessage(msg, backendPayload, roundevents.RoundCreateRequestTopic) // Use helper
+	// Directly publish to the backend without additional checks
+	backendMsg, err := h.Helpers.CreateResultMessage(msg, payload, roundevents.RoundCreateRequestTopic)
 	if err != nil {
-		return nil, err
+		slog.Error("Failed to create result message", attr.CorrelationIDFromMsg(msg), attr.Error(err))
+		if updateErr := h.Gateway.UpdateInteractionResponseWithRetryButton(msg.Context(), msg.Metadata.Get("correlation_id"), "Failed to create result message: "+err.Error()); updateErr != nil {
+			return nil, updateErr
+		}
+		return nil, nil
 	}
 
-	// --- Return the message for the router to publish ---
-	h.Logger.Info(ctx, "Successfully processed round create request", attr.CorrelationIDFromMsg(msg))
+	slog.Info("Successfully processed round create request", attr.CorrelationIDFromMsg(msg))
 	return []*message.Message{backendMsg}, nil
 }
 
 func (h *RoundHandlers) HandleRoundCreated(msg *message.Message) ([]*message.Message, error) {
 	ctx := msg.Context()
-	h.Logger.Info(ctx, "Handling round created event", attr.CorrelationIDFromMsg(msg))
+	slog.Info("Handling round created event", attr.CorrelationIDFromMsg(msg))
 
-	var payload roundevents.RoundCreatedEventPayload
-	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
-		h.Logger.Error(ctx, "Failed to unmarshal payload", attr.CorrelationIDFromMsg(msg), attr.Error(err))
+	// Unmarshal the payload
+	var payload roundevents.RoundCreatedPayload
+	if err := h.Helpers.UnmarshalPayload(msg, &payload); err != nil {
+		slog.Error("Failed to unmarshal payload", attr.CorrelationIDFromMsg(msg), attr.Error(err))
 		return nil, fmt.Errorf("failed to unmarshal payload: %w", err)
 	}
 
-	internalPayload := &discordroundevents.RoundCreatedPayload{
-		RoundID:     payload.RoundID,
-		Title:       payload.Title,
-		StartTime:   payload.StartTime,
-		RequesterID: payload.UserID,
-		ChannelID:   payload.ChannelID,
-	}
-	internalMsg, err := h.createResultMessage(msg, internalPayload, discordroundevents.RoundCreatedTopic)
-	if err != nil {
+	// Extract required data
+	correlationID := msg.Metadata.Get("correlation_id")
+	roundID := payload.RoundID
+	channelID := "1344376922888474625"
+	creator := payload.CreatedBy
+
+	// 1️⃣ Update the original interaction response
+	successMessage := fmt.Sprintf("✅ Round created successfully! Round ID: %d", roundID)
+	slog.Info("Publishing success message", attr.String("message", successMessage), attr.String("correlation_id", correlationID))
+
+	if err := h.Gateway.UpdateInteractionResponse(ctx, correlationID, successMessage); err != nil {
+		slog.Error("Failed to update interaction response", attr.Error(err))
 		return nil, err
 	}
-	h.Logger.Info(ctx, "Successfully processed round created event", attr.CorrelationIDFromMsg(msg))
-	return []*message.Message{internalMsg}, nil
+
+	// 2️⃣ Send the embedded RSVP message with buttons
+	description := ""
+	if payload.Description != nil {
+		description = *payload.Description
+	}
+	location := ""
+	if payload.Location != nil {
+		location = *payload.Location
+	}
+
+	_, err := h.Gateway.SendRoundEventEmbed(channelID, fmt.Sprintf("%d", roundID), payload.Title, description, *payload.StartTime, location, creator)
+	if err != nil {
+		slog.Error("Failed to send round event embed", attr.Error(err))
+		return nil, err
+	}
+
+	tracePayload := discordroundevents.DiscordRoundCreatedTracePayload{
+		RoundID:   roundID,
+		Title:     payload.Title,
+		CreatedBy: payload.CreatedBy,
+		Timestamp: time.Now(),
+	}
+	tracingEvent, err := h.Helpers.CreateResultMessage(msg, tracePayload, discordroundevents.RoundCreatedTraceTopic)
+	if err != nil {
+		h.Logger.Error(ctx, "Failed to create trace event", attr.Error(err))
+		return nil, fmt.Errorf("failed to create trace event: %w", err)
+	}
+
+	// Cleanup stored interactions
+	h.interactionStore.Delete(correlationID)
+
+	return []*message.Message{tracingEvent}, nil
+}
+
+func (h *RoundHandlers) HandleRoundCreationFailed(msg *message.Message) ([]*message.Message, error) {
+	ctx := msg.Context()
+	slog.Info("Handling round creation failed event", attr.CorrelationIDFromMsg(msg))
+	var payload discordroundevents.RoundCreationFailedPayload
+	if err := h.Helpers.UnmarshalPayload(msg, &payload); err != nil {
+		slog.Error("Failed to unmarshal payload", attr.CorrelationIDFromMsg(msg), attr.Error(err))
+		return nil, fmt.Errorf("failed to unmarshal payload: %w", err)
+	}
+	correlationID := msg.Metadata.Get("correlation_id")
+
+	// Prepare the error message
+	errorMessage := "❌ Round creation failed: " + payload.Reason
+
+	// Call the gateway handler to update the interaction response with a retry button
+	if err := h.Gateway.UpdateInteractionResponseWithRetryButton(ctx, correlationID, errorMessage); err != nil {
+		slog.Error("Failed to update interaction response", attr.Error(err))
+		return nil, err
+	}
+	h.interactionStore.Delete(correlationID)
+
+	return nil, nil
 }
 
 func (h *RoundHandlers) HandleRoundValidationFailed(msg *message.Message) ([]*message.Message, error) {
 	ctx := msg.Context()
-
+	slog.Info("Received round validation failed message", attr.CorrelationIDFromMsg(msg))
 	var payload roundevents.RoundValidationFailedPayload
-	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
-		h.Logger.Error(ctx, "Failed to unmarshal payload", attr.CorrelationIDFromMsg(msg), attr.Error(err))
+	if err := h.Helpers.UnmarshalPayload(msg, &payload); err != nil {
+		slog.Error("Failed to unmarshal payload", attr.CorrelationIDFromMsg(msg), attr.Error(err))
 		return nil, fmt.Errorf("failed to unmarshal payload: %w", err)
 	}
+	correlationID := msg.Metadata.Get("correlation_id")
 
-	userID := payload.UserID
-	errorMessage := payload.ErrorMessage
+	// Prepare the error message
+	errorMessages := payload.ErrorMessage
+	errorMessage := "❌ " + strings.Join(errorMessages, "\n") + " Please try again."
+	slog.Warn("Round validation failed", attr.UserID(payload.UserID), attr.String("error", errorMessage))
 
-	h.Logger.Warn(ctx, "Round validation failed", attr.UserID(userID), attr.String("error", errorMessage))
+	// Call the gateway handler to update the interaction response with a retry button
+	if err := h.Gateway.UpdateInteractionResponseWithRetryButton(ctx, correlationID, errorMessage); err != nil {
+		slog.Error("Failed to update interaction response", attr.Error(err))
+	}
 
-	// Send an ephemeral message to the user
-	h.Discord.SendDM(ctx, userID, "❌ "+errorMessage+" Please try again.")
+	slog.Info("Successfully handled round validation failure", attr.CorrelationIDFromMsg(msg))
 
-	return []*message.Message{errorMessage}, nil
+	h.interactionStore.Delete(correlationID)
+	return nil, nil
 }

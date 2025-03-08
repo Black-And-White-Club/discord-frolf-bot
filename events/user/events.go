@@ -19,18 +19,15 @@ const (
 	InteractionResponded      = "discord.user.interaction.responded"
 	SignupFormSubmitted       = "discord.user.signupformsubmitted"
 	SignupSubmission          = "discord.user.signupsubmission"
-
 	// Discord DM events
 	SendUserDM = "discord.send.dm"     // Keep: This is the event to trigger sending a DM.
 	DMSent     = "discord.user.dmsent" // Keep: This is for the success case.
 	// DMCreateError = "discord.user.dmcreateerror" // REMOVE: No longer needed.
 	// DMSendError   = "discord.user.dmsenderror"   // REMOVE: No longer needed
 	DMError = "discord.user.dmerror" // ADD:  A single, generic error event.
-
 	// Tag-related events (Discord-side).
 	TagNumberRequested = "discord.user.tag.number.requested"
 	TagNumberResponse  = "discord.user.tag.number.response" // Payload from the user.
-
 	// Role Update events (Discord-side).
 	RoleUpdateCommand     = "discord.user.roleupdatecommand" // From command handler.
 	RoleUpdateButtonPress = "discord.user.roleupdatebuttonpress"
@@ -38,17 +35,14 @@ const (
 	RoleOptionsRequested  = "discord.user.roleoptionsrequested"
 	RoleResponse          = "discord.user.roleresponse"
 	RoleResponseFailed    = "discord.user.roleresponsefailed"
-
 	// Trace events, keeping these, I guess.
 	SignupResponseTrace     = "discord.user.signup.response.trace"
 	RoleUpdateResponseTrace = "discord.user.role.update.response.trace"
-
 	// Generic Trace event
 	DiscordEventTrace = "discord.user.event.trace"
 )
 
 // --- Payload Structs ---
-
 // RoleUpdateCommandPayload defines the payload for the internal RoleUpdateCommand event.
 type RoleUpdateCommandPayload struct {
 	TargetUserID string `json:"target_user_id"`
@@ -73,7 +67,6 @@ type SendUserDMPayload struct {
 }
 
 // ---  Payloads below this probably aren't needed anymore ---
-
 // RoleUpdateResponsePayload is the user's response to role options
 // DEPRECATED.  This is handled via RoleUpdateButtonPressPayload
 type RoleUpdateResponsePayload struct {
@@ -116,7 +109,6 @@ type TagNumberRequestedPayload struct {
 type RoleUpdateTimeoutPayload struct {
 	UserID string `json:"user_id"`
 }
-
 type TagNumberProvidedPayload struct {
 	UserID      string                 `json:"user_id"`
 	TagNumber   string                 `json:"tag_number"`
@@ -137,7 +129,6 @@ type SignupFailedPayload struct {
 	UserID        string `json:"user_id"`
 	CorrelationID string `json:"correlation_id"`
 }
-
 type SignupFormSubmittedPayload struct {
 	UserID           string `json:"user_id"`
 	InteractionID    string `json:"interaction_id"`

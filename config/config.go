@@ -64,16 +64,13 @@ func LoadConfig(filename string) (*Config, error) {
 	if err != nil {
 		fmt.Printf("Failed to read config file: %v\n", err)
 		fmt.Println("Trying to load configuration from environment variables...")
-
 		cfg := &Config{} // Create a new Config to pass to loadConfigFromEnv
 		return loadConfigFromEnv(cfg)
 	}
-
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
-
 	// After unmarshaling, load from environment if values are missing
 	loadConfigFromEnv(&cfg)
 	fmt.Println("Loaded Discord Token:", cfg.Discord.Token)
@@ -86,62 +83,51 @@ func LoadConfig(filename string) (*Config, error) {
 // loadConfigFromEnv loads the configuration from environment variables.
 func loadConfigFromEnv(cfg *Config) (*Config, error) {
 	// Only load from environment variables if the value is not already set.
-
 	if cfg.NATS.URL == "" {
 		cfg.NATS.URL = os.Getenv("NATS_URL")
 		if cfg.NATS.URL == "" {
 			return nil, fmt.Errorf("NATS_URL environment variable not set")
 		}
 	}
-
 	if cfg.Service.Name == "" {
 		cfg.Service.Name = os.Getenv("SERVICE_NAME")
 		if cfg.Service.Name == "" {
 			return nil, fmt.Errorf("SERVICE_NAME environment variable not set")
 		}
 	}
-
 	if cfg.Loki.URL == "" {
 		cfg.Loki.URL = os.Getenv("LOKI_URL")
 		if cfg.Loki.URL == "" {
 			return nil, fmt.Errorf("LOKI_URL environment variable not set")
 		}
 	}
-
 	if cfg.Loki.TenantID == "" {
 		cfg.Loki.TenantID = os.Getenv("LOKI_TENANT_ID")
 		if cfg.Loki.TenantID == "" {
 			return nil, fmt.Errorf("LOKI_TENANT_ID environment variable not set")
 		}
 	}
-
 	if cfg.Discord.Token == "" {
 		cfg.Discord.Token = os.Getenv("DISCORD_TOKEN")
 		if cfg.Discord.Token == "" {
 			return nil, fmt.Errorf("DISCORD_TOKEN environment variable not set")
 		}
 	}
-
 	if cfg.Discord.RegisteredRoleID == "" {
 		cfg.Discord.RegisteredRoleID = os.Getenv("DISCORD_REGISTERED_ROLE_ID")
 	}
-
 	if cfg.Discord.GuildID == "" {
 		cfg.Discord.GuildID = os.Getenv("DISCORD_GUILD_ID")
 	}
-
 	if cfg.Discord.DiscordAppID == "" {
 		cfg.Discord.DiscordAppID = os.Getenv("DISCORD_APP_ID")
 	}
-
 	if cfg.Discord.SignupChannelID == "" {
 		cfg.Discord.SignupChannelID = os.Getenv("DISCORD_SIGNUP_CHANNEL_ID")
 	}
-
 	if cfg.Discord.SignupMessageID == "" {
 		cfg.Discord.SignupMessageID = os.Getenv("DISCORD_SIGNUP_MESSAGE_ID")
 	}
-
 	// Load role mappings from environment variables (special handling)
 	if cfg.Discord.RoleMappings == nil {
 		cfg.Discord.RoleMappings = make(map[string]string)
@@ -157,6 +143,5 @@ func loadConfigFromEnv(cfg *Config) (*Config, error) {
 			}
 		}
 	}
-
 	return cfg, nil
 }

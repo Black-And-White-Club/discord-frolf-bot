@@ -12,6 +12,5 @@ func (h *DiscordHandlers) interactionResponded(msg *message.Message, userID, sta
 		UserID:        userID,
 		Status:        status,
 	}
-
 	return interactionPayload
 }

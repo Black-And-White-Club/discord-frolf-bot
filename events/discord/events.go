@@ -4,9 +4,8 @@ const (
 	StatusSuccess = "success"
 	StatusFail    = "fail"
 	SendDM        = "discord.send.dm"
-	DMSent        = "discord.user.dmsent"  // Keep: This is for the success case.
-	DMError       = "discord.user.dmerror" // ADD:  A single, generic error event.
-
+	DMSent        = "discord.user.dmsent"
+	DMError       = "discord.user.dmerror"
 )
 
 // Interaction response tracking
@@ -27,8 +26,19 @@ type DMErrorPayload struct {
 	UserID      string `json:"user_id"`
 	ErrorDetail string `json:"error_detail"`
 }
-
 type SendDMPayload struct {
 	UserID  string `json:"user_id"`
 	Message string `json:"message"`
+}
+type InteractionResponse struct {
+	InteractionID string
+	Token         string
+	Message       string
+	RetryData     *RetryData
+}
+type RetryData struct {
+	Title       string
+	Description string
+	StartTime   string
+	Location    string
 }

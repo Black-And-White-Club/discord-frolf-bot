@@ -32,7 +32,6 @@ type LeaderboardRetrievedPayload struct {
 	ChannelID             string                               `json:"channel_id"`
 	MessageID             string                               `json:"message_id"`
 }
-
 type LeaderboardTagAssignRequestPayload struct {
 	events.CommonMetadata `json:",inline"`
 	TargetUserID          string `json:"target_user_id"`
@@ -48,7 +47,6 @@ type LeaderboardTagAssignedPayload struct {
 	ChannelID             string `json:"channel_id"`
 	MessageID             string `json:"message_id"`
 }
-
 type LeaderboardTagAssignFailedPayload struct {
 	events.CommonMetadata `json:",inline"`
 	TargetUserID          string `json:"target_user_id"`
@@ -57,7 +55,6 @@ type LeaderboardTagAssignFailedPayload struct {
 	ChannelID             string `json:"channel_id"`
 	MessageID             string `json:"message_id"`
 }
-
 type LeaderboardTagAvailabilityRequestPayload struct {
 	events.CommonMetadata `json:",inline"`
 	TagNumber             int    `json:"tag_number"`
@@ -65,7 +62,6 @@ type LeaderboardTagAvailabilityRequestPayload struct {
 	ChannelID             string `json:"channel_id"`
 	MessageID             string `json:"message_id"`
 }
-
 type LeaderboardTagAvailabilityResponsePayload struct {
 	events.CommonMetadata `json:",inline"`
 	TagNumber             int    `json:"tag_number"`
@@ -80,7 +76,6 @@ type LeaderboardTagSwapRequestPayload struct {
 	ChannelID             string `json:"channel_id"`
 	MessageID             string `json:"message_id"`
 }
-
 type LeaderboardTagSwappedPayload struct {
 	events.CommonMetadata `json:",inline"`
 	User1ID               string `json:"user1_id"`
@@ -88,7 +83,6 @@ type LeaderboardTagSwappedPayload struct {
 	ChannelID             string `json:"channel_id"`
 	MessageID             string `json:"message_id"`
 }
-
 type LeaderboardTagSwapFailedPayload struct {
 	events.CommonMetadata `json:",inline"`
 	User1ID               string `json:"user1_id"`

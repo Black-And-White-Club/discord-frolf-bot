@@ -97,6 +97,20 @@ func (mr *MockOperationsMockRecorder) RespondToRoleRequest(ctx, interactionID, i
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RespondToRoleRequest", reflect.TypeOf((*MockOperations)(nil).RespondToRoleRequest), ctx, interactionID, interactionToken, targetUserID)
 }
 
+// SendCreateRoundModal mocks base method.
+func (m *MockOperations) SendCreateRoundModal(ctx context.Context, i *discordgo.Interaction) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SendCreateRoundModal", ctx, i)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SendCreateRoundModal indicates an expected call of SendCreateRoundModal.
+func (mr *MockOperationsMockRecorder) SendCreateRoundModal(ctx, i any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendCreateRoundModal", reflect.TypeOf((*MockOperations)(nil).SendCreateRoundModal), ctx, i)
+}
+
 // SendDM mocks base method.
 func (m *MockOperations) SendDM(ctx context.Context, userID, message string) (*discordgo.Message, error) {
 	m.ctrl.T.Helper()

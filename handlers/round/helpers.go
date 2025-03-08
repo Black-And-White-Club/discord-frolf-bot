@@ -12,25 +12,21 @@ import (
 // createResultMessage creates a new Watermill message and sets metadata.
 func (h *RoundHandlers) createResultMessage(originalMsg *message.Message, payload interface{}, topic string) (*message.Message, error) {
 	newEvent := message.NewMessage(watermill.NewUUID(), nil)
-
 	// Copy metadata from the original message.  Watermill *will* propagate the correlation ID.
 	if originalMsg != nil {
 		for key, value := range originalMsg.Metadata {
 			newEvent.Metadata.Set(key, value)
 		}
 	}
-
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		h.Logger.Error(originalMsg.Context(), "Failed to marshal payload in createResultMessage", attr.Error(err), attr.CorrelationIDFromMsg(originalMsg))
 		return nil, fmt.Errorf("failed to marshal payload: %w", err)
 	}
 	newEvent.Payload = payloadBytes
-
 	newEvent.Metadata.Set("handler_name", "createResultMessage")
 	newEvent.Metadata.Set("topic", topic)
 	newEvent.Metadata.Set("domain", "round")
-
 	return newEvent, nil
 }
 

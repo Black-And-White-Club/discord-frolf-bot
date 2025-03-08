@@ -30,6 +30,7 @@ type UserRouter struct {
 }
 
 // NewUserRouter creates a new UserRouter.
+
 func NewUserRouter(logger observability.Logger, router *message.Router, subscriber eventbus.EventBus, publisher eventbus.EventBus, discord discord.Operations, config *config.Config, helper utils.Helpers, tracer observability.Tracer) *UserRouter {
 	return &UserRouter{
 		logger:           logger,
@@ -48,7 +49,7 @@ func NewUserRouter(logger observability.Logger, router *message.Router, subscrib
 func (r *UserRouter) Configure(handlers userhandlers.Handlers, eventbus eventbus.EventBus) error {
 	r.Router.AddMiddleware(
 		middleware.CorrelationID,
-		r.middlewareHelper.CommonMetadataMiddleware("user"),
+		r.middlewareHelper.CommonMetadataMiddleware("discord-user"),
 		r.middlewareHelper.DiscordMetadataMiddleware(),
 		r.middlewareHelper.RoutingMetadataMiddleware(),
 		middleware.Recoverer,
@@ -56,11 +57,9 @@ func (r *UserRouter) Configure(handlers userhandlers.Handlers, eventbus eventbus
 		r.tracer.TraceHandler,
 		observability.LokiLoggingMiddleware(r.logger),
 	)
-
 	if err := r.RegisterHandlers(context.Background(), handlers); err != nil {
 		return fmt.Errorf("failed to register handlers: %w", err)
 	}
-
 	return nil
 }
 
@@ -75,10 +74,8 @@ func (r *UserRouter) RegisterHandlers(ctx context.Context, handlers userhandlers
 		discorduserevents.RoleUpdateButtonPress: handlers.HandleRoleUpdateButtonPress,
 		discorduserevents.SignupFormSubmitted:   handlers.HandleUserSignupRequest,
 	}
-
 	for topic, handlerFunc := range eventsToHandlers {
 		handlerName := fmt.Sprintf("discord-user.%s", topic)
-
 		r.Router.AddHandler(
 			handlerName,
 			topic,
@@ -90,7 +87,6 @@ func (r *UserRouter) RegisterHandlers(ctx context.Context, handlers userhandlers
 				if err != nil {
 					return nil, err
 				}
-
 				// Automatically publish messages based on metadata
 				for _, m := range messages {
 					publishTopic := m.Metadata.Get("topic")
@@ -108,12 +104,10 @@ func (r *UserRouter) RegisterHandlers(ctx context.Context, handlers userhandlers
 						)
 					}
 				}
-
 				return nil, nil // ✅ No messages returned, they're published instead
 			},
 		)
 	}
-
 	return nil
 }
 

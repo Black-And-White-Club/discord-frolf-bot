@@ -12,6 +12,7 @@ package mocks
 import (
 	context "context"
 	reflect "reflect"
+	time "time"
 
 	discordgo "github.com/bwmarrin/discordgo"
 	gomock "go.uber.org/mock/gomock"
@@ -39,6 +40,42 @@ func NewMockGatewayEventHandler(ctrl *gomock.Controller) *MockGatewayEventHandle
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockGatewayEventHandler) EXPECT() *MockGatewayEventHandlerMockRecorder {
 	return m.recorder
+}
+
+// HandleCreateRoundCommand mocks base method.
+func (m *MockGatewayEventHandler) HandleCreateRoundCommand(ctx context.Context, i *discordgo.InteractionCreate) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "HandleCreateRoundCommand", ctx, i)
+}
+
+// HandleCreateRoundCommand indicates an expected call of HandleCreateRoundCommand.
+func (mr *MockGatewayEventHandlerMockRecorder) HandleCreateRoundCommand(ctx, i any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleCreateRoundCommand", reflect.TypeOf((*MockGatewayEventHandler)(nil).HandleCreateRoundCommand), ctx, i)
+}
+
+// HandleCreateRoundModalSubmit mocks base method.
+func (m *MockGatewayEventHandler) HandleCreateRoundModalSubmit(ctx context.Context, i *discordgo.InteractionCreate) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "HandleCreateRoundModalSubmit", ctx, i)
+}
+
+// HandleCreateRoundModalSubmit indicates an expected call of HandleCreateRoundModalSubmit.
+func (mr *MockGatewayEventHandlerMockRecorder) HandleCreateRoundModalSubmit(ctx, i any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleCreateRoundModalSubmit", reflect.TypeOf((*MockGatewayEventHandler)(nil).HandleCreateRoundModalSubmit), ctx, i)
+}
+
+// HandleRetryCreateRound mocks base method.
+func (m *MockGatewayEventHandler) HandleRetryCreateRound(ctx context.Context, i *discordgo.InteractionCreate) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "HandleRetryCreateRound", ctx, i)
+}
+
+// HandleRetryCreateRound indicates an expected call of HandleRetryCreateRound.
+func (mr *MockGatewayEventHandlerMockRecorder) HandleRetryCreateRound(ctx, i any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleRetryCreateRound", reflect.TypeOf((*MockGatewayEventHandler)(nil).HandleRetryCreateRound), ctx, i)
 }
 
 // HandleRoleButtonPress mocks base method.
@@ -75,6 +112,18 @@ func (m *MockGatewayEventHandler) HandleRoleRequestCommand(ctx context.Context, 
 func (mr *MockGatewayEventHandlerMockRecorder) HandleRoleRequestCommand(ctx, i any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleRoleRequestCommand", reflect.TypeOf((*MockGatewayEventHandler)(nil).HandleRoleRequestCommand), ctx, i)
+}
+
+// HandleRoundResponse mocks base method.
+func (m *MockGatewayEventHandler) HandleRoundResponse(ctx context.Context, i *discordgo.InteractionCreate, response string) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "HandleRoundResponse", ctx, i, response)
+}
+
+// HandleRoundResponse indicates an expected call of HandleRoundResponse.
+func (mr *MockGatewayEventHandlerMockRecorder) HandleRoundResponse(ctx, i, response any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleRoundResponse", reflect.TypeOf((*MockGatewayEventHandler)(nil).HandleRoundResponse), ctx, i, response)
 }
 
 // HandleSignupButtonPress mocks base method.
@@ -135,4 +184,52 @@ func (m *MockGatewayEventHandler) MessageReactionAdd(s *discordgo.Session, r *di
 func (mr *MockGatewayEventHandlerMockRecorder) MessageReactionAdd(s, r any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MessageReactionAdd", reflect.TypeOf((*MockGatewayEventHandler)(nil).MessageReactionAdd), s, r)
+}
+
+// SendRoundEventEmbed mocks base method.
+func (m *MockGatewayEventHandler) SendRoundEventEmbed(channelID, eventID, title, description string, startTime time.Time, location, creator string) (*discordgo.Message, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SendRoundEventEmbed", channelID, eventID, title, description, startTime, location, creator)
+	ret0, _ := ret[0].(*discordgo.Message)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SendRoundEventEmbed indicates an expected call of SendRoundEventEmbed.
+func (mr *MockGatewayEventHandlerMockRecorder) SendRoundEventEmbed(channelID, eventID, title, description, startTime, location, creator any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendRoundEventEmbed", reflect.TypeOf((*MockGatewayEventHandler)(nil).SendRoundEventEmbed), channelID, eventID, title, description, startTime, location, creator)
+}
+
+// UpdateInteractionResponse mocks base method.
+func (m *MockGatewayEventHandler) UpdateInteractionResponse(ctx context.Context, correlationID, message string, edit ...*discordgo.WebhookEdit) error {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, correlationID, message}
+	for _, a := range edit {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "UpdateInteractionResponse", varargs...)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateInteractionResponse indicates an expected call of UpdateInteractionResponse.
+func (mr *MockGatewayEventHandlerMockRecorder) UpdateInteractionResponse(ctx, correlationID, message any, edit ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, correlationID, message}, edit...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateInteractionResponse", reflect.TypeOf((*MockGatewayEventHandler)(nil).UpdateInteractionResponse), varargs...)
+}
+
+// UpdateInteractionResponseWithRetryButton mocks base method.
+func (m *MockGatewayEventHandler) UpdateInteractionResponseWithRetryButton(ctx context.Context, correlationID, message string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateInteractionResponseWithRetryButton", ctx, correlationID, message)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateInteractionResponseWithRetryButton indicates an expected call of UpdateInteractionResponseWithRetryButton.
+func (mr *MockGatewayEventHandlerMockRecorder) UpdateInteractionResponseWithRetryButton(ctx, correlationID, message any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateInteractionResponseWithRetryButton", reflect.TypeOf((*MockGatewayEventHandler)(nil).UpdateInteractionResponseWithRetryButton), ctx, correlationID, message)
 }

@@ -21,12 +21,10 @@ import (
 func TestScoreHandlers_HandleScoreUpdateRequest(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-
 	mockLogger := logger_mocks.NewMockLogger(ctrl)
 	mockSession := mocks.NewMockSession(ctrl)
 	mockConfig := &config.Config{}
 	mockEventUtil := utils.NewEventUtil()
-
 	tests := []struct {
 		name           string
 		msg            *message.Message
@@ -124,37 +122,30 @@ func TestScoreHandlers_HandleScoreUpdateRequest(t *testing.T) {
 			expectedResult: nil,
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setupMocks()
-
 			h := &ScoreHandlers{
 				Logger:    mockLogger,
 				Session:   mockSession,
 				Config:    mockConfig,
 				EventUtil: mockEventUtil,
 			}
-
 			got, err := h.HandleScoreUpdateRequest(tt.msg)
-
 			if (err != nil) != tt.expectedError {
 				t.Errorf("HandleScoreUpdateRequest() error = %v, expectedError %v", err, tt.expectedError)
 				return
 			}
-
 			if tt.expectedResult == nil {
 				if got != nil {
 					t.Errorf("expected nil result but got messages")
 				}
 				return
 			}
-
 			if len(got) != len(tt.expectedResult) {
 				t.Errorf("expected %d messages, got %d", len(tt.expectedResult), len(got))
 				return
 			}
-
 			for i, expectedMsg := range tt.expectedResult {
 				var gotPayload, expectedPayload map[string]interface{}
 				if err := json.Unmarshal(got[i].Payload, &gotPayload); err != nil {
@@ -163,11 +154,9 @@ func TestScoreHandlers_HandleScoreUpdateRequest(t *testing.T) {
 				if err := json.Unmarshal(expectedMsg.Payload, &expectedPayload); err != nil {
 					t.Fatalf("failed to unmarshal expected payload: %v", err)
 				}
-
 				if !reflect.DeepEqual(gotPayload, expectedPayload) {
 					t.Errorf("message %d payload mismatch:\ngot:  %v\nwant: %v", i, gotPayload, expectedPayload)
 				}
-
 				if !reflect.DeepEqual(got[i].Metadata, expectedMsg.Metadata) {
 					t.Errorf("message %d metadata mismatch:\ngot:  %v\nwant: %v", i, got[i].Metadata, expectedMsg.Metadata)
 				}
@@ -179,12 +168,10 @@ func TestScoreHandlers_HandleScoreUpdateRequest(t *testing.T) {
 func TestScoreHandlers_HandleScoreUpdateResponse(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-
 	mockLogger := logger_mocks.NewMockLogger(ctrl)
 	mockSession := mocks.NewMockSession(ctrl)
 	mockConfig := &config.Config{}
 	mockEventUtil := utils.NewEventUtil()
-
 	tests := []struct {
 		name           string
 		msg            *message.Message
@@ -287,37 +274,30 @@ func TestScoreHandlers_HandleScoreUpdateResponse(t *testing.T) {
 			expectedResult: nil,
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setupMocks()
-
 			h := &ScoreHandlers{
 				Logger:    mockLogger,
 				Session:   mockSession,
 				Config:    mockConfig,
 				EventUtil: mockEventUtil,
 			}
-
 			got, err := h.HandleScoreUpdateResponse(tt.msg)
-
 			if (err != nil) != tt.expectedError {
 				t.Errorf("HandleScoreUpdateResponse() error = %v, expectedError %v", err, tt.expectedError)
 				return
 			}
-
 			if tt.expectedResult == nil {
 				if got != nil {
 					t.Errorf("expected nil result but got messages")
 				}
 				return
 			}
-
 			if len(got) != len(tt.expectedResult) {
 				t.Errorf("expected %d messages, got %d", len(tt.expectedResult), len(got))
 				return
 			}
-
 			for i, expectedMsg := range tt.expectedResult {
 				var gotPayload, expectedPayload map[string]interface{}
 				if err := json.Unmarshal(got[i].Payload, &gotPayload); err != nil {
@@ -326,11 +306,9 @@ func TestScoreHandlers_HandleScoreUpdateResponse(t *testing.T) {
 				if err := json.Unmarshal(expectedMsg.Payload, &expectedPayload); err != nil {
 					t.Fatalf("failed to unmarshal expected payload: %v", err)
 				}
-
 				if !reflect.DeepEqual(gotPayload, expectedPayload) {
 					t.Errorf("message %d payload mismatch:\ngot:  %v\nwant: %v", i, gotPayload, expectedPayload)
 				}
-
 				if !reflect.DeepEqual(got[i].Metadata, expectedMsg.Metadata) {
 					t.Errorf("message %d metadata mismatch:\ngot:  %v\nwant: %v", i, got[i].Metadata, expectedMsg.Metadata)
 				}

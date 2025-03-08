@@ -22,6 +22,7 @@ type ScoreHandlers struct {
 }
 
 // NewScoreHandlers creates a new ScoreHandlers.
+
 func NewScoreHandlers(logger observability.Logger, session discord.Session, config *config.Config, eventUtil utils.EventUtil) Handlers {
 	return &ScoreHandlers{
 		Logger:    logger,

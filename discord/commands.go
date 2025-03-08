@@ -11,7 +11,6 @@ import (
 
 // RegisterCommands registers the bot's slash commands with Discord.
 func RegisterCommands(s Session, logger observability.Logger, guildID string) error {
-
 	// --- /updaterole Command ---
 	appID, err := s.GetBotUser()
 	if err != nil {
@@ -34,7 +33,6 @@ func RegisterCommands(s Session, logger observability.Logger, guildID string) er
 		return fmt.Errorf("failed to create '/updaterole' command: %w", err)
 	}
 	logger.Info(context.Background(), "registered command: /updaterole")
-
 	_, err = s.ApplicationCommandCreate(appID.ID, guildID, &discordgo.ApplicationCommand{
 		Name:        "createround",
 		Description: "Create A Round",
@@ -44,6 +42,5 @@ func RegisterCommands(s Session, logger observability.Logger, guildID string) er
 		return fmt.Errorf("failed to create '/createround' command: %w", err)
 	}
 	logger.Info(context.Background(), "registered command: /createround")
-
 	return nil
 }

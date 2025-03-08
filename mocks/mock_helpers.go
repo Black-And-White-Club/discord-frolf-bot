@@ -5,6 +5,5 @@
 //
 //	mockgen -source=./helpers/helpers.go -destination=./mocks/mock_helpers.go -package=mocks
 //
-
 // Package mocks is a generated GoMock package.
 package mocks

@@ -30,6 +30,7 @@ type LeaderboardHandlers struct {
 }
 
 // NewLeaderboardHandlers creates a new LeaderboardHandlers.
+
 func NewLeaderboardHandlers(logger observability.Logger, config *config.Config, eventUtil utils.EventUtil, helper utils.Helpers) Handlers {
 	return &LeaderboardHandlers{
 		Logger:    logger,
