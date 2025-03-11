@@ -1,3 +1,4 @@
+// signup/signup.go
 package signup
 
 import (
@@ -17,7 +18,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-// SignupManager defines the interface for create round operations.
+// SignupManager defines the interface for signup operations.
 type SignupManager interface {
 	SendSignupModal(ctx context.Context, i *discordgo.InteractionCreate) error
 	HandleSignupModalSubmit(ctx context.Context, i *discordgo.InteractionCreate)
@@ -30,7 +31,6 @@ type SignupManager interface {
 // signupManager implements the SignupManager interface.
 type signupManager struct {
 	session          discord.Session
-	operations       discord.Operations
 	publisher        eventbus.EventBus
 	logger           observability.Logger
 	helper           utils.Helpers
@@ -38,39 +38,47 @@ type signupManager struct {
 	interactionStore storage.ISInterface
 }
 
-// NewCreateSignupManager creates a new CreateSignupManager instance.
-func NewSignupManager(session discord.Session, operations discord.Operations, publisher eventbus.EventBus, logger observability.Logger, helper utils.Helpers, config *config.Config, interactionStore storage.ISInterface) SignupManager {
+// NewSignupManager creates a new SignupManager instance.
+func NewSignupManager(session discord.Session, publisher eventbus.EventBus, logger observability.Logger, helper utils.Helpers, config *config.Config, interactionStore storage.ISInterface) (SignupManager, error) {
 	logger.Info(context.Background(), "Creating SignupManager",
 		attr.Any("session", session),
-		attr.Any("operations", operations),
 		attr.Any("publisher", publisher),
 		attr.Any("config", config),
 	)
 	return &signupManager{
 		session:          session,
-		operations:       operations,
 		publisher:        publisher,
 		logger:           logger,
 		helper:           helper,
 		config:           config,
 		interactionStore: interactionStore,
-	}
+	}, nil
 }
 
 // createEvent is a helper function to create a Watermill message.
-func (crm *signupManager) createEvent(ctx context.Context, topic string, payload interface{}, i *discordgo.InteractionCreate) (*message.Message, error) {
+func (sm *signupManager) createEvent(ctx context.Context, topic string, payload interface{}, i *discordgo.InteractionCreate) (*message.Message, error) {
 	newEvent := message.NewMessage(watermill.NewUUID(), nil)
+
+	// Ensure Metadata is initialized
+	if newEvent.Metadata == nil {
+		newEvent.Metadata = make(map[string]string)
+	}
+
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
-		crm.logger.Error(ctx, "Failed to marshal payload in CreateResultMessage", attr.Error(err))
-		return nil, fmt.Errorf("failed to marshal payload: %w, original error: %v", err, err)
+		sm.logger.Error(ctx, "Failed to marshal payload in CreateResultMessage", attr.Error(err))
+		return nil, fmt.Errorf("failed to marshal payload: %w", err)
 	}
+
 	newEvent.Payload = payloadBytes
+
+	// Set metadata fields
 	newEvent.Metadata.Set("handler_name", "Create Original Discord Message to Backend")
 	newEvent.Metadata.Set("topic", topic)
 	newEvent.Metadata.Set("domain", "discord")
 	newEvent.Metadata.Set("interaction_id", i.Interaction.ID)
 	newEvent.Metadata.Set("interaction_token", i.Interaction.Token)
-	newEvent.Metadata.Set("guild_id", crm.config.Discord.GuildID)
+	newEvent.Metadata.Set("guild_id", sm.config.Discord.GuildID)
+
 	return newEvent, nil
 }

@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/Black-And-White-Club/discord-frolf-bot/app/discord"
 	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
-	roundhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/watermill/handlers/round"
+	roundhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/round/watermill/handlers"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
@@ -24,22 +23,22 @@ type RoundRouter struct {
 	Router           *message.Router
 	subscriber       eventbus.EventBus
 	publisher        eventbus.EventBus
-	session          discord.Session
 	config           *config.Config
+	helper           utils.Helpers
 	tracer           observability.Tracer
 	middlewareHelper utils.MiddlewareHelpers
 }
 
 // NewRoundRouter creates a new RoundRouter.
 
-func NewRoundRouter(logger observability.Logger, router *message.Router, subscriber eventbus.EventBus, publisher eventbus.EventBus, session discord.Session, config *config.Config, tracer observability.Tracer) *RoundRouter {
+func NewRoundRouter(logger observability.Logger, router *message.Router, subscriber eventbus.EventBus, publisher eventbus.EventBus, config *config.Config, helper utils.Helpers, tracer observability.Tracer) *RoundRouter {
 	return &RoundRouter{
 		logger:           logger,
 		Router:           router,
 		subscriber:       subscriber,
 		publisher:        publisher,
-		session:          session,
 		config:           config,
+		helper:           helper,
 		tracer:           tracer,
 		middlewareHelper: utils.NewMiddlewareHelper(),
 	}

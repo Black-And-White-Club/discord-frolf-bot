@@ -1,3 +1,4 @@
+// role/role.go
 package role
 
 import (
@@ -17,7 +18,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-// RoleManager defines the interface for create round operations.
+// RoleManager defines the interface for role operations.
 type RoleManager interface {
 	AddRoleToUser(ctx context.Context, guildID, userID, roleID string) error
 	EditRoleUpdateResponse(ctx context.Context, correlationID string, content string) error
@@ -31,7 +32,6 @@ type RoleManager interface {
 // roleManager implements the RoleManager interface.
 type roleManager struct {
 	session          discord.Session
-	operations       discord.Operations
 	publisher        eventbus.EventBus
 	logger           observability.Logger
 	helper           utils.Helpers
@@ -39,23 +39,21 @@ type roleManager struct {
 	interactionStore storage.ISInterface
 }
 
-// NewCreateRoleManager creates a new CreateRoleManager instance.
-func NewRoleManager(session discord.Session, operations discord.Operations, publisher eventbus.EventBus, logger observability.Logger, helper utils.Helpers, config *config.Config, interactionStore storage.ISInterface) RoleManager {
+// NewRoleManager creates a new RoleManager instance.
+func NewRoleManager(session discord.Session, publisher eventbus.EventBus, logger observability.Logger, helper utils.Helpers, config *config.Config, interactionStore storage.ISInterface) (RoleManager, error) {
 	logger.Info(context.Background(), "Creating RoleManager",
 		attr.Any("session", session),
-		attr.Any("operations", operations),
 		attr.Any("publisher", publisher),
 		attr.Any("config", config),
 	)
 	return &roleManager{
 		session:          session,
-		operations:       operations,
 		publisher:        publisher,
 		logger:           logger,
 		helper:           helper,
 		config:           config,
 		interactionStore: interactionStore,
-	}
+	}, nil
 }
 
 // createEvent is a helper function to create a Watermill message.

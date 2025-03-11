@@ -68,7 +68,7 @@ func (ts *InteractionStore) Delete(correlationID string) {
 	slog.Info("InteractionStore: Interaction deleted successfully", attr.String("correlation_id", correlationID))
 }
 
-// Get retrieves the token (one-time use)
+// Get retrieves the token
 func (ts *InteractionStore) Get(correlationID string) (interface{}, bool) {
 	ts.mu.Lock() // Lock to ensure safe access
 	defer ts.mu.Unlock()

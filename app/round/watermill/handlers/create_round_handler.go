@@ -17,7 +17,7 @@ func (h *RoundHandlers) HandleRoundCreateRequested(msg *message.Message) ([]*mes
 	var payload discordroundevents.CreateRoundRequestedPayload
 	if err := h.Helpers.UnmarshalPayload(msg, &payload); err != nil {
 		slog.Error("Failed to unmarshal payload", attr.CorrelationIDFromMsg(msg), attr.Error(err))
-		if err := h.Gateway.UpdateInteractionResponseWithRetryButton(msg.Context(), msg.Metadata.Get("correlation_id"), "Failed to unmarshal payload: "+err.Error()); err != nil {
+		if err := h.RoundDiscord.GetCreateRoundManager().UpdateInteractionResponseWithRetryButton(msg.Context(), msg.Metadata.Get("correlation_id"), "Failed to unmarshal payload: "+err.Error()); err != nil {
 			return nil, err
 		}
 		return nil, nil
@@ -27,7 +27,7 @@ func (h *RoundHandlers) HandleRoundCreateRequested(msg *message.Message) ([]*mes
 	backendMsg, err := h.Helpers.CreateResultMessage(msg, payload, roundevents.RoundCreateRequestTopic)
 	if err != nil {
 		slog.Error("Failed to create result message", attr.CorrelationIDFromMsg(msg), attr.Error(err))
-		if updateErr := h.Gateway.UpdateInteractionResponseWithRetryButton(msg.Context(), msg.Metadata.Get("correlation_id"), "Failed to create result message: "+err.Error()); updateErr != nil {
+		if updateErr := h.RoundDiscord.GetCreateRoundManager().UpdateInteractionResponseWithRetryButton(msg.Context(), msg.Metadata.Get("correlation_id"), "Failed to create result message: "+err.Error()); updateErr != nil {
 			return nil, updateErr
 		}
 		return nil, nil
@@ -58,7 +58,7 @@ func (h *RoundHandlers) HandleRoundCreated(msg *message.Message) ([]*message.Mes
 	successMessage := fmt.Sprintf("✅ Round created successfully! Round ID: %d", roundID)
 	slog.Info("Publishing success message", attr.String("message", successMessage), attr.String("correlation_id", correlationID))
 
-	if err := h.Gateway.UpdateInteractionResponse(ctx, correlationID, successMessage); err != nil {
+	if err := h.RoundDiscord.GetCreateRoundManager().UpdateInteractionResponse(ctx, correlationID, successMessage); err != nil {
 		slog.Error("Failed to update interaction response", attr.Error(err))
 		return nil, err
 	}
@@ -73,7 +73,7 @@ func (h *RoundHandlers) HandleRoundCreated(msg *message.Message) ([]*message.Mes
 		location = *payload.Location
 	}
 
-	_, err := h.Gateway.SendRoundEventEmbed(channelID, fmt.Sprintf("%d", roundID), payload.Title, description, *payload.StartTime, location, creator)
+	_, err := h.RoundDiscord.GetCreateRoundManager().SendRoundEventEmbed(channelID, fmt.Sprintf("%d", roundID), payload.Title, description, *payload.StartTime, location, creator)
 	if err != nil {
 		slog.Error("Failed to send round event embed", attr.Error(err))
 		return nil, err
@@ -90,9 +90,7 @@ func (h *RoundHandlers) HandleRoundCreated(msg *message.Message) ([]*message.Mes
 		h.Logger.Error(ctx, "Failed to create trace event", attr.Error(err))
 		return nil, fmt.Errorf("failed to create trace event: %w", err)
 	}
-
-	// Cleanup stored interactions
-	h.interactionStore.Delete(correlationID)
+	tracingEvent.Metadata.Set("topic", discordroundevents.RoundCreatedTraceTopic)
 
 	return []*message.Message{tracingEvent}, nil
 }
@@ -111,12 +109,10 @@ func (h *RoundHandlers) HandleRoundCreationFailed(msg *message.Message) ([]*mess
 	errorMessage := "❌ Round creation failed: " + payload.Reason
 
 	// Call the gateway handler to update the interaction response with a retry button
-	if err := h.Gateway.UpdateInteractionResponseWithRetryButton(ctx, correlationID, errorMessage); err != nil {
+	if err := h.RoundDiscord.GetCreateRoundManager().UpdateInteractionResponseWithRetryButton(ctx, correlationID, errorMessage); err != nil {
 		slog.Error("Failed to update interaction response", attr.Error(err))
 		return nil, err
 	}
-	h.interactionStore.Delete(correlationID)
-
 	return nil, nil
 }
 
@@ -136,12 +132,11 @@ func (h *RoundHandlers) HandleRoundValidationFailed(msg *message.Message) ([]*me
 	slog.Warn("Round validation failed", attr.UserID(payload.UserID), attr.String("error", errorMessage))
 
 	// Call the gateway handler to update the interaction response with a retry button
-	if err := h.Gateway.UpdateInteractionResponseWithRetryButton(ctx, correlationID, errorMessage); err != nil {
+	if err := h.RoundDiscord.GetCreateRoundManager().UpdateInteractionResponseWithRetryButton(ctx, correlationID, errorMessage); err != nil {
 		slog.Error("Failed to update interaction response", attr.Error(err))
 	}
 
 	slog.Info("Successfully handled round validation failure", attr.CorrelationIDFromMsg(msg))
 
-	h.interactionStore.Delete(correlationID)
 	return nil, nil
 }

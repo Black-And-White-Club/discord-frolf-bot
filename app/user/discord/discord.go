@@ -29,20 +29,26 @@ type UserDiscord struct {
 func NewUserDiscord(
 	ctx context.Context,
 	session discordgo.Session,
-	operations discordgo.Operations,
 	publisher eventbus.EventBus,
 	logger observability.Logger,
 	helper utils.Helpers,
 	config *config.Config,
 	interactionStore storage.ISInterface,
-) UserDiscordInterface {
-	roleManager := role.NewRoleManager(session, operations, publisher, logger, helper, config, interactionStore)
-	signupManager := signup.NewSignupManager(session, operations, publisher, logger, helper, config, interactionStore)
+) (UserDiscordInterface, error) {
+	roleManager, err := role.NewRoleManager(session, publisher, logger, helper, config, interactionStore)
+	if err != nil {
+		return nil, err
+	}
+
+	signupManager, err := signup.NewSignupManager(session, publisher, logger, helper, config, interactionStore)
+	if err != nil {
+		return nil, err
+	}
 
 	return &UserDiscord{
 		RoleManager:   roleManager,
 		SignupManager: signupManager,
-	}
+	}, nil
 }
 
 // GetRoleManager returns the RoleManager.

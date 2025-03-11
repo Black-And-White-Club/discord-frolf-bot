@@ -177,8 +177,6 @@ func (crm *createRoundManager) HandleRoundResponse(ctx context.Context, i *disco
 		slog.Error("Failed to acknowledge interaction", attr.Error(err))
 	}
 
-	// Here you can store the user's response in a database or update a message
-	// Example: sending a follow-up confirmation
 	crm.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
 		Content: fmt.Sprintf("%s has %s the event!", user.Mention(), response),
 	})

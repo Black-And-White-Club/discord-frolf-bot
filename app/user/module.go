@@ -14,6 +14,7 @@ import (
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
+	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 )
 
@@ -21,17 +22,20 @@ import (
 func InitializeUserModule(
 	ctx context.Context,
 	session discord.Session,
-	operations discord.Operations,
 	interactionRegistry *interactions.Registry,
 	publisher eventbus.EventBus,
 	logger observability.Logger,
 	config *config.Config,
 	eventUtil utils.EventUtil,
 	helper utils.Helpers,
-	interactionStore *storage.InteractionStore,
-) {
+	interactionStore storage.ISInterface,
+) error {
 	// Initialize Discord services
-	userDiscord := userdiscord.NewUserDiscord(ctx, session, operations, publisher, logger, helper, config, interactionStore)
+	userDiscord, err := userdiscord.NewUserDiscord(ctx, session, publisher, logger, helper, config, interactionStore)
+	if err != nil {
+		logger.Error(ctx, "Failed to initialize user Discord services", attr.Error(err))
+		return err
+	}
 
 	// Register Discord interactions
 	role.RegisterHandlers(interactionRegistry, userDiscord.GetRoleManager())
@@ -40,4 +44,5 @@ func InitializeUserModule(
 	// Initialize Watermill handlers (no need to register with router here)
 	userhandlers.NewUserHandlers(logger, config, eventUtil, helper, userDiscord)
 
+	return nil
 }

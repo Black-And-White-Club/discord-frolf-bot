@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Black-And-White-Club/discord-frolf-bot/app/discord"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
@@ -34,25 +34,22 @@ type CreateRoundManager interface {
 // createRoundManager implements the CreateRoundManager interface.
 type createRoundManager struct {
 	session          discord.Session
-	operations       discord.Operations
 	publisher        eventbus.EventBus
 	logger           observability.Logger
 	helper           utils.Helpers
 	config           *config.Config
-	interactionStore *storage.InteractionStore
+	interactionStore storage.ISInterface
 }
 
 // NewCreateRoundManager creates a new CreateRoundManager instance.
-func NewCreateRoundManager(session discord.Session, operations discord.Operations, publisher eventbus.EventBus, logger observability.Logger, helper utils.Helpers, config *config.Config, interactionStore *storage.InteractionStore) CreateRoundManager {
+func NewCreateRoundManager(session discord.Session, publisher eventbus.EventBus, logger observability.Logger, helper utils.Helpers, config *config.Config, interactionStore storage.ISInterface) CreateRoundManager {
 	logger.Info(context.Background(), "Creating CreateRoundManager",
 		attr.Any("session", session),
-		attr.Any("operations", operations),
 		attr.Any("publisher", publisher),
 		attr.Any("config", config),
 	)
 	return &createRoundManager{
 		session:          session,
-		operations:       operations,
 		publisher:        publisher,
 		logger:           logger,
 		helper:           helper,

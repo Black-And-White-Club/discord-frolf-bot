@@ -107,22 +107,25 @@ func (rm *roleManager) HandleRoleRequestCommand(ctx context.Context, i *discordg
 	slog.Info("🔄 Handling /updaterole command", attr.String("interaction_id", i.Interaction.ID))
 
 	// Get the user from the interaction
-	user := i.Interaction.User
-	if user == nil {
+	var userID string
+	if i.Member != nil {
+		userID = i.Member.User.ID
+	} else if i.User != nil {
+		userID = i.User.ID
+	} else {
 		slog.Error("❌ User is nil")
 		return
 	}
 
-	slog.Info("✅ User: %s", attr.String("user", fmt.Sprintf("%+v", user)))
+	slog.Info("✅ User ID: %s", attr.String("user_id", userID))
 
 	// Respond to the role request with buttons for role selection
-	err := rm.RespondToRoleRequest(ctx, i.Interaction.ID, i.Interaction.Token, user.ID)
+	err := rm.RespondToRoleRequest(ctx, i.Interaction.ID, i.Interaction.Token, userID)
 	if err != nil {
-		slog.Error("Failed to respond to role request", attr.UserID(user.ID), attr.Error(err))
+		slog.Error("Failed to respond to role request", attr.UserID(userID), attr.Error(err))
 	}
 }
 
-// HandleRoleButtonPress handles role button presses.
 // HandleRoleButtonPress handles role button presses.
 func (rm *roleManager) HandleRoleButtonPress(ctx context.Context, i *discordgo.InteractionCreate) {
 	// Check for nil dependencies

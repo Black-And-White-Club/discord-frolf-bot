@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	discorduserevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/user"
 	userhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/user/watermill/handlers"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
@@ -22,7 +21,6 @@ type UserRouter struct {
 	Router           *message.Router
 	subscriber       eventbus.EventBus
 	publisher        eventbus.EventBus
-	discord          discord.Operations
 	config           *config.Config
 	helper           utils.Helpers
 	tracer           observability.Tracer
@@ -31,13 +29,12 @@ type UserRouter struct {
 
 // NewUserRouter creates a new UserRouter.
 
-func NewUserRouter(logger observability.Logger, router *message.Router, subscriber eventbus.EventBus, publisher eventbus.EventBus, discord discord.Operations, config *config.Config, helper utils.Helpers, tracer observability.Tracer) *UserRouter {
+func NewUserRouter(logger observability.Logger, router *message.Router, subscriber eventbus.EventBus, publisher eventbus.EventBus, config *config.Config, helper utils.Helpers, tracer observability.Tracer) *UserRouter {
 	return &UserRouter{
 		logger:           logger,
 		Router:           router,
 		subscriber:       subscriber,
 		publisher:        publisher,
-		discord:          discord,
 		config:           config,
 		helper:           helper,
 		tracer:           tracer,
