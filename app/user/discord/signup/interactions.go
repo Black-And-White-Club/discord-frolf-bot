@@ -41,62 +41,52 @@ func (sm *signupManager) MessageReactionAdd(s discord.Session, r *discordgo.Mess
 // handleSignupReactionAdd sends the signup modal.
 func (sm *signupManager) HandleSignupReactionAdd(ctx context.Context, r *discordgo.MessageReactionAdd) {
 	slog.Info("Handling signup reaction", attr.UserID(r.UserID))
-	// Verify guild ID
+
+	// Verify the reaction happened in the correct guild
 	if r.GuildID != sm.config.Discord.GuildID {
 		slog.Warn("Reaction from wrong guild", attr.UserID(r.UserID), attr.String("guildID", r.GuildID))
 		return
 	}
-	slog.Info("Attempting to create DM channel...")
-	// Attempt to create a DM channel
+
 	dmChannel, err := sm.session.UserChannelCreate(r.UserID)
 	if err != nil {
-		slog.Error("Failed to create DM channel for signup", attr.UserID(r.UserID), attr.Error(err))
+		slog.Error("Failed to create DM channel", attr.UserID(r.UserID), attr.Error(err))
 		return
 	}
 	slog.Info("DM channel created", attr.String("dm_channel_id", dmChannel.ID))
-	// Store a placeholder identifier + user ID in `CustomID`
+
 	metadataStr := fmt.Sprintf("signup_button|%s", r.UserID)
-	// Send the ephemeral message with the "Signup" button
+
 	_, err = sm.session.ChannelMessageSendComplex(dmChannel.ID, &discordgo.MessageSend{
-		Content: "Click the button below to start signup:",
+		Content: "Click the button below to start your signup!",
 		Components: []discordgo.MessageComponent{
 			discordgo.ActionsRow{
 				Components: []discordgo.MessageComponent{
 					discordgo.Button{
 						Label:    "Signup",
 						Style:    discordgo.PrimaryButton,
-						CustomID: metadataStr, // Store placeholder + user ID
+						CustomID: metadataStr,
 					},
 				},
 			},
 		},
 	})
 	if err != nil {
-		slog.Error("Failed to send ephemeral signup message", attr.UserID(r.UserID), attr.Error(err))
+		slog.Error("Failed to send signup button in DM", attr.UserID(r.UserID), attr.Error(err))
 	} else {
-		slog.Info("Ephemeral signup message successfully sent!", attr.UserID(r.UserID))
+		slog.Info("✅ Signup button successfully sent in DM!", attr.UserID(r.UserID))
 	}
 }
 
 // New handler for the button press
 func (sm *signupManager) HandleSignupButtonPress(ctx context.Context, i *discordgo.InteractionCreate) {
-	slog.Info("Signup button clicked!", attr.String("custom_id", i.Interaction.Data.(*discordgo.MessageComponentInteractionData).CustomID))
+	slog.Info("Inside HandleSignupButtonPress!", attr.String("custom_id", i.MessageComponentData().CustomID), attr.UserID(i.User.ID))
 
-	// Send the signup modal and log if it fails
 	err := sm.SendSignupModal(ctx, i)
 	if err != nil {
-		slog.Error("Failed to send signup modal", attr.Error(err))
+		slog.Error("❌ Failed to send signup modal", attr.Error(err))
 		return
 	}
-	err = sm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{
-			Content: "Signup modal sent successfully!",
-			Flags:   discordgo.MessageFlagsEphemeral, // Make it ephemeral
-		},
-	})
-	if err != nil {
-		slog.Error("Failed to send ephemeral message", attr.Error(err))
-		return
-	}
+
+	slog.Info("✅ Successfully called SendSignupModal")
 }

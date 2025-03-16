@@ -7,7 +7,8 @@ import (
 	"strings"
 	"time"
 
-	roundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
+	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
+	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	"github.com/bwmarrin/discordgo"
 	"github.com/google/uuid"
@@ -115,8 +116,8 @@ func (crm *createRoundManager) HandleCreateRoundModalSubmit(ctx context.Context,
 
 	// Constants for response messages
 	const (
-		errTitle       = "❌ Round creation failecrm."
-		errMsgRequired = "Title and Start Time are requirecrm."
+		errTitle       = "❌ Round creation failed."
+		errMsgRequired = "Title and Start Time are required."
 		errMsgTitleLen = "Title must be less than 100 characters."
 		errMsgDescLen  = "Description must be less than 500 characters."
 		errMsgLocLen   = "Location must be less than 100 characters."
@@ -125,10 +126,10 @@ func (crm *createRoundManager) HandleCreateRoundModalSubmit(ctx context.Context,
 	// Basic validation (check required fields and length)
 	var validationErrors []string
 	if title == "" {
-		validationErrors = append(validationErrors, "Title is requirecrm.")
+		validationErrors = append(validationErrors, "Title is required.")
 	}
 	if startTimeStr == "" {
-		validationErrors = append(validationErrors, "Start Time is requirecrm.")
+		validationErrors = append(validationErrors, "Start Time is required.")
 	}
 	if len(title) > 100 {
 		validationErrors = append(validationErrors, "Title must be less than 100 characters.")
@@ -169,7 +170,7 @@ func (crm *createRoundManager) HandleCreateRoundModalSubmit(ctx context.Context,
 	correlationID := uuid.New().String()
 	crm.interactionStore.Set(correlationID, i.Interaction, 15*time.Minute)
 
-	msg, err := crm.createEvent(ctx, roundevents.RoundCreateModalSubmit, payload, i)
+	msg, err := crm.createEvent(ctx, discordroundevents.RoundCreateModalSubmit, payload, i)
 	if err != nil {
 		crm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -186,7 +187,7 @@ func (crm *createRoundManager) HandleCreateRoundModalSubmit(ctx context.Context,
 	msg.Metadata.Set("correlation_id", correlationID)
 	msg.Metadata.Set("user_id", i.Member.User.ID)
 
-	if err := crm.publisher.Publish(roundevents.RoundCreateModalSubmit, msg); err != nil {
+	if err := crm.publisher.Publish(discordroundevents.RoundCreateModalSubmit, msg); err != nil {
 		crm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
@@ -204,7 +205,7 @@ func (crm *createRoundManager) HandleCreateRoundModalSubmit(ctx context.Context,
 	crm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Content:    "Round creation request receivecrm. Please wait for confirmation.",
+			Content:    "Round creation request received. Please wait for confirmation.",
 			Flags:      discordgo.MessageFlagsEphemeral,
 			Components: []discordgo.MessageComponent{},
 		},
@@ -220,9 +221,9 @@ func (crm *createRoundManager) HandleCreateRoundModalCancel(ctx context.Context,
 	crm.interactionStore.Delete(i.Interaction.ID)
 
 	err := crm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseUpdateMessage,
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Content:    "Round creation cancellecrm.",
+			Content:    "Round creation cancelled.",
 			Components: []discordgo.MessageComponent{},
 			Flags:      discordgo.MessageFlagsEphemeral,
 		},

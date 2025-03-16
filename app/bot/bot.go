@@ -57,9 +57,12 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 
 	// Create the interaction registry
 	registry := interactions.NewRegistry()
+	messageReaction := interactions.NewReactionRegistry()
+
+	messageReaction.RegisterWithSession(discordgoSession, bot.Session)
 
 	// Initialize user module
-	err = user.InitializeUserModule(ctx, bot.Session, registry, bot.EventBus, bot.Logger, bot.Config, utils.NewEventUtil(), utils.NewHelper(bot.Logger), bot.InteractionStore)
+	err = user.InitializeUserModule(ctx, bot.Session, registry, messageReaction, bot.EventBus, bot.Logger, bot.Config, utils.NewEventUtil(), utils.NewHelper(bot.Logger), bot.InteractionStore)
 	if err != nil {
 		bot.Logger.Error(ctx, "Failed to initialize user module", attr.Error(err))
 		return err
@@ -74,7 +77,14 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 
 	// Add the Discord interaction handler
 	discordgoSession.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		fmt.Println("InteractionCreate handler triggered!") // Debug
+		slog.Info("InteractionCreate triggered!", attr.String("channel_id", i.ChannelID))
+
+		// ✅ Log the exact CustomID received
+		if i.Type == discordgo.InteractionMessageComponent {
+			customID := i.MessageComponentData().CustomID
+			slog.Info("Received button interaction!", attr.String("custom_id", customID))
+		}
+
 		registry.HandleInteraction(s, i)
 	})
 

@@ -16,7 +16,6 @@ import (
 
 func (sm *signupManager) SendSignupModal(ctx context.Context, i *discordgo.InteractionCreate) error {
 	if i == nil || i.Interaction == nil || i.User == nil {
-		slog.Error("Interaction or User is nil")
 		return fmt.Errorf("interaction or user is nil")
 	}
 
@@ -46,22 +45,11 @@ func (sm *signupManager) SendSignupModal(ctx context.Context, i *discordgo.Inter
 		},
 	})
 	if err != nil {
-		slog.Error("Failed to send signup modal", attr.UserID(i.User.ID), attr.Error(err))
+		slog.Error("❌ Failed to send signup modal", attr.UserID(i.User.ID), attr.Error(err))
 		return fmt.Errorf("failed to send signup modal: %w", err)
 	}
 
-	err = sm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{
-			Content: "✅ Signup modal sent successfully!",
-			Flags:   discordgo.MessageFlagsEphemeral,
-		},
-	})
-	if err != nil {
-		slog.Error("Failed to send ephemeral message", attr.UserID(i.User.ID), attr.Error(err))
-		return fmt.Errorf("failed to send ephemeral message: %w", err)
-	}
-
+	slog.Info("Signup modal successfully sent!", attr.UserID(i.User.ID))
 	return nil
 }
 
@@ -84,8 +72,28 @@ func (sm *signupManager) HandleSignupModalSubmit(ctx context.Context, i *discord
 		return
 	}
 
+	// Check if the interaction is a modal submission
+	if i.Interaction.Type != discordgo.InteractionModalSubmit {
+		slog.Error("❌ Interaction is not a modal submission")
+		return
+	}
+
+	// Extract the user ID based on whether the interaction is in a guild or DM
+	var userID string
+	if i.Member != nil {
+		// Interaction is in a guild
+		userID = i.Member.User.ID
+	} else if i.User != nil {
+		// Interaction is in a DM
+		userID = i.User.ID
+	} else {
+		slog.Error("❌ Unable to determine user ID: both Member and User are nil")
+		return
+	}
+
 	slog.Info("HandlingModalSubmit", attr.String("custom_id", i.ModalSubmitData().CustomID))
 
+	// Acknowledge the modal submission
 	err := sm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
@@ -97,8 +105,6 @@ func (sm *signupManager) HandleSignupModalSubmit(ctx context.Context, i *discord
 		slog.Error("❌ Failed to acknowledge modal submission", attr.Error(err))
 		return
 	}
-
-	userID := i.Member.User.ID
 
 	data := i.ModalSubmitData()
 	tagNumberPtr, err := sm.extractTagNumber(data)
@@ -133,7 +139,7 @@ func (sm *signupManager) HandleSignupModalSubmit(ctx context.Context, i *discord
 		slog.Error("❌ Failed to publish event", attr.Error(err))
 		return
 	}
-	slog.Info("✅ Signup form event published successfully")
+	slog.Info("Signup form event published successfully")
 }
 
 // extractTagNumber extracts the tag number from the modal submission data.

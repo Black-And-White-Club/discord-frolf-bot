@@ -39,6 +39,7 @@ type Session interface {
 	ApplicationCommandDelete(appID, guildID, cmdID string, options ...discordgo.RequestOption) error
 	WebhookMessageEdit(webhookID string, token string, messageID string, data *discordgo.WebhookEdit, options ...discordgo.RequestOption) (st *discordgo.Message, err error)
 	ChannelMessageEditEmbed(channelID string, messageID string, embed *discordgo.MessageEmbed, options ...discordgo.RequestOption) (*discordgo.Message, error)
+	ChannelMessage(channelID string, messageID string, options ...discordgo.RequestOption) (st *discordgo.Message, err error)
 }
 
 // State defines an interface that provides access to the Discord state.
@@ -225,4 +226,8 @@ func (d *DiscordSession) FollowupMessageEdit(interaction *discordgo.Interaction,
 }
 func (d *DiscordSession) WebhookMessageEdit(webhookID string, token string, messageID string, data *discordgo.WebhookEdit, options ...discordgo.RequestOption) (st *discordgo.Message, err error) {
 	return d.session.WebhookMessageEdit(webhookID, token, messageID, data, options...)
+}
+
+func (d *DiscordSession) ChannelMessage(channelID string, messageID string, options ...discordgo.RequestOption) (st *discordgo.Message, err error) {
+	return d.session.ChannelMessage(channelID, messageID, options...)
 }

@@ -63,7 +63,7 @@ func TestLeaderboardHandlers_HandleLeaderboardRetrieveRequest(t *testing.T) {
 					EventUtil: mockEventUtil,
 				}
 				payload := leaderboardevents.GetLeaderboardRequestPayload{}
-				msg, _ := h.createResultMessage(nil, payload, leaderboardevents.GetLeaderboardRequest)
+				msg, _ := h.Helpers.CreateResultMessage(nil, payload, leaderboardevents.GetLeaderboardRequest)
 				msg.Metadata.Set("correlation_id", "correlation123")
 				return []*message.Message{msg}
 			}(),
@@ -199,7 +199,7 @@ func TestLeaderboardHandlers_HandleLeaderboardData(t *testing.T) {
 						{TagNumber: 456, DiscordID: "user456"},
 					},
 				}
-				msg, _ := h.createResultMessage(nil, payload, discordleaderboardevents.LeaderboardRetrievedTopic)
+				msg, _ := h.Helpers.CreateResultMessage(nil, payload, discordleaderboardevents.LeaderboardRetrievedTopic)
 				msg.Metadata.Set("correlation_id", "correlation123")
 				return []*message.Message{msg}
 			}(),
@@ -237,7 +237,7 @@ func TestLeaderboardHandlers_HandleLeaderboardData(t *testing.T) {
 					EventUtil: mockEventUtil,
 				}
 				payload := leaderboardevents.GetLeaderboardRequestPayload{}
-				msg, _ := h.createResultMessage(nil, payload, leaderboardevents.GetLeaderboardRequest)
+				msg, _ := h.Helpers.CreateResultMessage(nil, payload, leaderboardevents.GetLeaderboardRequest)
 				msg.Metadata.Set("correlation_id", "correlation123")
 				return []*message.Message{msg}
 			}(),

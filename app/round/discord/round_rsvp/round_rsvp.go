@@ -1,4 +1,4 @@
-package createround
+package roundrsvp
 
 import (
 	"context"
@@ -18,20 +18,14 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-// CreateRoundManager defines the interface for create round operations.
-type CreateRoundManager interface {
-	HandleCreateRoundCommand(ctx context.Context, i *discordgo.InteractionCreate)
-	HandleCreateRoundModalSubmit(ctx context.Context, i *discordgo.InteractionCreate)
-	UpdateInteractionResponse(ctx context.Context, correlationID, message string, edit ...*discordgo.WebhookEdit) error
-	UpdateInteractionResponseWithRetryButton(ctx context.Context, correlationID, message string) error
-	HandleCreateRoundModalCancel(ctx context.Context, i *discordgo.InteractionCreate)
-	SendRoundEventEmbed(channelID string, eventID string, title roundtypes.Title, description roundtypes.Description, startTime roundtypes.StartTime, location roundtypes.Location, creatorID roundtypes.UserID, roundID roundtypes.ID) (*discordgo.Message, error)
-	SendCreateRoundModal(ctx context.Context, i *discordgo.InteractionCreate) error
-	HandleRetryCreateRound(ctx context.Context, i *discordgo.InteractionCreate)
+// RoundRsvpManager defines the interface for create round operations.
+type RoundRsvpManager interface {
+	HandleRoundResponse(ctx context.Context, i *discordgo.InteractionCreate)
+	UpdateRoundEventEmbed(channelID, messageID string, acceptedParticipants, declinedParticipants, tentativeParticipants []roundtypes.Participant) error
 }
 
-// createRoundManager implements the CreateRoundManager interface.
-type createRoundManager struct {
+// RoundRsvpManager implements the RoundRsvpManager interface.
+type roundRsvpManager struct {
 	session          discord.Session
 	publisher        eventbus.EventBus
 	logger           observability.Logger
@@ -40,14 +34,14 @@ type createRoundManager struct {
 	interactionStore storage.ISInterface
 }
 
-// NewCreateRoundManager creates a new CreateRoundManager instance.
-func NewCreateRoundManager(session discord.Session, publisher eventbus.EventBus, logger observability.Logger, helper utils.Helpers, config *config.Config, interactionStore storage.ISInterface) CreateRoundManager {
-	logger.Info(context.Background(), "Creating CreateRoundManager",
+// NewRoundRsvpManager creates a new RoundRsvpManager instance.
+func NewRoundRsvpManager(session discord.Session, publisher eventbus.EventBus, logger observability.Logger, helper utils.Helpers, config *config.Config, interactionStore storage.ISInterface) RoundRsvpManager {
+	logger.Info(context.Background(), "Creating RoundRsvpManager",
 		attr.Any("session", session),
 		attr.Any("publisher", publisher),
 		attr.Any("config", config),
 	)
-	return &createRoundManager{
+	return &roundRsvpManager{
 		session:          session,
 		publisher:        publisher,
 		logger:           logger,
@@ -58,11 +52,11 @@ func NewCreateRoundManager(session discord.Session, publisher eventbus.EventBus,
 }
 
 // createEvent is a helper function to create a Watermill message.
-func (crm *createRoundManager) createEvent(ctx context.Context, topic string, payload interface{}, i *discordgo.InteractionCreate) (*message.Message, error) {
+func (rrm *roundRsvpManager) createEvent(ctx context.Context, topic string, payload interface{}, i *discordgo.InteractionCreate) (*message.Message, error) {
 	newEvent := message.NewMessage(watermill.NewUUID(), nil)
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
-		crm.logger.Error(ctx, "Failed to marshal payload in CreateResultMessage", attr.Error(err))
+		rrm.logger.Error(ctx, "Failed to marshal payload in CreateResultMessage", attr.Error(err))
 		return nil, fmt.Errorf("failed to marshal payload: %w, original error: %v", err, err)
 	}
 	newEvent.Payload = payloadBytes
@@ -71,6 +65,6 @@ func (crm *createRoundManager) createEvent(ctx context.Context, topic string, pa
 	newEvent.Metadata.Set("domain", "discord")
 	newEvent.Metadata.Set("interaction_id", i.Interaction.ID)
 	newEvent.Metadata.Set("interaction_token", i.Interaction.Token)
-	newEvent.Metadata.Set("guild_id", crm.config.Discord.GuildID)
+	newEvent.Metadata.Set("guild_id", rrm.config.Discord.GuildID)
 	return newEvent, nil
 }

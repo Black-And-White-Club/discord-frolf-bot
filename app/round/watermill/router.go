@@ -65,21 +65,21 @@ func (r *RoundRouter) Configure(handlers roundhandlers.Handlers, eventbus eventb
 // RegisterHandlers registers event handlers.
 func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandlers.Handlers) error {
 	eventsToHandlers := map[string]message.HandlerFunc{
-		discordroundevents.RoundCreateModalSubmit:            handlers.HandleRoundCreateRequested,
-		discordroundevents.RoundCreatedTopic:                 handlers.HandleRoundCreated,
-		discordroundevents.RoundStartedTopic:                 handlers.HandleRoundStarted,
-		discordroundevents.RoundParticipantJoinReqTopic:      handlers.HandleRoundParticipantJoinRequest,
-		discordroundevents.RoundParticipantJoinedTopic:       handlers.HandleRoundParticipantJoined,
-		discordroundevents.RoundUpdateRequestTopic:           handlers.HandleRoundUpdateRequest,
-		discordroundevents.RoundUpdatedTopic:                 handlers.HandleRoundUpdated,
-		discordroundevents.RoundDeleteRequestTopic:           handlers.HandleRoundDeleteRequest,
-		discordroundevents.RoundDeletedTopic:                 handlers.HandleRoundDeleted,
-		discordroundevents.RoundScoreUpdateRequestTopic:      handlers.HandleRoundScoreUpdateRequest,
-		discordroundevents.RoundParticipantScoreUpdatedTopic: handlers.HandleRoundParticipantScoreUpdated,
-		discordroundevents.RoundFinalizedTopic:               handlers.HandleRoundFinalized,
-		discordroundevents.RoundReminderTopic:                handlers.HandleRoundReminder,
-		discordroundevents.RoundValidationFailed:             handlers.HandleRoundValidationFailed,
-		roundevents.RoundCreationFailed:                      handlers.HandleRoundCreationFailed,
+		discordroundevents.RoundCreateModalSubmit: handlers.HandleRoundCreateRequested,
+		discordroundevents.RoundCreatedTopic:      handlers.HandleRoundCreated,
+		// discordroundevents.RoundStartedTopic:                 handlers.HandleRoundStarted,
+		discordroundevents.RoundParticipantJoinReqTopic: handlers.HandleRoundParticipantJoinRequest,
+		discordroundevents.RoundParticipantJoinedTopic:  handlers.HandleRoundParticipantJoined,
+		// discordroundevents.RoundUpdateRequestTopic:           handlers.HandleRoundUpdateRequest,
+		// discordroundevents.RoundUpdatedTopic:                 handlers.HandleRoundUpdated,
+		// discordroundevents.RoundDeleteRequestTopic:           handlers.HandleRoundDeleteRequest,
+		// discordroundevents.RoundDeletedTopic:                 handlers.HandleRoundDeleted,
+		// discordroundevents.RoundScoreUpdateRequestTopic:      handlers.HandleRoundScoreUpdateRequest,
+		// discordroundevents.RoundParticipantScoreUpdatedTopic: handlers.HandleRoundParticipantScoreUpdated,
+		// discordroundevents.RoundFinalizedTopic:               handlers.HandleRoundFinalized,
+		// discordroundevents.RoundReminderTopic:                handlers.HandleRoundReminder,
+		discordroundevents.RoundValidationFailed: handlers.HandleRoundValidationFailed,
+		roundevents.RoundCreationFailed:          handlers.HandleRoundCreationFailed,
 	}
 	for topic, handlerFunc := range eventsToHandlers {
 		handlerName := fmt.Sprintf("discord-round.%s", topic)

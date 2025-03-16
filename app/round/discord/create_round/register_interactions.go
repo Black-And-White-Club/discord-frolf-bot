@@ -25,18 +25,4 @@ func RegisterHandlers(registry *interactions.Registry, manager CreateRoundManage
 		manager.HandleRetryCreateRound(ctx, i)
 	})
 
-	registry.RegisterHandler("round_accept|", func(ctx context.Context, i *discordgo.InteractionCreate) {
-		slog.Info("Handling round_accept button press", attr.String("custom_id", i.MessageComponentData().CustomID))
-		manager.HandleRoundResponse(ctx, i, "accepted")
-	})
-
-	registry.RegisterHandler("round_decline|", func(ctx context.Context, i *discordgo.InteractionCreate) {
-		slog.Info("Handling round_decline button press", attr.String("custom_id", i.MessageComponentData().CustomID))
-		manager.HandleRoundResponse(ctx, i, "declined")
-	})
-
-	registry.RegisterHandler("round_tentative|", func(ctx context.Context, i *discordgo.InteractionCreate) {
-		slog.Info("Handling round_tentative button press", attr.String("custom_id", i.MessageComponentData().CustomID))
-		manager.HandleRoundResponse(ctx, i, "tentative")
-	})
 }

@@ -69,7 +69,7 @@ func TestLeaderboardHandlers_HandleGetTagByDiscordID(t *testing.T) {
 				payload := leaderboardevents.GetTagByDiscordIDRequestPayload{
 					DiscordID: "123456789",
 				}
-				msg, _ := h.createResultMessage(nil, payload, leaderboardevents.GetTagByDiscordIDRequest)
+				msg, _ := h.Helpers.CreateResultMessage(nil, payload, leaderboardevents.GetTagByDiscordIDRequest)
 				msg.Metadata.Set("correlation_id", "correlation123")
 				return []*message.Message{msg}
 			}(),
@@ -200,7 +200,7 @@ func TestLeaderboardHandlers_HandleGetTagByDiscordIDResponse(t *testing.T) {
 					ChannelID: "channel123",
 					MessageID: "message123",
 				}
-				msg, _ := h.createResultMessage(nil, payload, discordleaderboardevents.LeaderboardTagAvailabilityResponseTopic)
+				msg, _ := h.Helpers.CreateResultMessage(nil, payload, discordleaderboardevents.LeaderboardTagAvailabilityResponseTopic)
 				msg.Metadata.Set("correlation_id", "correlation123")
 				return []*message.Message{msg}
 			}(),

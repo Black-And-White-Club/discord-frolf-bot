@@ -5,6 +5,7 @@ import (
 
 	discordgo "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	createround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/create_round"
+	roundrsvp "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/round_rsvp"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
@@ -15,11 +16,13 @@ import (
 // RoundDiscordInterface defines the interface for RoundDiscord.
 type RoundDiscordInterface interface {
 	GetCreateRoundManager() createround.CreateRoundManager
+	GetRoundRsvpManager() roundrsvp.RoundRsvpManager
 }
 
 // RoundDiscord encapsulates all Round Discord services.
 type RoundDiscord struct {
 	CreateRoundManager createround.CreateRoundManager
+	RoundRsvpManager   roundrsvp.RoundRsvpManager
 }
 
 // NewRoundDiscord creates a new RoundDiscord instance.
@@ -33,13 +36,19 @@ func NewRoundDiscord(
 	interactionStore storage.ISInterface,
 ) (RoundDiscordInterface, error) {
 	createRoundManager := createround.NewCreateRoundManager(session, publisher, logger, helper, config, interactionStore)
+	roundRsvpManager := roundrsvp.NewRoundRsvpManager(session, publisher, logger, helper, config, interactionStore)
 
 	return &RoundDiscord{
 		CreateRoundManager: createRoundManager,
+		RoundRsvpManager:   roundRsvpManager,
 	}, nil
 }
 
 // GetRoleManager returns the RoleManager.
 func (rd *RoundDiscord) GetCreateRoundManager() createround.CreateRoundManager {
 	return rd.CreateRoundManager
+}
+
+func (rd *RoundDiscord) GetRoundRsvpManager() roundrsvp.RoundRsvpManager {
+	return rd.RoundRsvpManager
 }

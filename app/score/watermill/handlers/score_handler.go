@@ -15,7 +15,7 @@ func (h *ScoreHandlers) HandleScoreUpdateRequest(msg *message.Message) ([]*messa
 	ctx := msg.Context()
 	h.Logger.Info(ctx, "Handling ScoreUpdateRequest", attr.CorrelationIDFromMsg(msg))
 	var discordPayload discordscoreevents.ScoreUpdateRequestPayload
-	if err := h.unmarshalPayload(msg, &discordPayload); err != nil {
+	if err := h.Helpers.UnmarshalPayload(msg, &discordPayload); err != nil {
 		return nil, err
 	}
 	userID := discordPayload.UserID //From common metadata assumption
@@ -37,7 +37,7 @@ func (h *ScoreHandlers) HandleScoreUpdateRequest(msg *message.Message) ([]*messa
 		Score:       discordPayload.Score, // Already a pointer.
 		TagNumber:   discordPayload.TagNumber,
 	}
-	backendMsg, err := h.createResultMessage(msg, backendPayload, scoreevents.ScoreUpdateRequest)
+	backendMsg, err := h.Helpers.CreateResultMessage(msg, backendPayload, scoreevents.ScoreUpdateRequest)
 	if err != nil {
 		h.Logger.Error(ctx, "Failed to create backend message", attr.CorrelationIDFromMsg(msg), attr.Error(err))
 		return nil, err
@@ -54,7 +54,7 @@ func (h *ScoreHandlers) HandleScoreUpdateResponse(msg *message.Message) ([]*mess
 	ctx := msg.Context()
 	h.Logger.Info(ctx, "Handling ScoreUpdateResponse", attr.CorrelationIDFromMsg(msg))
 	var backendPayload scoreevents.ScoreUpdateResponsePayload //  Backend response payload.
-	if err := h.unmarshalPayload(msg, &backendPayload); err != nil {
+	if err := h.Helpers.UnmarshalPayload(msg, &backendPayload); err != nil {
 		return nil, err
 	}
 	userID := msg.Metadata.Get("user_id")
@@ -78,7 +78,7 @@ func (h *ScoreHandlers) HandleScoreUpdateResponse(msg *message.Message) ([]*mess
 		ChannelID:   channelID,
 		MessageID:   messageID,
 	}
-	discordMsg, err := h.createResultMessage(msg, discordPayload, discordscoreevents.ScoreUpdateResponseTopic)
+	discordMsg, err := h.Helpers.CreateResultMessage(msg, discordPayload, discordscoreevents.ScoreUpdateResponseTopic)
 	if err != nil {
 		h.Logger.Error(ctx, "Failed to create discord message", attr.CorrelationIDFromMsg(msg), attr.Error(err))
 		return nil, fmt.Errorf("failed to create discord message: %w", err)

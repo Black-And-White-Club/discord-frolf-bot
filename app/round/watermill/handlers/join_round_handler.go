@@ -4,49 +4,74 @@ import (
 	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
+	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	"github.com/ThreeDotsLabs/watermill/message"
 )
 
+// HandleRoundParticipantJoinRequest handles the request for a participant to join a round.
 func (h *RoundHandlers) HandleRoundParticipantJoinRequest(msg *message.Message) ([]*message.Message, error) {
 	ctx := msg.Context()
 	h.Logger.Info(ctx, "Handling round participant join request", attr.CorrelationIDFromMsg(msg))
 	var payload discordroundevents.DiscordRoundParticipantJoinRequestPayload
-	if err := h.unmarshalPayload(msg, &payload); err != nil {
+	if err := h.Helpers.UnmarshalPayload(msg, &payload); err != nil {
 		return nil, err
 	}
+
+	// Extract the response from the message metadata or custom logic
+	responseStr := msg.Metadata.Get("response")
+	var response roundtypes.Response
+	switch responseStr {
+	case "accepted":
+		response = roundtypes.ResponseAccept
+	case "declined":
+		response = roundtypes.ResponseDecline
+	case "tentative":
+		response = roundtypes.ResponseTentative
+	default:
+		response = roundtypes.ResponseAccept
+	}
+
+	// Default tag number to 0
+	tagNumber := 0
+	tagNumberPtr := &tagNumber
+
 	// Construct the backend payload
 	backendPayload := roundevents.ParticipantJoinRequestPayload{
-		RoundID:   payload.RoundID,
-		DiscordID: payload.UserID,
+		RoundID:   roundtypes.ID(payload.RoundID),
+		UserID:    roundtypes.UserID(payload.UserID),
+		Response:  response,
+		TagNumber: tagNumberPtr,
 	}
-	backendMsg, err := h.createResultMessage(msg, backendPayload, roundevents.RoundParticipantJoinRequest)
+
+	// Create a message to send to the backend
+	backendMsg, err := h.Helpers.CreateResultMessage(msg, backendPayload, roundevents.RoundParticipantJoinRequest)
 	if err != nil {
 		return nil, err
 	}
+
 	h.Logger.Info(ctx, "Successfully processed participant join request", attr.CorrelationIDFromMsg(msg))
 	return []*message.Message{backendMsg}, nil
 }
 
-// This comes from the backend
+// HandleRoundParticipantJoined handles the event when a participant has joined a round.
 func (h *RoundHandlers) HandleRoundParticipantJoined(msg *message.Message) ([]*message.Message, error) {
 	ctx := msg.Context()
 	h.Logger.Info(ctx, "Handling participant joined", attr.CorrelationIDFromMsg(msg))
 	var payload roundevents.ParticipantJoinedPayload
-	if err := h.unmarshalPayload(msg, &payload); err != nil {
+	if err := h.Helpers.UnmarshalPayload(msg, &payload); err != nil {
 		return nil, err
 	}
+
 	channelID := msg.Metadata.Get("channel_id")
-	// Construct the *internal* Discord payload for successful join
-	discordPayload := discordroundevents.DiscordRoundParticipantJoinedPayload{
-		RoundID:   payload.RoundID,
-		UserID:    payload.Participant,
-		TagNumber: payload.TagNumber,
-		ChannelID: channelID,
-	}
-	discordMsg, err := h.createResultMessage(msg, discordPayload, discordroundevents.RoundParticipantJoinedTopic)
+	messageID := msg.Metadata.Get("message_id")
+
+	// Update the Discord embed with the new participant information
+	err := h.RoundDiscord.GetRoundRsvpManager().UpdateRoundEventEmbed(channelID, messageID, payload.AcceptedParticipants, payload.DeclinedParticipants, payload.TentativeParticipants)
 	if err != nil {
+		h.Logger.Error(ctx, "Failed to update round event embed", attr.Error(err))
 		return nil, err
 	}
-	h.Logger.Info(ctx, "Successfully processed participant joined", attr.CorrelationIDFromMsg(msg))
-	return []*message.Message{discordMsg}, nil
+
+	h.Logger.Info(ctx, "Successfully updated participant joined", attr.CorrelationIDFromMsg(msg))
+	return nil, nil
 }

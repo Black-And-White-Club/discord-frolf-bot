@@ -23,6 +23,7 @@ func InitializeUserModule(
 	ctx context.Context,
 	session discord.Session,
 	interactionRegistry *interactions.Registry,
+	reactionRegistry *interactions.ReactionRegistry,
 	publisher eventbus.EventBus,
 	logger observability.Logger,
 	config *config.Config,
@@ -43,6 +44,9 @@ func InitializeUserModule(
 
 	// Initialize Watermill handlers (no need to register with router here)
 	userhandlers.NewUserHandlers(logger, config, eventUtil, helper, userDiscord)
+
+	// Register reaction handlers
+	reactionRegistry.RegisterMessageReactionAddHandler(userDiscord.GetSignupManager().MessageReactionAdd)
 
 	return nil
 }
