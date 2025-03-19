@@ -8,21 +8,18 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-func (crm *createRoundManager) SendRoundEventEmbed(channelID string, eventID string, title roundtypes.Title, description roundtypes.Description, startTime roundtypes.StartTime, location roundtypes.Location, creatorID roundtypes.UserID, roundID roundtypes.ID) (*discordgo.Message, error) {
-	// Convert time to Unix for Discord formatting
+func (crm *createRoundManager) SendRoundEventEmbed(channelID string, title roundtypes.Title, description roundtypes.Description, startTime roundtypes.StartTime, location roundtypes.Location, creatorID roundtypes.UserID, roundID roundtypes.ID) (*discordgo.Message, error) {
+	// Convert time for Discord formatting
 	timeValue := time.Time(startTime)
 	unixTimestamp := timeValue.Unix()
 
-	// Fetch the user's information from the Discord API
+	// Get the creator's display name
 	user, err := crm.session.User(string(creatorID))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get creator info: %w", err)
 	}
-
-	// Attempt to fetch the member's nickname from the guild
-	guildID := crm.config.Discord.GuildID
-	creatorName := user.Username // Default to username
-	if member, err := crm.session.GuildMember(guildID, string(creatorID)); err == nil && member.Nick != "" {
+	creatorName := user.Username
+	if member, err := crm.session.GuildMember(crm.config.Discord.GuildID, string(creatorID)); err == nil && member.Nick != "" {
 		creatorName = member.Nick
 	}
 
@@ -86,10 +83,13 @@ func (crm *createRoundManager) SendRoundEventEmbed(channelID string, eventID str
 	}
 
 	// Send the message
-	messageSend := &discordgo.MessageSend{
+	message, err := crm.session.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
 		Embeds:     []*discordgo.MessageEmbed{embed},
 		Components: components,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to send discord message: %w", err)
 	}
 
-	return crm.session.ChannelMessageSendComplex(channelID, messageSend)
+	return message, nil
 }

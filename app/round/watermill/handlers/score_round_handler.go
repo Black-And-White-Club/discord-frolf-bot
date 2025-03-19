@@ -1,51 +1,53 @@
 package roundhandlers
 
-// import (
-// 	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
-// 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
-// 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
-// 	"github.com/ThreeDotsLabs/watermill/message"
-// )
+import (
+	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
+	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
+	"github.com/ThreeDotsLabs/watermill/message"
+)
 
-// func (h *RoundHandlers) HandleRoundScoreUpdateRequest(msg *message.Message) ([]*message.Message, error) {
-// 	ctx := msg.Context()
-// 	h.Logger.Info(ctx, "Handling round score update request", attr.CorrelationIDFromMsg(msg))
-// 	var payload discordroundevents.DiscordRoundScoreUpdateRequestPayload
-// 	if err := h.Helpers.UnmarshalPayload(msg, &payload); err != nil {
-// 		return nil, err // unmarshalPayload already logs
-// 	}
-// 	// Construct the backend payload
-// 	backendPayload := roundevents.ScoreUpdateRequestPayload{
-// 		RoundID:     payload.RoundID,
-// 		Participant: payload.UserID,
-// 		Score:       &payload.Score,
-// 	}
-// 	backendMsg, err := h.Helpers.CreateResultMessage(msg, backendPayload, roundevents.RoundScoreUpdateRequest)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	h.Logger.Info(ctx, "Successfully processed round score update request", attr.CorrelationIDFromMsg(msg))
-// 	return []*message.Message{backendMsg}, nil
-// }
-// func (h *RoundHandlers) HandleRoundParticipantScoreUpdated(msg *message.Message) ([]*message.Message, error) {
-// 	ctx := msg.Context()
-// 	h.Logger.Info(ctx, "Handling round participant score updated", attr.CorrelationIDFromMsg(msg))
-// 	var payload roundevents.ParticipantScoreUpdatedPayload
-// 	if err := h.Helpers.UnmarshalPayload(msg, &payload); err != nil {
-// 		return nil, err
-// 	}
-// 	// Construct the *internal* Discord payload
-// 	discordPayload := discordroundevents.DiscordRoundParticipantScoreUpdatedPayload{
-// 		RoundID:   payload.RoundID,
-// 		UserID:    payload.Participant,
-// 		Score:     payload.Score,
-// 		ChannelID: payload.ChannelID,
-// 		MessageID: payload.MessageID,
-// 	}
-// 	discordMsg, err := h.Helpers.CreateResultMessage(msg, discordPayload, discordroundevents.RoundParticipantScoreUpdatedTopic)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	h.Logger.Info(ctx, "Successfully processed round participant score updated", attr.CorrelationIDFromMsg(msg))
-// 	return []*message.Message{discordMsg}, nil
-// }
+// HandleParticipantScoreUpdated handles a successful score update event
+func (h *RoundHandlers) HandleParticipantScoreUpdated(msg *message.Message) ([]*message.Message, error) {
+	ctx := msg.Context()
+	h.Logger.Info(ctx, "Handling participant score update", attr.CorrelationIDFromMsg(msg))
+
+	var payload roundevents.ParticipantScoreUpdatedPayload
+	if err := h.Helpers.UnmarshalPayload(msg, &payload); err != nil {
+		return nil, err
+	}
+
+	scorePtr := &payload.Score
+
+	// Send confirmation message via Discord
+	err := h.RoundDiscord.GetScoreRoundManager().SendScoreUpdateConfirmation(payload.ChannelID, payload.Participant, scorePtr)
+	if err != nil {
+		h.Logger.Error(ctx, "Failed to send score update confirmation", attr.Error(err))
+	}
+
+	return nil, nil
+}
+
+// HandleScoreUpdateError processes a failed score update
+func (h *RoundHandlers) HandleScoreUpdateError(msg *message.Message) ([]*message.Message, error) {
+	ctx := msg.Context()
+	h.Logger.Info(ctx, "Handling score update error", attr.CorrelationIDFromMsg(msg))
+
+	var payload roundevents.RoundScoreUpdateErrorPayload
+	if err := h.Helpers.UnmarshalPayload(msg, &payload); err != nil {
+		return nil, err
+	}
+
+	// Ensure there is an error message before sending it
+	if payload.Error == "" {
+		h.Logger.Error(ctx, "Received empty error message in HandleScoreUpdateError")
+		return nil, nil
+	}
+
+	// Notify the user in Discord
+	err := h.RoundDiscord.GetScoreRoundManager().SendScoreUpdateError(payload.ScoreUpdateRequest.Participant, payload.Error)
+	if err != nil {
+		h.Logger.Error(ctx, "Failed to send score update error notification", attr.Error(err))
+	}
+
+	return nil, nil
+}

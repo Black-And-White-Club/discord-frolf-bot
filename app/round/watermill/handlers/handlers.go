@@ -10,12 +10,12 @@ import (
 
 // Handlers defines the interface for round handlers.
 type Handlers interface {
-	// HandleRoundStarted(msg *message.Message) ([]*message.Message, error)
+	HandleRoundStarted(msg *message.Message) ([]*message.Message, error)
 	// HandleRoundScoreUpdateRequest(msg *message.Message) ([]*message.Message, error)
 	// HandleRoundParticipantScoreUpdated(msg *message.Message) ([]*message.Message, error)
 	// HandleRoundUpdateRequest(msg *message.Message) ([]*message.Message, error)
 	// HandleRoundUpdated(msg *message.Message) ([]*message.Message, error)
-	// HandleRoundReminder(msg *message.Message) ([]*message.Message, error)
+	HandleRoundReminder(msg *message.Message) ([]*message.Message, error)
 	HandleRoundParticipantJoinRequest(msg *message.Message) ([]*message.Message, error)
 	HandleRoundParticipantJoined(msg *message.Message) ([]*message.Message, error)
 	// HandleRoundFinalized(msg *message.Message) ([]*message.Message, error)

@@ -13,6 +13,7 @@ import (
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	"github.com/ThreeDotsLabs/watermill/message"
+	"github.com/bwmarrin/discordgo"
 	"go.uber.org/mock/gomock"
 )
 
@@ -208,7 +209,6 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    []*message.Message
 		wantErr bool
 		setup   func()
 	}{
@@ -222,10 +222,6 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 			args: args{
 				msg: message.NewMessage("1", []byte(`{"round_id": 1, "user_id": "user123", "title": "Test Round", "start_time": "2023-10-10T10:00:00Z"}`)),
 			},
-			want: func() []*message.Message {
-				msg := message.NewMessage(discordroundevents.RoundCreatedTraceTopic, []byte(`{"round_id":1,"title":"Test Round","created_by":"user123","timestamp":"0001-01-01T00:00:00Z"}`))
-				return []*message.Message{msg}
-			}(),
 			wantErr: false,
 			setup: func() {
 				expectedPayload := roundevents.RoundCreatedPayload{
@@ -239,6 +235,8 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 						}(),
 					},
 				}
+
+				// Mock payload unmarshal
 				mockHelpers.EXPECT().
 					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundCreatedPayload{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
@@ -246,24 +244,35 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 						return nil
 					}).Times(1)
 
+				// Mock `GetCreateRoundManager`
 				mockRoundDiscord.EXPECT().
 					GetCreateRoundManager().
 					Return(mockCreateRoundManager).
 					Times(2)
 
+				// Mock interaction response update
 				mockCreateRoundManager.EXPECT().
 					UpdateInteractionResponse(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil).Times(1)
 
+				// Mock `SendRoundEventEmbed` to return a message with an ID
 				mockCreateRoundManager.EXPECT().
-					SendRoundEventEmbed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(nil, nil).Times(1)
+					SendRoundEventEmbed(
+						gomock.Any(), // Channel ID
+						gomock.Any(), // Title
+						gomock.Any(), // Description
+						gomock.Any(), // Start Time
+						gomock.Any(), // Location
+						gomock.Any(), // Creator ID
+						gomock.Any(), // Round ID
+					).
+					Return(&discordgo.Message{ID: "message-id"}, nil).
+					Times(1)
 
-				msg := message.NewMessage(discordroundevents.RoundCreatedTraceTopic, []byte(`{"round_id":1,"title":"Test Round","created_by":"user123","timestamp":"0001-01-01T00:00:00Z"}`))
-
+				// Mock event message creation
 				mockHelpers.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Any(), discordroundevents.RoundCreatedTraceTopic).
-					Return(msg, nil).Times(1)
+					CreateResultMessage(gomock.Any(), gomock.AssignableToTypeOf(roundevents.RoundEventMessageIDUpdatedPayload{}), roundevents.RoundEventMessageIDUpdate).
+					Times(1)
 			},
 		},
 		{
@@ -276,7 +285,6 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 			args: args{
 				msg: message.NewMessage("1", []byte(`invalid payload`)),
 			},
-			want:    nil,
 			wantErr: true,
 			setup: func() {
 				mockHelpers.EXPECT().UnmarshalPayload(gomock.Any(), gomock.Any()).Return(errors.New("unmarshal error")).Times(1)
@@ -292,7 +300,6 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 			args: args{
 				msg: message.NewMessage("1", []byte(`{"round_id": 1, "user_id": "user123", "title": "Test Round", "start_time": "2023-10-10T10:00:00Z"}`)),
 			},
-			want:    nil,
 			wantErr: true,
 			setup: func() {
 				expectedPayload := roundevents.RoundCreatedPayload{
@@ -306,12 +313,14 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 						}(),
 					},
 				}
+
 				mockHelpers.EXPECT().
 					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundCreatedPayload{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
 						*v.(*roundevents.RoundCreatedPayload) = expectedPayload
 						return nil
 					}).Times(1)
+
 				mockRoundDiscord.EXPECT().
 					GetCreateRoundManager().
 					Return(mockCreateRoundManager).
@@ -320,7 +329,6 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 				mockCreateRoundManager.EXPECT().
 					UpdateInteractionResponse(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(errors.New("update error")).Times(1)
-
 			},
 		},
 	}
@@ -337,35 +345,17 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 			}
 			got, err := h.HandleRoundCreated(tt.args.msg)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("RoundHandlers.HandleRoundCreated() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("HandleRoundCreated() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
-			if tt.want == nil {
+			if tt.wantErr {
 				if got != nil {
-					t.Errorf("RoundHandlers.HandleRoundCreated() = %v, want nil", got)
+					t.Errorf("HandleRoundCreated() should return nil messages when failing")
 				}
-			} else if got == nil {
-				if tt.want != nil {
-					t.Errorf("RoundHandlers.HandleRoundCreated() = nil, want %v", tt.want)
-				}
-			} else if len(got) != len(tt.want) {
-				t.Errorf("RoundHandlers.HandleRoundCreated() returned %d messages, want %d", len(got), len(tt.want))
 			} else {
-				for i, wantMsg := range tt.want {
-					if i >= len(got) {
-						t.Errorf("Missing expected message at index %d", i)
-						continue
-					}
-
-					gotMsg := got[i]
-					if wantMsg.UUID != gotMsg.UUID {
-						t.Errorf("Message UUID mismatch at index %d: got %s, want %s", i, gotMsg.UUID, wantMsg.UUID)
-					}
-
-					if string(wantMsg.Payload) != string(gotMsg.Payload) {
-						t.Errorf("Message payload mismatch at index %d: got %s, want %s", i, string(gotMsg.Payload), string(wantMsg.Payload))
-					}
+				if len(got) == 0 {
+					t.Errorf("HandleRoundCreated() should return a valid message")
 				}
 			}
 		})

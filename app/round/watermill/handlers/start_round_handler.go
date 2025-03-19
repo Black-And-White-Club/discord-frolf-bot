@@ -1,36 +1,54 @@
 package roundhandlers
 
-// import (
-// 	"encoding/json"
-// 	"fmt"
+import (
+	"fmt"
 
-// 	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
-// 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
-// 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
-// 	"github.com/ThreeDotsLabs/watermill/message"
-// )
+	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
+	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
+	"github.com/ThreeDotsLabs/watermill/message"
+)
 
-// func (h *RoundHandlers) HandleRoundStarted(msg *message.Message) ([]*message.Message, error) {
-// 	ctx := msg.Context()
-// 	h.Logger.Info(ctx, "Handling round started event", attr.CorrelationIDFromMsg(msg))
-// 	var payload roundevents.RoundStartedPayload
-// 	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
-// 		h.Logger.Error(ctx, "Failed to unmarshal RoundStartedPayload", attr.CorrelationIDFromMsg(msg), attr.Error(err))
-// 		return nil, fmt.Errorf("failed to unmarshal payload: %w", err)
-// 	}
-// 	h.Logger.Info(ctx, "Preparing to notify Discord of round start", attr.Int64("round_id", payload.RoundID), attr.CorrelationIDFromMsg(msg))
-// 	// Construct the Discord-specific payload
-// 	discordPayload := discordroundevents.DiscordRoundStartPayload{
-// 		RoundID:   payload.RoundID,
-// 		Title:     payload.Title,
-// 		Location:  payload.Location,
-// 		StartTime: payload.StartTime,
-// 		ChannelID: payload.ChannelID,
-// 	}
-// 	discordMsg, err := h.Helpers.CreateResultMessage(msg, discordPayload, discordroundevents.RoundStartedTopic)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	h.Logger.Info(ctx, "Successfully processed round started event", attr.CorrelationIDFromMsg(msg))
-// 	return []*message.Message{discordMsg}, nil
-// }
+// HandleRoundStarted handles the DiscordRoundStarted event and updates the Discord embed
+func (h *RoundHandlers) HandleRoundStarted(msg *message.Message) ([]*message.Message, error) {
+	ctx := msg.Context()
+	h.Logger.Info(ctx, "Handling round started event", attr.CorrelationIDFromMsg(msg))
+
+	// Unmarshal the payload
+	var payload roundevents.DiscordRoundStartPayload
+	if err := h.Helpers.UnmarshalPayload(msg, &payload); err != nil {
+		h.Logger.Error(ctx, "Failed to unmarshal payload", attr.CorrelationIDFromMsg(msg), attr.Error(err))
+		return nil, fmt.Errorf("failed to unmarshal payload: %w", err)
+	}
+
+	// Make sure we have an event message ID
+	if payload.EventMessageID == "" {
+		h.Logger.Error(ctx, "Missing event message ID in payload", attr.CorrelationIDFromMsg(msg))
+		return nil, fmt.Errorf("missing event message ID in round start payload")
+	}
+
+	channelID := payload.DiscordChannelID
+
+	// Update the round embed to scorecard format
+	if err := h.RoundDiscord.GetStartRoundManager().UpdateRoundToScorecard(ctx, channelID, string(payload.EventMessageID), &payload); err != nil {
+		h.Logger.Error(ctx, "Failed to update round to scorecard", attr.Error(err))
+		return nil, err
+	}
+
+	h.Logger.Info(ctx, "Successfully processed round start event", attr.CorrelationIDFromMsg(msg))
+
+	// Create trace event inline without a separate function
+	tracePayload := map[string]interface{}{
+		"round_id":   payload.RoundID,
+		"event_type": "round_started",
+		"status":     "scorecard_updated",
+		"message_id": payload.EventMessageID,
+	}
+
+	traceMsg, err := h.Helpers.CreateResultMessage(msg, tracePayload, roundevents.RoundTraceEvent)
+	if err != nil {
+		h.Logger.Error(ctx, "Failed to create trace event", attr.Error(err))
+		return []*message.Message{}, nil
+	}
+
+	return []*message.Message{traceMsg}, nil
+}

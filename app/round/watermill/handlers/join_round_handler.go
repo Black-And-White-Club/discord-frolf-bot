@@ -12,12 +12,13 @@ import (
 func (h *RoundHandlers) HandleRoundParticipantJoinRequest(msg *message.Message) ([]*message.Message, error) {
 	ctx := msg.Context()
 	h.Logger.Info(ctx, "Handling round participant join request", attr.CorrelationIDFromMsg(msg))
+
 	var payload discordroundevents.DiscordRoundParticipantJoinRequestPayload
 	if err := h.Helpers.UnmarshalPayload(msg, &payload); err != nil {
 		return nil, err
 	}
 
-	// Extract the response from the message metadata or custom logic
+	// Extract the response from the message metadata
 	responseStr := msg.Metadata.Get("response")
 	var response roundtypes.Response
 	switch responseStr {
@@ -31,16 +32,23 @@ func (h *RoundHandlers) HandleRoundParticipantJoinRequest(msg *message.Message) 
 		response = roundtypes.ResponseAccept
 	}
 
+	// Check if this is a late join (defaults to false if not set)
+	joinedLate := false
+	if payload.JoinedLate != nil {
+		joinedLate = *payload.JoinedLate
+	}
+
 	// Default tag number to 0
 	tagNumber := 0
 	tagNumberPtr := &tagNumber
 
 	// Construct the backend payload
 	backendPayload := roundevents.ParticipantJoinRequestPayload{
-		RoundID:   roundtypes.ID(payload.RoundID),
-		UserID:    roundtypes.UserID(payload.UserID),
-		Response:  response,
-		TagNumber: tagNumberPtr,
+		RoundID:    roundtypes.ID(payload.RoundID),
+		UserID:     roundtypes.UserID(payload.UserID),
+		Response:   response,
+		TagNumber:  tagNumberPtr,
+		JoinedLate: &joinedLate,
 	}
 
 	// Create a message to send to the backend
@@ -49,7 +57,11 @@ func (h *RoundHandlers) HandleRoundParticipantJoinRequest(msg *message.Message) 
 		return nil, err
 	}
 
-	h.Logger.Info(ctx, "Successfully processed participant join request", attr.CorrelationIDFromMsg(msg))
+	h.Logger.Info(ctx, "Successfully processed participant join request",
+		attr.CorrelationIDFromMsg(msg),
+		attr.Bool("joined_late", joinedLate),
+	)
+
 	return []*message.Message{backendMsg}, nil
 }
 
@@ -57,6 +69,7 @@ func (h *RoundHandlers) HandleRoundParticipantJoinRequest(msg *message.Message) 
 func (h *RoundHandlers) HandleRoundParticipantJoined(msg *message.Message) ([]*message.Message, error) {
 	ctx := msg.Context()
 	h.Logger.Info(ctx, "Handling participant joined", attr.CorrelationIDFromMsg(msg))
+
 	var payload roundevents.ParticipantJoinedPayload
 	if err := h.Helpers.UnmarshalPayload(msg, &payload); err != nil {
 		return nil, err
@@ -65,13 +78,26 @@ func (h *RoundHandlers) HandleRoundParticipantJoined(msg *message.Message) ([]*m
 	channelID := msg.Metadata.Get("channel_id")
 	messageID := msg.Metadata.Get("message_id")
 
+	// Determine if this was a late join
+	joinedLate := false
+	if payload.JoinedLate != nil {
+		joinedLate = *payload.JoinedLate
+	}
+
 	// Update the Discord embed with the new participant information
-	err := h.RoundDiscord.GetRoundRsvpManager().UpdateRoundEventEmbed(channelID, messageID, payload.AcceptedParticipants, payload.DeclinedParticipants, payload.TentativeParticipants)
+	err := h.RoundDiscord.GetRoundRsvpManager().UpdateRoundEventEmbed(
+		channelID, messageID,
+		payload.AcceptedParticipants, payload.DeclinedParticipants, payload.TentativeParticipants,
+	)
 	if err != nil {
 		h.Logger.Error(ctx, "Failed to update round event embed", attr.Error(err))
 		return nil, err
 	}
 
-	h.Logger.Info(ctx, "Successfully updated participant joined", attr.CorrelationIDFromMsg(msg))
+	h.Logger.Info(ctx, "Successfully updated participant joined",
+		attr.CorrelationIDFromMsg(msg),
+		attr.Bool("joined_late", joinedLate),
+	)
+
 	return nil, nil
 }

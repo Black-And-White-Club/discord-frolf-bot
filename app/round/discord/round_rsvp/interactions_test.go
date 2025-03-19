@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
+	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
 	storagemocks "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
@@ -85,12 +86,12 @@ func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
 
 				expectedPayload := createExpectedPayload(roundtypes.ResponseAccept)
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Eq(expectedPayload), gomock.Eq(roundevents.RoundParticipantJoinRequest)).
+					CreateResultMessage(gomock.Any(), gomock.Eq(expectedPayload), gomock.Eq(discordroundevents.RoundParticipantJoinReqTopic)).
 					Return(&message.Message{UUID: "msg-123"}, nil).
 					Times(1)
 
 				mockPublisher.EXPECT().
-					Publish(gomock.Eq(roundevents.RoundParticipantJoinRequest), gomock.Any()).
+					Publish(gomock.Eq(discordroundevents.RoundParticipantJoinReqTopic), gomock.Any()).
 					Return(nil).
 					Times(1)
 
@@ -127,12 +128,12 @@ func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
 
 				expectedPayload := createExpectedPayload(roundtypes.ResponseDecline)
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Eq(expectedPayload), gomock.Eq(roundevents.RoundParticipantJoinRequest)).
+					CreateResultMessage(gomock.Any(), gomock.Eq(expectedPayload), gomock.Eq(discordroundevents.RoundParticipantJoinReqTopic)).
 					Return(&message.Message{UUID: "msg-123"}, nil).
 					Times(1)
 
 				mockPublisher.EXPECT().
-					Publish(gomock.Eq(roundevents.RoundParticipantJoinRequest), gomock.Any()).
+					Publish(gomock.Eq(discordroundevents.RoundParticipantJoinReqTopic), gomock.Any()).
 					Return(nil).
 					Times(1)
 				mockSession.EXPECT().
@@ -162,12 +163,12 @@ func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
 
 				expectedPayload := createExpectedPayload(roundtypes.ResponseTentative)
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Eq(expectedPayload), gomock.Eq(roundevents.RoundParticipantJoinRequest)).
+					CreateResultMessage(gomock.Any(), gomock.Eq(expectedPayload), gomock.Eq(discordroundevents.RoundParticipantJoinReqTopic)).
 					Return(&message.Message{UUID: "msg-123"}, nil).
 					Times(1)
 
 				mockPublisher.EXPECT().
-					Publish(gomock.Eq(roundevents.RoundParticipantJoinRequest), gomock.Any()).
+					Publish(gomock.Eq(discordroundevents.RoundParticipantJoinReqTopic), gomock.Any()).
 					Return(nil).
 					Times(1)
 
@@ -243,7 +244,7 @@ func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
 					Times(1)
 
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(roundevents.RoundParticipantJoinRequest)).
+					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(discordroundevents.RoundParticipantJoinReqTopic)).
 					Return(nil, errors.New("failed to create result message")).
 					Times(1)
 			},
@@ -264,12 +265,12 @@ func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
 					Times(1)
 
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(roundevents.RoundParticipantJoinRequest)).
+					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(discordroundevents.RoundParticipantJoinReqTopic)).
 					Return(&message.Message{UUID: "msg-123"}, nil).
 					Times(1)
 
 				mockPublisher.EXPECT().
-					Publish(gomock.Eq(roundevents.RoundParticipantJoinRequest), gomock.Any()).
+					Publish(gomock.Eq(discordroundevents.RoundParticipantJoinReqTopic), gomock.Any()).
 					Return(errors.New("failed to publish message")).
 					Times(1)
 			},
@@ -290,12 +291,12 @@ func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
 					Times(1)
 
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(roundevents.RoundParticipantJoinRequest)).
+					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(discordroundevents.RoundParticipantJoinReqTopic)).
 					Return(&message.Message{UUID: "msg-123"}, nil).
 					Times(1)
 
 				mockPublisher.EXPECT().
-					Publish(gomock.Eq(roundevents.RoundParticipantJoinRequest), gomock.Any()).
+					Publish(gomock.Eq(discordroundevents.RoundParticipantJoinReqTopic), gomock.Any()).
 					Return(nil).
 					Times(1)
 
@@ -334,6 +335,203 @@ func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
 			}
 
 			rrm.HandleRoundResponse(tt.args.ctx, tt.args.i)
+		})
+	}
+}
+
+func Test_roundRsvpManager_InteractionJoinRoundLate(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockSession := discordmocks.NewMockSession(ctrl)
+	mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
+	mockLogger := mocks.NewMockLogger(ctrl)
+	mockHelper := helpersmocks.NewMockHelpers(ctrl)
+	mockConfig := &config.Config{}
+	mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+
+	// Helper function to create a sample InteractionCreate with a given custom ID
+	createInteraction := func(customID string) *discordgo.InteractionCreate {
+		return &discordgo.InteractionCreate{
+			Interaction: &discordgo.Interaction{
+				ID: "interaction-123",
+				Member: &discordgo.Member{
+					User: &discordgo.User{
+						ID:       "user-123",
+						Username: "TestUser",
+					},
+				},
+				Data: discordgo.MessageComponentInteractionData{
+					CustomID:      customID,
+					ComponentType: discordgo.ButtonComponent,
+				},
+				Type: discordgo.InteractionMessageComponent,
+			},
+		}
+	}
+
+	tests := []struct {
+		name  string
+		setup func()
+		args  struct {
+			ctx context.Context
+			i   *discordgo.InteractionCreate
+		}
+	}{
+		{
+			name: "successful late join",
+			setup: func() {
+				mockSession.EXPECT().
+					InteractionRespond(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil).
+					Times(1)
+
+				// Expected payload with JoinedLate = true
+				tagNumber := 0
+				joinedLate := true
+				expectedPayload := roundevents.ParticipantJoinRequestPayload{
+					RoundID:    123,
+					UserID:     "user-123",
+					Response:   roundtypes.ResponseAccept,
+					TagNumber:  &tagNumber,
+					JoinedLate: &joinedLate,
+				}
+
+				mockHelper.EXPECT().
+					CreateResultMessage(gomock.Any(), gomock.Eq(expectedPayload), gomock.Eq(discordroundevents.RoundParticipantJoinReqTopic)).
+					Return(&message.Message{UUID: "msg-123"}, nil).
+					Times(1)
+
+				mockPublisher.EXPECT().
+					Publish(gomock.Eq(discordroundevents.RoundParticipantJoinReqTopic), gomock.Any()).
+					Return(nil).
+					Times(1)
+
+				mockSession.EXPECT().
+					FollowupMessageCreate(gomock.Any(), gomock.Eq(true),
+						gomock.AssignableToTypeOf(&discordgo.WebhookParams{
+							Flags: discordgo.MessageFlagsEphemeral,
+						}),
+						gomock.Any()).
+					Return(&discordgo.Message{ID: "message-123"}, nil).
+					Times(1)
+			},
+			args: struct {
+				ctx context.Context
+				i   *discordgo.InteractionCreate
+			}{
+				ctx: context.Background(),
+				i:   createInteraction("round_join|round-123"),
+			},
+		},
+		{
+			name: "invalid custom ID format",
+			setup: func() {
+				// Function should exit early, no mocks needed
+			},
+			args: struct {
+				ctx context.Context
+				i   *discordgo.InteractionCreate
+			}{
+				ctx: context.Background(),
+				i:   createInteraction("invalid_format"),
+			},
+		},
+		{
+			name: "interaction respond error",
+			setup: func() {
+				mockSession.EXPECT().
+					InteractionRespond(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(errors.New("failed to respond")).
+					Times(1)
+			},
+			args: struct {
+				ctx context.Context
+				i   *discordgo.InteractionCreate
+			}{
+				ctx: context.Background(),
+				i:   createInteraction("round_join|round-123"),
+			},
+		},
+		{
+			name: "publish error",
+			setup: func() {
+				mockSession.EXPECT().
+					InteractionRespond(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil).
+					Times(1)
+
+				mockHelper.EXPECT().
+					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(discordroundevents.RoundParticipantJoinReqTopic)).
+					Return(&message.Message{UUID: "msg-123"}, nil).
+					Times(1)
+
+				mockPublisher.EXPECT().
+					Publish(gomock.Eq(discordroundevents.RoundParticipantJoinReqTopic), gomock.Any()).
+					Return(errors.New("failed to publish")).
+					Times(1)
+			},
+			args: struct {
+				ctx context.Context
+				i   *discordgo.InteractionCreate
+			}{
+				ctx: context.Background(),
+				i:   createInteraction("round_join|round-123"),
+			},
+		},
+		{
+			name: "follow-up message error",
+			setup: func() {
+				mockSession.EXPECT().
+					InteractionRespond(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil).
+					Times(1)
+
+				mockHelper.EXPECT().
+					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(discordroundevents.RoundParticipantJoinReqTopic)).
+					Return(&message.Message{UUID: "msg-123"}, nil).
+					Times(1)
+
+				mockPublisher.EXPECT().
+					Publish(gomock.Eq(discordroundevents.RoundParticipantJoinReqTopic), gomock.Any()).
+					Return(nil).
+					Times(1)
+
+				mockSession.EXPECT().
+					FollowupMessageCreate(gomock.Any(), gomock.Eq(true),
+						gomock.AssignableToTypeOf(&discordgo.WebhookParams{
+							Flags: discordgo.MessageFlagsEphemeral,
+						}),
+						gomock.Any()).
+					Return(nil, errors.New("failed to send follow-up message")).
+					Times(1)
+			},
+			args: struct {
+				ctx context.Context
+				i   *discordgo.InteractionCreate
+			}{
+				ctx: context.Background(),
+				i:   createInteraction("round_join|round-123"),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setup != nil {
+				tt.setup()
+			}
+
+			rrm := &roundRsvpManager{
+				session:          mockSession,
+				publisher:        mockPublisher,
+				logger:           mockLogger,
+				helper:           mockHelper,
+				config:           mockConfig,
+				interactionStore: mockInteractionStore,
+			}
+
+			rrm.InteractionJoinRoundLate(tt.args.ctx, tt.args.i)
 		})
 	}
 }

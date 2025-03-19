@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"time"
 
 	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
@@ -38,6 +37,7 @@ func (h *RoundHandlers) HandleRoundCreateRequested(msg *message.Message) ([]*mes
 	return []*message.Message{backendMsg}, nil
 }
 
+// Handles the RoundCreated Event from the Backend
 func (h *RoundHandlers) HandleRoundCreated(msg *message.Message) ([]*message.Message, error) {
 	ctx := msg.Context()
 	slog.Info("Handling round created event", attr.CorrelationIDFromMsg(msg))
@@ -53,12 +53,9 @@ func (h *RoundHandlers) HandleRoundCreated(msg *message.Message) ([]*message.Mes
 	correlationID := msg.Metadata.Get("correlation_id")
 	roundID := payload.RoundID
 	channelID := "1344376922888474625"
-	creator := payload.UserID
 
 	// 1️⃣ Update the original interaction response
 	successMessage := fmt.Sprintf("✅ Round created successfully! Round ID: %d", roundID)
-	slog.Info("Publishing success message", attr.String("message", successMessage), attr.String("correlation_id", correlationID))
-
 	if err := h.RoundDiscord.GetCreateRoundManager().UpdateInteractionResponse(ctx, correlationID, successMessage); err != nil {
 		slog.Error("Failed to update interaction response", attr.Error(err))
 		return nil, err
@@ -74,14 +71,13 @@ func (h *RoundHandlers) HandleRoundCreated(msg *message.Message) ([]*message.Mes
 		location = string(*payload.Location)
 	}
 
-	_, err := h.RoundDiscord.GetCreateRoundManager().SendRoundEventEmbed(
+	discordMsg, err := h.RoundDiscord.GetCreateRoundManager().SendRoundEventEmbed(
 		channelID,
-		fmt.Sprintf("%d", roundID),
 		roundtypes.Title(payload.Title),
 		roundtypes.Description(description),
 		roundtypes.StartTime(*payload.StartTime),
 		roundtypes.Location(location),
-		roundtypes.UserID(creator),
+		roundtypes.UserID(payload.UserID),
 		roundtypes.ID(roundID),
 	)
 	if err != nil {
@@ -89,20 +85,20 @@ func (h *RoundHandlers) HandleRoundCreated(msg *message.Message) ([]*message.Mes
 		return nil, err
 	}
 
-	tracePayload := discordroundevents.DiscordRoundCreatedTracePayload{
-		RoundID:   int64(roundID),
-		Title:     string(payload.Title),
-		CreatedBy: string(payload.UserID),
-		Timestamp: time.Now(),
+	// 3️⃣ Publish the message ID as an event
+	eventPayload := roundevents.RoundEventMessageIDUpdatedPayload{
+		RoundID:        roundID,
+		EventMessageID: discordMsg.ID,
 	}
-	tracingEvent, err := h.Helpers.CreateResultMessage(msg, tracePayload, discordroundevents.RoundCreatedTraceTopic)
+	resultMsg, err := h.Helpers.CreateResultMessage(msg, eventPayload, roundevents.RoundEventMessageIDUpdate)
 	if err != nil {
-		h.Logger.Error(ctx, "Failed to create trace event", attr.Error(err))
-		return nil, fmt.Errorf("failed to create trace event: %w", err)
+		slog.Error("Failed to create result message", attr.Error(err))
+		return nil, err
 	}
-	tracingEvent.Metadata.Set("topic", discordroundevents.RoundCreatedTraceTopic)
 
-	return []*message.Message{tracingEvent}, nil
+	slog.Info("Successfully processed round embed", attr.CorrelationIDFromMsg(msg))
+
+	return []*message.Message{resultMsg}, nil
 }
 
 func (h *RoundHandlers) HandleRoundCreationFailed(msg *message.Message) ([]*message.Message, error) {

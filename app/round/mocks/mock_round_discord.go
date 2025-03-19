@@ -13,7 +13,10 @@ import (
 	reflect "reflect"
 
 	createround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/create_round"
+	roundreminder "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/round_reminder"
 	roundrsvp "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/round_rsvp"
+	scoreround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/score_round"
+	startround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/start_round"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -55,6 +58,20 @@ func (mr *MockRoundDiscordInterfaceMockRecorder) GetCreateRoundManager() *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCreateRoundManager", reflect.TypeOf((*MockRoundDiscordInterface)(nil).GetCreateRoundManager))
 }
 
+// GetRoundReminderManager mocks base method.
+func (m *MockRoundDiscordInterface) GetRoundReminderManager() roundreminder.RoundReminderManager {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRoundReminderManager")
+	ret0, _ := ret[0].(roundreminder.RoundReminderManager)
+	return ret0
+}
+
+// GetRoundReminderManager indicates an expected call of GetRoundReminderManager.
+func (mr *MockRoundDiscordInterfaceMockRecorder) GetRoundReminderManager() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRoundReminderManager", reflect.TypeOf((*MockRoundDiscordInterface)(nil).GetRoundReminderManager))
+}
+
 // GetRoundRsvpManager mocks base method.
 func (m *MockRoundDiscordInterface) GetRoundRsvpManager() roundrsvp.RoundRsvpManager {
 	m.ctrl.T.Helper()
@@ -67,4 +84,32 @@ func (m *MockRoundDiscordInterface) GetRoundRsvpManager() roundrsvp.RoundRsvpMan
 func (mr *MockRoundDiscordInterfaceMockRecorder) GetRoundRsvpManager() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRoundRsvpManager", reflect.TypeOf((*MockRoundDiscordInterface)(nil).GetRoundRsvpManager))
+}
+
+// GetScoreRoundManager mocks base method.
+func (m *MockRoundDiscordInterface) GetScoreRoundManager() scoreround.ScoreRoundManager {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetScoreRoundManager")
+	ret0, _ := ret[0].(scoreround.ScoreRoundManager)
+	return ret0
+}
+
+// GetScoreRoundManager indicates an expected call of GetScoreRoundManager.
+func (mr *MockRoundDiscordInterfaceMockRecorder) GetScoreRoundManager() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetScoreRoundManager", reflect.TypeOf((*MockRoundDiscordInterface)(nil).GetScoreRoundManager))
+}
+
+// GetStartRoundManager mocks base method.
+func (m *MockRoundDiscordInterface) GetStartRoundManager() startround.StartRoundManager {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetStartRoundManager")
+	ret0, _ := ret[0].(startround.StartRoundManager)
+	return ret0
+}
+
+// GetStartRoundManager indicates an expected call of GetStartRoundManager.
+func (mr *MockRoundDiscordInterfaceMockRecorder) GetStartRoundManager() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStartRoundManager", reflect.TypeOf((*MockRoundDiscordInterface)(nil).GetStartRoundManager))
 }

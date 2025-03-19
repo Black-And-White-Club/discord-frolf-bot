@@ -5,7 +5,10 @@ import (
 
 	discordgo "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	createround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/create_round"
+	roundreminder "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/round_reminder"
 	roundrsvp "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/round_rsvp"
+	scoreround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/score_round"
+	startround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/start_round"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
@@ -17,12 +20,18 @@ import (
 type RoundDiscordInterface interface {
 	GetCreateRoundManager() createround.CreateRoundManager
 	GetRoundRsvpManager() roundrsvp.RoundRsvpManager
+	GetRoundReminderManager() roundreminder.RoundReminderManager
+	GetStartRoundManager() startround.StartRoundManager
+	GetScoreRoundManager() scoreround.ScoreRoundManager
 }
 
 // RoundDiscord encapsulates all Round Discord services.
 type RoundDiscord struct {
-	CreateRoundManager createround.CreateRoundManager
-	RoundRsvpManager   roundrsvp.RoundRsvpManager
+	CreateRoundManager   createround.CreateRoundManager
+	RoundRsvpManager     roundrsvp.RoundRsvpManager
+	RoundReminderManager roundreminder.RoundReminderManager
+	StartRoundManager    startround.StartRoundManager
+	ScoreRoundManager    scoreround.ScoreRoundManager
 }
 
 // NewRoundDiscord creates a new RoundDiscord instance.
@@ -37,10 +46,16 @@ func NewRoundDiscord(
 ) (RoundDiscordInterface, error) {
 	createRoundManager := createround.NewCreateRoundManager(session, publisher, logger, helper, config, interactionStore)
 	roundRsvpManager := roundrsvp.NewRoundRsvpManager(session, publisher, logger, helper, config, interactionStore)
+	roundReminderManager := roundreminder.NewRoundReminderManager(session, publisher, logger, helper, config)
+	startRoundManager := startround.NewStartRoundManager(session, publisher, logger, helper, config)
+	scoreRoundManager := scoreround.NewScoreRoundManager(session, publisher, logger, helper, config)
 
 	return &RoundDiscord{
-		CreateRoundManager: createRoundManager,
-		RoundRsvpManager:   roundRsvpManager,
+		CreateRoundManager:   createRoundManager,
+		RoundRsvpManager:     roundRsvpManager,
+		RoundReminderManager: roundReminderManager,
+		StartRoundManager:    startRoundManager,
+		ScoreRoundManager:    scoreRoundManager,
 	}, nil
 }
 
@@ -51,4 +66,16 @@ func (rd *RoundDiscord) GetCreateRoundManager() createround.CreateRoundManager {
 
 func (rd *RoundDiscord) GetRoundRsvpManager() roundrsvp.RoundRsvpManager {
 	return rd.RoundRsvpManager
+}
+
+func (rd *RoundDiscord) GetRoundReminderManager() roundreminder.RoundReminderManager {
+	return rd.RoundReminderManager
+}
+
+func (rd *RoundDiscord) GetStartRoundManager() startround.StartRoundManager {
+	return rd.StartRoundManager
+}
+
+func (rd *RoundDiscord) GetScoreRoundManager() scoreround.ScoreRoundManager {
+	return rd.ScoreRoundManager
 }

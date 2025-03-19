@@ -54,6 +54,18 @@ func (mr *MockRoundRsvpManagerMockRecorder) HandleRoundResponse(ctx, i any) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleRoundResponse", reflect.TypeOf((*MockRoundRsvpManager)(nil).HandleRoundResponse), ctx, i)
 }
 
+// InteractionJoinRoundLate mocks base method.
+func (m *MockRoundRsvpManager) InteractionJoinRoundLate(ctx context.Context, i *discordgo.InteractionCreate) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "InteractionJoinRoundLate", ctx, i)
+}
+
+// InteractionJoinRoundLate indicates an expected call of InteractionJoinRoundLate.
+func (mr *MockRoundRsvpManagerMockRecorder) InteractionJoinRoundLate(ctx, i any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InteractionJoinRoundLate", reflect.TypeOf((*MockRoundRsvpManager)(nil).InteractionJoinRoundLate), ctx, i)
+}
+
 // UpdateRoundEventEmbed mocks base method.
 func (m *MockRoundRsvpManager) UpdateRoundEventEmbed(channelID, messageID string, acceptedParticipants, declinedParticipants, tentativeParticipants []roundtypes.Participant) error {
 	m.ctrl.T.Helper()

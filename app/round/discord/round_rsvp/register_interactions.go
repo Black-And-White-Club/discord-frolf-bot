@@ -33,4 +33,12 @@ func RegisterHandlers(registry *interactions.Registry, manager RoundRsvpManager)
 			attr.String("user", i.Member.User.Username))
 		manager.HandleRoundResponse(ctx, i)
 	})
+
+	registry.RegisterHandler("round_join_late|", func(ctx context.Context, i *discordgo.InteractionCreate) {
+		slog.Info("Handling round_join_late button press",
+			attr.String("custom_id", i.MessageComponentData().CustomID),
+			attr.String("interaction_id", i.ID),
+			attr.String("user", i.Member.User.Username))
+		manager.HandleRoundResponse(ctx, i)
+	})
 }

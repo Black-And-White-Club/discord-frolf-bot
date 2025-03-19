@@ -225,7 +225,6 @@ func Test_createRoundManager_SendRoundEventEmbed(t *testing.T) {
 
 			got, err := crm.SendRoundEventEmbed(
 				tt.args.channelID,
-				tt.args.eventID,
 				tt.args.title,
 				tt.args.description,
 				tt.args.startTime,

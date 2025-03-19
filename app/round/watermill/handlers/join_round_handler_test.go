@@ -45,21 +45,17 @@ func TestRoundHandlers_HandleRoundParticipantJoinRequest(t *testing.T) {
 		setup   func()
 	}{
 		{
-			name: "successful participant join request - default accepted",
+			name: "successful normal join",
 			fields: fields{
 				Logger:       mockLogger,
 				Helpers:      mockHelpers,
 				RoundDiscord: mockRoundDiscord,
 			},
 			args: args{
-				msg: func() *message.Message {
-					msg := message.NewMessage("1", []byte(`{"round_id": 123, "user_id": "user456"}`))
-					return msg
-				}(),
+				msg: message.NewMessage("backend-1", []byte(`{"round_id": 123, "user_id": "user456"}`)),
 			},
 			want: func() []*message.Message {
-				msg := message.NewMessage(roundevents.RoundParticipantJoinRequest, []byte(`{"round_id":123,"user_id":"user456","response":"accept","tag_number":0}`))
-				return []*message.Message{msg}
+				return []*message.Message{message.NewMessage("backend-1", nil)}
 			}(),
 			wantErr: false,
 			setup: func() {
@@ -74,10 +70,19 @@ func TestRoundHandlers_HandleRoundParticipantJoinRequest(t *testing.T) {
 						return nil
 					}).Times(1)
 
-				msg := message.NewMessage(roundevents.RoundParticipantJoinRequest, []byte(`{"round_id":123,"user_id":"user456","response":"accept","tag_number":0}`))
+				tagNumber := 0
+				falseVar := false
+				expectedBackendPayload := roundevents.ParticipantJoinRequestPayload{
+					RoundID:    123,
+					UserID:     "user456",
+					Response:   roundtypes.ResponseAccept,
+					TagNumber:  &tagNumber,
+					JoinedLate: &falseVar,
+				}
+
 				mockHelpers.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Any(), roundevents.RoundParticipantJoinRequest).
-					Return(msg, nil).Times(1)
+					CreateResultMessage(gomock.Any(), gomock.Eq(expectedBackendPayload), roundevents.RoundParticipantJoinRequest).
+					Return(message.NewMessage("backend-1", nil), nil).Times(1)
 			},
 		},
 		{
@@ -95,8 +100,7 @@ func TestRoundHandlers_HandleRoundParticipantJoinRequest(t *testing.T) {
 				}(),
 			},
 			want: func() []*message.Message {
-				msg := message.NewMessage(roundevents.RoundParticipantJoinRequest, []byte(`{"round_id":123,"user_id":"user456","response":"tentative","tag_number":0}`))
-				return []*message.Message{msg}
+				return []*message.Message{message.NewMessage(roundevents.RoundParticipantJoinRequest, []byte(`{"round_id":123,"user_id":"user456","response":"tentative","tag_number":0}`))}
 			}(),
 			wantErr: false,
 			setup: func() {
@@ -127,7 +131,6 @@ func TestRoundHandlers_HandleRoundParticipantJoinRequest(t *testing.T) {
 			args: args{
 				msg: message.NewMessage("1", []byte(`invalid payload`)),
 			},
-			want:    nil,
 			wantErr: true,
 			setup: func() {
 				mockHelpers.EXPECT().UnmarshalPayload(gomock.Any(), gomock.Any()).Return(errors.New("unmarshal error")).Times(1)
@@ -143,7 +146,6 @@ func TestRoundHandlers_HandleRoundParticipantJoinRequest(t *testing.T) {
 			args: args{
 				msg: message.NewMessage("1", []byte(`{"round_id": 123, "user_id": "user456"}`)),
 			},
-			want:    nil,
 			wantErr: true,
 			setup: func() {
 				expectedPayload := discordroundevents.DiscordRoundParticipantJoinRequestPayload{
@@ -161,6 +163,49 @@ func TestRoundHandlers_HandleRoundParticipantJoinRequest(t *testing.T) {
 					CreateResultMessage(gomock.Any(), gomock.Any(), roundevents.RoundParticipantJoinRequest).
 					Return(nil, errors.New("failed to create result message")).
 					Times(1)
+			},
+		},
+		{
+			name: "successful late join",
+			fields: fields{
+				Logger:       mockLogger,
+				Helpers:      mockHelpers,
+				RoundDiscord: mockRoundDiscord,
+			},
+			args: args{
+				msg: message.NewMessage("1", []byte(`{"round_id": 123, "user_id": "user456", "joined_late": true}`)),
+			},
+			want: func() []*message.Message {
+				return []*message.Message{message.NewMessage("backend-1", nil)}
+			}(),
+			wantErr: false,
+			setup: func() {
+				expectedPayload := discordroundevents.DiscordRoundParticipantJoinRequestPayload{
+					RoundID:    123,
+					UserID:     "user456",
+					JoinedLate: func() *bool { b := true; return &b }(),
+				}
+
+				mockHelpers.EXPECT().
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discordroundevents.DiscordRoundParticipantJoinRequestPayload{})).
+					DoAndReturn(func(_ *message.Message, v any) error {
+						*v.(*discordroundevents.DiscordRoundParticipantJoinRequestPayload) = expectedPayload
+						return nil
+					}).Times(1)
+
+				tagNumber := 0
+				joinedLate := true
+				expectedBackendPayload := roundevents.ParticipantJoinRequestPayload{
+					RoundID:    123,
+					UserID:     "user456",
+					Response:   roundtypes.ResponseAccept,
+					TagNumber:  &tagNumber,
+					JoinedLate: &joinedLate,
+				}
+
+				mockHelpers.EXPECT().
+					CreateResultMessage(gomock.Any(), gomock.Eq(expectedBackendPayload), roundevents.RoundParticipantJoinRequest).
+					Return(message.NewMessage("backend-1", nil), nil).Times(1)
 			},
 		},
 	}
@@ -209,7 +254,6 @@ func TestRoundHandlers_HandleRoundParticipantJoinRequest(t *testing.T) {
 		})
 	}
 }
-
 func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -236,7 +280,7 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 		setup   func()
 	}{
 		{
-			name: "successful participant joined event",
+			name: "successful participant joined (normal join)",
 			fields: fields{
 				Logger:       mockLogger,
 				Helpers:      mockHelpers,
@@ -244,36 +288,18 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 			},
 			args: args{
 				msg: func() *message.Message {
-					msg := message.NewMessage("1", []byte(`{
-						"round_id": 123,
-						"accepted_participants": [{"user_id": "user1", "tag_number": 1}, {"user_id": "user2", "tag_number": 2}],
-						"declined_participants": [{"user_id": "user3", "tag_number": 0}],
-						"tentative_participants": [{"user_id": "user4", "tag_number": 0}]
-					}`))
+					msg := message.NewMessage("1", []byte(`{"round_id": 123, "accepted_participants": [{"user_id": "user1"}]}`))
 					msg.Metadata.Set("channel_id", "channel123")
 					msg.Metadata.Set("message_id", "message456")
 					return msg
 				}(),
 			},
-			want:    nil,
 			wantErr: false,
 			setup: func() {
-				acceptedParticipants := []roundtypes.Participant{
-					{UserID: "user1", TagNumber: intPtr(1)},
-					{UserID: "user2", TagNumber: intPtr(2)},
-				}
-				declinedParticipants := []roundtypes.Participant{
-					{UserID: "user3", TagNumber: intPtr(0)},
-				}
-				tentativeParticipants := []roundtypes.Participant{
-					{UserID: "user4", TagNumber: intPtr(0)},
-				}
-
 				expectedPayload := roundevents.ParticipantJoinedPayload{
-					RoundID:               123,
-					AcceptedParticipants:  acceptedParticipants,
-					DeclinedParticipants:  declinedParticipants,
-					TentativeParticipants: tentativeParticipants,
+					RoundID:              123,
+					AcceptedParticipants: []roundtypes.Participant{{UserID: "user1"}},
+					JoinedLate:           nil,
 				}
 
 				mockHelpers.EXPECT().
@@ -289,7 +315,54 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 					Times(1)
 
 				mockRoundRsvpManager.EXPECT().
-					UpdateRoundEventEmbed("channel123", "message456", acceptedParticipants, declinedParticipants, tentativeParticipants).
+					UpdateRoundEventEmbed("channel123", "message456",
+						expectedPayload.AcceptedParticipants, nil, nil).
+					Return(nil).
+					Times(1)
+			},
+		},
+		{
+			name: "successful participant joined (late join)",
+			fields: fields{
+				Logger:       mockLogger,
+				Helpers:      mockHelpers,
+				RoundDiscord: mockRoundDiscord,
+			},
+			args: args{
+				msg: func() *message.Message {
+					msg := message.NewMessage("1", []byte(`{
+									"round_id": 123,
+									"accepted_participants": [{"user_id": "user1"}],
+									"joined_late": true
+							}`))
+					msg.Metadata.Set("channel_id", "channel123")
+					msg.Metadata.Set("message_id", "message456")
+					return msg
+				}(),
+			},
+			wantErr: false,
+			setup: func() {
+				expectedPayload := roundevents.ParticipantJoinedPayload{
+					RoundID:              123,
+					AcceptedParticipants: []roundtypes.Participant{{UserID: "user1"}},
+					JoinedLate:           func() *bool { b := true; return &b }(),
+				}
+
+				mockHelpers.EXPECT().
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.ParticipantJoinedPayload{})).
+					DoAndReturn(func(_ *message.Message, v any) error {
+						*v.(*roundevents.ParticipantJoinedPayload) = expectedPayload
+						return nil
+					}).Times(1)
+
+				mockRoundDiscord.EXPECT().
+					GetRoundRsvpManager().
+					Return(mockRoundRsvpManager).
+					Times(1)
+
+				mockRoundRsvpManager.EXPECT().
+					UpdateRoundEventEmbed("channel123", "message456",
+						expectedPayload.AcceptedParticipants, nil, nil).
 					Return(nil).
 					Times(1)
 			},

@@ -7,7 +7,9 @@ import (
 	"strconv"
 	"strings"
 
+	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
+
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	"github.com/ThreeDotsLabs/watermill/message"
@@ -67,7 +69,7 @@ func (rrm *roundRsvpManager) HandleRoundResponse(ctx context.Context, i *discord
 	payload := roundevents.ParticipantJoinRequestPayload{
 		RoundID:   roundID,
 		UserID:    userID,
-		Response:  response, // Use the roundtypes.Response type directly
+		Response:  response,
 		TagNumber: tagNumberPtr,
 	}
 
@@ -75,30 +77,121 @@ func (rrm *roundRsvpManager) HandleRoundResponse(ctx context.Context, i *discord
 	msg := &message.Message{
 		Metadata: message.Metadata{
 			"correlation_id": i.ID,
-			"topic":          roundevents.RoundParticipantJoinRequest, // Add topic to metadata
+			"topic":          discordroundevents.RoundParticipantJoinReqTopic,
 		},
 	}
 
 	// Call CreateResultMessage with the correct parameters
-	resultMsg, err := rrm.helper.CreateResultMessage(msg, payload, roundevents.RoundParticipantJoinRequest)
+	resultMsg, err := rrm.helper.CreateResultMessage(msg, payload, discordroundevents.RoundParticipantJoinReqTopic)
 	if err != nil {
 		slog.Error("Failed to create result message", attr.Error(err))
 		return
 	}
 
 	// Publish the message to the backend
-	if err := rrm.publisher.Publish(roundevents.RoundParticipantJoinRequest, resultMsg); err != nil {
+	if err := rrm.publisher.Publish(discordroundevents.RoundParticipantJoinReqTopic, resultMsg); err != nil {
 		slog.Error("Failed to publish participant join request", attr.Error(err))
 		return
 	}
 
 	slog.Info("Successfully published participant join request",
 		attr.String("message_id", resultMsg.UUID),
-		attr.String("topic", roundevents.RoundParticipantJoinRequest))
+		attr.String("topic", discordroundevents.RoundParticipantJoinReqTopic))
 
 	// Send a follow-up message to the user (ephemeral)
 	_, err = rrm.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
 		Content: fmt.Sprintf("You have chosen: %s", string(response)),
+		Flags:   discordgo.MessageFlagsEphemeral,
+	})
+	if err != nil {
+		slog.Error("Failed to send follow-up message", attr.Error(err))
+	} else {
+		slog.Info("Sent ephemeral follow-up message to user", attr.String("user", user.Username))
+	}
+}
+
+// InteractionJoinRoundLate handles the interaction when a user clicks "Join Round LATE"
+func (rrm *roundRsvpManager) InteractionJoinRoundLate(ctx context.Context, i *discordgo.InteractionCreate) {
+	user := i.Member.User
+
+	// Extract round ID from custom ID (format: "round_join|round-123")
+	parts := strings.Split(i.MessageComponentData().CustomID, "|")
+	if len(parts) < 2 {
+		slog.Error("Invalid custom ID format", attr.String("custom_id", i.MessageComponentData().CustomID))
+		return
+	}
+
+	roundIDStr := strings.TrimPrefix(parts[1], "round-")
+
+	slog.Info("Processing late round join",
+		attr.String("user", user.Username),
+		attr.String("round_id", roundIDStr),
+		attr.String("interaction_id", i.ID),
+		attr.String("custom_id", i.MessageComponentData().CustomID))
+
+	// Acknowledge the interaction (so Discord doesn't time out)
+	err := rrm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseDeferredMessageUpdate,
+	})
+	if err != nil {
+		slog.Error("Failed to acknowledge interaction", attr.Error(err))
+		return
+	}
+
+	// Convert string roundID to int64
+	roundIDInt, err := strconv.ParseInt(roundIDStr, 10, 64)
+	if err != nil {
+		slog.Error("Failed to parse round ID", attr.Error(err), attr.String("round_id_str", roundIDStr))
+		return
+	}
+
+	// Convert int64 to roundtypes.ID
+	roundID := roundtypes.ID(roundIDInt)
+	userID := roundtypes.UserID(user.ID)
+
+	// Create a pointer to an int for TagNumber
+	tagNumber := 0
+	tagNumberPtr := &tagNumber
+	joinedLate := true
+	joinedLatePtr := &joinedLate
+
+	// Create the payload for the backend
+	payload := roundevents.ParticipantJoinRequestPayload{
+		RoundID:    roundID,
+		UserID:     userID,
+		Response:   roundtypes.ResponseAccept,
+		TagNumber:  tagNumberPtr,
+		JoinedLate: joinedLatePtr,
+	}
+
+	// Create a message to send to the backend
+	msg := &message.Message{
+		Metadata: message.Metadata{
+			"correlation_id": i.ID,
+			"topic":          discordroundevents.RoundParticipantJoinReqTopic, // Could use same topic as regular joins
+		},
+	}
+
+	// Call CreateResultMessage with the correct parameters
+	resultMsg, err := rrm.helper.CreateResultMessage(msg, payload, discordroundevents.RoundParticipantJoinReqTopic)
+	if err != nil {
+		slog.Error("Failed to create result message", attr.Error(err))
+		return
+	}
+
+	// Publish the message to the backend
+	if err := rrm.publisher.Publish(discordroundevents.RoundParticipantJoinReqTopic, resultMsg); err != nil {
+		slog.Error("Failed to publish participant join request", attr.Error(err))
+		return
+	}
+
+	slog.Info("Successfully published late participant join request",
+		attr.String("message_id", resultMsg.UUID),
+		attr.String("topic", discordroundevents.RoundParticipantJoinReqTopic))
+
+	// Send a follow-up message to the user (ephemeral)
+	_, err = rrm.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+		Content: "You have joined the round!",
 		Flags:   discordgo.MessageFlagsEphemeral,
 	})
 	if err != nil {

@@ -15,9 +15,11 @@ type Session interface {
 	GuildMemberRoleAdd(guildID, userID, roleID string, options ...discordgo.RequestOption) error
 	GuildMemberRoleRemove(guildID, userID, roleID string, options ...discordgo.RequestOption) error
 	MessageReactionAdd(channelID, messageID, emojiID string) error
-	GetChannel(channelID string) (*discordgo.Channel, error)
+	GetChannel(channelID string, options ...discordgo.RequestOption) (st *discordgo.Channel, err error)
+	ChannelMessageEditComplex(m *discordgo.MessageEdit, options ...discordgo.RequestOption) (st *discordgo.Message, err error)
 	WebhookExecute(webhookID string, token string, wait bool, data *discordgo.WebhookParams, options ...discordgo.RequestOption) (st *discordgo.Message, err error)
 	ChannelMessages(channelID string, limit int, beforeID string, afterID string, aroundID string, options ...discordgo.RequestOption) (st []*discordgo.Message, err error)
+	ThreadsActive(channelID string, options ...discordgo.RequestOption) (threads *discordgo.ThreadsList, err error)
 	MessageThreadStartComplex(channelID string, messageID string, data *discordgo.ThreadStart, options ...discordgo.RequestOption) (ch *discordgo.Channel, err error)
 	ThreadMemberAdd(threadID string, memberID string, options ...discordgo.RequestOption) error
 	GetBotUser() (*discordgo.User, error)
@@ -86,6 +88,10 @@ func NewDiscordState(state *discordgo.State) *DiscordState {
 	return &DiscordState{state: state}
 }
 
+func (d *DiscordSession) ChannelMessageEditComplex(m *discordgo.MessageEdit, options ...discordgo.RequestOption) (st *discordgo.Message, err error) {
+	return d.session.ChannelMessageEditComplex(m, options...)
+}
+
 // AddHandler wraps the discordgo AddHandler method.
 func (d *DiscordSession) AddHandler(handler interface{}) func() {
 	return d.session.AddHandler(handler)
@@ -119,8 +125,8 @@ func (d *DiscordSession) MessageReactionAdd(channelID, messageID, emojiID string
 }
 
 // GetChannel retrieves a channel by its ID.
-func (d *DiscordSession) GetChannel(channelID string) (*discordgo.Channel, error) {
-	return d.session.Channel(channelID)
+func (d *DiscordSession) GetChannel(channelID string, options ...discordgo.RequestOption) (st *discordgo.Channel, err error) {
+	return d.session.Channel(channelID, options...)
 }
 
 // ChannelMessages fetches messages from a channel.
@@ -160,6 +166,10 @@ func (d *DiscordSession) GuildScheduledEventCreate(guildID string, params *disco
 // GuildScheduledEventEdit edits a scheduled event.
 func (d *DiscordSession) GuildScheduledEventEdit(guildID, eventID string, params *discordgo.GuildScheduledEventParams, options ...discordgo.RequestOption) (*discordgo.GuildScheduledEvent, error) {
 	return d.session.GuildScheduledEventEdit(guildID, eventID, params, options...)
+}
+
+func (d *DiscordSession) ThreadsActive(channelID string, options ...discordgo.RequestOption) (threads *discordgo.ThreadsList, err error) {
+	return d.session.ThreadsActive(channelID, options...)
 }
 
 // ThreadStartComplex starts a new thread in a channel.

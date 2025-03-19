@@ -65,9 +65,9 @@ func (r *RoundRouter) Configure(handlers roundhandlers.Handlers, eventbus eventb
 // RegisterHandlers registers event handlers.
 func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandlers.Handlers) error {
 	eventsToHandlers := map[string]message.HandlerFunc{
-		discordroundevents.RoundCreateModalSubmit: handlers.HandleRoundCreateRequested,
-		discordroundevents.RoundCreatedTopic:      handlers.HandleRoundCreated,
-		// discordroundevents.RoundStartedTopic:                 handlers.HandleRoundStarted,
+		discordroundevents.RoundCreateModalSubmit:       handlers.HandleRoundCreateRequested,
+		discordroundevents.RoundCreatedTopic:            handlers.HandleRoundCreated,
+		discordroundevents.RoundStartedTopic:            handlers.HandleRoundStarted,
 		discordroundevents.RoundParticipantJoinReqTopic: handlers.HandleRoundParticipantJoinRequest,
 		discordroundevents.RoundParticipantJoinedTopic:  handlers.HandleRoundParticipantJoined,
 		// discordroundevents.RoundUpdateRequestTopic:           handlers.HandleRoundUpdateRequest,

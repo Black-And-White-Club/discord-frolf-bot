@@ -1,4 +1,4 @@
-package roundreminder
+package startround
 
 import (
 	"context"
@@ -10,15 +10,17 @@ import (
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
+	"github.com/bwmarrin/discordgo"
 )
 
-// RoundReminderManager defines the interface for create round operations.
-type RoundReminderManager interface {
-	SendRoundReminder(ctx context.Context, payload *roundevents.DiscordReminderPayload) (bool, error)
+// StartRoundManager defines the interface for create round operations.
+type StartRoundManager interface {
+	TransformRoundToScorecard(payload *roundevents.DiscordRoundStartPayload) (*discordgo.MessageEmbed, []discordgo.MessageComponent, error)
+	UpdateRoundToScorecard(ctx context.Context, channelID, messageID string, payload *roundevents.DiscordRoundStartPayload) error
 }
 
-// RoundReminderManager implements the RoundReminderManager interface.
-type roundReminderManager struct {
+// startRoundManager implements the StartRoundManager interface.
+type startRoundManager struct {
 	session   discord.Session
 	publisher eventbus.EventBus
 	logger    observability.Logger
@@ -26,14 +28,14 @@ type roundReminderManager struct {
 	config    *config.Config
 }
 
-// NewRoundReminderManager creates a new RoundReminderManager instance.
-func NewRoundReminderManager(session discord.Session, publisher eventbus.EventBus, logger observability.Logger, helper utils.Helpers, config *config.Config) RoundReminderManager {
-	logger.Info(context.Background(), "Creating RoundReminderManager",
+// NewStartRoundManager creates a new StartRoundManager instance.
+func NewStartRoundManager(session discord.Session, publisher eventbus.EventBus, logger observability.Logger, helper utils.Helpers, config *config.Config) StartRoundManager {
+	logger.Info(context.Background(), "Creating StartRoundManager",
 		attr.Any("session", session),
 		attr.Any("publisher", publisher),
 		attr.Any("config", config),
 	)
-	return &roundReminderManager{
+	return &startRoundManager{
 		session:   session,
 		publisher: publisher,
 		logger:    logger,

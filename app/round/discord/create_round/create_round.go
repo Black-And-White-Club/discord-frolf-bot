@@ -25,7 +25,7 @@ type CreateRoundManager interface {
 	UpdateInteractionResponse(ctx context.Context, correlationID, message string, edit ...*discordgo.WebhookEdit) error
 	UpdateInteractionResponseWithRetryButton(ctx context.Context, correlationID, message string) error
 	HandleCreateRoundModalCancel(ctx context.Context, i *discordgo.InteractionCreate)
-	SendRoundEventEmbed(channelID string, eventID string, title roundtypes.Title, description roundtypes.Description, startTime roundtypes.StartTime, location roundtypes.Location, creatorID roundtypes.UserID, roundID roundtypes.ID) (*discordgo.Message, error)
+	SendRoundEventEmbed(channelID string, title roundtypes.Title, description roundtypes.Description, startTime roundtypes.StartTime, location roundtypes.Location, creatorID roundtypes.UserID, roundID roundtypes.ID) (*discordgo.Message, error)
 	SendCreateRoundModal(ctx context.Context, i *discordgo.InteractionCreate) error
 	HandleRetryCreateRound(ctx context.Context, i *discordgo.InteractionCreate)
 }

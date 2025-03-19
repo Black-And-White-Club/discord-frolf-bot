@@ -80,6 +80,7 @@ type DiscordRoundParticipantJoinRequestPayload struct {
 	RoundID               int64  `json:"round_id"`
 	UserID                string `json:"user_id"`
 	ChannelID             string `json:"channel_id"`
+	JoinedLate            *bool  `json:"joined_late,omitempty"`
 }
 type DiscordRoundParticipantJoinedPayload struct {
 	events.CommonMetadata `json:",inline"`
