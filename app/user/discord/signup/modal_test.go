@@ -32,8 +32,8 @@ func Test_signupManager_SendSignupModal(t *testing.T) {
 			name: "successful send",
 			setup: func() {
 				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(nil).Times(2)
+					InteractionRespond(gomock.Any(), gomock.Any()).
+					Return(nil).Times(1)
 			},
 			args: &discordgo.InteractionCreate{
 				Interaction: &discordgo.Interaction{
@@ -49,27 +49,9 @@ func Test_signupManager_SendSignupModal(t *testing.T) {
 			name: "failed to send modal",
 			setup: func() {
 				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(errors.New("send error"))
-			},
-			args: &discordgo.InteractionCreate{
-				Interaction: &discordgo.Interaction{
-					ID:   uuid.New().String(),
-					Type: discordgo.InteractionApplicationCommand,
-					User: &discordgo.User{ID: "12345"},
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name: "failed to send ephemeral message",
-			setup: func() {
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(nil).Times(1)
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(errors.New("send error"))
+					InteractionRespond(gomock.Any(), gomock.Any()).
+					Return(errors.New("send error")).
+					Times(1)
 			},
 			args: &discordgo.InteractionCreate{
 				Interaction: &discordgo.Interaction{

@@ -13,6 +13,8 @@ import (
 	reflect "reflect"
 
 	createround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/create_round"
+	deleteround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/delete_round"
+	finalizeround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/finalize_round"
 	roundreminder "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/round_reminder"
 	roundrsvp "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/round_rsvp"
 	scoreround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/score_round"
@@ -56,6 +58,34 @@ func (m *MockRoundDiscordInterface) GetCreateRoundManager() createround.CreateRo
 func (mr *MockRoundDiscordInterfaceMockRecorder) GetCreateRoundManager() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCreateRoundManager", reflect.TypeOf((*MockRoundDiscordInterface)(nil).GetCreateRoundManager))
+}
+
+// GetDeleteRoundManager mocks base method.
+func (m *MockRoundDiscordInterface) GetDeleteRoundManager() deleteround.DeleteRoundManager {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDeleteRoundManager")
+	ret0, _ := ret[0].(deleteround.DeleteRoundManager)
+	return ret0
+}
+
+// GetDeleteRoundManager indicates an expected call of GetDeleteRoundManager.
+func (mr *MockRoundDiscordInterfaceMockRecorder) GetDeleteRoundManager() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDeleteRoundManager", reflect.TypeOf((*MockRoundDiscordInterface)(nil).GetDeleteRoundManager))
+}
+
+// GetFinalizeRoundManager mocks base method.
+func (m *MockRoundDiscordInterface) GetFinalizeRoundManager() finalizeround.FinalizeRoundManager {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetFinalizeRoundManager")
+	ret0, _ := ret[0].(finalizeround.FinalizeRoundManager)
+	return ret0
+}
+
+// GetFinalizeRoundManager indicates an expected call of GetFinalizeRoundManager.
+func (mr *MockRoundDiscordInterfaceMockRecorder) GetFinalizeRoundManager() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFinalizeRoundManager", reflect.TypeOf((*MockRoundDiscordInterface)(nil).GetFinalizeRoundManager))
 }
 
 // GetRoundReminderManager mocks base method.

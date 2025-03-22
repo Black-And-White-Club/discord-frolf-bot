@@ -15,7 +15,7 @@ const (
 	RoundReminderTopic                = "discord.round.reminder"        // From round handler to discord handler
 	RoundStartedTopic                 = "discord.round.started"
 	RoundParticipantJoinReqTopic      = "discord.round.participant.join.request" // From discord handler to round handler
-	RoundParticipantJoinedTopic       = "discord.round.participant.joined"       // From round handler to discord
+	RoundParticipantJoinedTopic       = "discord.round.participantjoined"        // From round handler to discord
 	RoundUpdateRequestTopic           = "discord.round.update.request"           // From discord handler to round handler
 	RoundUpdatedTopic                 = "discord.round.updated"                  //From round handler to discord handler
 	RoundDeleteRequestTopic           = "discord.round.delete.request"           // From discord handler to round handler

@@ -67,7 +67,7 @@ func (mr *MockRoundRsvpManagerMockRecorder) InteractionJoinRoundLate(ctx, i any)
 }
 
 // UpdateRoundEventEmbed mocks base method.
-func (m *MockRoundRsvpManager) UpdateRoundEventEmbed(channelID, messageID string, acceptedParticipants, declinedParticipants, tentativeParticipants []roundtypes.Participant) error {
+func (m *MockRoundRsvpManager) UpdateRoundEventEmbed(channelID string, messageID roundtypes.EventMessageID, acceptedParticipants, declinedParticipants, tentativeParticipants []roundtypes.Participant) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateRoundEventEmbed", channelID, messageID, acceptedParticipants, declinedParticipants, tentativeParticipants)
 	ret0, _ := ret[0].(error)

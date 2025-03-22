@@ -1,7 +1,6 @@
 package discord
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
@@ -29,18 +28,18 @@ func RegisterCommands(s Session, logger observability.Logger, guildID string) er
 		},
 	})
 	if err != nil {
-		logger.Error(context.Background(), "Failed to create '/updaterole' command", attr.Error(err))
+		logger.Error("Failed to create '/updaterole' command", attr.Error(err))
 		return fmt.Errorf("failed to create '/updaterole' command: %w", err)
 	}
-	logger.Info(context.Background(), "registered command: /updaterole")
+	logger.Info("registered command: /updaterole")
 	_, err = s.ApplicationCommandCreate(appID.ID, guildID, &discordgo.ApplicationCommand{
 		Name:        "createround",
 		Description: "Create A Round",
 	})
 	if err != nil {
-		logger.Error(context.Background(), "Failed to create '/createround' command", attr.Error(err))
+		logger.Error("Failed to create '/createround' command", attr.Error(err))
 		return fmt.Errorf("failed to create '/createround' command: %w", err)
 	}
-	logger.Info(context.Background(), "registered command: /createround")
+	logger.Info("registered command: /createround")
 	return nil
 }

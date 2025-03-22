@@ -5,6 +5,8 @@ import (
 
 	discordgo "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	createround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/create_round"
+	deleteround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/delete_round"
+	finalizeround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/finalize_round"
 	roundreminder "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/round_reminder"
 	roundrsvp "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/round_rsvp"
 	scoreround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/score_round"
@@ -23,6 +25,8 @@ type RoundDiscordInterface interface {
 	GetRoundReminderManager() roundreminder.RoundReminderManager
 	GetStartRoundManager() startround.StartRoundManager
 	GetScoreRoundManager() scoreround.ScoreRoundManager
+	GetFinalizeRoundManager() finalizeround.FinalizeRoundManager
+	GetDeleteRoundManager() deleteround.DeleteRoundManager
 }
 
 // RoundDiscord encapsulates all Round Discord services.
@@ -32,6 +36,8 @@ type RoundDiscord struct {
 	RoundReminderManager roundreminder.RoundReminderManager
 	StartRoundManager    startround.StartRoundManager
 	ScoreRoundManager    scoreround.ScoreRoundManager
+	FinalizeRoundManager finalizeround.FinalizeRoundManager
+	DeleteRoundManager   deleteround.DeleteRoundManager
 }
 
 // NewRoundDiscord creates a new RoundDiscord instance.
@@ -49,6 +55,8 @@ func NewRoundDiscord(
 	roundReminderManager := roundreminder.NewRoundReminderManager(session, publisher, logger, helper, config)
 	startRoundManager := startround.NewStartRoundManager(session, publisher, logger, helper, config)
 	scoreRoundManager := scoreround.NewScoreRoundManager(session, publisher, logger, helper, config)
+	finalizeRoundManager := finalizeround.NewFinalizeRoundManager(session, publisher, logger, helper, config)
+	deleteRoundManager := deleteround.NewDeleteRoundManager(session, publisher, logger, helper, config)
 
 	return &RoundDiscord{
 		CreateRoundManager:   createRoundManager,
@@ -56,6 +64,8 @@ func NewRoundDiscord(
 		RoundReminderManager: roundReminderManager,
 		StartRoundManager:    startRoundManager,
 		ScoreRoundManager:    scoreRoundManager,
+		FinalizeRoundManager: finalizeRoundManager,
+		DeleteRoundManager:   deleteRoundManager,
 	}, nil
 }
 
@@ -78,4 +88,12 @@ func (rd *RoundDiscord) GetStartRoundManager() startround.StartRoundManager {
 
 func (rd *RoundDiscord) GetScoreRoundManager() scoreround.ScoreRoundManager {
 	return rd.ScoreRoundManager
+}
+
+func (rd *RoundDiscord) GetFinalizeRoundManager() finalizeround.FinalizeRoundManager {
+	return rd.FinalizeRoundManager
+}
+
+func (rd *RoundDiscord) GetDeleteRoundManager() deleteround.DeleteRoundManager {
+	return rd.DeleteRoundManager
 }

@@ -24,7 +24,22 @@ func (h *RoundHandlers) HandleParticipantScoreUpdated(msg *message.Message) ([]*
 		h.Logger.Error(ctx, "Failed to send score update confirmation", attr.Error(err))
 	}
 
-	return nil, nil
+	// Create trace event
+	tracePayload := map[string]interface{}{
+		"round_id":    payload.RoundID,
+		"event_type":  "participant_score_updated",
+		"status":      "confirmation_sent",
+		"participant": payload.Participant,
+		"score":       payload.Score,
+	}
+
+	traceMsg, err := h.Helpers.CreateResultMessage(msg, tracePayload, roundevents.RoundTraceEvent)
+	if err != nil {
+		h.Logger.Error(ctx, "Failed to create trace event", attr.Error(err))
+		return []*message.Message{}, nil
+	}
+
+	return []*message.Message{traceMsg}, nil
 }
 
 // HandleScoreUpdateError processes a failed score update
@@ -49,5 +64,20 @@ func (h *RoundHandlers) HandleScoreUpdateError(msg *message.Message) ([]*message
 		h.Logger.Error(ctx, "Failed to send score update error notification", attr.Error(err))
 	}
 
-	return nil, nil
+	// Create trace event
+	tracePayload := map[string]interface{}{
+		"round_id":    payload.ScoreUpdateRequest.RoundID,
+		"event_type":  "score_update_error",
+		"status":      "error_notification_sent",
+		"participant": payload.ScoreUpdateRequest.Participant,
+		"error":       payload.Error,
+	}
+
+	traceMsg, err := h.Helpers.CreateResultMessage(msg, tracePayload, roundevents.RoundTraceEvent)
+	if err != nil {
+		h.Logger.Error(ctx, "Failed to create trace event", attr.Error(err))
+		return []*message.Message{}, nil
+	}
+
+	return []*message.Message{traceMsg}, nil
 }

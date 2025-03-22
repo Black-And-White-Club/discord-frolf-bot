@@ -15,7 +15,7 @@ SCORE_DIR := ./app/score
 
 # Mocks for User Domain
 mocks-user: mocks-user-discord mocks-user-handlers mocks-user-role-manager mocks-user-signup-manager
-mocks-round: mocks-create-round-manager mocks-round-rsvp-manager mocks-round-discord mocks-round-reminder-manager mocks-start-round-manager mocks-score-round-manager
+mocks-round: mocks-create-round-manager mocks-round-rsvp-manager mocks-round-discord mocks-round-reminder-manager mocks-start-round-manager mocks-score-round-manager mocks-finalize-round-manager mocks-delete-round-manager
 
 mocks-user-discord:
 	$(MOCKGEN) -source=$(USER_DIR)/discord/discord.go -destination=$(USER_DIR)/mocks/mock_user_discord.go -package=mocks
@@ -42,6 +42,9 @@ mocks-start-round-manager:
 	$(MOCKGEN) -source=$(ROUND_DIR)/discord/start_round/start_round.go -destination=$(ROUND_DIR)/mocks/mock_start_round_manager.go -package=mocks
 mocks-score-round-manager:
 	$(MOCKGEN) -source=$(ROUND_DIR)/discord/score_round/score_round.go -destination=$(ROUND_DIR)/mocks/mock_score_round_manager.go -package=mocks
-
+mocks-finalize-round-manager:
+	$(MOCKGEN) -source=$(ROUND_DIR)/discord/finalize_round/finalize_round.go -destination=$(ROUND_DIR)/mocks/mock_finalize_round_manager.go -package=mocks
+mocks-delete-round-manager:
+	$(MOCKGEN) -source=$(ROUND_DIR)/discord/delete_round/delete_round.go -destination=$(ROUND_DIR)/mocks/mock_delete_round_manager.go -package=mocks
 
 # Mocks for other domains (if needed, add here)

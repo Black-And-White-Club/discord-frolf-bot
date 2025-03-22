@@ -7,6 +7,7 @@ import (
 
 	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/round/mocks"
+	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	utils "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
@@ -263,10 +264,18 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 	mockRoundDiscord := mocks.NewMockRoundDiscordInterface(ctrl)
 	mockRoundRsvpManager := mocks.NewMockRoundRsvpManager(ctrl)
 
+	// Create a test config with the required channel ID
+	testConfig := &config.Config{
+		Discord: config.DiscordConfig{
+			ChannelID: "channel123",
+		},
+	}
+
 	type fields struct {
 		Logger       observability.Logger
 		Helpers      *utils.MockHelpers
 		RoundDiscord *mocks.MockRoundDiscordInterface
+		Config       *config.Config
 	}
 	type args struct {
 		msg *message.Message
@@ -285,14 +294,14 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 				Logger:       mockLogger,
 				Helpers:      mockHelpers,
 				RoundDiscord: mockRoundDiscord,
+				Config:       testConfig,
 			},
 			args: args{
-				msg: func() *message.Message {
-					msg := message.NewMessage("1", []byte(`{"round_id": 123, "accepted_participants": [{"user_id": "user1"}]}`))
-					msg.Metadata.Set("channel_id", "channel123")
-					msg.Metadata.Set("message_id", "message456")
-					return msg
-				}(),
+				msg: message.NewMessage("1", []byte(`{
+					"round_id": 123,
+					"accepted_participants": [{"user_id": "user1"}],
+					"event_message_id": "message456"
+				}`)),
 			},
 			wantErr: false,
 			setup: func() {
@@ -300,6 +309,7 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 					RoundID:              123,
 					AcceptedParticipants: []roundtypes.Participant{{UserID: "user1"}},
 					JoinedLate:           nil,
+					EventMessageID:       "message456",
 				}
 
 				mockHelpers.EXPECT().
@@ -315,7 +325,7 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 					Times(1)
 
 				mockRoundRsvpManager.EXPECT().
-					UpdateRoundEventEmbed("channel123", "message456",
+					UpdateRoundEventEmbed("channel123", roundtypes.EventMessageID("message456"),
 						expectedPayload.AcceptedParticipants, nil, nil).
 					Return(nil).
 					Times(1)
@@ -327,25 +337,24 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 				Logger:       mockLogger,
 				Helpers:      mockHelpers,
 				RoundDiscord: mockRoundDiscord,
+				Config:       testConfig,
 			},
 			args: args{
-				msg: func() *message.Message {
-					msg := message.NewMessage("1", []byte(`{
-									"round_id": 123,
-									"accepted_participants": [{"user_id": "user1"}],
-									"joined_late": true
-							}`))
-					msg.Metadata.Set("channel_id", "channel123")
-					msg.Metadata.Set("message_id", "message456")
-					return msg
-				}(),
+				msg: message.NewMessage("1", []byte(`{
+					"round_id": 123,
+					"accepted_participants": [{"user_id": "user1"}],
+					"joined_late": true,
+					"event_message_id": "message456"
+				}`)),
 			},
 			wantErr: false,
 			setup: func() {
+				joinedLate := true
 				expectedPayload := roundevents.ParticipantJoinedPayload{
 					RoundID:              123,
 					AcceptedParticipants: []roundtypes.Participant{{UserID: "user1"}},
-					JoinedLate:           func() *bool { b := true; return &b }(),
+					JoinedLate:           &joinedLate,
+					EventMessageID:       "message456",
 				}
 
 				mockHelpers.EXPECT().
@@ -361,7 +370,7 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 					Times(1)
 
 				mockRoundRsvpManager.EXPECT().
-					UpdateRoundEventEmbed("channel123", "message456",
+					UpdateRoundEventEmbed("channel123", roundtypes.EventMessageID("message456"),
 						expectedPayload.AcceptedParticipants, nil, nil).
 					Return(nil).
 					Times(1)
@@ -373,6 +382,7 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 				Logger:       mockLogger,
 				Helpers:      mockHelpers,
 				RoundDiscord: mockRoundDiscord,
+				Config:       testConfig,
 			},
 			args: args{
 				msg: message.NewMessage("1", []byte(`invalid payload`)),
@@ -389,19 +399,16 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 				Logger:       mockLogger,
 				Helpers:      mockHelpers,
 				RoundDiscord: mockRoundDiscord,
+				Config:       testConfig,
 			},
 			args: args{
-				msg: func() *message.Message {
-					msg := message.NewMessage("1", []byte(`{
-						"round_id": 123,
-						"accepted_participants": [{"user_id": "user1", "tag_number": 1}],
-						"declined_participants": [],
-						"tentative_participants": []
-					}`))
-					msg.Metadata.Set("channel_id", "channel123")
-					msg.Metadata.Set("message_id", "message456")
-					return msg
-				}(),
+				msg: message.NewMessage("1", []byte(`{
+					"round_id": 123,
+					"accepted_participants": [{"user_id": "user1", "tag_number": 1}],
+					"declined_participants": [],
+					"tentative_participants": [],
+					"event_message_id": "message456"
+				}`)),
 			},
 			want:    nil,
 			wantErr: true,
@@ -417,6 +424,7 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 					AcceptedParticipants:  acceptedParticipants,
 					DeclinedParticipants:  declinedParticipants,
 					TentativeParticipants: tentativeParticipants,
+					EventMessageID:        "message456",
 				}
 
 				mockHelpers.EXPECT().
@@ -432,7 +440,7 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 					Times(1)
 
 				mockRoundRsvpManager.EXPECT().
-					UpdateRoundEventEmbed("channel123", "message456", acceptedParticipants, declinedParticipants, tentativeParticipants).
+					UpdateRoundEventEmbed("channel123", roundtypes.EventMessageID("message456"), acceptedParticipants, declinedParticipants, tentativeParticipants).
 					Return(errors.New("update error")).
 					Times(1)
 			},
@@ -448,6 +456,7 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 				Logger:       tt.fields.Logger,
 				Helpers:      tt.fields.Helpers,
 				RoundDiscord: tt.fields.RoundDiscord,
+				Config:       tt.fields.Config,
 			}
 			got, err := h.HandleRoundParticipantJoined(tt.args.msg)
 			if (err != nil) != tt.wantErr {

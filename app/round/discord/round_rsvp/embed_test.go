@@ -82,15 +82,27 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 					User(gomock.Eq("user-123")).
 					Return(&discordgo.User{ID: "user-123", Username: "AcceptedUser"}, nil).
 					Times(1)
+				mockSession.EXPECT().
+					GuildMember(gomock.Eq("guild-id"), gomock.Eq("user-123")).
+					Return(&discordgo.Member{Nick: "AcceptedNick"}, nil).
+					Times(1)
 
 				mockSession.EXPECT().
 					User(gomock.Eq("user-456")).
 					Return(&discordgo.User{ID: "user-456", Username: "DeclinedUser"}, nil).
 					Times(1)
+				mockSession.EXPECT().
+					GuildMember(gomock.Eq("guild-id"), gomock.Eq("user-456")).
+					Return(&discordgo.Member{Nick: "DeclinedNick"}, nil).
+					Times(1)
 
 				mockSession.EXPECT().
 					User(gomock.Eq("user-789")).
 					Return(&discordgo.User{ID: "user-789", Username: "TentativeUser"}, nil).
+					Times(1)
+				mockSession.EXPECT().
+					GuildMember(gomock.Eq("guild-id"), gomock.Eq("user-789")).
+					Return(&discordgo.Member{Nick: "TentativeNick"}, nil).
 					Times(1)
 
 				// Mock ChannelMessageEditEmbed call
@@ -155,15 +167,27 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 					User(gomock.Eq("user-123")).
 					Return(&discordgo.User{ID: "user-123", Username: "AcceptedUser"}, nil).
 					Times(1)
+				mockSession.EXPECT().
+					GuildMember(gomock.Eq("guild-id"), gomock.Eq("user-123")).
+					Return(&discordgo.Member{Nick: "AcceptedNick"}, nil).
+					Times(1)
 
 				mockSession.EXPECT().
 					User(gomock.Eq("user-456")).
 					Return(&discordgo.User{ID: "user-456", Username: "DeclinedUser"}, nil).
 					Times(1)
+				mockSession.EXPECT().
+					GuildMember(gomock.Eq("guild-id"), gomock.Eq("user-456")).
+					Return(&discordgo.Member{Nick: "DeclinedNick"}, nil).
+					Times(1)
 
 				mockSession.EXPECT().
 					User(gomock.Eq("user-789")).
 					Return(&discordgo.User{ID: "user-789", Username: "TentativeUser"}, nil).
+					Times(1)
+				mockSession.EXPECT().
+					GuildMember(gomock.Eq("guild-id"), gomock.Eq("user-789")).
+					Return(&discordgo.Member{Nick: "TentativeNick"}, nil).
 					Times(1)
 
 				// Mock ChannelMessageEditEmbed call failure
@@ -210,13 +234,21 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 					User(gomock.Eq("user-456")).
 					Return(&discordgo.User{ID: "user-456", Username: "DeclinedUser"}, nil).
 					Times(1)
+				mockSession.EXPECT().
+					GuildMember(gomock.Eq("guild-id"), gomock.Eq("user-456")).
+					Return(&discordgo.Member{Nick: "DeclinedNick"}, nil).
+					Times(1)
 
 				mockSession.EXPECT().
 					User(gomock.Eq("user-789")).
 					Return(&discordgo.User{ID: "user-789", Username: "TentativeUser"}, nil).
 					Times(1)
+				mockSession.EXPECT().
+					GuildMember(gomock.Eq("guild-id"), gomock.Eq("user-789")).
+					Return(&discordgo.Member{Nick: "TentativeNick"}, nil).
+					Times(1)
 
-					// Message should still be updated with a placeholder for the failed user
+				// Message should still be updated with a placeholder for the failed user
 				mockSession.EXPECT().
 					ChannelMessageEditEmbed(gomock.Eq("channel-123"), gomock.Eq("message-123"), gomock.Any()).
 					Return(&discordgo.Message{ID: "message-123"}, nil).
@@ -287,7 +319,7 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 
 			err := rrm.UpdateRoundEventEmbed(
 				tt.args.channelID,
-				tt.args.messageID,
+				roundtypes.EventMessageID(tt.args.messageID),
 				tt.args.acceptedParticipants,
 				tt.args.declinedParticipants,
 				tt.args.tentativeParticipants,

@@ -15,7 +15,27 @@ import (
 
 // HandleScoreButton opens the score submission modal when a user clicks "Enter Score"
 func (srm *scoreRoundManager) HandleScoreButton(ctx context.Context, i *discordgo.InteractionCreate) {
-	roundID := strings.Split(i.MessageComponentData().CustomID, "|")[1]
+	customIDParts := strings.Split(i.MessageComponentData().CustomID, "|")
+	if len(customIDParts) < 2 {
+		srm.logger.Error(ctx, "Invalid CustomID for score button", attr.String("custom_id", i.MessageComponentData().CustomID))
+		return
+	}
+
+	roundID := customIDParts[1]
+
+	// Check if the round is finalized
+	if strings.Contains(i.MessageComponentData().CustomID, "finalized") {
+		srm.logger.Info(ctx, "Attempted score submission on a finalized round", attr.String("round_id", roundID), attr.String("user_id", i.Member.User.ID))
+
+		srm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "❌ This round has been finalized. Score updates are no longer allowed.",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		return
+	}
 
 	srm.logger.Info(ctx, "Opening score submission modal",
 		attr.String("round_id", roundID),
@@ -49,14 +69,13 @@ func (srm *scoreRoundManager) HandleScoreButton(ctx context.Context, i *discordg
 			attr.String("round_id", roundID),
 			attr.String("user_id", i.Member.User.ID),
 			attr.String("correlation_id", i.ID))
-
-		// Could add fallback handling here if necessary
 	} else {
 		srm.logger.Info(ctx, "Successfully opened score modal",
 			attr.String("round_id", roundID),
 			attr.String("user_id", i.Member.User.ID),
 			attr.String("correlation_id", i.ID))
 	}
+
 }
 
 // HandleScoreSubmission processes the score entered in the modal
@@ -165,12 +184,11 @@ func (srm *scoreRoundManager) HandleScoreSubmission(ctx context.Context, i *disc
 
 	// Publish score update request to backend
 	payload := roundevents.ScoreUpdateRequestPayload{
-		RoundID:        roundtypes.ID(roundID),
-		Participant:    roundtypes.UserID(userID),
-		Score:          &score,
-		EventMessageID: &i.Message.ID,
+		RoundID:     roundtypes.ID(roundID),
+		Participant: roundtypes.UserID(userID),
+		Score:       &score,
 	}
-	msg := message.NewMessage(correlationID, nil) // Use interaction ID as message ID
+	msg := message.NewMessage(correlationID, nil)
 	msg.Metadata = message.Metadata{
 		"correlation_id": correlationID,
 		"topic":          roundevents.RoundScoreUpdateRequest,

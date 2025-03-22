@@ -98,7 +98,7 @@ func Test_startRoundManager_TransformRoundToScorecard(t *testing.T) {
 						discordgo.Button{
 							Label:    "Join Round LATE",
 							Style:    discordgo.SecondaryButton,
-							CustomID: "round_join|round-123",
+							CustomID: "round_join_late|round-123",
 							Emoji: &discordgo.ComponentEmoji{
 								Name: "Join Round LATE",
 								ID:   "🦇",
@@ -197,7 +197,7 @@ func Test_startRoundManager_TransformRoundToScorecard(t *testing.T) {
 						discordgo.Button{
 							Label:    "Join Round LATE",
 							Style:    discordgo.SecondaryButton,
-							CustomID: "round_join|round-123",
+							CustomID: "round_join_late|round-123",
 							Emoji: &discordgo.ComponentEmoji{
 								Name: "Join Round LATE",
 								ID:   "🦇",
@@ -296,7 +296,7 @@ func Test_startRoundManager_TransformRoundToScorecard(t *testing.T) {
 						discordgo.Button{
 							Label:    "Join Round LATE",
 							Style:    discordgo.SecondaryButton,
-							CustomID: "round_join|round-123",
+							CustomID: "round_join_late|round-123",
 							Emoji: &discordgo.ComponentEmoji{
 								Name: "Join Round LATE",
 								ID:   "🦇",
@@ -365,7 +365,7 @@ func Test_startRoundManager_TransformRoundToScorecard(t *testing.T) {
 						discordgo.Button{
 							Label:    "Join Round LATE",
 							Style:    discordgo.SecondaryButton,
-							CustomID: "round_join|round-123",
+							CustomID: "round_join_late|round-123",
 							Emoji: &discordgo.ComponentEmoji{
 								Name: "Join Round LATE",
 								ID:   "🦇",
@@ -444,7 +444,7 @@ func Test_startRoundManager_TransformRoundToScorecard(t *testing.T) {
 						discordgo.Button{
 							Label:    "Join Round LATE",
 							Style:    discordgo.SecondaryButton,
-							CustomID: "round_join|round-123",
+							CustomID: "round_join_late|round-123",
 							Emoji: &discordgo.ComponentEmoji{
 								Name: "Join Round LATE",
 								ID:   "🦇",

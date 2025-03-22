@@ -229,9 +229,10 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 						RoundID: 1,
 						Title:   "Test Round",
 						UserID:  "user123",
-						StartTime: func() *time.Time {
+						StartTime: func() *roundtypes.StartTime {
 							t, _ := time.Parse(time.RFC3339, "2023-10-10T10:00:00Z")
-							return &t
+							startTime := roundtypes.StartTime(t) // Convert time.Time to roundtypes.StartTime
+							return &startTime
 						}(),
 					},
 				}
@@ -307,13 +308,13 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 						RoundID: 1,
 						Title:   "Test Round",
 						UserID:  "user123",
-						StartTime: func() *time.Time {
+						StartTime: func() *roundtypes.StartTime {
 							t, _ := time.Parse(time.RFC3339, "2023-10-10T10:00:00Z")
-							return &t
+							startTime := roundtypes.StartTime(t) // Convert time.Time to roundtypes.StartTime
+							return &startTime
 						}(),
 					},
 				}
-
 				mockHelpers.EXPECT().
 					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundCreatedPayload{})).
 					DoAndReturn(func(_ *message.Message, v any) error {

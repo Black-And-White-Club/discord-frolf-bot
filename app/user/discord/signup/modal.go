@@ -49,7 +49,7 @@ func (sm *signupManager) SendSignupModal(ctx context.Context, i *discordgo.Inter
 		return fmt.Errorf("failed to send signup modal: %w", err)
 	}
 
-	slog.Info("Signup modal successfully sent!", attr.UserID(i.User.ID))
+	slog.Info("✅ Signup modal successfully sent!", attr.UserID(i.User.ID))
 	return nil
 }
 

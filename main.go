@@ -10,6 +10,9 @@ import (
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/bot"
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	leaderboarddiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord"
+	leaderboardrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/watermill"
+	leaderboardhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/watermill/handlers"
 	rounddiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord"
 	roundrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/round/watermill"
 	roundhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/round/watermill/handlers"
@@ -124,6 +127,18 @@ func main() {
 		log.Fatalf("Failed to configure round router: %v", err)
 	}
 	slogLogger.Info("Round router subscribers configured.")
+
+	leaderboardDiscord, err := leaderboarddiscord.NewLeaderboardDiscord(ctx, discordSessionWrapper, eventBus, logger, utils.NewHelper(logger), cfg)
+	if err != nil {
+		log.Fatalf("Failed to create leaderboard Discord services: %v", err)
+	}
+
+	leaderboardRouter := leaderboardrouter.NewLeaderboardRouter(logger, watermillRouter, eventBus, eventBus, cfg, utils.NewHelper(logger), tracerInstance)
+	slogLogger.Info("Configuring leaderboard router subscribers...")
+	if err := leaderboardRouter.Configure(leaderboardhandlers.NewLeaderboardHandlers(logger, cfg, utils.NewEventUtil(), utils.NewHelper(logger), leaderboardDiscord), eventBus); err != nil {
+		log.Fatalf("Failed to configure leaderboard router: %v", err)
+	}
+	slogLogger.Info("leaderboard router subscribers configured.")
 
 	// ✅ Start Watermill Router AFTER Handlers Are Registered
 	go func() {

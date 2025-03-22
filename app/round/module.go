@@ -9,7 +9,9 @@ import (
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/interactions"
 	rounddiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord"
 	createround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/create_round"
+	deleteround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/delete_round"
 	roundrsvp "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/round_rsvp"
+	scoreround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/score_round"
 	roundhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/round/watermill/handlers"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
@@ -41,6 +43,8 @@ func InitializeRoundModule(
 	// Register Discord interactions
 	createround.RegisterHandlers(interactionRegistry, roundDiscord.GetCreateRoundManager())
 	roundrsvp.RegisterHandlers(interactionRegistry, roundDiscord.GetRoundRsvpManager())
+	deleteround.RegisterHandlers(interactionRegistry, roundDiscord.GetDeleteRoundManager())
+	scoreround.RegisterHandlers(interactionRegistry, roundDiscord.GetScoreRoundManager())
 
 	// Initialize Watermill handlers (no need to register with router here)
 	roundhandlers.NewRoundHandlers(logger, config, eventUtil, helper, roundDiscord)

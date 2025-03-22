@@ -3,6 +3,7 @@ package roundrsvp
 import (
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
@@ -10,9 +11,9 @@ import (
 )
 
 // UpdateRoundEventEmbed updates the round event embed with new participant information.
-func (rrm *roundRsvpManager) UpdateRoundEventEmbed(channelID, messageID string, acceptedParticipants, declinedParticipants, tentativeParticipants []roundtypes.Participant) error {
+func (rrm *roundRsvpManager) UpdateRoundEventEmbed(channelID string, messageID roundtypes.EventMessageID, acceptedParticipants, declinedParticipants, tentativeParticipants []roundtypes.Participant) error {
 	// Fetch the message from the channel
-	msg, err := rrm.session.ChannelMessage(channelID, messageID)
+	msg, err := rrm.session.ChannelMessage(channelID, string(messageID))
 	if err != nil {
 		return err
 	}
@@ -24,7 +25,7 @@ func (rrm *roundRsvpManager) UpdateRoundEventEmbed(channelID, messageID string, 
 	embed.Fields[4].Value = rrm.formatParticipants(tentativeParticipants)
 
 	// Update the message in the channel
-	_, err = rrm.session.ChannelMessageEditEmbed(channelID, messageID, embed)
+	_, err = rrm.session.ChannelMessageEditEmbed(channelID, string(messageID), embed)
 	if err != nil {
 		slog.Error("Failed to update round event embed", attr.Error(err))
 		return err
@@ -39,16 +40,50 @@ func (rrm *roundRsvpManager) formatParticipants(participants []roundtypes.Partic
 		return "-"
 	}
 
-	var names []string
+	// Separate participants into those with and without a tag number
+	var withTag []roundtypes.Participant
+	var withoutTag []roundtypes.Participant
+
 	for _, participant := range participants {
+		if participant.TagNumber != nil && *participant.TagNumber > 0 {
+			withTag = append(withTag, participant)
+		} else {
+			withoutTag = append(withoutTag, participant)
+		}
+	}
+
+	// Sort by TagNumber in ascending order
+	sort.Slice(withTag, func(i, j int) bool {
+		return *withTag[i].TagNumber < *withTag[j].TagNumber
+	})
+
+	// Merge sorted participants with those without a tag
+	sortedParticipants := append(withTag, withoutTag...)
+
+	// Format participant list
+	var names []string
+	for _, participant := range sortedParticipants {
 		user, err := rrm.session.User(string(participant.UserID))
 		if err != nil {
 			slog.Error("Failed to get user", attr.Error(err), attr.String("user_id", string(participant.UserID)))
-			// Return a placeholder instead of the error directly
-			names = append(names, fmt.Sprintf("Unknown User (Tag: %d) - %s", participant.TagNumber, participant.Response))
+			names = append(names, "Unknown User")
 			continue
 		}
-		names = append(names, fmt.Sprintf("%s (Tag: %d) - %s", user.Username, participant.TagNumber, participant.Response))
+
+		// Fetch the user's nickname from the guild if available
+		member, err := rrm.session.GuildMember(rrm.config.Discord.GuildID, string(participant.UserID))
+		displayName := user.Username
+		if err == nil && member.Nick != "" {
+			displayName = member.Nick
+		}
+
+		// Append with or without TagNumber
+		if participant.TagNumber != nil && *participant.TagNumber > 0 {
+			names = append(names, fmt.Sprintf("%s Tag: %d", displayName, *participant.TagNumber))
+		} else {
+			names = append(names, displayName)
+		}
 	}
+
 	return strings.Join(names, "\n")
 }

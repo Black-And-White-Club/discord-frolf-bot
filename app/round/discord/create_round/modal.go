@@ -10,6 +10,7 @@ import (
 	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
+	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	"github.com/bwmarrin/discordgo"
 	"github.com/google/uuid"
 )
@@ -157,12 +158,12 @@ func (crm *createRoundManager) HandleCreateRoundModalSubmit(ctx context.Context,
 
 	// Publish event for backend validation
 	payload := roundevents.CreateRoundRequestedPayload{
-		UserID:      i.Member.User.ID,
-		Title:       title,
-		Description: description,
+		UserID:      roundtypes.UserID(i.Member.User.ID),
+		Title:       roundtypes.Title(title),
+		Description: roundtypes.Description(description),
 		StartTime:   startTimeStr,
-		Location:    location,
-		Timezone:    timezone,
+		Location:    roundtypes.Location(location),
+		Timezone:    roundtypes.Timezone(timezone),
 	}
 
 	slog.Info("Publishing event for Modal validation", attr.Any("payload", payload))

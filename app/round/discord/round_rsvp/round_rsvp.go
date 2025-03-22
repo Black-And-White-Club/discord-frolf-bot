@@ -17,7 +17,7 @@ import (
 // RoundRsvpManager defines the interface for create round operations.
 type RoundRsvpManager interface {
 	HandleRoundResponse(ctx context.Context, i *discordgo.InteractionCreate)
-	UpdateRoundEventEmbed(channelID, messageID string, acceptedParticipants, declinedParticipants, tentativeParticipants []roundtypes.Participant) error
+	UpdateRoundEventEmbed(channelID string, messageID roundtypes.EventMessageID, acceptedParticipants, declinedParticipants, tentativeParticipants []roundtypes.Participant) error
 	InteractionJoinRoundLate(ctx context.Context, i *discordgo.InteractionCreate)
 }
 

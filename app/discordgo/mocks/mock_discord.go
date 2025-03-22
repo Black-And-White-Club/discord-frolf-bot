@@ -152,6 +152,25 @@ func (mr *MockSessionMockRecorder) ChannelMessage(channelID, messageID any, opti
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChannelMessage", reflect.TypeOf((*MockSession)(nil).ChannelMessage), varargs...)
 }
 
+// ChannelMessageDelete mocks base method.
+func (m *MockSession) ChannelMessageDelete(channelID, messageID string, options ...discordgo.RequestOption) error {
+	m.ctrl.T.Helper()
+	varargs := []any{channelID, messageID}
+	for _, a := range options {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ChannelMessageDelete", varargs...)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ChannelMessageDelete indicates an expected call of ChannelMessageDelete.
+func (mr *MockSessionMockRecorder) ChannelMessageDelete(channelID, messageID any, options ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{channelID, messageID}, options...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChannelMessageDelete", reflect.TypeOf((*MockSession)(nil).ChannelMessageDelete), varargs...)
+}
+
 // ChannelMessageEditComplex mocks base method.
 func (m_2 *MockSession) ChannelMessageEditComplex(m *discordgo.MessageEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
 	m_2.ctrl.T.Helper()

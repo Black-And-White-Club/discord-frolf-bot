@@ -75,8 +75,8 @@ func (h *RoundHandlers) HandleRoundParticipantJoined(msg *message.Message) ([]*m
 		return nil, err
 	}
 
-	channelID := msg.Metadata.Get("channel_id")
-	messageID := msg.Metadata.Get("message_id")
+	channelID := h.Config.Discord.ChannelID
+	messageID := payload.EventMessageID
 
 	// Determine if this was a late join
 	joinedLate := false

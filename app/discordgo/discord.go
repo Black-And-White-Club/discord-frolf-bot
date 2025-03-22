@@ -1,8 +1,6 @@
 package discord
 
 import (
-	"context"
-
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
 	"github.com/bwmarrin/discordgo"
 )
@@ -28,6 +26,7 @@ type Session interface {
 	GuildScheduledEventEdit(guildID, eventID string, params *discordgo.GuildScheduledEventParams, options ...discordgo.RequestOption) (*discordgo.GuildScheduledEvent, error)
 	ThreadStartComplex(channelID string, data *discordgo.ThreadStart, options ...discordgo.RequestOption) (ch *discordgo.Channel, err error)
 	AddHandler(handler interface{}) func()
+	ChannelMessageDelete(channelID string, messageID string, options ...discordgo.RequestOption) (err error)
 	User(userID string, options ...discordgo.RequestOption) (st *discordgo.User, err error)
 	FollowupMessageCreate(interaction *discordgo.Interaction, wait bool, data *discordgo.WebhookParams, options ...discordgo.RequestOption) (*discordgo.Message, error)
 	FollowupMessageEdit(interaction *discordgo.Interaction, messageID string, data *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error)
@@ -99,13 +98,13 @@ func (d *DiscordSession) AddHandler(handler interface{}) func() {
 
 // Open wraps the discordgo Open method.
 func (d *DiscordSession) Open() error {
-	d.logger.Info(context.Background(), "Opening discord websocket connection")
+	d.logger.Info("Opening discord websocket connection")
 	return d.session.Open()
 }
 
 // Close wraps the discordgo Close method.
 func (d *DiscordSession) Close() error {
-	d.logger.Info(context.Background(), "Closing discord websocket connection")
+	d.logger.Info("Closing discord websocket connection")
 	return d.session.Close()
 }
 
@@ -147,6 +146,10 @@ func (d *DiscordSession) ThreadMemberAdd(threadID string, memberID string, optio
 // GetBotUser retrieves the bot user.
 func (d *DiscordSession) GetBotUser() (*discordgo.User, error) {
 	return d.session.User("@me")
+}
+
+func (d *DiscordSession) ChannelMessageDelete(channelID string, messageID string, options ...discordgo.RequestOption) (err error) {
+	return d.session.ChannelMessageDelete(channelID, messageID, options...)
 }
 
 func (d *DiscordSession) ChannelMessageEditEmbed(channelID string, messageID string, embed *discordgo.MessageEmbed, options ...discordgo.RequestOption) (*discordgo.Message, error) {

@@ -34,6 +34,7 @@ type DiscordConfig struct {
 	SignupMessageID  string            `yaml:"signup_message_id"`
 	SignupEmoji      string            `yaml:"signup_emoji"`
 	AdminRoleID      string            `yaml:"admin_role_id"`
+	ChannelID        string            `yaml:"event_channel_id"`
 }
 
 // ServiceConfig holds general service configuration

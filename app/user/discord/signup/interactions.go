@@ -80,7 +80,16 @@ func (sm *signupManager) HandleSignupReactionAdd(ctx context.Context, r *discord
 
 // New handler for the button press
 func (sm *signupManager) HandleSignupButtonPress(ctx context.Context, i *discordgo.InteractionCreate) {
-	slog.Info("Inside HandleSignupButtonPress!", attr.String("custom_id", i.MessageComponentData().CustomID), attr.UserID(i.User.ID))
+	// // Explicit type assertion
+	// data, ok := i.Interaction.Data.(*discordgo.MessageComponentInteractionData)
+	// if !ok {
+	// 	slog.Error("❌ Failed to cast Interaction.Data to MessageComponentInteractionData")
+	// 	return
+	// }
+
+	// slog.Info("Inside HandleSignupButtonPress!",
+	// 	attr.String("custom_id", data.CustomID),
+	// )
 
 	err := sm.SendSignupModal(ctx, i)
 	if err != nil {

@@ -47,7 +47,6 @@ func NewRoundRouter(logger observability.Logger, router *message.Router, subscri
 // Configure sets up the router.
 func (r *RoundRouter) Configure(handlers roundhandlers.Handlers, eventbus eventbus.EventBus) error {
 	r.Router.AddMiddleware(
-		middleware.CorrelationID,
 		middleware.Retry{MaxRetries: 3}.Middleware,
 		r.middlewareHelper.CommonMetadataMiddleware("discord-round"),
 		r.middlewareHelper.DiscordMetadataMiddleware(),
@@ -69,16 +68,16 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 		discordroundevents.RoundCreatedTopic:            handlers.HandleRoundCreated,
 		discordroundevents.RoundStartedTopic:            handlers.HandleRoundStarted,
 		discordroundevents.RoundParticipantJoinReqTopic: handlers.HandleRoundParticipantJoinRequest,
-		discordroundevents.RoundParticipantJoinedTopic:  handlers.HandleRoundParticipantJoined,
+		roundevents.RoundParticipantJoined:              handlers.HandleRoundParticipantJoined,
+		discordroundevents.RoundValidationFailed:        handlers.HandleRoundValidationFailed,
 		// discordroundevents.RoundUpdateRequestTopic:           handlers.HandleRoundUpdateRequest,
 		// discordroundevents.RoundUpdatedTopic:                 handlers.HandleRoundUpdated,
-		// discordroundevents.RoundDeleteRequestTopic:           handlers.HandleRoundDeleteRequest,
-		// discordroundevents.RoundDeletedTopic:                 handlers.HandleRoundDeleted,
-		// discordroundevents.RoundScoreUpdateRequestTopic:      handlers.HandleRoundScoreUpdateRequest,
-		// discordroundevents.RoundParticipantScoreUpdatedTopic: handlers.HandleRoundParticipantScoreUpdated,
-		// discordroundevents.RoundFinalizedTopic:               handlers.HandleRoundFinalized,
+		discordroundevents.RoundDeletedTopic: handlers.HandleRoundDeleted,
+		roundevents.DiscordRoundFinalized:    handlers.HandleRoundFinalized,
 		// discordroundevents.RoundReminderTopic:                handlers.HandleRoundReminder,
-		discordroundevents.RoundValidationFailed: handlers.HandleRoundValidationFailed,
+		// discordroundevents.RoundScoreUpdateRequestTopic:      handlers.HandleRoundScoreUpdateRequest,
+		roundevents.RoundParticipantScoreUpdated: handlers.HandleParticipantScoreUpdated,
+		roundevents.RoundScoreUpdateError:        handlers.HandleScoreUpdateError,
 		roundevents.RoundCreationFailed:          handlers.HandleRoundCreationFailed,
 	}
 	for topic, handlerFunc := range eventsToHandlers {
