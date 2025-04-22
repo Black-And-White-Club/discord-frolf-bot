@@ -2,6 +2,7 @@ package rounddiscord
 
 import (
 	"context"
+	"log/slog"
 
 	discordgo "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	createround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/create_round"
@@ -14,7 +15,6 @@ import (
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
-	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 )
 
@@ -45,7 +45,7 @@ func NewRoundDiscord(
 	ctx context.Context,
 	session discordgo.Session,
 	publisher eventbus.EventBus,
-	logger observability.Logger,
+	logger *slog.Logger,
 	helper utils.Helpers,
 	config *config.Config,
 	interactionStore storage.ISInterface,

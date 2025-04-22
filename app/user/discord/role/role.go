@@ -1,85 +1,159 @@
-// role/role.go
 package role
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
+	"log/slog"
+	"time"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
-	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
+	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
-	"github.com/ThreeDotsLabs/watermill"
-	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/bwmarrin/discordgo"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 )
 
 // RoleManager defines the interface for role operations.
 type RoleManager interface {
-	AddRoleToUser(ctx context.Context, guildID, userID, roleID string) error
-	EditRoleUpdateResponse(ctx context.Context, correlationID string, content string) error
-	HandleRoleRequestCommand(ctx context.Context, i *discordgo.InteractionCreate)
-	HandleRoleButtonPress(ctx context.Context, i *discordgo.InteractionCreate)
-	HandleRoleCancelButton(ctx context.Context, i *discordgo.InteractionCreate)
-	RespondToRoleRequest(ctx context.Context, interactionID, interactionToken, targetUserID string) error
-	RespondToRoleButtonPress(ctx context.Context, interactionID, interactionToken, requesterID, selectedRole, targetUserID string) error
+	AddRoleToUser(ctx context.Context, guildID string, userID sharedtypes.DiscordID, roleID string) (RoleOperationResult, error)
+	EditRoleUpdateResponse(ctx context.Context, correlationID string, content string) (RoleOperationResult, error)
+	HandleRoleRequestCommand(ctx context.Context, i *discordgo.InteractionCreate) (RoleOperationResult, error)
+	HandleRoleButtonPress(ctx context.Context, i *discordgo.InteractionCreate) (RoleOperationResult, error)
+	HandleRoleCancelButton(ctx context.Context, i *discordgo.InteractionCreate) (RoleOperationResult, error)
+	RespondToRoleRequest(ctx context.Context, interactionID, interactionToken string, targetUserID sharedtypes.DiscordID) (RoleOperationResult, error)
+	RespondToRoleButtonPress(ctx context.Context, interactionID, interactionToken string, requesterID sharedtypes.DiscordID, selectedRole string, targetUserID sharedtypes.DiscordID) (RoleOperationResult, error)
 }
 
-// roleManager implements the RoleManager interface.
 type roleManager struct {
 	session          discord.Session
 	publisher        eventbus.EventBus
-	logger           observability.Logger
+	logger           *slog.Logger
 	helper           utils.Helpers
 	config           *config.Config
 	interactionStore storage.ISInterface
+	tracer           trace.Tracer
+	metrics          discordmetrics.DiscordMetrics
+	operationWrapper func(ctx context.Context, opName string, fn func(ctx context.Context) (RoleOperationResult, error)) (RoleOperationResult, error)
 }
 
-// NewRoleManager creates a new RoleManager instance.
-func NewRoleManager(session discord.Session, publisher eventbus.EventBus, logger observability.Logger, helper utils.Helpers, config *config.Config, interactionStore storage.ISInterface) (RoleManager, error) {
-	logger.Info(context.Background(), "Creating RoleManager",
-		attr.Any("session", session),
-		attr.Any("publisher", publisher),
-		attr.Any("config", config),
-	)
-	return &roleManager{
+func NewRoleManager(
+	session discord.Session,
+	publisher eventbus.EventBus,
+	logger *slog.Logger,
+	helper utils.Helpers,
+	config *config.Config,
+	interactionStore storage.ISInterface,
+	tracer trace.Tracer,
+	metrics discordmetrics.DiscordMetrics,
+) (RoleManager, error) {
+	if logger != nil {
+		logger.InfoContext(context.Background(), "Creating RoleManager")
+	}
+
+	rm := &roleManager{
 		session:          session,
 		publisher:        publisher,
 		logger:           logger,
 		helper:           helper,
 		config:           config,
 		interactionStore: interactionStore,
-	}, nil
+		tracer:           tracer,
+		metrics:          metrics,
+		operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (RoleOperationResult, error)) (RoleOperationResult, error) {
+			return wrapRoleOperation(ctx, opName, fn, logger, tracer, metrics)
+		},
+	}
+
+	return rm, nil
 }
 
-// createEvent is a helper function to create a Watermill message.
-func (rm *roleManager) createEvent(ctx context.Context, topic string, payload interface{}, i *discordgo.InteractionCreate) (*message.Message, error) {
-	newEvent := message.NewMessage(watermill.NewUUID(), nil)
-
-	// Ensure Metadata is initialized
-	if newEvent.Metadata == nil {
-		newEvent.Metadata = make(map[string]string)
+// operation wrapper
+func wrapRoleOperation(
+	ctx context.Context,
+	operationName string,
+	fn func(ctx context.Context) (RoleOperationResult, error),
+	logger *slog.Logger,
+	tracer trace.Tracer,
+	metrics discordmetrics.DiscordMetrics,
+) (result RoleOperationResult, err error) {
+	if fn == nil {
+		return RoleOperationResult{}, errors.New("operation function is nil")
 	}
 
-	payloadBytes, err := json.Marshal(payload)
+	// Handle nil tracer
+	if tracer == nil {
+		tracer = noop.NewTracerProvider().Tracer("noop")
+	}
+
+	ctx, span := tracer.Start(ctx, operationName, trace.WithAttributes(
+		attribute.String("operation", operationName),
+	))
+	defer span.End()
+
+	start := time.Now()
+
+	defer func() {
+		duration := time.Since(start)
+		if logger != nil {
+			logger.InfoContext(ctx, fmt.Sprintf("Completed %s", operationName),
+				attr.String("duration_sec", fmt.Sprintf("%.2f", duration.Seconds())),
+			)
+		}
+		if metrics != nil {
+			metrics.RecordAPIRequestDuration(ctx, operationName, duration)
+		}
+	}()
+
+	// Use named return parameters (result, err) so we can modify them in the defer
+	defer func() {
+		if r := recover(); r != nil {
+			// Set the err return value when a panic occurs
+			err = fmt.Errorf("panic in %s: %v", operationName, r)
+			if logger != nil {
+				logger.ErrorContext(ctx, "Recovered from panic", attr.Error(err))
+			}
+			span.RecordError(err)
+			if metrics != nil {
+				metrics.RecordAPIError(ctx, operationName, "panic")
+			}
+		}
+	}()
+
+	result, err = fn(ctx)
 	if err != nil {
-		rm.logger.Error(ctx, "Failed to marshal payload in CreateResultMessage", attr.Error(err))
-		return nil, fmt.Errorf("failed to marshal payload: %w", err)
+		wrapped := fmt.Errorf("%s operation error: %w", operationName, err)
+		if logger != nil {
+			logger.ErrorContext(ctx, fmt.Sprintf("Error in %s", operationName), attr.Error(wrapped))
+		}
+		span.RecordError(wrapped)
+		if metrics != nil {
+			metrics.RecordAPIError(ctx, operationName, "operation_error")
+		}
+		return RoleOperationResult{}, wrapped
 	}
 
-	newEvent.Payload = payloadBytes
+	if result.Error != nil {
+		span.RecordError(result.Error)
+		if metrics != nil {
+			metrics.RecordAPIError(ctx, operationName, "result_error")
+		}
+	} else if metrics != nil {
+		metrics.RecordAPIRequest(ctx, operationName)
+	}
 
-	// Set metadata fields
-	newEvent.Metadata.Set("handler_name", "Create Original Discord Message to Backend")
-	newEvent.Metadata.Set("topic", topic)
-	newEvent.Metadata.Set("domain", "discord")
-	newEvent.Metadata.Set("interaction_id", i.Interaction.ID)
-	newEvent.Metadata.Set("interaction_token", i.Interaction.Token)
-	newEvent.Metadata.Set("guild_id", rm.config.Discord.GuildID)
+	return result, nil
+}
 
-	return newEvent, nil
+type RoleOperationResult struct {
+	Success interface{}
+	Failure interface{}
+	Error   error
 }

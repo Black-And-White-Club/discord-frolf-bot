@@ -2,100 +2,178 @@ package signup
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"log/slog"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
+	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	"github.com/bwmarrin/discordgo"
 )
 
-// messageReactionAdd handles MessageReactionAdd events.
-func (sm *signupManager) MessageReactionAdd(s discord.Session, r *discordgo.MessageReactionAdd) {
-	slog.Info("signupManager.MessageReactionAdd called", attr.UserID(r.UserID))
-	signupChannelID := sm.config.Discord.SignupChannelID
-	signupMessageID := sm.config.Discord.SignupMessageID
-	signupEmoji := sm.config.Discord.SignupEmoji
-	if r.ChannelID != signupChannelID || r.MessageID != signupMessageID || r.Emoji.Name != signupEmoji {
-		slog.Info("Reaction mismatch",
-			attr.UserID(r.UserID),
-			attr.String("channel_id", r.ChannelID),
-			attr.String("message_id", r.MessageID),
-			attr.Any("emoji", r.Emoji.Name))
-		return
-	}
-	slog.Info("Valid reaction detected, processing signup.")
-	botUser, err := sm.session.GetBotUser()
-	if err != nil {
-		slog.Error("Failed to get bot user", attr.Error(err))
-		return
-	}
-	if r.UserID == botUser.ID {
-		slog.Info("Ignoring bot's own reaction.")
-		return
-	}
-	slog.Info("Publishing signup reaction event...")
-	sm.HandleSignupReactionAdd(context.Background(), r)
+// MessageReactionAdd is the top-level Watermill/Discord event hook
+// Updated to use the wrapper and return SignupOperationResult, error
+func (sm *signupManager) MessageReactionAdd(s discord.Session, r *discordgo.MessageReactionAdd) (SignupOperationResult, error) {
+	ctx := context.Background() // Start with a background context for top-level event
+	ctx = discordmetrics.WithValue(ctx, discordmetrics.UserIDKey, r.UserID)
+	ctx = discordmetrics.WithValue(ctx, discordmetrics.CommandNameKey, "reaction_signup")
+	ctx = discordmetrics.WithValue(ctx, discordmetrics.InteractionType, "reaction")
+
+	ctx = discordmetrics.WithValue(ctx, discordmetrics.GuildIDKey, r.GuildID) // Add GuildID if available
+
+	// Wrap the entire logic in the operationWrapper
+	return sm.operationWrapper(ctx, "message_reaction_add", func(ctx context.Context) (SignupOperationResult, error) {
+		sm.logger.InfoContext(ctx, "signupManager.MessageReactionAdd called")
+
+		signupChannelID := sm.config.Discord.SignupChannelID
+		signupMessageID := sm.config.Discord.SignupMessageID
+		signupEmoji := sm.config.Discord.SignupEmoji
+
+		// Check if the reaction matches the configured signup message and emoji
+		if r.ChannelID != signupChannelID || r.MessageID != signupMessageID || r.Emoji.Name != signupEmoji {
+			sm.logger.InfoContext(ctx, "Reaction mismatch - ignoring",
+				attr.String("channel_id", r.ChannelID),
+				attr.String("message_id", r.MessageID),
+				attr.Any("emoji", r.Emoji.Name),
+				attr.String("expected_channel", signupChannelID),
+				attr.String("expected_message", signupMessageID),
+				attr.String("expected_emoji", signupEmoji),
+			)
+			// Return success, indicating the reaction was received but not processed as a signup reaction
+			return SignupOperationResult{Success: "reaction mismatch, ignored"}, nil
+		}
+
+		sm.logger.InfoContext(ctx, "Valid signup reaction detected, processing...")
+
+		// Get bot user to ignore its own reactions
+		botUser, err := sm.session.GetBotUser()
+		if err != nil {
+			sm.logger.ErrorContext(ctx, "Failed to get bot user", attr.Error(err))
+			// Return SignupOperationResult with an error and nil outer error
+			return SignupOperationResult{Error: fmt.Errorf("failed to get bot user: %w", err)}, nil
+		}
+		if r.UserID == botUser.ID {
+			sm.logger.InfoContext(ctx, "Ignoring bot's own reaction")
+			// Return success, indicating bot's reaction was ignored
+			return SignupOperationResult{Success: "ignored bot reaction"}, nil
+		}
+
+		sm.logger.InfoContext(ctx, "Publishing signup reaction event...")
+		// Delegate to HandleSignupReactionAdd and return its result
+		// Note: HandleSignupReactionAdd is also wrapped, so this call will trigger another wrapped operation.
+		// This is acceptable, but be mindful of nested spans/logs.
+		return sm.HandleSignupReactionAdd(ctx, r)
+	})
 }
 
-// handleSignupReactionAdd sends the signup modal.
-func (sm *signupManager) HandleSignupReactionAdd(ctx context.Context, r *discordgo.MessageReactionAdd) {
-	slog.Info("Handling signup reaction", attr.UserID(r.UserID))
+func (sm *signupManager) HandleSignupReactionAdd(ctx context.Context, r *discordgo.MessageReactionAdd) (SignupOperationResult, error) {
+	ctx = discordmetrics.WithValue(ctx, discordmetrics.UserIDKey, r.UserID)
+	ctx = discordmetrics.WithValue(ctx, discordmetrics.CommandNameKey, "handle_signup_reaction")
+	ctx = discordmetrics.WithValue(ctx, discordmetrics.InteractionType, "reaction")
+	ctx = discordmetrics.WithValue(ctx, discordmetrics.GuildIDKey, r.GuildID)
 
-	// Verify the reaction happened in the correct guild
-	if r.GuildID != sm.config.Discord.GuildID {
-		slog.Warn("Reaction from wrong guild", attr.UserID(r.UserID), attr.String("guildID", r.GuildID))
-		return
+	// 🔥 Check if context is already cancelled — prevents wasted work
+	if ctx.Err() != nil {
+		return SignupOperationResult{Error: ctx.Err()}, ctx.Err()
 	}
 
-	dmChannel, err := sm.session.UserChannelCreate(r.UserID)
-	if err != nil {
-		slog.Error("Failed to create DM channel", attr.UserID(r.UserID), attr.Error(err))
-		return
-	}
-	slog.Info("DM channel created", attr.String("dm_channel_id", dmChannel.ID))
+	result, err := sm.operationWrapper(ctx, "handle_signup_reaction", func(ctx context.Context) (SignupOperationResult, error) {
+		sm.logger.InfoContext(ctx, "Handling signup reaction")
 
-	metadataStr := fmt.Sprintf("signup_button|%s", r.UserID)
+		if r.GuildID != sm.config.Discord.GuildID {
+			sm.logger.WarnContext(ctx, "Reaction from wrong guild", attr.String("guildID", r.GuildID))
+			return SignupOperationResult{Error: fmt.Errorf("reaction from unauthorized guild")}, nil
+		}
 
-	_, err = sm.session.ChannelMessageSendComplex(dmChannel.ID, &discordgo.MessageSend{
-		Content: "Click the button below to start your signup!",
-		Components: []discordgo.MessageComponent{
-			discordgo.ActionsRow{
-				Components: []discordgo.MessageComponent{
-					discordgo.Button{
-						Label:    "Signup",
-						Style:    discordgo.PrimaryButton,
-						CustomID: metadataStr,
+		dmChannel, err := sm.session.UserChannelCreate(r.UserID)
+		if err != nil {
+			sm.logger.ErrorContext(ctx, "Failed to create DM channel", attr.Error(err))
+			return SignupOperationResult{Error: fmt.Errorf("failed to create DM channel: %w", err)}, err
+		}
+		sm.logger.InfoContext(ctx, "DM channel created", attr.String("dm_channel_id", dmChannel.ID))
+
+		metadataStr := fmt.Sprintf("signup_button|%s", r.UserID)
+
+		_, err = sm.session.ChannelMessageSendComplex(dmChannel.ID, &discordgo.MessageSend{
+			Content: "Click the button below to start your signup!",
+			Components: []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						discordgo.Button{
+							Label:    "Signup",
+							Style:    discordgo.PrimaryButton,
+							CustomID: metadataStr,
+						},
 					},
 				},
 			},
-		},
+		})
+		if err != nil {
+			sm.logger.ErrorContext(ctx, "Failed to send signup button in DM", attr.Error(err))
+			return SignupOperationResult{Error: fmt.Errorf("failed to send signup button in DM: %w", err)}, err
+		}
+
+		sm.logger.InfoContext(ctx, "Signup button successfully sent in DM")
+		return SignupOperationResult{Success: "signup button sent"}, nil
 	})
-	if err != nil {
-		slog.Error("Failed to send signup button in DM", attr.UserID(r.UserID), attr.Error(err))
-	} else {
-		slog.Info("✅ Signup button successfully sent in DM!", attr.UserID(r.UserID))
-	}
+
+	return result, err
 }
 
-// New handler for the button press
-func (sm *signupManager) HandleSignupButtonPress(ctx context.Context, i *discordgo.InteractionCreate) {
-	// // Explicit type assertion
-	// data, ok := i.Interaction.Data.(*discordgo.MessageComponentInteractionData)
-	// if !ok {
-	// 	slog.Error("❌ Failed to cast Interaction.Data to MessageComponentInteractionData")
-	// 	return
-	// }
-
-	// slog.Info("Inside HandleSignupButtonPress!",
-	// 	attr.String("custom_id", data.CustomID),
-	// )
-
-	err := sm.SendSignupModal(ctx, i)
-	if err != nil {
-		slog.Error("❌ Failed to send signup modal", attr.Error(err))
-		return
+func (sm *signupManager) HandleSignupButtonPress(ctx context.Context, i *discordgo.InteractionCreate) (SignupOperationResult, error) {
+	// Early validation checks
+	if i == nil || i.Interaction == nil {
+		return SignupOperationResult{Error: errors.New("interaction is nil or incomplete")}, nil
 	}
 
-	slog.Info("✅ Successfully called SendSignupModal")
+	// Context enrichment
+	ctx = discordmetrics.WithValue(ctx, discordmetrics.CommandNameKey, "handle_signup_button_press")
+	ctx = discordmetrics.WithValue(ctx, discordmetrics.InteractionType, "button")
+
+	if i.Interaction.Member == nil || (i.Interaction.Member.User == nil && i.Interaction.User == nil) {
+		return SignupOperationResult{Error: errors.New("user is nil in interaction")}, nil
+	}
+
+	// Extract user ID from either Member.User or direct User field
+	userID := ""
+	if i.Interaction.Member != nil && i.Interaction.Member.User != nil {
+		userID = i.Interaction.Member.User.ID
+	} else if i.Interaction.User != nil {
+		userID = i.Interaction.User.ID
+	}
+	ctx = discordmetrics.WithValue(ctx, discordmetrics.UserIDKey, userID)
+
+	// Check context cancellation before proceeding
+	if err := ctx.Err(); err != nil {
+		return SignupOperationResult{Error: err}, err
+	}
+
+	// Validate interaction type
+	if i.Interaction.Type != discordgo.InteractionMessageComponent {
+		return SignupOperationResult{Error: errors.New("unsupported interaction type")}, nil
+	}
+
+	// Extract and validate the button ID
+	data, ok := i.Interaction.Data.(*discordgo.MessageComponentInteractionData)
+	if !ok || data.CustomID != "signup-button" {
+		return SignupOperationResult{Error: errors.New("unsupported button custom ID")}, nil
+	}
+
+	// Wrap the operation with minimal error handling
+	return sm.operationWrapper(ctx, "handle_signup_button_press", func(ctx context.Context) (SignupOperationResult, error) {
+		err := sm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseModal,
+			Data: &discordgo.InteractionResponseData{
+				CustomID: "signup-modal",
+				Title:    "Sign Up Form",
+				// Components would be defined here...
+			},
+		})
+		if err != nil {
+			// Return the original error directly without wrapping it
+			return SignupOperationResult{Error: err}, err
+		}
+
+		return SignupOperationResult{Success: "modal sent"}, nil
+	})
 }

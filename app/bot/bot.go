@@ -13,7 +13,6 @@ import (
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/user"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
-	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"github.com/ThreeDotsLabs/watermill/message"
@@ -22,14 +21,14 @@ import (
 
 type DiscordBot struct {
 	Session          discord.Session
-	Logger           observability.Logger
+	Logger           *slog.Logger
 	Config           *config.Config
 	WatermillRouter  *message.Router
 	EventBus         eventbus.EventBus
 	InteractionStore storage.ISInterface
 }
 
-func NewDiscordBot(session discord.Session, cfg *config.Config, logger observability.Logger, eventBus eventbus.EventBus, router *message.Router, interactionStore storage.ISInterface) (*DiscordBot, error) {
+func NewDiscordBot(session discord.Session, cfg *config.Config, logger *slog.Logger, eventBus eventbus.EventBus, router *message.Router, interactionStore storage.ISInterface) (*DiscordBot, error) {
 	logger.Info("Creating DiscordBot")
 	bot := &DiscordBot{
 		Session:          session,

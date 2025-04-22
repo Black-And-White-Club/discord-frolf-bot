@@ -2,6 +2,7 @@ package roundhandlers
 
 import (
 	"errors"
+	"log/slog"
 	"testing"
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/round/mocks"
@@ -23,7 +24,7 @@ func TestRoundHandlers_HandleParticipantScoreUpdated(t *testing.T) {
 	mockScoreRoundManager := mocks.NewMockScoreRoundManager(ctrl)
 
 	type fields struct {
-		Logger       observability.Logger
+		Logger       *slog.Logger
 		Helpers      *utils.MockHelpers
 		RoundDiscord *mocks.MockRoundDiscordInterface
 	}
@@ -306,7 +307,7 @@ func TestRoundHandlers_HandleScoreUpdateError(t *testing.T) {
 	mockScoreRoundManager := mocks.NewMockScoreRoundManager(ctrl)
 
 	type fields struct {
-		Logger       observability.Logger
+		Logger       *slog.Logger
 		Helpers      *utils.MockHelpers
 		RoundDiscord *mocks.MockRoundDiscordInterface
 	}

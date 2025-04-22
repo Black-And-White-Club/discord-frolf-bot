@@ -2,11 +2,11 @@ package scoreround
 
 import (
 	"context"
+	"log/slog"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
-	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
@@ -25,13 +25,13 @@ type ScoreRoundManager interface {
 type scoreRoundManager struct {
 	session   discord.Session
 	publisher eventbus.EventBus
-	logger    observability.Logger
+	logger    *slog.Logger
 	helper    utils.Helpers
 	config    *config.Config
 }
 
 // NewScoreRoundManager creates a new ScoreRoundManager instance.
-func NewScoreRoundManager(session discord.Session, publisher eventbus.EventBus, logger observability.Logger, helper utils.Helpers, config *config.Config) ScoreRoundManager {
+func NewScoreRoundManager(session discord.Session, publisher eventbus.EventBus, logger *slog.Logger, helper utils.Helpers, config *config.Config) ScoreRoundManager {
 	logger.Info(context.Background(), "Creating ScoreRoundManager",
 		attr.Any("session", session),
 		attr.Any("publisher", publisher),

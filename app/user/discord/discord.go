@@ -2,6 +2,7 @@ package userdiscord
 
 import (
 	"context"
+	"log/slog"
 
 	discordgo "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
@@ -9,8 +10,9 @@ import (
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord/signup"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
-	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
+	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // UserDiscordInterface defines the interface for UserDiscord.
@@ -30,17 +32,19 @@ func NewUserDiscord(
 	ctx context.Context,
 	session discordgo.Session,
 	publisher eventbus.EventBus,
-	logger observability.Logger,
+	logger *slog.Logger,
 	helper utils.Helpers,
 	config *config.Config,
 	interactionStore storage.ISInterface,
+	tracer trace.Tracer,
+	metrics discordmetrics.DiscordMetrics,
 ) (UserDiscordInterface, error) {
-	roleManager, err := role.NewRoleManager(session, publisher, logger, helper, config, interactionStore)
+	roleManager, err := role.NewRoleManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics)
 	if err != nil {
 		return nil, err
 	}
 
-	signupManager, err := signup.NewSignupManager(session, publisher, logger, helper, config, interactionStore)
+	signupManager, err := signup.NewSignupManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics)
 	if err != nil {
 		return nil, err
 	}

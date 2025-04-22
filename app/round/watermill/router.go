@@ -19,7 +19,7 @@ import (
 
 // RoundRouter handles routing for round module events.
 type RoundRouter struct {
-	logger           observability.Logger
+	logger           *slog.Logger
 	Router           *message.Router
 	subscriber       eventbus.EventBus
 	publisher        eventbus.EventBus
@@ -31,7 +31,7 @@ type RoundRouter struct {
 
 // NewRoundRouter creates a new RoundRouter.
 
-func NewRoundRouter(logger observability.Logger, router *message.Router, subscriber eventbus.EventBus, publisher eventbus.EventBus, config *config.Config, helper utils.Helpers, tracer observability.Tracer) *RoundRouter {
+func NewRoundRouter(logger *slog.Logger, router *message.Router, subscriber eventbus.EventBus, publisher eventbus.EventBus, config *config.Config, helper utils.Helpers, tracer observability.Tracer) *RoundRouter {
 	return &RoundRouter{
 		logger:           logger,
 		Router:           router,

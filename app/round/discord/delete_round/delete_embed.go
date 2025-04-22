@@ -5,36 +5,42 @@ import (
 	"fmt"
 
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
-	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
+	"github.com/google/uuid"
 )
 
-// DeleteEmbed removes the message with the given messageID from the specified channel.
-func (dem *deleteRoundManager) DeleteEmbed(ctx context.Context, eventMessageID roundtypes.EventMessageID, channelID string) (bool, error) {
-	dem.logger.Info(ctx, "Attempting to delete round embed",
-		attr.String("channel_id", channelID),
-		attr.String("message_id", string(eventMessageID)))
-
-	// Ensure both channelID and eventMessageID are provided
-	if channelID == "" || eventMessageID == "" {
-		dem.logger.Error(ctx, "Missing channelID or eventMessageID",
+// DeleteRoundEventEmbed removes the message with the given messageID from the specified channel.
+func (drm *deleteRoundManager) DeleteRoundEventEmbed(ctx context.Context, eventMessageID sharedtypes.RoundID, channelID string) (DeleteRoundOperationResult, error) {
+	return drm.operationWrapper(ctx, "DeleteRoundEventEmbed", func(ctx context.Context) (DeleteRoundOperationResult, error) {
+		drm.logger.InfoContext(ctx, "Attempting to delete round embed",
 			attr.String("channel_id", channelID),
-			attr.String("message_id", string(eventMessageID)))
-		return false, fmt.Errorf("channelID or eventMessageID is missing")
-	}
+			attr.RoundID("message_id", eventMessageID))
 
-	// Attempt to delete the message
-	err := dem.session.ChannelMessageDelete(channelID, string(eventMessageID))
-	if err != nil {
-		dem.logger.Error(ctx, "Failed to delete round embed",
+		// Ensure both channelID and eventMessageID are provided
+		if channelID == "" || eventMessageID == sharedtypes.RoundID(uuid.Nil) {
+			err := fmt.Errorf("channelID or eventMessageID is missing")
+			drm.logger.ErrorContext(ctx, "Missing channelID or eventMessageID",
+				attr.String("channel_id", channelID),
+				attr.RoundID("message_id", eventMessageID),
+				attr.Error(err))
+			return DeleteRoundOperationResult{Error: err, Success: false}, nil // Explicitly set Success to false
+		}
+
+		// Attempt to delete the message
+		err := drm.session.ChannelMessageDelete(channelID, eventMessageID.String())
+		if err != nil {
+			wrappedErr := fmt.Errorf("failed to delete message: %w", err)
+			drm.logger.ErrorContext(ctx, "Failed to delete round embed",
+				attr.String("channel_id", channelID),
+				attr.RoundID("message_id", eventMessageID),
+				attr.Error(wrappedErr))
+			return DeleteRoundOperationResult{Error: wrappedErr, Success: false}, nil // Explicitly set Success to false
+		}
+
+		drm.logger.InfoContext(ctx, "Successfully deleted round embed",
 			attr.String("channel_id", channelID),
-			attr.String("message_id", string(eventMessageID)),
-			attr.Error(err))
-		return false, fmt.Errorf("failed to delete message: %w", err)
-	}
+			attr.RoundID("message_id", eventMessageID))
 
-	dem.logger.Info(ctx, "Successfully deleted round embed",
-		attr.String("channel_id", channelID),
-		attr.String("message_id", string(eventMessageID)))
-
-	return true, nil
+		return DeleteRoundOperationResult{Success: true}, nil
+	})
 }

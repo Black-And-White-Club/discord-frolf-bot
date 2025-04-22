@@ -1,9 +1,10 @@
 package discordhandlers
 
 import (
+	"log/slog"
+
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/discord"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
-	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"github.com/ThreeDotsLabs/watermill/message"
 )
@@ -15,7 +16,7 @@ type Handlers interface {
 
 // UserHandlers handles user-related events.
 type DiscordHandlers struct {
-	Logger    observability.Logger
+	Logger    *slog.Logger
 	Config    *config.Config
 	EventUtil utils.EventUtil
 	Helper    utils.Helpers
@@ -24,7 +25,7 @@ type DiscordHandlers struct {
 
 // NewDiscordHandlers creates a new DiscordHandlers struct.
 func NewDiscordHandlers(
-	logger observability.Logger,
+	logger *slog.Logger,
 	config *config.Config,
 	eventUtil utils.EventUtil,
 	helper utils.Helpers,

@@ -1,9 +1,10 @@
 package roundhandlers
 
 import (
+	"log/slog"
+
 	rounddiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
-	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"github.com/ThreeDotsLabs/watermill/message"
 )
@@ -30,7 +31,7 @@ type Handlers interface {
 
 // RoundHandlers handles round-related events.
 type RoundHandlers struct {
-	Logger       observability.Logger
+	Logger       *slog.Logger
 	Config       *config.Config
 	EventUtil    utils.EventUtil
 	Helpers      utils.Helpers
@@ -38,7 +39,7 @@ type RoundHandlers struct {
 }
 
 // NewRoundHandlers creates a new RoundHandlers.
-func NewRoundHandlers(logger observability.Logger, config *config.Config, eventUtil utils.EventUtil, helpers utils.Helpers, roundDiscord rounddiscord.RoundDiscordInterface) Handlers {
+func NewRoundHandlers(logger *slog.Logger, config *config.Config, eventUtil utils.EventUtil, helpers utils.Helpers, roundDiscord rounddiscord.RoundDiscordInterface) Handlers {
 	return &RoundHandlers{
 		Logger:       logger,
 		Config:       config,

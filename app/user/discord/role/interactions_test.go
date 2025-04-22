@@ -3,6 +3,7 @@ package role
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
@@ -10,10 +11,20 @@ import (
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
 	util_mocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
-	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
+	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
+	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
+	"github.com/ThreeDotsLabs/watermill"
+	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/bwmarrin/discordgo"
+
+	"go.opentelemetry.io/otel/trace/noop"
 	"go.uber.org/mock/gomock"
 )
+
+var testOperationWrapper = func(ctx context.Context, operationName string, operation func(ctx context.Context) (RoleOperationResult, error)) (RoleOperationResult, error) {
+	return operation(ctx)
+}
 
 func Test_roleManager_RespondToRoleRequest(t *testing.T) {
 	ctrl := gomock.NewController(t)
@@ -21,10 +32,32 @@ func Test_roleManager_RespondToRoleRequest(t *testing.T) {
 
 	mockSession := discordmocks.NewMockSession(ctrl)
 	mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
-	mockLogger := observability.NewNoOpLogger()
-	mockConfig := &config.Config{}
+	logger := loggerfrolfbot.NoOpLogger
+	mockConfig := &config.Config{
+		Discord: config.DiscordConfig{
+			RoleMappings: map[string]string{
+				"Admin":  "role-id-admin",
+				"Member": "role-id-member",
+			},
+		},
+	}
 	mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
 	mockHelper := util_mocks.NewMockHelpers(ctrl)
+	tracerProvider := noop.NewTracerProvider()
+	tracer := tracerProvider.Tracer("test")
+	metrics := &discordmetrics.NoOpMetrics{}
+
+	rm := &roleManager{
+		session:          mockSession,
+		publisher:        mockPublisher,
+		logger:           logger,
+		helper:           mockHelper,
+		config:           mockConfig,
+		interactionStore: mockInteractionStore,
+		tracer:           tracer,
+		metrics:          metrics,
+		operationWrapper: testOperationWrapper,
+	}
 
 	tests := []struct {
 		name             string
@@ -32,14 +65,19 @@ func Test_roleManager_RespondToRoleRequest(t *testing.T) {
 		ctx              context.Context
 		interactionID    string
 		interactionToken string
-		targetUserID     string
-		wantErr          bool
+		targetUserID     sharedtypes.DiscordID
+		wantSuccess      string
+		wantErrMsg       string
+		wantErrIs        error
 	}{
 		{
 			name: "successful role request response",
 			setup: func() {
 				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
+					InteractionRespond(
+						gomock.Eq(&discordgo.Interaction{ID: "interaction-id", Token: "interaction-token"}),
+						gomock.Any(),
+					).
 					Return(nil).
 					Times(1)
 			},
@@ -47,21 +85,44 @@ func Test_roleManager_RespondToRoleRequest(t *testing.T) {
 			interactionID:    "interaction-id",
 			interactionToken: "interaction-token",
 			targetUserID:     "target-user-id",
-			wantErr:          false,
+			wantSuccess:      "role request response sent",
+			wantErrMsg:       "",
+			wantErrIs:        nil,
 		},
 		{
-			name: "failed to respond to role request",
+			name: "context cancelled before interaction",
+			setup: func() {
+			},
+			ctx: func() context.Context {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel() // Cancel the context immediately
+				return ctx
+			}(),
+			interactionID:    "interaction-id",
+			interactionToken: "interaction-token",
+			targetUserID:     "target-user-id",
+			wantSuccess:      "",
+			wantErrMsg:       context.Canceled.Error(),
+			wantErrIs:        context.Canceled,
+		},
+		{
+			name: "failed to respond to role request (API error)",
 			setup: func() {
 				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					Return(errors.New("respond to role request error")).
+					InteractionRespond(
+						gomock.Eq(&discordgo.Interaction{ID: "interaction-id", Token: "interaction-token"}),
+						gomock.Any(),
+					).
+					Return(errors.New("discord API error")).
 					Times(1)
 			},
 			ctx:              context.Background(),
 			interactionID:    "interaction-id",
 			interactionToken: "interaction-token",
 			targetUserID:     "target-user-id",
-			wantErr:          true,
+			wantSuccess:      "",
+			wantErrMsg:       "failed to respond to role request: discord API error",
+			wantErrIs:        nil,
 		},
 	}
 
@@ -71,18 +132,37 @@ func Test_roleManager_RespondToRoleRequest(t *testing.T) {
 				tt.setup()
 			}
 
-			rm := &roleManager{
-				session:          mockSession,
-				publisher:        mockPublisher,
-				logger:           mockLogger,
-				helper:           mockHelper,
-				config:           mockConfig,
-				interactionStore: mockInteractionStore,
+			// Call the function under test. The wrapper just passes through fn(ctx).
+			result, err := rm.RespondToRoleRequest(tt.ctx, tt.interactionID, tt.interactionToken, tt.targetUserID)
+			if err != nil {
+				t.Fatalf("RespondToRoleRequest() second return value error was non-nil: %v; expected nil with pass-through wrapper", err)
 			}
 
-			err := rm.RespondToRoleRequest(tt.ctx, tt.interactionID, tt.interactionToken, tt.targetUserID)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("roleManager.RespondToRoleRequest() error = %v, wantErr %v", err, tt.wantErr)
+			// 2. Check the RoleOperationResult fields (Success and Error)
+			if result.Success != tt.wantSuccess {
+				t.Errorf("RoleOperationResult.Success mismatch: got %q, want %q", result.Success, tt.wantSuccess)
+			}
+
+			// 3. Check the RoleOperationResult.Error field
+			if tt.wantErrMsg != "" {
+				// Expecting an error within the result
+				if result.Error == nil {
+					t.Errorf("RoleOperationResult.Error is nil, expected error containing %q", tt.wantErrMsg)
+				} else {
+					// Check if the error message contains the expected substring
+					if !strings.Contains(result.Error.Error(), tt.wantErrMsg) {
+						t.Errorf("RoleOperationResult.Error message mismatch: got %q, want substring %q", result.Error.Error(), tt.wantErrMsg)
+					}
+					// Optionally, check for a specific error type if tt.wantErrIs is set
+					if tt.wantErrIs != nil && !errors.Is(result.Error, tt.wantErrIs) {
+						t.Errorf("RoleOperationResult.Error type mismatch: got %T, want type %T", result.Error, tt.wantErrIs)
+					}
+				}
+			} else {
+				// Expecting no error within the result
+				if result.Error != nil {
+					t.Errorf("RoleOperationResult.Error is not nil, expected nil. Got: %v", result.Error)
+				}
 			}
 		})
 	}
@@ -94,46 +174,105 @@ func Test_roleManager_RespondToRoleButtonPress(t *testing.T) {
 
 	mockSession := discordmocks.NewMockSession(ctrl)
 	mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
-	mockLogger := observability.NewNoOpLogger()
+	logger := loggerfrolfbot.NoOpLogger
+	mockConfig := &config.Config{
+		Discord: config.DiscordConfig{
+			RoleMappings: map[string]string{
+				"Admin":  "role-id-admin",
+				"Member": "role-id-member",
+			},
+		},
+	}
+	mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+	mockHelper := util_mocks.NewMockHelpers(ctrl)
+	tracerProvider := noop.NewTracerProvider()
+	tracer := tracerProvider.Tracer("test")
+	metrics := &discordmetrics.NoOpMetrics{}
+
+	rm := &roleManager{
+		session:          mockSession,
+		publisher:        mockPublisher,
+		logger:           logger,
+		helper:           mockHelper,
+		config:           mockConfig,
+		interactionStore: mockInteractionStore,
+		tracer:           tracer,
+		metrics:          metrics,
+		operationWrapper: testOperationWrapper,
+	}
 
 	tests := []struct {
 		name             string
 		setup            func()
+		ctx              context.Context
 		interactionID    string
 		interactionToken string
-		requesterID      string
+		requesterID      sharedtypes.DiscordID
 		selectedRole     string
-		targetUserID     string
-		wantErr          bool
+		targetUserID     sharedtypes.DiscordID
+		wantSuccess      string
+		wantErrMsg       string
+		wantErrIs        error
 	}{
 		{
-			name: "successful button press response",
+			name: "successful button press acknowledgement",
 			setup: func() {
 				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
+					InteractionRespond(
+						gomock.Any(),
+						gomock.Any(),
+					).
 					Return(nil).
 					Times(1)
 			},
+			ctx:              context.Background(),
 			interactionID:    "interaction-id",
 			interactionToken: "interaction-token",
 			requesterID:      "requester-id",
 			selectedRole:     "Admin",
 			targetUserID:     "target-user-id",
-			wantErr:          false,
+			wantSuccess:      "button press acknowledged",
+			wantErrMsg:       "",
+			wantErrIs:        nil,
 		},
 		{
-			name: "failed to acknowledge button press",
+			name: "failed to acknowledge button press (API error)",
 			setup: func() {
 				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).Return(errors.New("acknowledge error")).
+					InteractionRespond(
+						gomock.Any(),
+						gomock.Any(),
+					).
+					Return(errors.New("discord API error")).
 					Times(1)
 			},
+			ctx:              context.Background(),
 			interactionID:    "interaction-id",
 			interactionToken: "interaction-token",
 			requesterID:      "requester-id",
-			selectedRole:     "User ",
+			selectedRole:     "Member",
 			targetUserID:     "target-user-id",
-			wantErr:          true,
+			wantSuccess:      "",
+			wantErrMsg:       "failed to acknowledge role button press: discord API error",
+			wantErrIs:        nil,
+		},
+		{
+			name: "context cancelled before operation",
+			setup: func() {
+			},
+			ctx: func() context.Context {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel() // Cancel the context immediately
+				return ctx
+			}(),
+			interactionID:    "interaction-id",
+			interactionToken: "interaction-token",
+			requesterID:      "requester-id",
+			selectedRole:     "Admin",
+			targetUserID:     "target-user-id",
+			wantSuccess:      "",                       // No success message on context cancellation
+			wantErrMsg:       context.Canceled.Error(), // Expected error message from context
+			wantErrIs:        context.Canceled,         // Expected context.Canceled error type
 		},
 	}
 
@@ -143,15 +282,34 @@ func Test_roleManager_RespondToRoleButtonPress(t *testing.T) {
 				tt.setup()
 			}
 
-			rm := &roleManager{
-				session:   mockSession,
-				publisher: mockPublisher,
-				logger:    mockLogger,
+			result, err := rm.RespondToRoleButtonPress(tt.ctx, tt.interactionID, tt.interactionToken, tt.requesterID, tt.selectedRole, tt.targetUserID)
+			if err != nil {
+				t.Fatalf("RespondToRoleButtonPress() second return value error was non-nil: %v; expected nil with pass-through wrapper", err)
 			}
 
-			err := rm.RespondToRoleButtonPress(context.Background(), tt.interactionID, tt.interactionToken, tt.requesterID, tt.selectedRole, tt.targetUserID)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("roleManager.RespondToRoleButtonPress() error = %v, wantErr %v", err, tt.wantErr)
+			// Check the RoleOperationResult.Success field
+			if result.Success != tt.wantSuccess {
+				t.Errorf("RoleOperationResult.Success mismatch: got %q, want %q", result.Success, tt.wantSuccess)
+			}
+
+			// Check the RoleOperationResult.Error field
+			if tt.wantErrMsg != "" {
+				if result.Error == nil {
+					t.Errorf("RoleOperationResult.Error is nil, expected error containing %q", tt.wantErrMsg)
+				} else {
+					// Check if the error message contains the expected substring
+					if !strings.Contains(result.Error.Error(), tt.wantErrMsg) {
+						t.Errorf("RoleOperationResult.Error message mismatch: got %q, want substring %q", result.Error.Error(), tt.wantErrMsg)
+					}
+					// Optionally, check for a specific error type if tt.wantErrIs is set
+					if tt.wantErrIs != nil && !errors.Is(result.Error, tt.wantErrIs) {
+						t.Errorf("RoleOperationResult.Error type mismatch: got %T, want type %T", result.Error, tt.wantErrIs)
+					}
+				}
+			} else {
+				if result.Error != nil {
+					t.Errorf("RoleOperationResult.Error is not nil, expected nil. Got: %v", result.Error)
+				}
 			}
 		})
 	}
@@ -163,10 +321,20 @@ func Test_roleManager_HandleRoleRequestCommand(t *testing.T) {
 
 	mockSession := discordmocks.NewMockSession(ctrl)
 	mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
-	mockLogger := observability.NewNoOpLogger()
-	mockConfig := &config.Config{}
+	logger := loggerfrolfbot.NoOpLogger
+	tracerProvider := noop.NewTracerProvider()
+	tracer := tracerProvider.Tracer("test")
+	mockConfig := &config.Config{
+		Discord: config.DiscordConfig{
+			RoleMappings: map[string]string{
+				"Admin": "123456789",
+				"User":  "987654321",
+			},
+		},
+	}
 	mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
 	mockHelper := util_mocks.NewMockHelpers(ctrl)
+	metrics := &discordmetrics.NoOpMetrics{}
 
 	tests := []struct {
 		name    string
@@ -247,10 +415,15 @@ func Test_roleManager_HandleRoleRequestCommand(t *testing.T) {
 			rm := &roleManager{
 				session:          mockSession,
 				publisher:        mockPublisher,
-				logger:           mockLogger,
+				logger:           logger,
 				helper:           mockHelper,
 				config:           mockConfig,
 				interactionStore: mockInteractionStore,
+				tracer:           tracer,
+				metrics:          metrics,
+				operationWrapper: func(ctx context.Context, operationName string, operation func(ctx context.Context) (RoleOperationResult, error)) (RoleOperationResult, error) {
+					return operation(ctx)
+				},
 			}
 
 			rm.HandleRoleRequestCommand(tt.ctx, tt.i)
@@ -264,17 +437,28 @@ func Test_roleManager_HandleRoleButtonPress(t *testing.T) {
 
 	mockSession := discordmocks.NewMockSession(ctrl)
 	mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
-	mockLogger := observability.NewNoOpLogger()
-	mockConfig := &config.Config{}
+	logger := loggerfrolfbot.NoOpLogger
+	mockConfig := &config.Config{
+		Discord: config.DiscordConfig{
+			RoleMappings: map[string]string{
+				"Admin": "123456789",
+				"User":  "987654321",
+			},
+		},
+	}
 	mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
 	mockHelper := util_mocks.NewMockHelpers(ctrl)
+	metrics := &discordmetrics.NoOpMetrics{}
+	tracerProvider := noop.NewTracerProvider()
+	tracer := tracerProvider.Tracer("test")
 
 	tests := []struct {
-		name    string
-		setup   func()
-		ctx     context.Context
-		i       *discordgo.InteractionCreate
-		wantErr bool
+		name      string
+		setup     func()
+		ctx       context.Context
+		i         *discordgo.InteractionCreate
+		wantErr   bool
+		tagNumber sharedtypes.TagNumber
 	}{
 		{
 			name:    "nil interaction",
@@ -293,31 +477,55 @@ func Test_roleManager_HandleRoleButtonPress(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:  "unexpected interaction data type",
-			setup: func() {},
-			ctx:   context.Background(),
+			name: "unexpected interaction data type",
+			setup: func() {
+				// Add expectation for InteractionRespond that may be called
+				mockSession.EXPECT().
+					InteractionRespond(gomock.Any(), gomock.Any()).
+					Return(nil).
+					AnyTimes()
+
+				// Add expectation for InteractionResponseEdit with the correct number of arguments (3)
+				mockSession.EXPECT().
+					InteractionResponseEdit(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&discordgo.Message{}, nil).
+					AnyTimes()
+			},
+			ctx: context.Background(),
 			i: &discordgo.InteractionCreate{
 				Interaction: &discordgo.Interaction{
-					ID:   "interaction-id",
-					User: &discordgo.User{ID: "user-id"},
-					Data: &discordgo.ApplicationCommandInteractionData{}, // Wrong type
+					ID:    "interaction-id",
+					User:  &discordgo.User{ID: "user-id"},
+					Token: "interaction-token",
+					Data:  &discordgo.ApplicationCommandInteractionData{},
 				},
 			},
 			wantErr: false,
 		},
 		{
-			name:  "no mentions in message",
-			setup: func() {},
-			ctx:   context.Background(),
+			name: "no mentions in message",
+			setup: func() {
+				// Add expectations for Discord API calls
+				mockSession.EXPECT().
+					InteractionRespond(gomock.Any(), gomock.Any()).
+					Return(nil).
+					AnyTimes()
+				mockSession.EXPECT().
+					InteractionResponseEdit(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&discordgo.Message{}, nil).
+					AnyTimes()
+			},
+			ctx: context.Background(),
 			i: &discordgo.InteractionCreate{
 				Interaction: &discordgo.Interaction{
-					ID:   "interaction-id",
-					User: &discordgo.User{ID: "user-id"},
+					ID:    "interaction-id",
+					User:  &discordgo.User{ID: "user-id"},
+					Token: "interaction-token",
 					Data: &discordgo.MessageComponentInteractionData{
 						CustomID: "role_button_admin",
 					},
 					Message: &discordgo.Message{
-						Mentions: []*discordgo.User{}, // No mentions
+						Mentions: []*discordgo.User{},
 					},
 				},
 			},
@@ -326,51 +534,24 @@ func Test_roleManager_HandleRoleButtonPress(t *testing.T) {
 		{
 			name: "valid role button press",
 			setup: func() {
+				mockSession.EXPECT().
+					InteractionRespond(gomock.Any(), gomock.Any()).
+					Return(nil).
+					AnyTimes()
+
+				mockSession.EXPECT().
+					InteractionResponseEdit(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&discordgo.Message{}, nil).
+					AnyTimes()
+
 				// mockPublisher.EXPECT().
 				// 	Publish(gomock.Any(), gomock.Any()).
 				// 	Return(nil).
 				// 	Times(1) // Ensure the event is published exactly once
 
-				// mockInteractionStore.EXPECT().
-				// 	Set(gomock.Any(), gomock.Any(), gomock.Any()).
-				// 	Times(1) // Ensure the interaction is stored
-			},
-			ctx: context.Background(),
-			i: &discordgo.InteractionCreate{
-				Interaction: &discordgo.Interaction{
-					ID:      "interaction-id",
-					User:    &discordgo.User{ID: "user-id"},
-					Token:   "interaction-token",
-					GuildID: "guild-id",
-					Data: &discordgo.MessageComponentInteractionData{
-						CustomID: "role_button_admin",
-					},
-					Message: &discordgo.Message{
-						Mentions: []*discordgo.User{
-							{ID: "mentioned-user-id"},
-						},
-					},
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "valid role button press",
-			setup: func() {
-				// mockPublisher.EXPECT().
-				// 	Publish(gomock.Any(), gomock.Any()).
-				// 	Do(func(event string, msg *message.Message) {
-				// 		fmt.Println("Publish() called with event:", event)
-				// 	}).
-				// 	Return(nil).
-				// 	Times(1)
-
-				// mockInteractionStore.EXPECT().
-				// 	Set(gomock.Any(), gomock.Any(), gomock.Any()).
-				// 	Do(func(key string, val interface{}, ttl time.Duration) {
-				// 		fmt.Println("Set() called with key:", key)
-				// 	}).
-				// 	Times(1)
+				mockInteractionStore.EXPECT().
+					Set(gomock.Any(), gomock.Any(), gomock.Any()).
+					Times(1) // Ensure the interaction is stored
 			},
 			ctx: context.Background(),
 			i: &discordgo.InteractionCreate{
@@ -394,9 +575,31 @@ func Test_roleManager_HandleRoleButtonPress(t *testing.T) {
 		{
 			name: "error in storing interaction reference in cache",
 			setup: func() {
-				mockInteractionStore.EXPECT().Set(gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New("error storing interaction reference"))
-				// Do not expect Publish to be called
-				mockPublisher.EXPECT().Publish(gomock.Any(), gomock.Any()).Times(0)
+				mockSession.EXPECT().
+					InteractionRespond(gomock.Any(), gomock.Any()).
+					Return(nil).
+					AnyTimes()
+
+				mockSession.EXPECT().
+					InteractionResponseEdit(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&discordgo.Message{}, nil).
+					AnyTimes()
+
+				// Create a message with initialized metadata
+				msg := message.NewMessage(watermill.NewUUID(), nil)
+
+				// Add expectation for CreateNewMessage
+				mockHelper.EXPECT().
+					CreateNewMessage(gomock.Any(), gomock.Any()).
+					Return(msg, nil).
+					AnyTimes()
+
+				mockInteractionStore.EXPECT().
+					Set(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(errors.New("error storing interaction reference")).
+					AnyTimes()
+
+				mockPublisher.EXPECT().Publish(gomock.Any(), gomock.Any()).Times(1)
 			},
 			ctx: context.Background(),
 			i: &discordgo.InteractionCreate{
@@ -423,6 +626,25 @@ func Test_roleManager_HandleRoleButtonPress(t *testing.T) {
 		{
 			name: "error in publishing event to JetStream",
 			setup: func() {
+				mockSession.EXPECT().
+					InteractionRespond(gomock.Any(), gomock.Any()).
+					Return(nil).
+					AnyTimes()
+
+				mockSession.EXPECT().
+					InteractionResponseEdit(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&discordgo.Message{}, nil).
+					AnyTimes()
+
+				mockInteractionStore.EXPECT().
+					Set(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil).
+					AnyTimes()
+
+				mockPublisher.EXPECT().
+					Publish(gomock.Any(), gomock.Any()).
+					Return(errors.New("failed to publish event")).
+					AnyTimes()
 			},
 			ctx: context.Background(),
 			i: &discordgo.InteractionCreate{
@@ -446,6 +668,20 @@ func Test_roleManager_HandleRoleButtonPress(t *testing.T) {
 		{
 			name: "error in sending error response to user",
 			setup: func() {
+				mockSession.EXPECT().
+					InteractionRespond(gomock.Any(), gomock.Any()).
+					Return(errors.New("failed to respond to interaction")).
+					AnyTimes()
+
+				mockSession.EXPECT().
+					InteractionResponseEdit(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&discordgo.Message{}, errors.New("failed to edit response")).
+					AnyTimes()
+
+				mockInteractionStore.EXPECT().
+					Set(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil).
+					AnyTimes()
 			},
 			ctx: context.Background(),
 			i: &discordgo.InteractionCreate{
@@ -477,10 +713,15 @@ func Test_roleManager_HandleRoleButtonPress(t *testing.T) {
 			rm := &roleManager{
 				session:          mockSession,
 				publisher:        mockPublisher,
-				logger:           mockLogger,
+				logger:           logger,
 				helper:           mockHelper,
 				config:           mockConfig,
 				interactionStore: mockInteractionStore,
+				metrics:          metrics,
+				tracer:           tracer,
+				operationWrapper: func(ctx context.Context, operationName string, operation func(ctx context.Context) (RoleOperationResult, error)) (RoleOperationResult, error) {
+					return operation(ctx)
+				},
 			}
 
 			rm.HandleRoleButtonPress(tt.ctx, tt.i)
@@ -494,10 +735,13 @@ func Test_roleManager_HandleRoleCancelButton(t *testing.T) {
 
 	mockSession := discordmocks.NewMockSession(ctrl)
 	mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
-	mockLogger := observability.NewNoOpLogger()
+	logger := loggerfrolfbot.NoOpLogger
 	mockConfig := &config.Config{}
 	mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
 	mockHelper := util_mocks.NewMockHelpers(ctrl)
+	tracerProvider := noop.NewTracerProvider()
+	tracer := tracerProvider.Tracer("test")
+	metrics := &discordmetrics.NoOpMetrics{}
 
 	tests := []struct {
 		name             string
@@ -612,10 +856,15 @@ func Test_roleManager_HandleRoleCancelButton(t *testing.T) {
 			rm := &roleManager{
 				session:          mockSession,
 				publisher:        mockPublisher,
-				logger:           mockLogger,
+				logger:           logger,
 				helper:           mockHelper,
 				config:           mockConfig,
 				interactionStore: mockInteractionStore,
+				tracer:           tracer,
+				metrics:          metrics,
+				operationWrapper: func(ctx context.Context, operationName string, operation func(ctx context.Context) (RoleOperationResult, error)) (RoleOperationResult, error) {
+					return operation(ctx)
+				},
 			}
 
 			var interaction *discordgo.InteractionCreate

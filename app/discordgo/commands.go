@@ -2,14 +2,14 @@ package discord
 
 import (
 	"fmt"
+	"log/slog"
 
-	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	"github.com/bwmarrin/discordgo"
 )
 
 // RegisterCommands registers the bot's slash commands with Discord.
-func RegisterCommands(s Session, logger observability.Logger, guildID string) error {
+func RegisterCommands(s Session, logger *slog.Logger, guildID string) error {
 	// --- /updaterole Command ---
 	appID, err := s.GetBotUser()
 	if err != nil {

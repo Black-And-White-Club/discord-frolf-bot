@@ -2,6 +2,7 @@ package roundhandlers
 
 import (
 	"errors"
+	"log/slog"
 	"testing"
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/round/mocks"
@@ -31,7 +32,7 @@ func TestRoundHandlers_HandleRoundDeleted(t *testing.T) {
 	}
 
 	type fields struct {
-		Logger       observability.Logger
+		Logger       *slog.Logger
 		Config       *config.Config
 		Helpers      *utils.MockHelpers
 		RoundDiscord *mocks.MockRoundDiscordInterface

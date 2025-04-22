@@ -2,6 +2,7 @@ package discordhandlers
 
 import (
 	"errors"
+	"log/slog"
 	"testing"
 
 	discordevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/discord"
@@ -25,7 +26,7 @@ func TestDiscordHandlers_HandleSendDM(t *testing.T) {
 		Config  *config.Config
 		Helper  *util_mocks.MockHelpers
 		Discord *mocks.MockOperations
-		Logger  observability.Logger
+		Logger  *slog.Logger
 	}
 	type args struct {
 		msg *message.Message

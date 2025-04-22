@@ -1,6 +1,7 @@
 package finalizeround
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"testing"
@@ -9,20 +10,23 @@ import (
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
-	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
+	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
+	"github.com/google/uuid"
 	"go.uber.org/mock/gomock"
 )
 
 func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) {
+	testRoundID := sharedtypes.RoundID(uuid.New())
 	// Helper function to create a pointer to a string
 	strPtr := func(s string) *string {
 		return &s
 	}
 
 	// Helper function to create a pointer to an int
-	intPtr := func(i int) *int {
+	intPtr := func(i sharedtypes.Score) *sharedtypes.Score {
 		return &i
 	}
 
@@ -49,10 +53,10 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 				// No setup needed for this case
 			},
 			payload: &roundevents.RoundFinalizedEmbedUpdatePayload{
-				RoundID:      roundtypes.ID(123),
+				RoundID:      sharedtypes.RoundID(testRoundID),
 				Title:        "Test Round",
 				Location:     (*roundtypes.Location)(strPtr("Test Course")),
-				StartTime:    (*roundtypes.StartTime)(timePtr(fixedTime)),
+				StartTime:    (*sharedtypes.StartTime)(timePtr(fixedTime)),
 				Participants: []roundtypes.Participant{}, // Use correct type
 			},
 			expectedEmbed: &discordgo.MessageEmbed{
@@ -80,7 +84,7 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 						discordgo.Button{
 							Label:    "Admin/Editor Score Update",
 							Style:    discordgo.DangerButton,
-							CustomID: "round_enter_score_finalized|round-123",
+							CustomID: fmt.Sprintf("round_enter_score_finalized|round-%d", testRoundID), // Use testRoundID
 							Emoji:    &discordgo.ComponentEmoji{Name: "🔒"},
 						},
 					},
@@ -114,18 +118,18 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 					Times(1)
 			},
 			payload: &roundevents.RoundFinalizedEmbedUpdatePayload{
-				RoundID:   roundtypes.ID(123),
+				RoundID:   sharedtypes.RoundID(testRoundID),
 				Title:     "Test Round",
 				Location:  (*roundtypes.Location)(strPtr("Test Course")),
-				StartTime: (*roundtypes.StartTime)(timePtr(fixedTime)),
+				StartTime: (*sharedtypes.StartTime)(timePtr(fixedTime)),
 				Participants: []roundtypes.Participant{
 					{
-						UserID:    string("user-123"),
+						UserID:    sharedtypes.DiscordID("user-123"),
 						TagNumber: nil,
 						Score:     intPtr(2),
 					},
 					{
-						UserID:    string("user-456"),
+						UserID:    sharedtypes.DiscordID("user-456"),
 						TagNumber: nil,
 						Score:     intPtr(-1),
 					},
@@ -166,7 +170,7 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 						discordgo.Button{
 							Label:    "Admin/Editor Score Update",
 							Style:    discordgo.DangerButton,
-							CustomID: "round_enter_score_finalized|round-123",
+							CustomID: fmt.Sprintf("round_enter_score_finalized|round-%d", testRoundID), // Use testRoundID
 							Emoji:    &discordgo.ComponentEmoji{Name: "🔒"},
 						},
 					},
@@ -200,18 +204,18 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 					Times(1)
 			},
 			payload: &roundevents.RoundFinalizedEmbedUpdatePayload{
-				RoundID:   roundtypes.ID(123),
+				RoundID:   sharedtypes.RoundID(testRoundID),
 				Title:     "Test Round",
 				Location:  (*roundtypes.Location)(strPtr("Test Course")),
-				StartTime: (*roundtypes.StartTime)(timePtr(fixedTime)),
+				StartTime: (*sharedtypes.StartTime)(timePtr(fixedTime)),
 				Participants: []roundtypes.Participant{
 					{
-						UserID:    string("user-123"),
+						UserID:    sharedtypes.DiscordID("user-123"),
 						TagNumber: nil,
 						Score:     intPtr(0),
 					},
 					{
-						UserID:    string("user-456"),
+						UserID:    sharedtypes.DiscordID("user-456"),
 						TagNumber: nil,
 						Score:     nil,
 					},
@@ -252,7 +256,7 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 						discordgo.Button{
 							Label:    "Admin/Editor Score Update",
 							Style:    discordgo.DangerButton,
-							CustomID: "round_enter_score_finalized|round-123",
+							CustomID: fmt.Sprintf("round_enter_score_finalized|round-%d", testRoundID), // Use testRoundID
 							Emoji:    &discordgo.ComponentEmoji{Name: "🔒"},
 						},
 					},
@@ -270,14 +274,13 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 					Times(1)
 			},
 			payload: &roundevents.RoundFinalizedEmbedUpdatePayload{
-				RoundID:   roundtypes.ID(123),
+				RoundID:   sharedtypes.RoundID(testRoundID),
 				Title:     "Test Round",
 				Location:  (*roundtypes.Location)(strPtr("Test Course")),
-				StartTime: (*roundtypes.StartTime)(timePtr(fixedTime)),
+				StartTime: (*sharedtypes.StartTime)(timePtr(fixedTime)),
 				Participants: []roundtypes.Participant{
-
 					{
-						UserID:    string("user-123"),
+						UserID:    sharedtypes.DiscordID("user-123"),
 						TagNumber: nil,
 						Score:     nil,
 					},
@@ -308,7 +311,7 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 						discordgo.Button{
 							Label:    "Admin/Editor Score Update",
 							Style:    discordgo.DangerButton,
-							CustomID: "round_enter_score_finalized|round-123",
+							CustomID: fmt.Sprintf("round_enter_score_finalized|round-%d", testRoundID), // Use testRoundID
 							Emoji:    &discordgo.ComponentEmoji{Name: "🔒"},
 						},
 					},
@@ -332,13 +335,13 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 					Times(1)
 			},
 			payload: &roundevents.RoundFinalizedEmbedUpdatePayload{
-				RoundID:   roundtypes.ID(123),
+				RoundID:   sharedtypes.RoundID(testRoundID),
 				Title:     "Test Round",
 				Location:  (*roundtypes.Location)(strPtr("Test Course")),
-				StartTime: (*roundtypes.StartTime)(timePtr(fixedTime)),
+				StartTime: (*sharedtypes.StartTime)(timePtr(fixedTime)),
 				Participants: []roundtypes.Participant{
 					{
-						UserID:    string("user-123"),
+						UserID:    sharedtypes.DiscordID("user-123"),
 						TagNumber: nil,
 						Score:     intPtr(-5),
 					},
@@ -374,7 +377,7 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 						discordgo.Button{
 							Label:    "Admin/Editor Score Update",
 							Style:    discordgo.DangerButton,
-							CustomID: "round_enter_score_finalized|round-123",
+							CustomID: fmt.Sprintf("round_enter_score_finalized|round-%d", testRoundID), // Use testRoundID
 							Emoji:    &discordgo.ComponentEmoji{Name: "🔒"},
 						},
 					},
@@ -388,10 +391,10 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 				// No setup needed for this case
 			},
 			payload: &roundevents.RoundFinalizedEmbedUpdatePayload{
-				RoundID:      roundtypes.ID(123),
+				RoundID:      sharedtypes.RoundID(testRoundID),
 				Title:        "Test Round",
 				Location:     nil,
-				StartTime:    (*roundtypes.StartTime)(timePtr(fixedTime)),
+				StartTime:    (*sharedtypes.StartTime)(timePtr(fixedTime)),
 				Participants: []roundtypes.Participant{},
 			},
 			expectedEmbed: &discordgo.MessageEmbed{
@@ -419,7 +422,7 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 						discordgo.Button{
 							Label:    "Admin/Editor Score Update",
 							Style:    discordgo.DangerButton,
-							CustomID: "round_enter_score_finalized|round-123",
+							CustomID: fmt.Sprintf("round_enter_score_finalized|round-%d", testRoundID), // Use testRoundID
 							Emoji:    &discordgo.ComponentEmoji{Name: "🔒"},
 						},
 					},
@@ -436,7 +439,7 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 			defer ctrl.Finish()
 
 			mockSession := discordmocks.NewMockSession(ctrl)
-			mockLogger := observability.NewNoOpLogger()
+			mockLogger := loggerfrolfbot.NoOpLogger
 			mockConfig := &config.Config{
 				Discord: config.DiscordConfig{
 					GuildID: "guild-id",
@@ -448,11 +451,14 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 				tt.setup(mockSession)
 			}
 
-			// Create manager with mocks
+			// Create manager with mocks and bypass the operationWrapper
 			frm := &finalizeRoundManager{
 				session: mockSession,
 				logger:  mockLogger,
 				config:  mockConfig,
+				operationWrapper: func(ctx context.Context, name string, fn func(ctx context.Context) (FinalizeRoundOperationResult, error)) (FinalizeRoundOperationResult, error) {
+					return fn(ctx)
+				},
 			}
 
 			// Call the function

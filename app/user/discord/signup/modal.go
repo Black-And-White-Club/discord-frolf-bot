@@ -2,148 +2,168 @@ package signup
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"log/slog"
 	"strconv"
 	"time"
 
 	userevents "github.com/Black-And-White-Club/frolf-bot-shared/events/user"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
-	usertypes "github.com/Black-And-White-Club/frolf-bot-shared/types/user"
+	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
 	"github.com/google/uuid"
 )
 
-func (sm *signupManager) SendSignupModal(ctx context.Context, i *discordgo.InteractionCreate) error {
-	if i == nil || i.Interaction == nil || i.User == nil {
-		return fmt.Errorf("interaction or user is nil")
+func (sm *signupManager) SendSignupModal(ctx context.Context, i *discordgo.InteractionCreate) (SignupOperationResult, error) {
+	if ctx.Err() != nil {
+		return SignupOperationResult{Error: ctx.Err()}, ctx.Err()
 	}
+	return sm.operationWrapper(ctx, "send_signup_modal", func(ctx context.Context) (SignupOperationResult, error) {
+		// Early validation - test expects these to return SignupOperationResult{Error: err}, err
+		if i == nil || i.Interaction == nil {
+			return SignupOperationResult{Error: errors.New("interaction is nil or incomplete")}, errors.New("interaction is nil or incomplete")
+		}
 
-	slog.Info("Preparing to send signup modal", attr.UserID(i.User.ID))
+		// Check for user in either Member or direct User field
+		userID := ""
+		if i.Interaction.Member != nil && i.Interaction.Member.User != nil {
+			userID = i.Interaction.Member.User.ID
+		} else if i.Interaction.User != nil {
+			userID = i.Interaction.User.ID
+		} else {
+			return SignupOperationResult{Error: errors.New("user is nil in interaction")}, errors.New("user is nil in interaction")
+		}
 
-	err := sm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseModal,
-		Data: &discordgo.InteractionResponseData{
-			CustomID: "signup_modal",
-			Title:    "Frolf Club Signup",
-			Components: []discordgo.MessageComponent{
-				discordgo.ActionsRow{
-					Components: []discordgo.MessageComponent{
-						discordgo.TextInput{
-							CustomID:    "tag_number",
-							Label:       "Tag Number (Optional)",
-							Style:       discordgo.TextInputShort,
-							Placeholder: "Enter your desired tag number (e.g., 13)",
-							Required:    false,
-							MaxLength:   3,
-							MinLength:   0,
-							Value:       "",
+		// Store the interaction AFTER validation checks
+		err := sm.interactionStore.Set(i.Interaction.ID, i.Interaction, 10*time.Minute)
+		if err != nil {
+			return SignupOperationResult{}, fmt.Errorf("failed to store interaction: %w", err)
+		}
+
+		sm.logger.InfoContext(ctx, "Preparing to send signup modal",
+			attr.String("user_id", userID))
+
+		// Send the modal with your existing components
+		err = sm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseModal,
+			Data: &discordgo.InteractionResponseData{
+				CustomID: "signup_modal",
+				Title:    "Frolf Club Signup",
+				Components: []discordgo.MessageComponent{
+					discordgo.ActionsRow{
+						Components: []discordgo.MessageComponent{
+							discordgo.TextInput{
+								CustomID:    "tag_number",
+								Label:       "Tag Number (Optional)",
+								Style:       discordgo.TextInputShort,
+								Placeholder: "Enter your desired tag number (e.g., 13)",
+								Required:    false,
+								MaxLength:   3,
+								MinLength:   0,
+								Value:       "",
+							},
 						},
 					},
 				},
 			},
-		},
-	})
-	if err != nil {
-		slog.Error("❌ Failed to send signup modal", attr.UserID(i.User.ID), attr.Error(err))
-		return fmt.Errorf("failed to send signup modal: %w", err)
-	}
+		})
+		if err != nil {
+			sm.logger.ErrorContext(ctx, "Failed to send signup modal",
+				attr.String("user_id", userID),
+				attr.Error(err))
+			// Tests expect nil in result.Error for operation errors
+			return SignupOperationResult{}, err
+		}
 
-	slog.Info("✅ Signup modal successfully sent!", attr.UserID(i.User.ID))
-	return nil
+		sm.logger.InfoContext(ctx, "Signup modal successfully sent!",
+			attr.String("user_id", userID))
+		return SignupOperationResult{Success: "modal sent"}, nil
+	})
 }
 
 // HandleSignupModalSubmit handles the submission of the signup modal.
-func (sm *signupManager) HandleSignupModalSubmit(ctx context.Context, i *discordgo.InteractionCreate) {
-	if i == nil || i.Interaction == nil {
-		slog.Error("❌ Interaction is nil")
-		return
+func (sm *signupManager) HandleSignupModalSubmit(ctx context.Context, i *discordgo.InteractionCreate) (SignupOperationResult, error) {
+	if err := ctx.Err(); err != nil {
+		sm.logger.ErrorContext(ctx, "Context cancelled before handling signup modal submit", attr.Error(err))
+		return SignupOperationResult{Error: err}, err
 	}
-	if i.Interaction.ID == "" {
-		slog.Error("❌ Interaction ID is missing")
-		return
+	if i == nil {
+		sm.logger.ErrorContext(context.Background(), "InteractionCreate is nil in HandleSignupModalSubmit")
+		return SignupOperationResult{Error: fmt.Errorf("interaction is nil or incomplete")}, fmt.Errorf("interaction is nil or incomplete")
 	}
-	if i.Interaction.Token == "" {
-		slog.Error("❌ Interaction Token is missing")
-		return
-	}
-	if i.Interaction.Data == nil {
-		slog.Error("❌ Interaction Data is missing")
-		return
+	if i.Interaction == nil {
+		sm.logger.ErrorContext(ctx, "Interaction is nil in HandleSignupModalSubmit")
+		return SignupOperationResult{Error: fmt.Errorf("interaction is nil or incomplete")}, fmt.Errorf("interaction is nil or incomplete")
 	}
 
-	// Check if the interaction is a modal submission
-	if i.Interaction.Type != discordgo.InteractionModalSubmit {
-		slog.Error("❌ Interaction is not a modal submission")
-		return
-	}
-
-	// Extract the user ID based on whether the interaction is in a guild or DM
-	var userID string
-	if i.Member != nil {
-		// Interaction is in a guild
+	userID := ""
+	if i.Member != nil && i.Member.User != nil {
 		userID = i.Member.User.ID
 	} else if i.User != nil {
-		// Interaction is in a DM
 		userID = i.User.ID
-	} else {
-		slog.Error("❌ Unable to determine user ID: both Member and User are nil")
-		return
 	}
 
-	slog.Info("HandlingModalSubmit", attr.String("custom_id", i.ModalSubmitData().CustomID))
+	if userID == "" {
+		return SignupOperationResult{Error: fmt.Errorf("user ID is missing")}, fmt.Errorf("user ID is missing")
+	}
 
-	// Acknowledge the modal submission
-	err := sm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{
-			Content: "✅ Signup request submitted successfully! Processing...",
-			Flags:   discordgo.MessageFlagsEphemeral,
-		},
+	ctx = discordmetrics.WithValue(ctx, discordmetrics.UserIDKey, userID)
+	ctx = discordmetrics.WithValue(ctx, discordmetrics.CommandNameKey, "handle_signup_modal_submit")
+	ctx = discordmetrics.WithValue(ctx, discordmetrics.InteractionType, "modal_submit")
+	ctx = discordmetrics.WithValue(ctx, discordmetrics.GuildIDKey, i.GuildID)
+
+	result, err := sm.operationWrapper(ctx, "handle_signup_modal_submit", func(ctx context.Context) (SignupOperationResult, error) {
+		sm.logger.InfoContext(ctx, "HandlingModalSubmit", attr.String("custom_id", i.ModalSubmitData().CustomID))
+
+		err := sm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "Signup request submitted successfully! Processing...",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		if err != nil {
+			return SignupOperationResult{Error: fmt.Errorf("failed to acknowledge modal submission: %w", err)}, err
+		}
+
+		data := i.ModalSubmitData()
+		tagNumberPtr, err := sm.extractTagNumber(data)
+		if err != nil {
+			_ = sm.sendFollowupMessage(i.Interaction, fmt.Sprintf("Invalid tag number: %v", err))
+			return SignupOperationResult{Error: fmt.Errorf("invalid tag number: %w", err)}, err
+		}
+
+		payload := userevents.UserSignupRequestPayload{
+			UserID:    sharedtypes.DiscordID(userID),
+			TagNumber: tagNumberPtr,
+		}
+		correlationID := uuid.New().String()
+		sm.interactionStore.Set(i.Interaction.Token, i.Interaction, 10*time.Minute)
+
+		msg, err := sm.createEvent(ctx, userevents.UserSignupRequest, payload, i)
+		if err != nil {
+			_ = sm.sendFollowupMessage(i.Interaction, "Error processing signup. Try again later.")
+			return SignupOperationResult{Error: fmt.Errorf("failed to create event: %w", err)}, err
+		}
+
+		msg.Metadata.Set("correlation_id", correlationID)
+		msg.Metadata.Set("user_id", userID)
+		msg.Metadata.Set("interaction_token", i.Interaction.Token)
+
+		if err := sm.publisher.Publish(userevents.UserSignupRequest, msg); err != nil {
+			_ = sm.sendFollowupMessage(i.Interaction, "Failed to publish signup event.")
+			return SignupOperationResult{Error: fmt.Errorf("failed to publish signup event: %w", err)}, err
+		}
+
+		return SignupOperationResult{Success: "signup event published"}, nil
 	})
-	if err != nil {
-		slog.Error("❌ Failed to acknowledge modal submission", attr.Error(err))
-		return
-	}
 
-	data := i.ModalSubmitData()
-	tagNumberPtr, err := sm.extractTagNumber(data)
-	if err != nil {
-		slog.Warn("⚠️ Invalid tag number", attr.Error(err))
-		return
-	}
-
-	payload := userevents.UserSignupRequestPayload{
-		DiscordID: usertypes.DiscordID(userID),
-		TagNumber: tagNumberPtr,
-	}
-
-	correlationID := uuid.New().String()
-	slog.Info("Storing interaction reference in cache", attr.String("correlation_id", correlationID))
-
-	sm.interactionStore.Set(correlationID, i.Interaction, 10*time.Minute)
-
-	slog.Info("Creating event message...")
-
-	msg, err := sm.createEvent(ctx, userevents.UserSignupRequest, payload, i)
-	if err != nil {
-		slog.Error("❌ Failed to create event", attr.Error(err))
-		return
-	}
-
-	msg.Metadata.Set("correlation_id", correlationID)
-	msg.Metadata.Set("user_id", userID)
-
-	slog.Info("Publishing signup form submitted event...")
-	if err := sm.publisher.Publish(userevents.UserSignupRequest, msg); err != nil {
-		slog.Error("❌ Failed to publish event", attr.Error(err))
-		return
-	}
-	slog.Info("Signup form event published successfully")
+	return result, err
 }
 
 // extractTagNumber extracts the tag number from the modal submission data.
-func (sm *signupManager) extractTagNumber(data discordgo.ModalSubmitInteractionData) (*int, error) {
+func (sm *signupManager) extractTagNumber(data discordgo.ModalSubmitInteractionData) (*sharedtypes.TagNumber, error) {
 	for _, comp := range data.Components {
 		row, ok := comp.(*discordgo.ActionsRow)
 		if !ok {
@@ -151,17 +171,34 @@ func (sm *signupManager) extractTagNumber(data discordgo.ModalSubmitInteractionD
 		}
 		for _, innerComp := range row.Components {
 			textInput, ok := innerComp.(*discordgo.TextInput)
-			if ok && textInput.CustomID == "tag_number" { // Check CustomID
+			if ok && textInput.CustomID == "tag_number" {
 				if textInput.Value == "" {
-					return nil, nil // No tag number provided, which is valid.
+					return nil, nil // Tag number is optional, return nil if empty
 				}
 				tagNumber, err := strconv.Atoi(textInput.Value)
 				if err != nil {
-					return nil, fmt.Errorf("invalid tag number format: %s", textInput.Value)
+					return nil, fmt.Errorf("tag number must be a valid number, received '%s'", textInput.Value)
 				}
-				return &tagNumber, nil
+				typed := sharedtypes.TagNumber(tagNumber)
+				return &typed, nil
 			}
 		}
 	}
-	return nil, nil // No tag number field found, which is valid
+	// If the tag_number component was not found, treat it as optional and return nil
+	return nil, nil
+}
+
+// sendFollowupMessage is a helper to send a followup message to an interaction.
+func (sm *signupManager) sendFollowupMessage(interaction *discordgo.Interaction, content string) error {
+	// Use FollowupMessageCreate to send a new message after the initial response
+	_, err := sm.session.FollowupMessageCreate(interaction, true, &discordgo.WebhookParams{
+		Content: content,
+		Flags:   discordgo.MessageFlagsEphemeral, // Make the followup message ephemeral (only visible to the user)
+	})
+	if err != nil {
+		sm.logger.Error("Failed to send ephemeral followup message", attr.Error(err))
+		return fmt.Errorf("failed to send ephemeral followup message: %w", err)
+	}
+	sm.logger.Info("Successfully sent ephemeral followup message")
+	return nil
 }

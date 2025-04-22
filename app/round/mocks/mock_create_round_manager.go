@@ -13,7 +13,9 @@ import (
 	context "context"
 	reflect "reflect"
 
+	createround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/create_round"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	discordgo "github.com/bwmarrin/discordgo"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -43,9 +45,12 @@ func (m *MockCreateRoundManager) EXPECT() *MockCreateRoundManagerMockRecorder {
 }
 
 // HandleCreateRoundCommand mocks base method.
-func (m *MockCreateRoundManager) HandleCreateRoundCommand(ctx context.Context, i *discordgo.InteractionCreate) {
+func (m *MockCreateRoundManager) HandleCreateRoundCommand(ctx context.Context, i *discordgo.InteractionCreate) (createround.CreateRoundOperationResult, error) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "HandleCreateRoundCommand", ctx, i)
+	ret := m.ctrl.Call(m, "HandleCreateRoundCommand", ctx, i)
+	ret0, _ := ret[0].(createround.CreateRoundOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // HandleCreateRoundCommand indicates an expected call of HandleCreateRoundCommand.
@@ -55,9 +60,12 @@ func (mr *MockCreateRoundManagerMockRecorder) HandleCreateRoundCommand(ctx, i an
 }
 
 // HandleCreateRoundModalCancel mocks base method.
-func (m *MockCreateRoundManager) HandleCreateRoundModalCancel(ctx context.Context, i *discordgo.InteractionCreate) {
+func (m *MockCreateRoundManager) HandleCreateRoundModalCancel(ctx context.Context, i *discordgo.InteractionCreate) (createround.CreateRoundOperationResult, error) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "HandleCreateRoundModalCancel", ctx, i)
+	ret := m.ctrl.Call(m, "HandleCreateRoundModalCancel", ctx, i)
+	ret0, _ := ret[0].(createround.CreateRoundOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // HandleCreateRoundModalCancel indicates an expected call of HandleCreateRoundModalCancel.
@@ -67,9 +75,12 @@ func (mr *MockCreateRoundManagerMockRecorder) HandleCreateRoundModalCancel(ctx, 
 }
 
 // HandleCreateRoundModalSubmit mocks base method.
-func (m *MockCreateRoundManager) HandleCreateRoundModalSubmit(ctx context.Context, i *discordgo.InteractionCreate) {
+func (m *MockCreateRoundManager) HandleCreateRoundModalSubmit(ctx context.Context, i *discordgo.InteractionCreate) (createround.CreateRoundOperationResult, error) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "HandleCreateRoundModalSubmit", ctx, i)
+	ret := m.ctrl.Call(m, "HandleCreateRoundModalSubmit", ctx, i)
+	ret0, _ := ret[0].(createround.CreateRoundOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // HandleCreateRoundModalSubmit indicates an expected call of HandleCreateRoundModalSubmit.
@@ -79,9 +90,12 @@ func (mr *MockCreateRoundManagerMockRecorder) HandleCreateRoundModalSubmit(ctx, 
 }
 
 // HandleRetryCreateRound mocks base method.
-func (m *MockCreateRoundManager) HandleRetryCreateRound(ctx context.Context, i *discordgo.InteractionCreate) {
+func (m *MockCreateRoundManager) HandleRetryCreateRound(ctx context.Context, i *discordgo.InteractionCreate) (createround.CreateRoundOperationResult, error) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "HandleRetryCreateRound", ctx, i)
+	ret := m.ctrl.Call(m, "HandleRetryCreateRound", ctx, i)
+	ret0, _ := ret[0].(createround.CreateRoundOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // HandleRetryCreateRound indicates an expected call of HandleRetryCreateRound.
@@ -91,11 +105,12 @@ func (mr *MockCreateRoundManagerMockRecorder) HandleRetryCreateRound(ctx, i any)
 }
 
 // SendCreateRoundModal mocks base method.
-func (m *MockCreateRoundManager) SendCreateRoundModal(ctx context.Context, i *discordgo.InteractionCreate) error {
+func (m *MockCreateRoundManager) SendCreateRoundModal(ctx context.Context, i *discordgo.InteractionCreate) (createround.CreateRoundOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SendCreateRoundModal", ctx, i)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(createround.CreateRoundOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // SendCreateRoundModal indicates an expected call of SendCreateRoundModal.
@@ -105,10 +120,10 @@ func (mr *MockCreateRoundManagerMockRecorder) SendCreateRoundModal(ctx, i any) *
 }
 
 // SendRoundEventEmbed mocks base method.
-func (m *MockCreateRoundManager) SendRoundEventEmbed(channelID string, title roundtypes.Title, description roundtypes.Description, startTime roundtypes.StartTime, location roundtypes.Location, creatorID roundtypes.UserID, roundID roundtypes.ID) (*discordgo.Message, error) {
+func (m *MockCreateRoundManager) SendRoundEventEmbed(channelID string, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, creatorID sharedtypes.DiscordID, roundID sharedtypes.RoundID) (createround.CreateRoundOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SendRoundEventEmbed", channelID, title, description, startTime, location, creatorID, roundID)
-	ret0, _ := ret[0].(*discordgo.Message)
+	ret0, _ := ret[0].(createround.CreateRoundOperationResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -120,15 +135,16 @@ func (mr *MockCreateRoundManagerMockRecorder) SendRoundEventEmbed(channelID, tit
 }
 
 // UpdateInteractionResponse mocks base method.
-func (m *MockCreateRoundManager) UpdateInteractionResponse(ctx context.Context, correlationID, message string, edit ...*discordgo.WebhookEdit) error {
+func (m *MockCreateRoundManager) UpdateInteractionResponse(ctx context.Context, correlationID, message string, edit ...*discordgo.WebhookEdit) (createround.CreateRoundOperationResult, error) {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, correlationID, message}
 	for _, a := range edit {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "UpdateInteractionResponse", varargs...)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(createround.CreateRoundOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // UpdateInteractionResponse indicates an expected call of UpdateInteractionResponse.
@@ -139,11 +155,12 @@ func (mr *MockCreateRoundManagerMockRecorder) UpdateInteractionResponse(ctx, cor
 }
 
 // UpdateInteractionResponseWithRetryButton mocks base method.
-func (m *MockCreateRoundManager) UpdateInteractionResponseWithRetryButton(ctx context.Context, correlationID, message string) error {
+func (m *MockCreateRoundManager) UpdateInteractionResponseWithRetryButton(ctx context.Context, correlationID, message string) (createround.CreateRoundOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateInteractionResponseWithRetryButton", ctx, correlationID, message)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(createround.CreateRoundOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // UpdateInteractionResponseWithRetryButton indicates an expected call of UpdateInteractionResponseWithRetryButton.

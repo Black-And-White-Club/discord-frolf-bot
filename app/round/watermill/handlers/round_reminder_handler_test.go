@@ -2,6 +2,7 @@ package roundhandlers
 
 import (
 	"errors"
+	"log/slog"
 	"testing"
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/round/mocks"
@@ -23,7 +24,7 @@ func TestRoundHandlers_HandleRoundReminder(t *testing.T) {
 	mockRoundReminderManager := mocks.NewMockRoundReminderManager(ctrl)
 
 	type fields struct {
-		Logger       observability.Logger
+		Logger       *slog.Logger
 		Helpers      *utils.MockHelpers
 		RoundDiscord *mocks.MockRoundDiscordInterface
 	}

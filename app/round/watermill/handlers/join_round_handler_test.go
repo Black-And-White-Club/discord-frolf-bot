@@ -2,6 +2,7 @@ package roundhandlers
 
 import (
 	"errors"
+	"log/slog"
 	"reflect"
 	"testing"
 
@@ -30,7 +31,7 @@ func TestRoundHandlers_HandleRoundParticipantJoinRequest(t *testing.T) {
 	mockRoundDiscord := mocks.NewMockRoundDiscordInterface(ctrl)
 
 	type fields struct {
-		Logger       observability.Logger
+		Logger       *slog.Logger
 		Helpers      *utils.MockHelpers
 		RoundDiscord *mocks.MockRoundDiscordInterface
 	}
@@ -255,6 +256,7 @@ func TestRoundHandlers_HandleRoundParticipantJoinRequest(t *testing.T) {
 		})
 	}
 }
+
 func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -272,7 +274,7 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 	}
 
 	type fields struct {
-		Logger       observability.Logger
+		Logger       *slog.Logger
 		Helpers      *utils.MockHelpers
 		RoundDiscord *mocks.MockRoundDiscordInterface
 		Config       *config.Config

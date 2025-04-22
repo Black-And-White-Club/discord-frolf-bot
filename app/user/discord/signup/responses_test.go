@@ -1,122 +1,148 @@
 package signup
 
 import (
+	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
 	storagemocks "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage/mocks"
-	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
+	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
 	"github.com/bwmarrin/discordgo"
 	"go.uber.org/mock/gomock"
 )
 
 func Test_signupManager_SendSignupResult(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockStorage := storagemocks.NewMockISInterface(ctrl)
-	mockSession := discordmocks.NewMockSession(ctrl)
-	mockLogger := observability.NewNoOpLogger()
-
-	type fields struct {
-		session          *discordmocks.MockSession
-		interactionStore *storagemocks.MockISInterface
-		logger           observability.Logger
-	}
 	type args struct {
 		correlationID string
 		success       bool
 	}
 	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
-		setup   func()
+		name        string
+		args        args
+		setup       func(mockStore *storagemocks.MockISInterface, mockDiscord *discordmocks.MockSession)
+		wantSuccess string
+		wantErr     bool
+		wantErrMsg  string
 	}{
 		{
 			name: "successful signup",
-			fields: fields{
-				session:          mockSession,
-				interactionStore: mockStorage,
-				logger:           mockLogger,
-			},
 			args: args{
 				correlationID: "valid_id",
 				success:       true,
 			},
-			wantErr: false,
-			setup: func() {
+			setup: func(mockStore *storagemocks.MockISInterface, mockDiscord *discordmocks.MockSession) {
 				interaction := &discordgo.Interaction{}
-				mockStorage.EXPECT().Get("valid_id").Return(interaction, true)
-				mockSession.EXPECT().InteractionResponseEdit(gomock.Any(), gomock.Any()).Return(&discordgo.Message{}, nil)
+				mockStore.EXPECT().Get("valid_id").Return(interaction, true)
+				mockDiscord.EXPECT().InteractionResponseEdit(gomock.Any(), gomock.Any()).Return(&discordgo.Message{}, nil)
 			},
+			wantSuccess: "🎉 Signup successful! Welcome!",
+			wantErr:     false,
+			wantErrMsg:  "",
 		},
 		{
-			name: "failed to get interaction from store",
-			fields: fields{
-				session:          mockSession,
-				interactionStore: mockStorage,
-				logger:           mockLogger,
-			},
+			name: "failed signup",
 			args: args{
-				correlationID: "invalid_id",
+				correlationID: "valid_id",
 				success:       false,
 			},
-			wantErr: true,
-			setup: func() {
-				mockStorage.EXPECT().Get("invalid_id").Return(nil, false)
+			setup: func(mockStore *storagemocks.MockISInterface, mockDiscord *discordmocks.MockSession) {
+				interaction := &discordgo.Interaction{}
+				mockStore.EXPECT().Get("valid_id").Return(interaction, true)
+				mockDiscord.EXPECT().InteractionResponseEdit(gomock.Any(), gomock.Any()).Return(&discordgo.Message{}, nil)
 			},
+			wantSuccess: "❌ Signup failed. Please try again.",
+			wantErr:     false,
+			wantErrMsg:  "",
 		},
 		{
-			name: "interaction is not of type *discordgo.Interaction",
-			fields: fields{
-				session:          mockSession,
-				interactionStore: mockStorage,
-				logger:           mockLogger,
+			name: "interaction not found",
+			args: args{
+				correlationID: "invalid_id",
+				success:       true,
 			},
+			setup: func(mockStore *storagemocks.MockISInterface, mockDiscord *discordmocks.MockSession) {
+				mockStore.EXPECT().Get("invalid_id").Return(nil, false)
+			},
+			wantSuccess: "",
+			wantErr:     false,
+			wantErrMsg:  "interaction not found for correlation ID: invalid_id",
+		},
+		{
+			name: "wrong interaction type",
 			args: args{
 				correlationID: "invalid_type_id",
 				success:       true,
 			},
-			wantErr: true,
-			setup: func() {
-				mockStorage.EXPECT().Get("invalid_type_id").Return("not_an_interaction", true)
+			setup: func(mockStore *storagemocks.MockISInterface, mockDiscord *discordmocks.MockSession) {
+				mockStore.EXPECT().Get("invalid_type_id").Return("not_an_interaction", true)
 			},
+			wantSuccess: "",
+			wantErr:     false,
+			wantErrMsg:  "interaction is not of the expected type",
 		},
 		{
-			name: "failed to send result",
-			fields: fields{
-				session:          mockSession,
-				interactionStore: mockStorage,
-				logger:           mockLogger,
-			},
+			name: "interaction edit error",
 			args: args{
-				correlationID: "valid_id",
-				success:       false,
+				correlationID: "edit_error_id",
+				success:       true,
 			},
-			wantErr: true,
-			setup: func() {
+			setup: func(mockStore *storagemocks.MockISInterface, mockDiscord *discordmocks.MockSession) {
 				interaction := &discordgo.Interaction{}
-				mockStorage.EXPECT().Get("valid_id").Return(interaction, true)
-				mockSession.EXPECT().InteractionResponseEdit(gomock.Any(), gomock.Any()).Return(nil, errors.New("edit error"))
+				mockStore.EXPECT().Get("edit_error_id").Return(interaction, true)
+				mockDiscord.EXPECT().InteractionResponseEdit(gomock.Any(), gomock.Any()).Return(nil, errors.New("edit error"))
 			},
+			wantSuccess: "",
+			wantErr:     true,
+			wantErrMsg:  "failed to send result: edit error",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.setup != nil {
-				tt.setup()
-			}
+			// Create new mock instances for each test
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			mockSession := discordmocks.NewMockSession(ctrl)
+			mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+			logger := loggerfrolfbot.NoOpLogger
+
 			sm := &signupManager{
-				session:          tt.fields.session,
-				interactionStore: tt.fields.interactionStore,
-				logger:           tt.fields.logger,
+				session:          mockSession,
+				interactionStore: mockInteractionStore,
+				logger:           logger,
+				operationWrapper: testOperationWrapper,
 			}
-			if err := sm.SendSignupResult(tt.args.correlationID, tt.args.success); (err != nil) != tt.wantErr {
-				t.Errorf("signupManager.SendSignupResult() error = %v, wantErr %v", err, tt.wantErr)
+
+			if tt.setup != nil {
+				tt.setup(mockInteractionStore, mockSession)
+			}
+
+			ctx := context.Background()
+			result, err := sm.SendSignupResult(ctx, tt.args.correlationID, tt.args.success)
+
+			// Check the wrapper return error
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SendSignupResult() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			// Check the SignupOperationResult.Success field
+			gotSuccess, _ := result.Success.(string)
+			if gotSuccess != tt.wantSuccess {
+				t.Errorf("SignupOperationResult.Success mismatch: got %q, want %q", gotSuccess, tt.wantSuccess)
+			}
+
+			// Check the SignupOperationResult.Error field
+			if tt.wantErrMsg != "" {
+				if result.Error == nil {
+					t.Errorf("SignupOperationResult.Error is nil, want error containing %q", tt.wantErrMsg)
+				} else if !strings.Contains(result.Error.Error(), tt.wantErrMsg) {
+					t.Errorf("SignupOperationResult.Error = %q, want error containing %q", result.Error.Error(), tt.wantErrMsg)
+				}
+			} else if result.Error != nil {
+				t.Errorf("SignupOperationResult.Error = %v, want nil", result.Error)
 			}
 		})
 	}

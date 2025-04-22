@@ -2,9 +2,9 @@ package discord
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
-	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -16,14 +16,15 @@ type Operations interface {
 // DiscordOperations implements the Operations interface.
 type discordOperations struct {
 	session Session
-	logger  observability.Logger
+	logger  *slog.Logger
 	config  *config.Config
 }
 
 // NewOperations creates a new Operations instance.
-func NewOperations(session Session, logger observability.Logger, config *config.Config) Operations {
+func NewOperations(session Session, logger *slog.Logger, config *config.Config) Operations {
 	return &discordOperations{
 		session: session,
 		logger:  logger,
-		config:  config}
+		config:  config,
+	}
 }

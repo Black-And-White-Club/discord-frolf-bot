@@ -13,6 +13,8 @@ import (
 	context "context"
 	reflect "reflect"
 
+	role "github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord/role"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	discordgo "github.com/bwmarrin/discordgo"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -42,11 +44,12 @@ func (m *MockRoleManager) EXPECT() *MockRoleManagerMockRecorder {
 }
 
 // AddRoleToUser mocks base method.
-func (m *MockRoleManager) AddRoleToUser(ctx context.Context, guildID, userID, roleID string) error {
+func (m *MockRoleManager) AddRoleToUser(ctx context.Context, guildID string, userID sharedtypes.DiscordID, roleID string) (role.RoleOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddRoleToUser", ctx, guildID, userID, roleID)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(role.RoleOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // AddRoleToUser indicates an expected call of AddRoleToUser.
@@ -56,11 +59,12 @@ func (mr *MockRoleManagerMockRecorder) AddRoleToUser(ctx, guildID, userID, roleI
 }
 
 // EditRoleUpdateResponse mocks base method.
-func (m *MockRoleManager) EditRoleUpdateResponse(ctx context.Context, correlationID, content string) error {
+func (m *MockRoleManager) EditRoleUpdateResponse(ctx context.Context, correlationID, content string) (role.RoleOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "EditRoleUpdateResponse", ctx, correlationID, content)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(role.RoleOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // EditRoleUpdateResponse indicates an expected call of EditRoleUpdateResponse.
@@ -70,9 +74,12 @@ func (mr *MockRoleManagerMockRecorder) EditRoleUpdateResponse(ctx, correlationID
 }
 
 // HandleRoleButtonPress mocks base method.
-func (m *MockRoleManager) HandleRoleButtonPress(ctx context.Context, i *discordgo.InteractionCreate) {
+func (m *MockRoleManager) HandleRoleButtonPress(ctx context.Context, i *discordgo.InteractionCreate) (role.RoleOperationResult, error) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "HandleRoleButtonPress", ctx, i)
+	ret := m.ctrl.Call(m, "HandleRoleButtonPress", ctx, i)
+	ret0, _ := ret[0].(role.RoleOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // HandleRoleButtonPress indicates an expected call of HandleRoleButtonPress.
@@ -82,9 +89,12 @@ func (mr *MockRoleManagerMockRecorder) HandleRoleButtonPress(ctx, i any) *gomock
 }
 
 // HandleRoleCancelButton mocks base method.
-func (m *MockRoleManager) HandleRoleCancelButton(ctx context.Context, i *discordgo.InteractionCreate) {
+func (m *MockRoleManager) HandleRoleCancelButton(ctx context.Context, i *discordgo.InteractionCreate) (role.RoleOperationResult, error) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "HandleRoleCancelButton", ctx, i)
+	ret := m.ctrl.Call(m, "HandleRoleCancelButton", ctx, i)
+	ret0, _ := ret[0].(role.RoleOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // HandleRoleCancelButton indicates an expected call of HandleRoleCancelButton.
@@ -94,9 +104,12 @@ func (mr *MockRoleManagerMockRecorder) HandleRoleCancelButton(ctx, i any) *gomoc
 }
 
 // HandleRoleRequestCommand mocks base method.
-func (m *MockRoleManager) HandleRoleRequestCommand(ctx context.Context, i *discordgo.InteractionCreate) {
+func (m *MockRoleManager) HandleRoleRequestCommand(ctx context.Context, i *discordgo.InteractionCreate) (role.RoleOperationResult, error) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "HandleRoleRequestCommand", ctx, i)
+	ret := m.ctrl.Call(m, "HandleRoleRequestCommand", ctx, i)
+	ret0, _ := ret[0].(role.RoleOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // HandleRoleRequestCommand indicates an expected call of HandleRoleRequestCommand.
@@ -106,11 +119,12 @@ func (mr *MockRoleManagerMockRecorder) HandleRoleRequestCommand(ctx, i any) *gom
 }
 
 // RespondToRoleButtonPress mocks base method.
-func (m *MockRoleManager) RespondToRoleButtonPress(ctx context.Context, interactionID, interactionToken, requesterID, selectedRole, targetUserID string) error {
+func (m *MockRoleManager) RespondToRoleButtonPress(ctx context.Context, interactionID, interactionToken string, requesterID sharedtypes.DiscordID, selectedRole string, targetUserID sharedtypes.DiscordID) (role.RoleOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RespondToRoleButtonPress", ctx, interactionID, interactionToken, requesterID, selectedRole, targetUserID)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(role.RoleOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // RespondToRoleButtonPress indicates an expected call of RespondToRoleButtonPress.
@@ -120,11 +134,12 @@ func (mr *MockRoleManagerMockRecorder) RespondToRoleButtonPress(ctx, interaction
 }
 
 // RespondToRoleRequest mocks base method.
-func (m *MockRoleManager) RespondToRoleRequest(ctx context.Context, interactionID, interactionToken, targetUserID string) error {
+func (m *MockRoleManager) RespondToRoleRequest(ctx context.Context, interactionID, interactionToken string, targetUserID sharedtypes.DiscordID) (role.RoleOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RespondToRoleRequest", ctx, interactionID, interactionToken, targetUserID)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(role.RoleOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // RespondToRoleRequest indicates an expected call of RespondToRoleRequest.

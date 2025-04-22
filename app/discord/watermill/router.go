@@ -18,7 +18,7 @@ import (
 
 // DiscordRouter handles routing for user module events.
 type DiscordRouter struct {
-	logger           observability.Logger
+	logger           *slog.Logger
 	Router           *message.Router
 	subscriber       eventbus.EventBus
 	publisher        eventbus.EventBus
@@ -31,7 +31,7 @@ type DiscordRouter struct {
 
 // NewDiscordRouter creates a new DiscordRouter.
 
-func NewDiscordRouter(logger observability.Logger, router *message.Router, subscriber eventbus.EventBus, publisher eventbus.EventBus, discord discord.Operations, config *config.Config, helper utils.Helpers, tracer observability.Tracer) *DiscordRouter {
+func NewDiscordRouter(logger *slog.Logger, router *message.Router, subscriber eventbus.EventBus, publisher eventbus.EventBus, discord discord.Operations, config *config.Config, helper utils.Helpers, tracer observability.Tracer) *DiscordRouter {
 	return &DiscordRouter{
 		logger:           logger,
 		Router:           router,

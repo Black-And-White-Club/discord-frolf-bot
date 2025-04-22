@@ -18,7 +18,7 @@ import (
 
 // LeaderboardRouter handles routing for leaderboard module events.
 type LeaderboardRouter struct {
-	logger           observability.Logger
+	logger           *slog.Logger
 	Router           *message.Router
 	subscriber       eventbus.EventBus
 	publisher        eventbus.EventBus
@@ -29,7 +29,7 @@ type LeaderboardRouter struct {
 }
 
 // NewLeaderboardRouter creates a new LeaderboardRouter.
-func NewLeaderboardRouter(logger observability.Logger, router *message.Router, subscriber eventbus.EventBus, publisher eventbus.EventBus, config *config.Config, helper utils.Helpers, tracer observability.Tracer) *LeaderboardRouter {
+func NewLeaderboardRouter(logger *slog.Logger, router *message.Router, subscriber eventbus.EventBus, publisher eventbus.EventBus, config *config.Config, helper utils.Helpers, tracer observability.Tracer) *LeaderboardRouter {
 	return &LeaderboardRouter{
 		logger:           logger,
 		Router:           router,

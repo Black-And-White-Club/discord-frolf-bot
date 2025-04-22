@@ -3,66 +3,87 @@ package deleteround
 import (
 	"context"
 	"fmt"
-	"log"
-	"log/slog"
-	"strconv"
 	"strings"
 
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
-	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
+	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
+	"github.com/google/uuid"
 )
 
 // HandleDeleteRound handles the delete round button interaction.
-func (drm *deleteRoundManager) HandleDeleteRound(ctx context.Context, i *discordgo.InteractionCreate) {
-	slog.Info("HandleDeleteRound called",
+func (drm *deleteRoundManager) HandleDeleteRoundCommand(ctx context.Context, i *discordgo.InteractionCreate) (DeleteRoundOperationResult, error) {
+	ctx = discordmetrics.WithValue(ctx, discordmetrics.CommandNameKey, "handle_delete_round_command")
+	ctx = discordmetrics.WithValue(ctx, discordmetrics.InteractionType, "button")
+	ctx = discordmetrics.WithValue(ctx, discordmetrics.UserIDKey, i.Member.User.ID)
+
+	drm.logger.InfoContext(ctx, "Handling delete round command",
 		attr.String("interaction_id", i.ID),
 		attr.String("custom_id", i.MessageComponentData().CustomID),
-		attr.String("user", i.Member.User.Username))
+		attr.UserID(sharedtypes.DiscordID(i.Member.User.ID)))
+
 	user := i.Member.User
 	customID := i.MessageComponentData().CustomID
 
 	// Extract the round ID safely
 	parts := strings.Split(customID, "|")
 	if len(parts) < 2 {
-		log.Printf("Invalid custom_id format: %s", customID)
-		return
+		err := fmt.Errorf("invalid custom_id format: %s", customID)
+		drm.logger.ErrorContext(ctx, err.Error(), attr.String("custom_id", customID))
+		return DeleteRoundOperationResult{Error: err}, nil
 	}
 	roundIDStr := parts[1]
 
-	// Convert roundID to int64
-	roundIDInt, err := strconv.ParseInt(roundIDStr, 10, 64)
+	// Convert roundID to uuid.UUID
+	roundUUID, err := uuid.Parse(roundIDStr)
 	if err != nil {
-		log.Printf("Failed to parse round ID: %v", err)
-		return
+		err = fmt.Errorf("failed to parse round ID as UUID: %w", err)
+		drm.logger.ErrorContext(ctx, err.Error(), attr.String("round_id_str", roundIDStr))
+		_, err2 := drm.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+			Content: "❌ Invalid Round ID. Please try again.", // User-friendly error
+			Flags:   discordgo.MessageFlagsEphemeral,
+		})
+		if err2 != nil {
+			drm.logger.ErrorContext(ctx, "Failed to send ephemeral error message", attr.Error(err2))
+			return DeleteRoundOperationResult{Error: fmt.Errorf("failed to parse round ID: %w, and also failed to send error message: %w", err, err2)}, nil
+		}
+		return DeleteRoundOperationResult{Error: err}, nil
 	}
-	roundID := roundtypes.ID(roundIDInt)
-	userID := roundtypes.UserID(user.ID)
+	roundID := sharedtypes.RoundID(roundUUID)
+	userID := sharedtypes.DiscordID(user.ID)
 
-	log.Printf("Processing delete request for round %s by user %s", roundIDStr, user.Username)
+	drm.logger.InfoContext(ctx, "Processing delete request",
+		attr.RoundID("round_id", roundID),
+		attr.UserID(userID))
 
 	err = drm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseDeferredMessageUpdate,
 	})
 	if err != nil {
-		log.Printf("Failed to acknowledge interaction: %v", err)
-		return
+		err = fmt.Errorf("failed to acknowledge interaction: %w", err)
+		drm.logger.ErrorContext(ctx, err.Error())
+		return DeleteRoundOperationResult{Error: err}, nil
 	}
 
-	slog.Info("Calling sendDeleteRequest",
-		attr.String("round_id", roundIDStr),
-		attr.String("user_id", user.ID))
+	drm.logger.InfoContext(ctx, "Calling sendDeleteRequest",
+		attr.RoundID("round_id", roundID),
+		attr.UserID(userID))
 
 	if err := drm.sendDeleteRequest(ctx, roundID, userID, i.ID); err != nil {
-		log.Printf("Failed to publish delete request for round %s: %v", roundIDStr, err)
-
+		err = fmt.Errorf("failed to publish delete request: %w", err)
+		drm.logger.ErrorContext(ctx, err.Error(), attr.RoundID("round_id", roundID), attr.UserID(userID))
 		// Send an ephemeral error response to the user
-		_, _ = drm.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+		_, err2 := drm.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
 			Content: "❌ Failed to delete the round.",
 			Flags:   discordgo.MessageFlagsEphemeral,
 		})
-		return
+		if err2 != nil {
+			drm.logger.ErrorContext(ctx, "Failed to send ephemeral error message", attr.Error(err2))
+			return DeleteRoundOperationResult{Error: fmt.Errorf("failed to publish delete request: %w, and also failed to send error message: %w", err, err2)}, nil
+		}
+		return DeleteRoundOperationResult{Error: err}, nil
 	}
 
 	// Send an ephemeral success message to the user
@@ -71,15 +92,17 @@ func (drm *deleteRoundManager) HandleDeleteRound(ctx context.Context, i *discord
 		Flags:   discordgo.MessageFlagsEphemeral,
 	})
 	if err != nil {
-		log.Printf("Failed to send ephemeral follow-up message: %v", err)
+		drm.logger.ErrorContext(ctx, "Failed to send ephemeral follow-up message: %v", attr.Error(err))
+		return DeleteRoundOperationResult{Error: fmt.Errorf("failed to send follow-up message: %w", err)}, nil // Return the error
 	}
+	return DeleteRoundOperationResult{Success: "delete request sent"}, nil
 }
 
 // sendDeleteRequest publishes the delete request to the backend.
-func (drm *deleteRoundManager) sendDeleteRequest(ctx context.Context, roundID roundtypes.ID, userID roundtypes.UserID, interactionID string) error {
-	slog.Info("sendDeleteRequest called",
-		attr.String("round_id", fmt.Sprintf("%d", roundID)),
-		attr.String("user_id", string(userID)),
+func (drm *deleteRoundManager) sendDeleteRequest(ctx context.Context, roundID sharedtypes.RoundID, userID sharedtypes.DiscordID, interactionID string) error {
+	drm.logger.InfoContext(ctx, "sendDeleteRequest called",
+		attr.RoundID("round_id", roundID),
+		attr.UserID(userID),
 		attr.String("interaction_id", interactionID))
 
 	// Prepare the payload
@@ -91,25 +114,25 @@ func (drm *deleteRoundManager) sendDeleteRequest(ctx context.Context, roundID ro
 	// Generate the result message without an original message
 	resultMsg, err := drm.helper.CreateResultMessage(nil, payload, roundevents.RoundDeleteRequest)
 	if err != nil {
-		slog.Error("Failed to create result message", attr.Error(err))
+		drm.logger.ErrorContext(ctx, "Failed to create result message", attr.Error(err))
 		return fmt.Errorf("failed to create result message: %w", err)
 	}
 
 	// Attach the context to the message
 	resultMsg.SetContext(ctx)
 
-	slog.Info("Publishing delete request",
+	drm.logger.InfoContext(ctx, "Publishing delete request",
 		attr.String("topic", roundevents.RoundDeleteRequest),
 		attr.String("message_id", resultMsg.UUID))
 
 	// Publish the delete request
 	if err := drm.publisher.Publish(roundevents.RoundDeleteRequest, resultMsg); err != nil {
-		slog.Error("Failed to publish delete request", attr.Error(err))
+		drm.logger.ErrorContext(ctx, "Failed to publish delete request", attr.Error(err))
 		return fmt.Errorf("failed to publish delete request: %w", err)
 	}
 
-	slog.Info("Successfully published delete request",
-		attr.String("round_id", fmt.Sprintf("%d", roundID)),
+	drm.logger.InfoContext(ctx, "Successfully published delete request",
+		attr.RoundID("round_id", roundID),
 		attr.String("message_id", resultMsg.UUID))
 
 	return nil

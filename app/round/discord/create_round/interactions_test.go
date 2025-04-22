@@ -3,97 +3,277 @@ package createround
 import (
 	"context"
 	"errors"
+	"log/slog"
+	"strings"
 	"testing"
 
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
 	storagemocks "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage/mocks"
+	"github.com/Black-And-White-Club/discord-frolf-bot/config"
+	helpermocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
+	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
+	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
+	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	"github.com/bwmarrin/discordgo"
+	"go.opentelemetry.io/otel/trace/noop"
 	"go.uber.org/mock/gomock"
 )
 
-// createRoundManagerMock is a testable version of createRoundManager that allows function mocking
-type createRoundManagerMock struct {
-	session                  discordmocks.MockSession
-	sendModalCalled          bool
-	mockSendCreateRoundModal func(ctx context.Context, i *discordgo.InteractionCreate) error
+var testOperationWrapper = func(ctx context.Context, operationName string, operationFunc func(ctx context.Context) (CreateRoundOperationResult, error)) (CreateRoundOperationResult, error) {
+	return operationFunc(ctx)
 }
 
-// HandleCreateRoundCommand implements the real function but uses mocked dependencies
-func (crm *createRoundManagerMock) HandleCreateRoundCommand(ctx context.Context, i *discordgo.InteractionCreate) {
-	// This mimics the actual implementation
-	err := crm.SendCreateRoundModal(ctx, i)
-	if err != nil {
-		// Error is logged in the real implementation
-	}
+// Helper function to get a pointer to a string
+func stringPtr(s string) *string {
+	return &s
+}
+
+// createRoundManagerMock is a testable version of createRoundManager that allows function mocking
+type createRoundManagerMock struct {
+	sendModalCalled          bool
+	mockSendCreateRoundModal func(ctx context.Context, i *discordgo.InteractionCreate) (CreateRoundOperationResult, error)
+	session                  *discordmocks.MockSession // Use the gomock mock
+	logger                   *slog.Logger
+	operationWrapper         func(ctx context.Context, operationName string, operationFunc func(ctx context.Context) (CreateRoundOperationResult, error)) (CreateRoundOperationResult, error)
+}
+
+// HandleCreateRoundCommand mimics the real implementation but allows bypassing the wrapper and mocking SendCreateRoundModal
+func (crm *createRoundManagerMock) HandleCreateRoundCommand(ctx context.Context, i *discordgo.InteractionCreate) (CreateRoundOperationResult, error) {
+	return func(ctx context.Context, fn func(ctx context.Context) (CreateRoundOperationResult, error)) (CreateRoundOperationResult, error) {
+		return fn(ctx)
+	}(ctx, func(ctx context.Context) (CreateRoundOperationResult, error) {
+		result, err := crm.SendCreateRoundModal(ctx, i)
+		if err != nil {
+			return CreateRoundOperationResult{Error: err}, err
+		}
+		if result.Error != nil {
+			return result, nil
+		}
+		return CreateRoundOperationResult{Success: "modal sent"}, nil
+	})
 }
 
 // SendCreateRoundModal is the mocked version for testing
-func (crm *createRoundManagerMock) SendCreateRoundModal(ctx context.Context, i *discordgo.InteractionCreate) error {
+func (crm *createRoundManagerMock) SendCreateRoundModal(ctx context.Context, i *discordgo.InteractionCreate) (CreateRoundOperationResult, error) {
 	crm.sendModalCalled = true
 	if crm.mockSendCreateRoundModal != nil {
 		return crm.mockSendCreateRoundModal(ctx, i)
 	}
-	return nil
+	return CreateRoundOperationResult{Success: "default"}, nil
+}
+
+// HandleRetryCreateRound mimics the real implementation for testing
+func (crm *createRoundManagerMock) HandleRetryCreateRound(ctx context.Context, i *discordgo.InteractionCreate) (CreateRoundOperationResult, error) {
+	return crm.operationWrapper(ctx, "handle_retry_create_round", func(ctx context.Context) (CreateRoundOperationResult, error) {
+		result, err := crm.SendCreateRoundModal(ctx, i)
+		if err != nil {
+			return CreateRoundOperationResult{Error: err}, err
+		}
+
+		if result.Error != nil {
+			// Simulate the message edit on error
+			_, updateErr := crm.session.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+				Content:    stringPtr("Failed to open the form. Please try using the /createround command again."),
+				Components: &[]discordgo.MessageComponent{},
+			})
+			if updateErr != nil {
+				crm.logger.ErrorContext(ctx, "Failed to update error message in mock", attr.Error(updateErr))
+			}
+			return result, nil
+		}
+
+		return CreateRoundOperationResult{Success: "retry modal sent"}, nil
+	})
 }
 
 func Test_createRoundManager_HandleCreateRoundCommand(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
-
-	// Sample interaction with member and user
-	testInteraction := &discordgo.InteractionCreate{
-		Interaction: &discordgo.Interaction{
-			Member: &discordgo.Member{
-				User: &discordgo.User{
-					ID: "user-123",
-				},
-			},
-		},
-	}
-
 	tests := []struct {
-		name     string
-		mockFunc func(*createRoundManagerMock)
+		name            string
+		mockModalFn     func(ctx context.Context, i *discordgo.InteractionCreate) (CreateRoundOperationResult, error)
+		expectSuccess   string
+		expectErrSubstr string
 	}{
 		{
-			name: "successful modal send",
-			mockFunc: func(crm *createRoundManagerMock) {
-				crm.mockSendCreateRoundModal = func(ctx context.Context, i *discordgo.InteractionCreate) error {
-					return nil
-				}
+			name: "modal sent successfully",
+			mockModalFn: func(ctx context.Context, i *discordgo.InteractionCreate) (CreateRoundOperationResult, error) {
+				return CreateRoundOperationResult{}, nil
 			},
+			expectSuccess: "modal sent",
 		},
 		{
-			name: "error sending modal",
-			mockFunc: func(crm *createRoundManagerMock) {
-				crm.mockSendCreateRoundModal = func(ctx context.Context, i *discordgo.InteractionCreate) error {
-					return errors.New("failed to send modal")
-				}
+			name: "modal returns operation error",
+			mockModalFn: func(ctx context.Context, i *discordgo.InteractionCreate) (CreateRoundOperationResult, error) {
+				return CreateRoundOperationResult{}, errors.New("modal failed")
 			},
+			expectErrSubstr: "modal failed",
+		},
+		{
+			name: "modal returns result error",
+			mockModalFn: func(ctx context.Context, i *discordgo.InteractionCreate) (CreateRoundOperationResult, error) {
+				return CreateRoundOperationResult{Error: errors.New("bad result")}, nil
+			},
+			expectErrSubstr: "bad result",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a mock wrapper that records method calls
 			crm := &createRoundManagerMock{
-				session:         *mockSession,
-				sendModalCalled: false,
+				mockSendCreateRoundModal: tt.mockModalFn,
+				session:                  &discordmocks.MockSession{}, // Initialize the mock session
+				operationWrapper: func(ctx context.Context, operationName string, operationFunc func(ctx context.Context) (CreateRoundOperationResult, error)) (CreateRoundOperationResult, error) {
+					return operationFunc(ctx)
+				},
+				logger: slog.Default(),
 			}
 
-			// Configure the mock behavior
-			if tt.mockFunc != nil {
-				tt.mockFunc(crm)
+			interaction := &discordgo.InteractionCreate{
+				Interaction: &discordgo.Interaction{
+					Member: &discordgo.Member{
+						User: &discordgo.User{
+							ID: "user-123",
+						},
+					},
+				},
 			}
 
-			// Execute the method under test
-			crm.HandleCreateRoundCommand(context.Background(), testInteraction)
+			result, _ := crm.HandleCreateRoundCommand(context.Background(), interaction)
 
-			// Verify the mock was called
+			if tt.expectErrSubstr != "" {
+				if result.Error == nil {
+					t.Errorf("expected error containing %q, got nil", tt.expectErrSubstr)
+				} else if !strings.Contains(result.Error.Error(), tt.expectErrSubstr) {
+					t.Errorf("expected error to contain %q, got %q", tt.expectErrSubstr, result.Error.Error())
+				}
+			} else {
+				if result.Error != nil {
+					t.Errorf("unexpected error: %v", result.Error)
+				}
+				if result.Success != tt.expectSuccess {
+					t.Errorf("unexpected success value: got %q, want %q", result.Success, tt.expectSuccess)
+				}
+			}
+
 			if !crm.sendModalCalled {
-				t.Error("SendCreateRoundModal was not called")
+				t.Errorf("SendCreateRoundModal was not called")
+			}
+		})
+	}
+}
+
+func Test_createRoundManager_HandleRetryCreateRound(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	tests := []struct {
+		name                        string
+		mockModalFn                 func(ctx context.Context, i *discordgo.InteractionCreate) (CreateRoundOperationResult, error)
+		mockInteractionEditError    error
+		expectedErrMsg              string
+		expectedSuccess             string
+		expectInteractionEditCalled bool
+	}{
+		{
+			name: "retry modal sent successfully",
+			mockModalFn: func(ctx context.Context, i *discordgo.InteractionCreate) (CreateRoundOperationResult, error) {
+				return CreateRoundOperationResult{}, nil
+			},
+			expectedSuccess:             "retry modal sent",
+			expectInteractionEditCalled: false,
+		},
+		{
+			name: "SendCreateRoundModal returns error",
+			mockModalFn: func(ctx context.Context, i *discordgo.InteractionCreate) (CreateRoundOperationResult, error) {
+				return CreateRoundOperationResult{}, errors.New("modal failed")
+			},
+			expectedErrMsg:              "modal failed",
+			expectInteractionEditCalled: false,
+		},
+		{
+			name: "SendCreateRoundModal returns result error, edit succeeds",
+			mockModalFn: func(ctx context.Context, i *discordgo.InteractionCreate) (CreateRoundOperationResult, error) {
+				return CreateRoundOperationResult{Error: errors.New("result failure")}, nil
+			},
+			expectedErrMsg:              "result failure",
+			expectInteractionEditCalled: true,
+		},
+		{
+			name: "SendCreateRoundModal returns result error, edit fails",
+			mockModalFn: func(ctx context.Context, i *discordgo.InteractionCreate) (CreateRoundOperationResult, error) {
+				return CreateRoundOperationResult{Error: errors.New("result failure")}, nil
+			},
+			mockInteractionEditError:    errors.New("edit failed"),
+			expectedErrMsg:              "result failure",
+			expectInteractionEditCalled: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockSession := discordmocks.NewMockSession(ctrl)
+
+			mock := &createRoundManagerMock{
+				mockSendCreateRoundModal: tt.mockModalFn,
+				session:                  mockSession,
+				operationWrapper:         testOperationWrapper,
+				logger:                   slog.Default(),
+			}
+
+			interaction := &discordgo.InteractionCreate{
+				Interaction: &discordgo.Interaction{
+					Member: &discordgo.Member{
+						User: &discordgo.User{
+							ID: "user-123",
+						},
+					},
+				},
+			}
+
+			// Set expectations on mockSession.InteractionResponseEdit
+			if tt.expectInteractionEditCalled {
+				mockSession.EXPECT().
+					InteractionResponseEdit(
+						gomock.Eq(interaction.Interaction), // Expect the correct interaction
+						gomock.Any(),                       // We might not care about the exact edit content here
+					).
+					Return(&discordgo.Message{}, tt.mockInteractionEditError). // Correct return values
+					Times(1)
+			} else {
+				mockSession.EXPECT().
+					InteractionResponseEdit(
+						gomock.Any(),
+						gomock.Any(),
+					).
+					Return(nil, nil). // Correct return values for no call
+					Times(0)
+			}
+
+			result, err := mock.HandleRetryCreateRound(context.Background(), interaction)
+
+			if tt.expectedErrMsg != "" {
+				if err != nil {
+					if !strings.Contains(err.Error(), tt.expectedErrMsg) {
+						t.Errorf("expected error to contain %q, got %q", tt.expectedErrMsg, err.Error())
+					}
+				} else if result.Error == nil {
+					t.Errorf("expected result.Error containing %q, got nil", tt.expectedErrMsg)
+				} else if !strings.Contains(result.Error.Error(), tt.expectedErrMsg) {
+					t.Errorf("expected result.Error to contain %q, got %q", tt.expectedErrMsg, result.Error.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("expected no error, got %v", err)
+				}
+				if result.Error != nil {
+					t.Errorf("expected no result.Error, got %v", result.Error)
+				}
+				if result.Success != tt.expectedSuccess {
+					t.Errorf("expected success: %q, got: %q", tt.expectedSuccess, result.Success)
+				}
+			}
+
+			if !mock.sendModalCalled {
+				t.Errorf("SendCreateRoundModal was not called")
 			}
 		})
 	}
@@ -105,37 +285,52 @@ func Test_createRoundManager_UpdateInteractionResponse(t *testing.T) {
 
 	mockSession := discordmocks.NewMockSession(ctrl)
 	mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+	logger := loggerfrolfbot.NoOpLogger
+	mockHelper := helpermocks.NewMockHelpers(ctrl)
+	mockConfig := &config.Config{}
+	tracerProvider := noop.NewTracerProvider()
+	tracer := tracerProvider.Tracer("test")
+	metrics := &discordmetrics.NoOpMetrics{}
 
-	crm := &createRoundManager{
+	rm := &createRoundManager{
 		session:          mockSession,
+		publisher:        nil,
+		logger:           logger,
+		helper:           mockHelper,
+		config:           mockConfig,
 		interactionStore: mockInteractionStore,
+		tracer:           tracer,
+		metrics:          metrics,
+		operationWrapper: testOperationWrapper,
 	}
 
 	tests := []struct {
 		name  string
-		setup func()
+		setup func(ctx context.Context)
 		args  struct {
 			ctx           context.Context
 			correlationID string
 			message       string
 			edit          []*discordgo.WebhookEdit
 		}
-		wantErr bool
+		wantSuccess string
+		wantErrMsg  string
+		wantErrIs   error
 	}{
 		{
-			name: "successful update",
-			setup: func() {
-				interaction := &discordgo.Interaction{
-					ID: "interaction-id",
-				}
+			name: "successful update without existing edit",
+			setup: func(ctx context.Context) {
 				mockInteractionStore.EXPECT().
-					Get("correlation-id").
-					Return(interaction, true)
-
-				// Return a response object and nil error for success
+					Get("corr-123").
+					Return(&discordgo.Interaction{ID: "int-id"}, true).
+					Times(1)
 				mockSession.EXPECT().
-					InteractionResponseEdit(gomock.Eq(interaction), gomock.Any()).
-					Return(&discordgo.Message{}, nil)
+					InteractionResponseEdit(
+						gomock.Eq(&discordgo.Interaction{ID: "int-id"}),
+						gomock.Eq(&discordgo.WebhookEdit{Content: stringPtr("Updated message")}),
+					).
+					Return(&discordgo.Message{}, nil).
+					Times(1)
 			},
 			args: struct {
 				ctx           context.Context
@@ -144,66 +339,30 @@ func Test_createRoundManager_UpdateInteractionResponse(t *testing.T) {
 				edit          []*discordgo.WebhookEdit
 			}{
 				ctx:           context.Background(),
-				correlationID: "correlation-id",
+				correlationID: "corr-123",
 				message:       "Updated message",
 				edit:          nil,
 			},
-			wantErr: false,
+			wantSuccess: "interaction response updated",
+			wantErrMsg:  "",
+			wantErrIs:   nil,
 		},
 		{
-			name: "interaction not found",
-			setup: func() {
+			name: "successful update with existing edit",
+			setup: func(ctx context.Context) {
 				mockInteractionStore.EXPECT().
-					Get("correlation-id").
-					Return(nil, false) // Interaction not found
-			},
-			args: struct {
-				ctx           context.Context
-				correlationID string
-				message       string
-				edit          []*discordgo.WebhookEdit
-			}{
-				ctx:           context.Background(),
-				correlationID: "correlation-id",
-				message:       "Updated message",
-				edit:          nil,
-			},
-			wantErr: true,
-		},
-		{
-			name: "stored interaction is not of type *discordgo.Interaction",
-			setup: func() {
-				mockInteractionStore.EXPECT().
-					Get("correlation-id").
-					Return("not-an-interaction", true) // Incorrect type
-			},
-			args: struct {
-				ctx           context.Context
-				correlationID string
-				message       string
-				edit          []*discordgo.WebhookEdit
-			}{
-				ctx:           context.Background(),
-				correlationID: "correlation-id",
-				message:       "Updated message",
-				edit:          nil,
-			},
-			wantErr: true,
-		},
-		{
-			name: "failed to update interaction response",
-			setup: func() {
-				interaction := &discordgo.Interaction{
-					ID: "interaction-id",
-				}
-				mockInteractionStore.EXPECT().
-					Get("correlation-id").
-					Return(interaction, true)
-
-				// Return nil response and an error for failure
+					Get("corr-456").
+					Return(&discordgo.Interaction{ID: "int-id-2"}, true).
+					Times(1)
+				existingEmbeds := []*discordgo.MessageEmbed{{Title: "Old Embed"}}
+				expectedEdit := &discordgo.WebhookEdit{Content: stringPtr("New message"), Embeds: &existingEmbeds}
 				mockSession.EXPECT().
-					InteractionResponseEdit(gomock.Eq(interaction), gomock.Any()).
-					Return(nil, errors.New("failed to update response"))
+					InteractionResponseEdit(
+						gomock.Eq(&discordgo.Interaction{ID: "int-id-2"}),
+						gomock.Eq(expectedEdit),
+					).
+					Return(&discordgo.Message{}, nil).
+					Times(1)
 			},
 			args: struct {
 				ctx           context.Context
@@ -212,55 +371,150 @@ func Test_createRoundManager_UpdateInteractionResponse(t *testing.T) {
 				edit          []*discordgo.WebhookEdit
 			}{
 				ctx:           context.Background(),
-				correlationID: "correlation-id",
-				message:       "Updated message",
-				edit:          nil,
-			},
-			wantErr: true,
-		},
-		{
-			name: "successful update with edit",
-			setup: func() {
-				interaction := &discordgo.Interaction{
-					ID: "interaction-id",
-				}
-				mockInteractionStore.EXPECT().
-					Get("correlation-id").
-					Return(interaction, true)
-
-				// Return a response object and nil error for success
-				mockSession.EXPECT().
-					InteractionResponseEdit(gomock.Eq(interaction), gomock.Any()).
-					Return(&discordgo.Message{}, nil)
-			},
-			args: struct {
-				ctx           context.Context
-				correlationID string
-				message       string
-				edit          []*discordgo.WebhookEdit
-			}{
-				ctx:           context.Background(),
-				correlationID: "correlation-id",
-				message:       "Updated message",
+				correlationID: "corr-456",
+				message:       "New message",
 				edit: []*discordgo.WebhookEdit{
 					{
-						Content: new(string),
+						Embeds: &[]*discordgo.MessageEmbed{{Title: "Old Embed"}},
 					},
 				},
 			},
-			wantErr: false,
+			wantSuccess: "interaction response updated",
+			wantErrMsg:  "",
+			wantErrIs:   nil,
+		},
+		{
+			name: "interaction not found",
+			setup: func(ctx context.Context) {
+				mockInteractionStore.EXPECT().
+					Get("corr-not-found").
+					Return(nil, false).
+					Times(1)
+			},
+			args: struct {
+				ctx           context.Context
+				correlationID string
+				message       string
+				edit          []*discordgo.WebhookEdit
+			}{
+				ctx:           context.Background(),
+				correlationID: "corr-not-found",
+				message:       "This won't be sent",
+				edit:          nil,
+			},
+			wantSuccess: "",
+			wantErrMsg:  "no interaction found for correlation ID: corr-not-found",
+			wantErrIs:   nil,
+		},
+		{
+			name: "stored interaction is wrong type",
+			setup: func(ctx context.Context) {
+				mockInteractionStore.EXPECT().
+					Get("corr-wrong-type").
+					Return("not-an-interaction", true).
+					Times(1)
+			},
+			args: struct {
+				ctx           context.Context
+				correlationID string
+				message       string
+				edit          []*discordgo.WebhookEdit
+			}{
+				ctx:           context.Background(),
+				correlationID: "corr-wrong-type",
+				message:       "This also won't be sent",
+				edit:          nil,
+			},
+			wantSuccess: "",
+			wantErrMsg:  "stored interaction is not of type *discordgo.Interaction",
+			wantErrIs:   nil,
+		},
+		{
+			name: "interaction response edit fails",
+			setup: func(ctx context.Context) {
+				mockInteractionStore.EXPECT().
+					Get("corr-fail").
+					Return(&discordgo.Interaction{ID: "int-fail"}, true).
+					Times(1)
+				mockSession.EXPECT().
+					InteractionResponseEdit(
+						gomock.Eq(&discordgo.Interaction{ID: "int-fail"}),
+						gomock.Eq(&discordgo.WebhookEdit{Content: stringPtr("Failed update")}),
+					).
+					Return(nil, errors.New("discord API error")).
+					Times(1)
+			},
+			args: struct {
+				ctx           context.Context
+				correlationID string
+				message       string
+				edit          []*discordgo.WebhookEdit
+			}{
+				ctx:           context.Background(),
+				correlationID: "corr-fail",
+				message:       "Failed update",
+				edit:          nil,
+			},
+			wantSuccess: "",
+			wantErrMsg:  "discord API error",
+			wantErrIs:   nil,
+		},
+		{
+			name: "context cancelled",
+			setup: func(ctx context.Context) {
+				// No expectations on mockInteractionStore or mockSession
+				// because the operation should return early due to context cancellation
+			},
+			args: struct {
+				ctx           context.Context
+				correlationID string
+				message       string
+				edit          []*discordgo.WebhookEdit
+			}{
+				ctx: func() context.Context {
+					ctx, cancel := context.WithCancel(context.Background())
+					cancel()
+					return ctx
+				}(),
+				correlationID: "corr-cancelled",
+				message:       "Should not be processed",
+				edit:          nil,
+			},
+			wantSuccess: "",
+			wantErrMsg:  context.Canceled.Error(),
+			wantErrIs:   context.Canceled,
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.setup != nil {
-				tt.setup()
+			tt.setup(tt.args.ctx) // Pass the context to the setup function
+
+			result, _ := rm.UpdateInteractionResponse(tt.args.ctx, tt.args.correlationID, tt.args.message, tt.args.edit...)
+
+			// Check the RoleOperationResult.Success field
+			gotSuccess, _ := result.Success.(string)
+			if gotSuccess != tt.wantSuccess {
+				t.Errorf("UpdateInteractionResponse() RoleOperationResult.Success mismatch: got %q, want %q", gotSuccess, tt.wantSuccess)
 			}
 
-			err := crm.UpdateInteractionResponse(tt.args.ctx, tt.args.correlationID, tt.args.message, tt.args.edit...)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("createRoundManager.UpdateInteractionResponse() error = %v, wantErr %v", err, tt.wantErr)
+			// Check the RoleOperationResult.Error field
+			if tt.wantErrMsg != "" {
+				if result.Error == nil {
+					t.Errorf("UpdateInteractionResponse() RoleOperationResult.Error is nil, expected error containing %q", tt.wantErrMsg)
+				} else {
+					// Check if the error message contains the expected substring
+					if !strings.Contains(result.Error.Error(), tt.wantErrMsg) {
+						t.Errorf("UpdateInteractionResponse() RoleOperationResult.Error message mismatch: got %q, want substring %q", result.Error.Error(), tt.wantErrMsg)
+					}
+					// Optionally, check for a specific error type if tt.wantErrIs is set
+					if tt.wantErrIs != nil && !errors.Is(result.Error, tt.wantErrIs) {
+						t.Errorf("UpdateInteractionResponse() RoleOperationResult.Error type mismatch: got %T, want type %T", result.Error, tt.wantErrIs)
+					}
+				}
+			} else {
+				if result.Error != nil {
+					t.Errorf("UpdateInteractionResponse() RoleOperationResult.Error is not nil, expected nil. Got: %v", result.Error)
+				}
 			}
 		})
 	}
@@ -272,35 +526,63 @@ func Test_createRoundManager_UpdateInteractionResponseWithRetryButton(t *testing
 
 	mockSession := discordmocks.NewMockSession(ctrl)
 	mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+	logger := loggerfrolfbot.NoOpLogger
+	mockHelper := helpermocks.NewMockHelpers(ctrl)
+	mockConfig := &config.Config{}
+	tracerProvider := noop.NewTracerProvider()
+	tracer := tracerProvider.Tracer("test")
+	metrics := &discordmetrics.NoOpMetrics{}
 
-	crm := &createRoundManager{
+	rm := &createRoundManager{
 		session:          mockSession,
+		publisher:        nil,
+		logger:           logger,
+		helper:           mockHelper,
+		config:           mockConfig,
 		interactionStore: mockInteractionStore,
+		tracer:           tracer,
+		metrics:          metrics,
+		operationWrapper: testOperationWrapper,
 	}
 
 	tests := []struct {
 		name  string
-		setup func()
+		setup func(ctx context.Context)
 		args  struct {
 			ctx           context.Context
 			correlationID string
 			message       string
 		}
-		wantErr bool
+		wantSuccess string
+		wantErrMsg  string
+		wantErrIs   error
 	}{
 		{
 			name: "successful update with retry button",
-			setup: func() {
-				interaction := &discordgo.Interaction{
-					ID: "interaction-id",
-				}
+			setup: func(ctx context.Context) {
 				mockInteractionStore.EXPECT().
-					Get("correlation-id").
-					Return(interaction, true)
-
+					Get("corr-123").
+					Return(&discordgo.Interaction{ID: "int-id"}, true).
+					Times(1)
+				expectedEdit := &discordgo.WebhookEdit{
+					Content: stringPtr("Something went wrong"),
+					Components: &[]discordgo.MessageComponent{
+						discordgo.ActionsRow{Components: []discordgo.MessageComponent{
+							discordgo.Button{
+								Label:    "Try Again",
+								Style:    discordgo.PrimaryButton,
+								CustomID: "retry_create_round",
+							},
+						}},
+					},
+				}
 				mockSession.EXPECT().
-					InteractionResponseEdit(gomock.Eq(interaction), gomock.Any()).
-					Return(&discordgo.Message{}, nil) // Return a message and no error
+					InteractionResponseEdit(
+						gomock.Eq(&discordgo.Interaction{ID: "int-id"}),
+						gomock.Eq(expectedEdit),
+					).
+					Return(&discordgo.Message{}, nil).
+					Times(1)
 			},
 			args: struct {
 				ctx           context.Context
@@ -308,17 +590,20 @@ func Test_createRoundManager_UpdateInteractionResponseWithRetryButton(t *testing
 				message       string
 			}{
 				ctx:           context.Background(),
-				correlationID: "correlation-id",
-				message:       "Updated message with retry button",
+				correlationID: "corr-123",
+				message:       "Something went wrong",
 			},
-			wantErr: false,
+			wantSuccess: "response updated with retry",
+			wantErrMsg:  "",
+			wantErrIs:   nil,
 		},
 		{
 			name: "interaction not found",
-			setup: func() {
+			setup: func(ctx context.Context) {
 				mockInteractionStore.EXPECT().
-					Get("correlation-id").
-					Return(nil, false) // Interaction not found
+					Get("corr-not-found").
+					Return(nil, false).
+					Times(1)
 			},
 			args: struct {
 				ctx           context.Context
@@ -326,17 +611,20 @@ func Test_createRoundManager_UpdateInteractionResponseWithRetryButton(t *testing
 				message       string
 			}{
 				ctx:           context.Background(),
-				correlationID: "correlation-id",
-				message:       "Updated message with retry button",
+				correlationID: "corr-not-found",
+				message:       "This won't be sent",
 			},
-			wantErr: true,
+			wantSuccess: "",
+			wantErrMsg:  "no interaction found for correlation ID: corr-not-found",
+			wantErrIs:   nil,
 		},
 		{
-			name: "stored interaction is not of type *discordgo.Interaction",
-			setup: func() {
+			name: "stored interaction is wrong type",
+			setup: func(ctx context.Context) {
 				mockInteractionStore.EXPECT().
-					Get("correlation-id").
-					Return("not-an-interaction", true) // Incorrect type
+					Get("corr-wrong-type").
+					Return("not-an-interaction", true).
+					Times(1)
 			},
 			args: struct {
 				ctx           context.Context
@@ -344,24 +632,39 @@ func Test_createRoundManager_UpdateInteractionResponseWithRetryButton(t *testing
 				message       string
 			}{
 				ctx:           context.Background(),
-				correlationID: "correlation-id",
-				message:       "Updated message with retry button",
+				correlationID: "corr-wrong-type",
+				message:       "This also won't be sent",
 			},
-			wantErr: true,
+			wantSuccess: "",
+			wantErrMsg:  "stored interaction is not of type *discordgo.Interaction",
+			wantErrIs:   nil,
 		},
 		{
-			name: "failed to update interaction response",
-			setup: func() {
-				interaction := &discordgo.Interaction{
-					ID: "interaction-id",
+			name: "interaction response edit fails",
+			setup: func(ctx context.Context) {
+				mockInteractionStore.EXPECT().
+					Get("corr-fail").
+					Return(&discordgo.Interaction{ID: "int-fail"}, true).
+					Times(1)
+				expectedEdit := &discordgo.WebhookEdit{
+					Content: stringPtr("Failed update"),
+					Components: &[]discordgo.MessageComponent{
+						discordgo.ActionsRow{Components: []discordgo.MessageComponent{
+							discordgo.Button{
+								Label:    "Try Again",
+								Style:    discordgo.PrimaryButton,
+								CustomID: "retry_create_round",
+							},
+						}},
+					},
 				}
-				mockInteractionStore.EXPECT().
-					Get("correlation-id").
-					Return(interaction, true)
-
 				mockSession.EXPECT().
-					InteractionResponseEdit(gomock.Eq(interaction), gomock.Any()).
-					Return(nil, errors.New("failed to update response")) // Simulate an error
+					InteractionResponseEdit(
+						gomock.Eq(&discordgo.Interaction{ID: "int-fail"}),
+						gomock.Eq(expectedEdit),
+					).
+					Return(nil, errors.New("discord API error")).
+					Times(1)
 			},
 			args: struct {
 				ctx           context.Context
@@ -369,93 +672,63 @@ func Test_createRoundManager_UpdateInteractionResponseWithRetryButton(t *testing
 				message       string
 			}{
 				ctx:           context.Background(),
-				correlationID: "correlation-id",
-				message:       "Updated message with retry button",
+				correlationID: "corr-fail",
+				message:       "Failed update",
 			},
-			wantErr: true,
+			wantSuccess: "",
+			wantErrMsg:  "discord API error", // Corrected error message
+			wantErrIs:   nil,
+		},
+		{
+			name: "context cancelled",
+			setup: func(ctx context.Context) {
+				// No expectations on mocks, operation should exit early
+			},
+			args: struct {
+				ctx           context.Context
+				correlationID string
+				message       string
+			}{
+				ctx: func() context.Context {
+					ctx, cancel := context.WithCancel(context.Background())
+					cancel()
+					return ctx
+				}(),
+				correlationID: "corr-cancelled",
+				message:       "Should not be processed",
+			},
+			wantSuccess: "",
+			wantErrMsg:  context.Canceled.Error(),
+			wantErrIs:   context.Canceled,
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.setup != nil {
-				tt.setup()
+			tt.setup(tt.args.ctx)
+
+			result, _ := rm.UpdateInteractionResponseWithRetryButton(tt.args.ctx, tt.args.correlationID, tt.args.message)
+
+			// Check the RoleOperationResult.Success field
+			gotSuccess, _ := result.Success.(string)
+			if gotSuccess != tt.wantSuccess {
+				t.Errorf("UpdateInteractionResponseWithRetryButton() RoleOperationResult.Success mismatch: got %q, want %q", gotSuccess, tt.wantSuccess)
 			}
 
-			if err := crm.UpdateInteractionResponseWithRetryButton(tt.args.ctx, tt.args.correlationID, tt.args.message); (err != nil) != tt.wantErr {
-				t.Errorf("createRoundManager.UpdateInteractionResponseWithRetryButton() error = %v, wantErr %v", err, tt.wantErr)
+			// Check the RoleOperationResult.Error field
+			if tt.wantErrMsg != "" {
+				if result.Error == nil {
+					t.Errorf("UpdateInteractionResponseWithRetryButton() RoleOperationResult.Error is nil, expected error containing %q", tt.wantErrMsg)
+				} else if !strings.Contains(result.Error.Error(), tt.wantErrMsg) {
+					t.Errorf("UpdateInteractionResponseWithRetryButton() RoleOperationResult.Error message mismatch: got %q, want substring %q", result.Error.Error(), tt.wantErrMsg)
+				}
+				if tt.wantErrIs != nil && !errors.Is(result.Error, tt.wantErrIs) {
+					t.Errorf("UpdateInteractionResponseWithRetryButton() RoleOperationResult.Error type mismatch: got %T, want type %T", result.Error, tt.wantErrIs)
+				}
+			} else {
+				if result.Error != nil {
+					t.Errorf("UpdateInteractionResponseWithRetryButton() RoleOperationResult.Error is not nil, expected nil. Got: %v", result.Error)
+				}
 			}
-		})
-	}
-}
-
-func (crm *createRoundManagerMock) HandleRetryCreateRound(ctx context.Context, i *discordgo.InteractionCreate) {
-	// This mimics the actual implementation
-	err := crm.SendCreateRoundModal(ctx, i)
-	if err != nil {
-		// If modal sending fails, update the message to inform the user
-		_, updateErr := crm.session.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
-			Content:    stringPtr("Failed to open the form. Please try using the /createround command again."),
-			Components: &[]discordgo.MessageComponent{},
-		})
-		if updateErr != nil {
-			// In real code, this error would be logged
-		}
-	}
-}
-
-func Test_createRoundManager_HandleRetryCreateRound(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	// Sample interaction with member and user
-	testInteraction := &discordgo.InteractionCreate{
-		Interaction: &discordgo.Interaction{
-			ID: "interaction-id",
-			Member: &discordgo.Member{
-				User: &discordgo.User{
-					ID: "user-123",
-				},
-			},
-		},
-	}
-
-	tests := []struct {
-		name                string
-		mockSendModalResult error
-		expectResponseEdit  bool
-		responseEditResult  error
-	}{
-		// Your test cases remain the same
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create fresh mocks for each test
-			mockSession := discordmocks.NewMockSession(ctrl)
-
-			// Create a createRoundManagerMock instead of createRoundManager
-			crm := &createRoundManagerMock{
-				session: *mockSession, // Use the same mock session
-			}
-
-			// Set up your mock function
-			crm.mockSendCreateRoundModal = func(ctx context.Context, i *discordgo.InteractionCreate) error {
-				return tt.mockSendModalResult
-			}
-
-			// If we expect error handling, set up the response edit expectation
-			if tt.expectResponseEdit {
-				mockSession.EXPECT().
-					InteractionResponseEdit(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(i *discordgo.Interaction, edit *discordgo.WebhookEdit) (*discordgo.Message, error) {
-						// Your validation remains the same
-						return &discordgo.Message{}, tt.responseEditResult
-					})
-			}
-
-			// Execute the function using the mock implementation
-			crm.HandleRetryCreateRound(context.Background(), testInteraction)
 		})
 	}
 }

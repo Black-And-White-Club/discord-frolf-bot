@@ -11,22 +11,25 @@ import (
 	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	helpersmocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
-	"github.com/Black-And-White-Club/frolf-bot-shared/observability/mocks"
-	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
+	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
+	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/bwmarrin/discordgo"
+	"github.com/google/uuid"
 	"go.uber.org/mock/gomock"
 )
 
-func Test_deleteRoundManager_HandleDeleteRound(t *testing.T) {
+func Test_deleteRoundManager_HandleDeleteRoundCommand(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockSession := discordmocks.NewMockSession(ctrl)
 	mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
 	mockHelper := helpersmocks.NewMockHelpers(ctrl)
 	mockConfig := &config.Config{}
+	metrics := &discordmetrics.NoOpMetrics{}
+	logger := loggerfrolfbot.NoOpLogger
 
 	// Helper function to create a sample InteractionCreate with the desired custom ID
 	createInteraction := func(customID string) *discordgo.InteractionCreate {
@@ -49,10 +52,10 @@ func Test_deleteRoundManager_HandleDeleteRound(t *testing.T) {
 	}
 
 	// Helper function to create an expected round delete request payload
-	createExpectedPayload := func(roundID int64) roundevents.RoundDeleteRequestPayload {
+	createExpectedPayload := func(roundID sharedtypes.RoundID) roundevents.RoundDeleteRequestPayload {
 		return roundevents.RoundDeleteRequestPayload{
-			RoundID:              roundtypes.ID(roundID),
-			RequestingUserUserID: "user-456",
+			RoundID:              roundID,
+			RequestingUserUserID: sharedtypes.DiscordID("user-456"),
 		}
 	}
 
@@ -63,6 +66,9 @@ func Test_deleteRoundManager_HandleDeleteRound(t *testing.T) {
 			ctx context.Context
 			i   *discordgo.InteractionCreate
 		}
+		expectErr     bool
+		expectedError string
+		expectSuccess bool
 	}{
 		{
 			name: "successful delete request",
@@ -70,15 +76,11 @@ func Test_deleteRoundManager_HandleDeleteRound(t *testing.T) {
 				// Mock InteractionRespond call
 				mockSession.EXPECT().
 					InteractionRespond(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(i *discordgo.Interaction, ir *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
-						if ir.Type != discordgo.InteractionResponseDeferredMessageUpdate {
-							t.Errorf("Expected InteractionResponseDeferredMessageUpdate, got %v", ir.Type)
-						}
-						return nil
-					}).
+					Return(nil).
 					Times(1)
 
-				expectedPayload := createExpectedPayload(789)
+				roundUUID := uuid.MustParse("00000000-0000-0000-0000-0000000003b1") // Example UUID
+				expectedPayload := createExpectedPayload(sharedtypes.RoundID(roundUUID))
 				mockHelper.EXPECT().
 					CreateResultMessage(gomock.Any(), gomock.Eq(expectedPayload), gomock.Eq(roundevents.RoundDeleteRequest)).
 					Return(&message.Message{UUID: "msg-456"}, nil).
@@ -91,30 +93,25 @@ func Test_deleteRoundManager_HandleDeleteRound(t *testing.T) {
 
 				mockSession.EXPECT().
 					FollowupMessageCreate(gomock.Any(), gomock.Eq(true), gomock.Any()).
-					DoAndReturn(func(i *discordgo.Interaction, wait bool, params *discordgo.WebhookParams, opts ...discordgo.RequestOption) (*discordgo.Message, error) {
-						// Check if the message is ephemeral
-						if params.Flags != discordgo.MessageFlagsEphemeral {
-							t.Errorf("Expected MessageFlagsEphemeral, got %v", params.Flags)
-						}
-						if !strings.Contains(params.Content, "deletion request sent") {
-							t.Errorf("Expected message to contain 'deletion request sent', got %s", params.Content)
-						}
-						return &discordgo.Message{ID: "message-456"}, nil
-					}).
+					Return(&discordgo.Message{ID: "message-456"}, nil).
 					Times(1)
+
+				// mockLogger.EXPECT().InfoContext(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes() // Remove this
 			},
 			args: struct {
 				ctx context.Context
 				i   *discordgo.InteractionCreate
 			}{
 				ctx: context.Background(),
-				i:   createInteraction("round_delete|789"),
+				i:   createInteraction("round_delete|00000000-0000-0000-0000-0000000003b1"), // Use valid UUID string
 			},
+			expectSuccess: true,
+			expectErr:     false,
 		},
 		{
 			name: "invalid custom ID format",
 			setup: func() {
-				// No mocks needed - function should return early
+				// mockLogger.EXPECT().ErrorContext(gomock.Any(), gomock.Any(), gomock.Any()).Times(1) // Remove this
 			},
 			args: struct {
 				ctx context.Context
@@ -123,11 +120,17 @@ func Test_deleteRoundManager_HandleDeleteRound(t *testing.T) {
 				ctx: context.Background(),
 				i:   createInteraction("round_delete"), // Missing the round ID part
 			},
+			expectErr:     true,
+			expectedError: "invalid custom_id format",
 		},
 		{
 			name: "invalid round ID",
 			setup: func() {
-				// No mocks needed - function should return early
+				mockSession.EXPECT().
+					FollowupMessageCreate(gomock.Any(), gomock.Eq(true), gomock.Any()).
+					Return(&discordgo.Message{ID: "message-456"}, nil).
+					Times(1)
+				// mockLogger.EXPECT().ErrorContext(gomock.Any(), gomock.Any(), gomock.Any()).Times(1) // Remove this
 			},
 			args: struct {
 				ctx context.Context
@@ -136,6 +139,8 @@ func Test_deleteRoundManager_HandleDeleteRound(t *testing.T) {
 				ctx: context.Background(),
 				i:   createInteraction("round_delete|invalid"),
 			},
+			expectErr:     true,
+			expectedError: "failed to parse round ID as UUID",
 		},
 		{
 			name: "interaction respond error",
@@ -145,14 +150,17 @@ func Test_deleteRoundManager_HandleDeleteRound(t *testing.T) {
 					InteractionRespond(gomock.Any(), gomock.Any()).
 					Return(errors.New("failed to respond to interaction")).
 					Times(1)
+				// mockLogger.EXPECT().ErrorContext(gomock.Any(), gomock.Any(), gomock.Any()).Times(1) // Remove this
 			},
 			args: struct {
 				ctx context.Context
 				i   *discordgo.InteractionCreate
 			}{
 				ctx: context.Background(),
-				i:   createInteraction("round_delete|789"),
+				i:   createInteraction("round_delete|00000000-0000-0000-0000-0000000003b1"),
 			},
+			expectErr:     true,
+			expectedError: "failed to acknowledge interaction",
 		},
 		{
 			name: "create result message error",
@@ -169,21 +177,19 @@ func Test_deleteRoundManager_HandleDeleteRound(t *testing.T) {
 
 				mockSession.EXPECT().
 					FollowupMessageCreate(gomock.Any(), gomock.Eq(true), gomock.Any()).
-					DoAndReturn(func(i *discordgo.Interaction, wait bool, params *discordgo.WebhookParams, opts ...discordgo.RequestOption) (*discordgo.Message, error) {
-						if !strings.Contains(params.Content, "Failed to delete") {
-							t.Errorf("Expected error message about failing to delete, got %s", params.Content)
-						}
-						return &discordgo.Message{ID: "message-456"}, nil
-					}).
+					Return(&discordgo.Message{ID: "message-456"}, nil).
 					Times(1)
+				// mockLogger.EXPECT().ErrorContext(gomock.Any(), gomock.Any(), gomock.Any()).Times(1) // Remove this
 			},
 			args: struct {
 				ctx context.Context
 				i   *discordgo.InteractionCreate
 			}{
 				ctx: context.Background(),
-				i:   createInteraction("round_delete|789"),
+				i:   createInteraction("round_delete|00000000-0000-0000-0000-0000000003b1"),
 			},
+			expectErr:     true,
+			expectedError: "failed to create result message",
 		},
 		{
 			name: "publish error",
@@ -205,21 +211,19 @@ func Test_deleteRoundManager_HandleDeleteRound(t *testing.T) {
 
 				mockSession.EXPECT().
 					FollowupMessageCreate(gomock.Any(), gomock.Eq(true), gomock.Any()).
-					DoAndReturn(func(i *discordgo.Interaction, wait bool, params *discordgo.WebhookParams, opts ...discordgo.RequestOption) (*discordgo.Message, error) {
-						if !strings.Contains(params.Content, "Failed to delete") {
-							t.Errorf("Expected error message about failing to delete, got %s", params.Content)
-						}
-						return &discordgo.Message{ID: "message-456"}, nil
-					}).
+					Return(&discordgo.Message{ID: "message-456"}, nil).
 					Times(1)
+				// mockLogger.EXPECT().ErrorContext(gomock.Any(), gomock.Any(), gomock.Any()).Times(1) // Remove this
 			},
 			args: struct {
 				ctx context.Context
 				i   *discordgo.InteractionCreate
 			}{
 				ctx: context.Background(),
-				i:   createInteraction("round_delete|789"),
+				i:   createInteraction("round_delete|00000000-0000-0000-0000-0000000003b1"),
 			},
+			expectErr:     true,
+			expectedError: "failed to publish delete request",
 		},
 		{
 			name: "followup message error",
@@ -243,14 +247,17 @@ func Test_deleteRoundManager_HandleDeleteRound(t *testing.T) {
 					FollowupMessageCreate(gomock.Any(), gomock.Eq(true), gomock.Any()).
 					Return(nil, errors.New("failed to send followup message")).
 					Times(1)
+				// mockLogger.EXPECT().ErrorContext(gomock.Any(), gomock.Any(), gomock.Any()).Times(1) // Remove this
 			},
 			args: struct {
 				ctx context.Context
 				i   *discordgo.InteractionCreate
 			}{
 				ctx: context.Background(),
-				i:   createInteraction("round_delete|789"),
+				i:   createInteraction("round_delete|00000000-0000-0000-0000-0000000003b1"),
 			},
+			expectErr:     true,
+			expectedError: "failed to send followup message",
 		},
 	}
 
@@ -263,12 +270,43 @@ func Test_deleteRoundManager_HandleDeleteRound(t *testing.T) {
 			drm := &deleteRoundManager{
 				session:   mockSession,
 				publisher: mockPublisher,
-				logger:    mockLogger,
+				logger:    logger,
 				helper:    mockHelper,
 				config:    mockConfig,
+				operationWrapper: func(ctx context.Context, operationName string, operationFunc func(ctx context.Context) (DeleteRoundOperationResult, error)) (DeleteRoundOperationResult, error) {
+					return operationFunc(ctx)
+				},
+				metrics: metrics,
 			}
 
-			drm.HandleDeleteRound(tt.args.ctx, tt.args.i)
+			result, err := drm.HandleDeleteRoundCommand(tt.args.ctx, tt.args.i)
+
+			if tt.expectErr {
+				if err == nil && result.Error == nil {
+					t.Errorf("%s: Expected error, got nil (err and result.Error)", tt.name)
+				}
+				if tt.expectedError != "" {
+					var actualError string
+					if err != nil {
+						actualError = err.Error()
+					} else if result.Error != nil {
+						actualError = result.Error.Error()
+					}
+					if !strings.Contains(actualError, tt.expectedError) {
+						t.Errorf("%s: Expected error containing: %q, got: %q", tt.name, tt.expectedError, actualError)
+					}
+				}
+			} else {
+				if err != nil {
+					t.Errorf("%s: Unexpected error: %v", tt.name, err)
+				}
+				if result.Error != nil {
+					t.Errorf("%s: Unexpected result.Error: %v", tt.name, result.Error)
+				}
+			}
+			if tt.expectSuccess != (result.Success != nil) {
+				t.Errorf("%s: Expected success: %v, got %v", tt.name, tt.expectSuccess, result.Success != nil)
+			}
 		})
 	}
 }

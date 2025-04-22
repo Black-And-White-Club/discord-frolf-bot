@@ -14,6 +14,7 @@ import (
 	reflect "reflect"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	signup "github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord/signup"
 	discordgo "github.com/bwmarrin/discordgo"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -43,9 +44,12 @@ func (m *MockSignupManager) EXPECT() *MockSignupManagerMockRecorder {
 }
 
 // HandleSignupButtonPress mocks base method.
-func (m *MockSignupManager) HandleSignupButtonPress(ctx context.Context, i *discordgo.InteractionCreate) {
+func (m *MockSignupManager) HandleSignupButtonPress(ctx context.Context, i *discordgo.InteractionCreate) (signup.SignupOperationResult, error) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "HandleSignupButtonPress", ctx, i)
+	ret := m.ctrl.Call(m, "HandleSignupButtonPress", ctx, i)
+	ret0, _ := ret[0].(signup.SignupOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // HandleSignupButtonPress indicates an expected call of HandleSignupButtonPress.
@@ -55,9 +59,12 @@ func (mr *MockSignupManagerMockRecorder) HandleSignupButtonPress(ctx, i any) *go
 }
 
 // HandleSignupModalSubmit mocks base method.
-func (m *MockSignupManager) HandleSignupModalSubmit(ctx context.Context, i *discordgo.InteractionCreate) {
+func (m *MockSignupManager) HandleSignupModalSubmit(ctx context.Context, i *discordgo.InteractionCreate) (signup.SignupOperationResult, error) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "HandleSignupModalSubmit", ctx, i)
+	ret := m.ctrl.Call(m, "HandleSignupModalSubmit", ctx, i)
+	ret0, _ := ret[0].(signup.SignupOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // HandleSignupModalSubmit indicates an expected call of HandleSignupModalSubmit.
@@ -67,9 +74,12 @@ func (mr *MockSignupManagerMockRecorder) HandleSignupModalSubmit(ctx, i any) *go
 }
 
 // HandleSignupReactionAdd mocks base method.
-func (m *MockSignupManager) HandleSignupReactionAdd(ctx context.Context, r *discordgo.MessageReactionAdd) {
+func (m *MockSignupManager) HandleSignupReactionAdd(ctx context.Context, r *discordgo.MessageReactionAdd) (signup.SignupOperationResult, error) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "HandleSignupReactionAdd", ctx, r)
+	ret := m.ctrl.Call(m, "HandleSignupReactionAdd", ctx, r)
+	ret0, _ := ret[0].(signup.SignupOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // HandleSignupReactionAdd indicates an expected call of HandleSignupReactionAdd.
@@ -79,9 +89,12 @@ func (mr *MockSignupManagerMockRecorder) HandleSignupReactionAdd(ctx, r any) *go
 }
 
 // MessageReactionAdd mocks base method.
-func (m *MockSignupManager) MessageReactionAdd(s discord.Session, r *discordgo.MessageReactionAdd) {
+func (m *MockSignupManager) MessageReactionAdd(s discord.Session, r *discordgo.MessageReactionAdd) (signup.SignupOperationResult, error) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "MessageReactionAdd", s, r)
+	ret := m.ctrl.Call(m, "MessageReactionAdd", s, r)
+	ret0, _ := ret[0].(signup.SignupOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // MessageReactionAdd indicates an expected call of MessageReactionAdd.
@@ -91,11 +104,12 @@ func (mr *MockSignupManagerMockRecorder) MessageReactionAdd(s, r any) *gomock.Ca
 }
 
 // SendSignupModal mocks base method.
-func (m *MockSignupManager) SendSignupModal(ctx context.Context, i *discordgo.InteractionCreate) error {
+func (m *MockSignupManager) SendSignupModal(ctx context.Context, i *discordgo.InteractionCreate) (signup.SignupOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SendSignupModal", ctx, i)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(signup.SignupOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // SendSignupModal indicates an expected call of SendSignupModal.
@@ -105,15 +119,16 @@ func (mr *MockSignupManagerMockRecorder) SendSignupModal(ctx, i any) *gomock.Cal
 }
 
 // SendSignupResult mocks base method.
-func (m *MockSignupManager) SendSignupResult(interactionToken string, success bool) error {
+func (m *MockSignupManager) SendSignupResult(ctx context.Context, interactionToken string, success bool) (signup.SignupOperationResult, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SendSignupResult", interactionToken, success)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret := m.ctrl.Call(m, "SendSignupResult", ctx, interactionToken, success)
+	ret0, _ := ret[0].(signup.SignupOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // SendSignupResult indicates an expected call of SendSignupResult.
-func (mr *MockSignupManagerMockRecorder) SendSignupResult(interactionToken, success any) *gomock.Call {
+func (mr *MockSignupManagerMockRecorder) SendSignupResult(ctx, interactionToken, success any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendSignupResult", reflect.TypeOf((*MockSignupManager)(nil).SendSignupResult), interactionToken, success)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendSignupResult", reflect.TypeOf((*MockSignupManager)(nil).SendSignupResult), ctx, interactionToken, success)
 }

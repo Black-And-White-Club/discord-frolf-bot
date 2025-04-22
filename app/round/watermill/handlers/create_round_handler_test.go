@@ -2,6 +2,7 @@ package roundhandlers
 
 import (
 	"errors"
+	"log/slog"
 	"reflect"
 	"testing"
 	"time"
@@ -26,7 +27,7 @@ func TestRoundHandlers_HandleRoundCreateRequested(t *testing.T) {
 	mockRoundDiscord := mocks.NewMockRoundDiscordInterface(ctrl)
 
 	type fields struct {
-		Logger       observability.Logger
+		Logger       *slog.Logger
 		Helpers      *utils.MockHelpers
 		RoundDiscord *mocks.MockRoundDiscordInterface
 	}
@@ -198,7 +199,7 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 	mockCreateRoundManager := mocks.NewMockCreateRoundManager(ctrl)
 
 	type fields struct {
-		Logger       observability.Logger
+		Logger       *slog.Logger
 		Helpers      *utils.MockHelpers
 		RoundDiscord *mocks.MockRoundDiscordInterface
 	}
@@ -373,7 +374,7 @@ func TestRoundHandlers_HandleRoundCreationFailed(t *testing.T) {
 	mockCreateRoundManager := mocks.NewMockCreateRoundManager(ctrl)
 
 	type fields struct {
-		Logger       observability.Logger
+		Logger       *slog.Logger
 		Helpers      *utils.MockHelpers
 		RoundDiscord *mocks.MockRoundDiscordInterface
 	}
@@ -502,7 +503,7 @@ func TestRoundHandlers_HandleRoundValidationFailed(t *testing.T) {
 	mockCreateRoundManager := mocks.NewMockCreateRoundManager(ctrl)
 
 	type fields struct {
-		Logger       observability.Logger
+		Logger       *slog.Logger
 		Helpers      *utils.MockHelpers
 		RoundDiscord *mocks.MockRoundDiscordInterface
 	}
