@@ -2,26 +2,16 @@ package main
 
 import (
 	"context"
-	"log"
-	"log/slog"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/bot"
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
-	leaderboarddiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord"
-	leaderboardrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/watermill"
-	leaderboardhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/watermill/handlers"
-	rounddiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord"
-	roundrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/round/watermill"
-	roundhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/round/watermill/handlers"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
-	userdiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord"
-	userrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/user/watermill"
-	userhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/user/watermill/handlers"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
-	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
@@ -31,65 +21,54 @@ import (
 )
 
 func main() {
-	// Load configuration
-	cfg, err := config.LoadConfig("config.yaml")
-	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
-	}
-
-	// Initialize logging
-	slogLogger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-
-	// Initialize Loki logger
-	logger, err := observability.NewLokiLogger(cfg.Loki.URL, cfg.Loki.Username, cfg.Loki.Password)
-	if err != nil {
-		log.Fatalf("Failed to initialize Loki logger: %v", err)
-	}
-	defer logger.Close()
-
-	// Initialize OpenTelemetry/Tempo tracing
-	tracerInstance := &observability.TempoTracer{}
-	tracingOpts := observability.TracingOptions{
-		ServiceName:    cfg.Service.Name,
-		TempoEndpoint:  cfg.Tempo.Endpoint,
-		Insecure:       cfg.Tempo.Insecure,
-		ServiceVersion: cfg.Tempo.ServiceVer,
-		SampleRate:     cfg.Tempo.SampleRate,
-	}
-	tracerShutdown, err := tracerInstance.InitTracing(context.Background(), tracingOpts)
-	if err != nil {
-		logger.Error(context.Background(), "Failed to initialize tracing", attr.Error(err))
-		return
-	}
-	defer tracerShutdown()
-
-	// Create a context for graceful shutdown
+	// Create initial context
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Initialize EventBus
-	slogLogger.Info("Initializing EventBus...")
-	eventBus, err := eventbus.NewEventBus(ctx, cfg.NATS.URL, slogLogger, "discord")
+	// --- Configuration Loading ---
+	cfg, err := config.LoadConfig("config.yaml")
 	if err != nil {
-		log.Fatalf("Failed to create event bus: %v", err)
+		fmt.Printf("Failed to load config: %v\n", err)
+		os.Exit(1)
 	}
-	slogLogger.Info("EventBus initialized, setting up subscriptions...")
-	defer eventBus.Close()
 
-	// Initialize Watermill router (but don't start yet!)
+	// --- Observability Initialization ---
+	obsConfig := observability.Config{
+		ServiceName:     "discord-frolf-bot",
+		Environment:     cfg.Observability.Environment,
+		Version:         cfg.Service.Version, // Ensure version is from the service config
+		MetricsAddress:  cfg.Observability.MetricsAddress,
+		TempoEndpoint:   cfg.Observability.TempoEndpoint,
+		TempoInsecure:   cfg.Observability.TempoInsecure,
+		TempoSampleRate: cfg.Observability.TempoSampleRate,
+	}
+
+	// Initialize observability stack
+	obs, err := observability.Init(ctx, obsConfig)
+	if err != nil {
+		fmt.Printf("Failed to initialize observability: %v\n", err)
+		os.Exit(1)
+	}
+	logger := obs.Provider.Logger
+
+	// --- Discord Components Initialization ---
+
+	// Initialize Watermill router
 	watermillRouter, err := message.NewRouter(message.RouterConfig{}, watermill.NopLogger{})
 	if err != nil {
-		log.Fatalf("Failed to create Watermill router: %v", err)
+		logger.Error("Failed to create Watermill router", attr.Error(err))
+		os.Exit(1)
 	}
 	defer watermillRouter.Close()
 
 	// Create Discord session
 	discordSession, err := discordgo.New("Bot " + cfg.Discord.Token)
 	if err != nil {
-		log.Fatalf("Failed to create Discord session: %v", err)
+		logger.Error("Failed to create Discord session", attr.Error(err))
+		os.Exit(1)
 	}
 
-	// Set Discord intents
+	// Configure Discord intents
 	discordSession.Identify.Intents = discordgo.IntentsGuilds |
 		discordgo.IntentsGuildMessages |
 		discordgo.IntentsGuildMessageReactions |
@@ -97,82 +76,65 @@ func main() {
 		discordgo.IntentMessageContent |
 		discordgo.IntentGuildMembers
 
-	// Wrap the Discord session
+	// Wrap Discord session with observability
 	discordSessionWrapper := discord.NewDiscordSession(discordSession, logger)
 
-	// Create a single instance of InteractionStore
+	// Create interaction store
 	interactionStore := storage.NewInteractionStore()
 
-	// Create domain routers (ensure they register handlers before running the router)
-	userDiscord, err := userdiscord.NewUserDiscord(ctx, discordSessionWrapper, eventBus, logger, utils.NewHelper(logger), cfg, interactionStore)
+	// --- Bot Initialization ---
+	discordBot, err := bot.NewDiscordBot(
+		discordSessionWrapper,
+		cfg,
+		logger,
+		watermillRouter,
+		interactionStore,
+		obs.Registry.DiscordMetrics,
+		obs.Registry.EventBusMetrics,
+		obs.Provider.TracerProvider.Tracer("discordbot"),
+		utils.NewHelper(logger),
+	)
 	if err != nil {
-		log.Fatalf("Failed to create user Discord services: %v", err)
+		logger.Error("Failed to create Discord bot", attr.Error(err))
+		os.Exit(1)
 	}
 
-	userRouter := userrouter.NewUserRouter(logger, watermillRouter, eventBus, eventBus, cfg, utils.NewHelper(logger), tracerInstance)
-	slogLogger.Info("Configuring user router subscribers...")
-	if err := userRouter.Configure(userhandlers.NewUserHandlers(logger, cfg, utils.NewEventUtil(), utils.NewHelper(logger), userDiscord), eventBus); err != nil {
-		log.Fatalf("Failed to configure user router: %v", err)
-	}
-	slogLogger.Info("User  router subscribers configured.")
+	// --- Graceful Shutdown Setup ---
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
+	cleanShutdown := make(chan struct{})
 
-	roundDiscord, err := rounddiscord.NewRoundDiscord(ctx, discordSessionWrapper, eventBus, logger, utils.NewHelper(logger), cfg, interactionStore)
-	if err != nil {
-		log.Fatalf("Failed to create round Discord services: %v", err)
-	}
-
-	roundRouter := roundrouter.NewRoundRouter(logger, watermillRouter, eventBus, eventBus, cfg, utils.NewHelper(logger), tracerInstance)
-	slogLogger.Info("Configuring round router subscribers...")
-	if err := roundRouter.Configure(roundhandlers.NewRoundHandlers(logger, cfg, utils.NewEventUtil(), utils.NewHelper(logger), roundDiscord), eventBus); err != nil {
-		log.Fatalf("Failed to configure round router: %v", err)
-	}
-	slogLogger.Info("Round router subscribers configured.")
-
-	leaderboardDiscord, err := leaderboarddiscord.NewLeaderboardDiscord(ctx, discordSessionWrapper, eventBus, logger, utils.NewHelper(logger), cfg)
-	if err != nil {
-		log.Fatalf("Failed to create leaderboard Discord services: %v", err)
-	}
-
-	leaderboardRouter := leaderboardrouter.NewLeaderboardRouter(logger, watermillRouter, eventBus, eventBus, cfg, utils.NewHelper(logger), tracerInstance)
-	slogLogger.Info("Configuring leaderboard router subscribers...")
-	if err := leaderboardRouter.Configure(leaderboardhandlers.NewLeaderboardHandlers(logger, cfg, utils.NewEventUtil(), utils.NewHelper(logger), leaderboardDiscord), eventBus); err != nil {
-		log.Fatalf("Failed to configure leaderboard router: %v", err)
-	}
-	slogLogger.Info("leaderboard router subscribers configured.")
-
-	// ✅ Start Watermill Router AFTER Handlers Are Registered
+	// Start bot components
 	go func() {
-		slogLogger.Info("Starting Watermill router...")
-		if err := watermillRouter.Run(ctx); err != nil && err != context.Canceled {
-			logger.Error(ctx, "Watermill router error", attr.Error(err))
-		}
-		slogLogger.Info("Watermill router stopped")
-	}()
-
-	// Create the Discord bot (but do NOT open the session yet)
-	discordBot, err := bot.NewDiscordBot(discordSessionWrapper, cfg, logger, eventBus, watermillRouter, interactionStore)
-	if err != nil {
-		log.Fatalf("Failed to create Discord bot: %v", err)
-	}
-
-	// Start the bot in a goroutine AFTER Watermill is running
-	go func() {
-		slogLogger.Info("Starting Discord bot...")
+		logger.Info("Starting Discord bot components...")
 		if err := discordBot.Run(ctx); err != nil && err != context.Canceled {
-			logger.Error(ctx, "Discord bot error", attr.Error(err))
+			logger.Error("Bot run failed", attr.Error(err))
 			cancel()
 		}
-		slogLogger.Info("Discord bot stopped")
 	}()
 
-	// Handle graceful shutdown
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	<-sigChan // Block until a signal is received.
-	logger.Info(context.Background(), "Shutting down gracefully...")
-	cancel()
+	// Shutdown handler
+	go func() {
+		select {
+		case sig := <-interrupt:
+			logger.Info("Received signal", attr.String("signal", sig.String()))
+		case <-ctx.Done():
+			logger.Info("Context cancelled")
+		}
 
-	// Close everything cleanly
-	discordBot.Close()
-	logger.Info(context.Background(), "Shutdown complete.")
+		logger.Info("Initiating graceful shutdown...")
+		cancel()
+
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer shutdownCancel()
+
+		if err := discordBot.Shutdown(shutdownCtx); err != nil {
+			logger.Error("Failed to shutdown Discord bot", attr.Error(err))
+		}
+		close(cleanShutdown)
+	}()
+
+	// Wait for shutdown to complete
+	<-cleanShutdown
+	logger.Info("Shutdown complete")
 }

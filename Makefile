@@ -16,16 +16,14 @@ SCORE_DIR := ./app/score
 # Mocks for User Domain
 mocks-user: mocks-user-discord mocks-user-handlers mocks-user-role-manager mocks-user-signup-manager
 mocks-round: mocks-create-round-manager mocks-round-rsvp-manager mocks-round-discord mocks-round-reminder-manager mocks-start-round-manager mocks-score-round-manager mocks-finalize-round-manager mocks-delete-round-manager mocks-update-round-manager
+mocks-leaderboard: mocks-leaderboard-discord mocks-leaderboard-update-manager
 
 mocks-user-discord:
 	$(MOCKGEN) -source=$(USER_DIR)/discord/discord.go -destination=$(USER_DIR)/mocks/mock_user_discord.go -package=mocks
-
 mocks-user-handlers:
 	$(MOCKGEN) -source=$(USER_DIR)/watermill/handlers/handlers.go -destination=$(USER_DIR)/mocks/mock_handlers.go -package=mocks
-
 mocks-user-role-manager:
 	$(MOCKGEN) -source=$(USER_DIR)/discord/role/role.go -destination=$(USER_DIR)/mocks/mock_role_manager.go -package=mocks
-
 mocks-user-signup-manager:
 	$(MOCKGEN) -source=$(USER_DIR)/discord/signup/signup.go -destination=$(USER_DIR)/mocks/mock_signup_manager.go -package=mocks
 
@@ -49,3 +47,9 @@ mocks-delete-round-manager:
 mocks-update-round-manager:
 	$(MOCKGEN) -source=$(ROUND_DIR)/discord/update_round/update_round.go -destination=$(ROUND_DIR)/mocks/mock_update_round_manager.go -package=mocks
 # Mocks for other domains (if needed, add here)
+
+#Mocks for Leaderboard Domain
+mocks-leaderboard-discord:
+	$(MOCKGEN) -source=$(LB_DIR)/discord/discord.go -destination=$(LB_DIR)/mocks/mock_leaderboard_discord.go -package=mocks
+mocks-leaderboard-update-manager:
+	$(MOCKGEN) -source=$(LB_DIR)/discord/leaderboard_updated/leaderboard_updated.go -destination=$(LB_DIR)/mocks/mock_leaderboard_updated_manager.go -package=mocks

@@ -1,277 +1,247 @@
 package leaderboardhandlers
 
-// import (
-// 	"context"
-// 	"encoding/json"
-// 	"reflect"
-// 	"testing"
+import (
+	"context"
+	"errors"
+	"io"
+	"log/slog"
+	"reflect"
+	"testing"
 
-// 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
-// 	discordleaderboardevents "github.com/Black-And-White-Club/discord-frolf-bot/events/leaderboard"
-// 	"github.com/Black-And-White-Club/discord-frolf-bot/mocks"
-// 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
-// 	logger_mocks "github.com/Black-And-White-Club/frolf-bot-shared/observability/mocks"
-// 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
-// 	"github.com/ThreeDotsLabs/watermill/message"
-// 	"go.uber.org/mock/gomock"
-// )
+	discordleaderboardevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/leaderboard"
+	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
+	util_mocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
+	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
+	"github.com/ThreeDotsLabs/watermill/message"
+	"go.opentelemetry.io/otel/trace/noop"
+	"go.uber.org/mock/gomock"
+)
 
-// func TestLeaderboardHandlers_HandleGetTagByDiscordID(t *testing.T) {
-// 	ctrl := gomock.NewController(t)
-// 	defer ctrl.Finish()
-// 	mockLogger := logger_mocks.NewMockLogger(ctrl)
-// 	mockSession := mocks.NewMockSession(ctrl)
-// 	mockConfig := &config.Config{}
-// 	mockEventUtil := utils.NewEventUtil()
-// 	tests := []struct {
-// 		name           string
-// 		msg            *message.Message
-// 		setupMocks     func()
-// 		expectedError  bool
-// 		expectedResult []*message.Message
-// 	}{
-// 		{
-// 			name: "successful get tag by discord ID",
-// 			msg: func() *message.Message {
-// 				payload := discordleaderboardevents.LeaderboardTagAvailabilityRequestPayload{
-// 					UserID:    "123456789",
-// 					ChannelID: "channel123",
-// 					MessageID: "message123",
-// 				}
-// 				payloadBytes, _ := json.Marshal(payload)
-// 				msg := message.NewMessage("test-id", payloadBytes)
-// 				msg.SetContext(context.Background())
-// 				msg.Metadata.Set("correlation_id", "correlation123")
-// 				return msg
-// 			}(),
-// 			setupMocks: func() {
-// 				mockLogger.EXPECT().
-// 					Info(
-// 						gomock.Any(),
-// 						"Handling GetTagByDiscordID request",
-// 						gomock.Any(),
-// 					)
-// 				mockLogger.EXPECT().
-// 					Info(
-// 						gomock.Any(),
-// 						"Successfully translated GetTagByDiscordID request",
-// 						gomock.Any(),
-// 					)
-// 			},
-// 			expectedError: false,
-// 			expectedResult: func() []*message.Message {
-// 				h := &LeaderboardHandlers{
-// 					Logger:    mockLogger,
-// 					Session:   mockSession,
-// 					Config:    mockConfig,
-// 					EventUtil: mockEventUtil,
-// 				}
-// 				payload := leaderboardevents.GetTagByDiscordIDRequestPayload{
-// 					DiscordID: "123456789",
-// 				}
-// 				msg, _ := h.Helpers.CreateResultMessage(nil, payload, leaderboardevents.GetTagByDiscordIDRequest)
-// 				msg.Metadata.Set("correlation_id", "correlation123")
-// 				return []*message.Message{msg}
-// 			}(),
-// 		},
-// 		{
-// 			name: "invalid payload - unmarshal error",
-// 			msg: func() *message.Message {
-// 				// Invalid JSON payload
-// 				msg := message.NewMessage("test-id", []byte(`{invalid json`))
-// 				msg.SetContext(context.Background())
-// 				msg.Metadata.Set("correlation_id", "correlation123")
-// 				return msg
-// 			}(),
-// 			setupMocks: func() {
-// 				mockLogger.EXPECT().
-// 					Info(
-// 						gomock.Any(),
-// 						"Handling GetTagByDiscordID request",
-// 						gomock.Any(),
-// 					)
-// 				mockLogger.EXPECT().
-// 					Error(
-// 						gomock.Any(),
-// 						"Failed to unmarshal payload",
-// 						gomock.Any(),
-// 						gomock.Any(),
-// 					)
-// 			},
-// 			expectedError:  true,
-// 			expectedResult: nil,
-// 		},
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			tt.setupMocks()
-// 			h := &LeaderboardHandlers{
-// 				Logger:    mockLogger,
-// 				Session:   mockSession,
-// 				Config:    mockConfig,
-// 				EventUtil: mockEventUtil,
-// 			}
-// 			got, err := h.HandleGetTagByDiscordID(tt.msg)
-// 			if (err != nil) != tt.expectedError {
-// 				t.Errorf("HandleGetTagByDiscordID() error = %v, expectedError %v", err, tt.expectedError)
-// 				return
-// 			}
-// 			if tt.expectedResult == nil {
-// 				if got != nil {
-// 					t.Errorf("expected nil result but got messages")
-// 				}
-// 				return
-// 			}
-// 			if len(got) != len(tt.expectedResult) {
-// 				t.Errorf("expected %d messages, got %d", len(tt.expectedResult), len(got))
-// 				return
-// 			}
-// 			for i, expectedMsg := range tt.expectedResult {
-// 				var gotPayload, expectedPayload map[string]interface{}
-// 				if err := json.Unmarshal(got[i].Payload, &gotPayload); err != nil {
-// 					t.Fatalf("failed to unmarshal got payload: %v", err)
-// 				}
-// 				if err := json.Unmarshal(expectedMsg.Payload, &expectedPayload); err != nil {
-// 					t.Fatalf("failed to unmarshal expected payload: %v", err)
-// 				}
-// 				if !reflect.DeepEqual(gotPayload, expectedPayload) {
-// 					t.Errorf("message %d payload mismatch:\ngot:  %v\nwant: %v", i, gotPayload, expectedPayload)
-// 				}
-// 				if !reflect.DeepEqual(got[i].Metadata, expectedMsg.Metadata) {
-// 					t.Errorf("message %d metadata mismatch:\ngot:  %v\nwant: %v", i, got[i].Metadata, expectedMsg.Metadata)
-// 				}
-// 			}
-// 		})
-// 	}
-// }
+func TestLeaderboardHandlers_HandleGetTagByDiscordID(t *testing.T) {
+	tests := []struct {
+		name    string
+		msg     *message.Message
+		want    []*message.Message
+		wantErr bool
+		setup   func(*gomock.Controller, *util_mocks.MockHelpers)
+	}{
+		{
+			name: "successful_request_translation",
+			msg: &message.Message{
+				UUID:     "test-uuid",
+				Metadata: message.Metadata{"correlation_id": "test-correlation"},
+			},
+			want:    []*message.Message{{}},
+			wantErr: false,
+			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
+				discordPayload := discordleaderboardevents.LeaderboardTagAvailabilityRequestPayload{UserID: "user123"}
+				mockHelper.EXPECT().UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discordleaderboardevents.LeaderboardTagAvailabilityRequestPayload{})).
+					DoAndReturn(func(msg *message.Message, v interface{}) error {
+						payload := v.(*discordleaderboardevents.LeaderboardTagAvailabilityRequestPayload)
+						*payload = discordPayload
+						return nil
+					}).Times(1)
 
-// func TestLeaderboardHandlers_HandleGetTagByDiscordIDResponse(t *testing.T) {
-// 	ctrl := gomock.NewController(t)
-// 	defer ctrl.Finish()
-// 	mockLogger := logger_mocks.NewMockLogger(ctrl)
-// 	mockSession := mocks.NewMockSession(ctrl)
-// 	mockConfig := &config.Config{}
-// 	mockEventUtil := utils.NewEventUtil()
-// 	tests := []struct {
-// 		name           string
-// 		msg            *message.Message
-// 		setupMocks     func()
-// 		expectedError  bool
-// 		expectedResult []*message.Message
-// 	}{
-// 		{
-// 			name: "successful get tag by discord ID response",
-// 			msg: func() *message.Message {
-// 				payload := leaderboardevents.GetTagByDiscordIDResponsePayload{
-// 					TagNumber: 123,
-// 					ChannelID: "channel123",
-// 					MessageID: "message123",
-// 				}
-// 				payloadBytes, _ := json.Marshal(payload)
-// 				msg := message.NewMessage("test-id", payloadBytes)
-// 				msg.SetContext(context.Background())
-// 				msg.Metadata.Set("correlation_id", "correlation123")
-// 				return msg
-// 			}(),
-// 			setupMocks: func() {
-// 				mockLogger.EXPECT().
-// 					Info(
-// 						gomock.Any(),
-// 						"Handling GetTagByDiscordIDResponse",
-// 						gomock.Any(),
-// 					)
-// 				mockLogger.EXPECT().
-// 					Info(
-// 						gomock.Any(),
-// 						"Successfully translated GetTagByDiscordIDResponse",
-// 						gomock.Any(),
-// 					)
-// 			},
-// 			expectedError: false,
-// 			expectedResult: func() []*message.Message {
-// 				h := &LeaderboardHandlers{
-// 					Logger:    mockLogger,
-// 					Session:   mockSession,
-// 					Config:    mockConfig,
-// 					EventUtil: mockEventUtil,
-// 				}
-// 				payload := discordleaderboardevents.LeaderboardTagAvailabilityResponsePayload{
-// 					TagNumber: 123,
-// 					ChannelID: "channel123",
-// 					MessageID: "message123",
-// 				}
-// 				msg, _ := h.Helpers.CreateResultMessage(nil, payload, discordleaderboardevents.LeaderboardTagAvailabilityResponseTopic)
-// 				msg.Metadata.Set("correlation_id", "correlation123")
-// 				return []*message.Message{msg}
-// 			}(),
-// 		},
-// 		{
-// 			name: "invalid payload - unmarshal error",
-// 			msg: func() *message.Message {
-// 				// Invalid JSON payload
-// 				msg := message.NewMessage("test-id", []byte(`{invalid json`))
-// 				msg.SetContext(context.Background())
-// 				msg.Metadata.Set("correlation_id", "correlation123")
-// 				return msg
-// 			}(),
-// 			setupMocks: func() {
-// 				mockLogger.EXPECT().
-// 					Info(
-// 						gomock.Any(),
-// 						"Handling GetTagByDiscordIDResponse",
-// 						gomock.Any(),
-// 					)
-// 				mockLogger.EXPECT().
-// 					Error(
-// 						gomock.Any(),
-// 						"Failed to unmarshal payload",
-// 						gomock.Any(),
-// 						gomock.Any(),
-// 					)
-// 			},
-// 			expectedError:  true,
-// 			expectedResult: nil,
-// 		},
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			tt.setupMocks()
-// 			h := &LeaderboardHandlers{
-// 				Logger:    mockLogger,
-// 				Session:   mockSession,
-// 				Config:    mockConfig,
-// 				EventUtil: mockEventUtil,
-// 			}
-// 			got, err := h.HandleGetTagByDiscordIDResponse(tt.msg)
-// 			if (err != nil) != tt.expectedError {
-// 				t.Errorf("HandleGetTagByDiscordIDResponse() error = %v, expectedError %v", err, tt.expectedError)
-// 				return
-// 			}
-// 			if tt.expectedResult == nil {
-// 				if got != nil {
-// 					t.Errorf("expected nil result but got messages")
-// 				}
-// 				return
-// 			}
-// 			if len(got) != len(tt.expectedResult) {
-// 				t.Errorf("expected %d messages, got %d", len(tt.expectedResult), len(got))
-// 				return
-// 			}
-// 			for i, expectedMsg := range tt.expectedResult {
-// 				var gotPayload, expectedPayload map[string]interface{}
-// 				if err := json.Unmarshal(got[i].Payload, &gotPayload); err != nil {
-// 					t.Fatalf("failed to unmarshal got payload: %v", err)
-// 				}
-// 				if err := json.Unmarshal(expectedMsg.Payload, &expectedPayload); err != nil {
-// 					t.Fatalf("failed to unmarshal expected payload: %v", err)
-// 				}
-// 				if !reflect.DeepEqual(gotPayload, expectedPayload) {
-// 					t.Errorf("message %d payload mismatch:\ngot:  %v\nwant: %v", i, gotPayload, expectedPayload)
-// 				}
-// 				if !reflect.DeepEqual(got[i].Metadata, expectedMsg.Metadata) {
-// 					t.Errorf("message %d metadata mismatch:\ngot:  %v\nwant: %v", i, got[i].Metadata, expectedMsg.Metadata)
-// 				}
-// 			}
-// 		})
-// 	}
-// }
+				backendPayload := leaderboardevents.SoloTagNumberRequestPayload{UserID: sharedtypes.DiscordID("user123")}
+				mockHelper.EXPECT().CreateResultMessage(gomock.Any(), backendPayload, leaderboardevents.GetTagByUserIDRequest).
+					Return(&message.Message{}, nil).Times(1)
+			},
+		},
+		{
+			name: "unmarshal_error",
+			msg: &message.Message{
+				UUID:     "test-uuid",
+				Metadata: message.Metadata{"correlation_id": "test-correlation"},
+			},
+			want:    nil,
+			wantErr: true,
+			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
+				mockHelper.EXPECT().UnmarshalPayload(gomock.Any(), gomock.Any()).
+					Return(errors.New("unmarshal error")).Times(1)
+			},
+		},
+		{
+			name: "create_result_message_error",
+			msg: &message.Message{
+				UUID:     "test-uuid",
+				Metadata: message.Metadata{"correlation_id": "test-correlation"},
+			},
+			want:    nil,
+			wantErr: true,
+			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
+				discordPayload := discordleaderboardevents.LeaderboardTagAvailabilityRequestPayload{UserID: "user123"}
+				mockHelper.EXPECT().UnmarshalPayload(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(msg *message.Message, v interface{}) error {
+						payload := v.(*discordleaderboardevents.LeaderboardTagAvailabilityRequestPayload)
+						*payload = discordPayload
+						return nil
+					}).Times(1)
+				mockHelper.EXPECT().CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil, errors.New("create error")).Times(1)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockHelper := util_mocks.NewMockHelpers(ctrl)
+			mockLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
+			mockMetrics := &discordmetrics.NoOpMetrics{}
+			mockTracer := noop.NewTracerProvider().Tracer("test")
+
+			if tt.setup != nil {
+				tt.setup(ctrl, mockHelper)
+			}
+
+			h := &LeaderboardHandlers{
+				Logger:             mockLogger,
+				Helpers:            mockHelper,
+				LeaderboardDiscord: nil, // Not used in this handler
+				Tracer:             mockTracer,
+				Metrics:            mockMetrics,
+				handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
+					return wrapHandler(handlerName, unmarshalTo, handlerFunc, mockLogger, mockMetrics, mockTracer, mockHelper)
+				},
+			}
+
+			got, err := h.HandleGetTagByDiscordID(tt.msg)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("HandleGetTagByDiscordID() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("HandleGetTagByDiscordID() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLeaderboardHandlers_HandleGetTagByDiscordIDResponse(t *testing.T) {
+	testTagNumber := sharedtypes.TagNumber(123)
+	tests := []struct {
+		name    string
+		msg     *message.Message
+		want    []*message.Message
+		wantErr bool
+		setup   func(*gomock.Controller, *util_mocks.MockHelpers)
+	}{
+		{
+			name: "successful_response_translation",
+			msg: &message.Message{
+				UUID:     "test-uuid",
+				Metadata: message.Metadata{"topic": leaderboardevents.GetTagNumberResponse, "correlation_id": "test-correlation"},
+				Payload:  []byte(`{"tag_number": 123}`),
+			},
+			want:    []*message.Message{{}},
+			wantErr: false,
+			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
+				backendPayload := leaderboardevents.GetTagNumberResponsePayload{TagNumber: &testTagNumber}
+				mockHelper.EXPECT().UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&leaderboardevents.GetTagNumberResponsePayload{})).
+					DoAndReturn(func(msg *message.Message, v interface{}) error {
+						payload := v.(*leaderboardevents.GetTagNumberResponsePayload)
+						payload.TagNumber = backendPayload.TagNumber
+						return nil
+					}).Times(1)
+
+				discordPayload := discordleaderboardevents.LeaderboardTagAvailabilityResponsePayload{TagNumber: 123}
+				mockHelper.EXPECT().CreateResultMessage(gomock.Any(), discordPayload, leaderboardevents.GetTagByUserIDResponse).
+					Return(&message.Message{}, nil).Times(1)
+			},
+		},
+		{
+			name: "handle_failed_event",
+			msg: &message.Message{
+				UUID:     "test-uuid",
+				Metadata: message.Metadata{"topic": leaderboardevents.GetTagNumberFailed, "correlation_id": "test-correlation"},
+			},
+			want:    nil,
+			wantErr: false,
+			setup:   func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {},
+		},
+		{
+			name: "unexpected_topic",
+			msg: &message.Message{
+				UUID:     "test-uuid",
+				Metadata: message.Metadata{"topic": "unknown-topic", "correlation_id": "test-correlation"},
+			},
+			want:    nil,
+			wantErr: true,
+			setup:   func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {},
+		},
+		{
+			name: "unmarshal_error_in_response",
+			msg: &message.Message{
+				UUID:     "test-uuid",
+				Metadata: message.Metadata{"topic": leaderboardevents.GetTagNumberResponse, "correlation_id": "test-correlation"},
+				Payload:  []byte(`invalid`),
+			},
+			want:    nil,
+			wantErr: true,
+			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
+				mockHelper.EXPECT().UnmarshalPayload(gomock.Any(), gomock.Any()).
+					Return(errors.New("unmarshal error")).Times(1)
+			},
+		},
+		{
+			name: "create_result_message_error_in_response",
+			msg: &message.Message{
+				UUID:     "test-uuid",
+				Metadata: message.Metadata{"topic": leaderboardevents.GetTagNumberResponse, "correlation_id": "test-correlation"},
+				Payload:  []byte(`{"tag_number": 123}`),
+			},
+			want:    nil,
+			wantErr: true,
+			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
+				backendPayload := leaderboardevents.GetTagNumberResponsePayload{TagNumber: &testTagNumber}
+				mockHelper.EXPECT().UnmarshalPayload(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(msg *message.Message, v interface{}) error {
+						payload := v.(*leaderboardevents.GetTagNumberResponsePayload)
+						payload.TagNumber = backendPayload.TagNumber
+						return nil
+					}).Times(1)
+				mockHelper.EXPECT().CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil, errors.New("create error")).Times(1)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockHelper := util_mocks.NewMockHelpers(ctrl)
+			mockLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
+			mockMetrics := &discordmetrics.NoOpMetrics{}
+			mockTracer := noop.NewTracerProvider().Tracer("test")
+
+			if tt.setup != nil {
+				tt.setup(ctrl, mockHelper)
+			}
+
+			h := &LeaderboardHandlers{
+				Logger:             mockLogger,
+				Helpers:            mockHelper,
+				LeaderboardDiscord: nil, // Not used in this handler
+				Tracer:             mockTracer,
+				Metrics:            mockMetrics,
+				handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
+					return wrapHandler(handlerName, unmarshalTo, handlerFunc, mockLogger, mockMetrics, mockTracer, mockHelper)
+				},
+			}
+
+			got, err := h.HandleGetTagByDiscordIDResponse(tt.msg)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("HandleGetTagByDiscordIDResponse() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("HandleGetTagByDiscordIDResponse() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

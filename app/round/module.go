@@ -12,6 +12,7 @@ import (
 	deleteround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/delete_round"
 	roundrsvp "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/round_rsvp"
 	scoreround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/score_round"
+	roundrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/round/watermill"
 	roundhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/round/watermill/handlers"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
@@ -19,6 +20,7 @@ import (
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
+	"github.com/ThreeDotsLabs/watermill/message"
 	"go.opentelemetry.io/otel"
 )
 
@@ -26,22 +28,23 @@ import (
 func InitializeRoundModule(
 	ctx context.Context,
 	session discord.Session,
+	router *message.Router,
 	interactionRegistry *interactions.Registry,
-	publisher eventbus.EventBus,
+	reactionRegistry *interactions.ReactionRegistry,
+	eventBus eventbus.EventBus,
 	logger *slog.Logger,
-	config *config.Config,
+	cfg *config.Config,
 	helper utils.Helpers,
 	interactionStore storage.ISInterface,
-	discordMetricsService discordmetrics.DiscordMetrics,
-) error {
-	// Initialize Tracer
+	discordMetrics discordmetrics.DiscordMetrics,
+) (*roundrouter.RoundRouter, error) {
 	tracer := otel.Tracer("round-module")
 
 	// Initialize Discord services
-	roundDiscord, err := rounddiscord.NewRoundDiscord(ctx, session, publisher, logger, helper, config, interactionStore, tracer, discordMetricsService)
+	roundDiscord, err := rounddiscord.NewRoundDiscord(ctx, session, eventBus, logger, helper, cfg, interactionStore, tracer, discordMetrics)
 	if err != nil {
 		logger.ErrorContext(ctx, "Failed to initialize round Discord services", attr.Error(err))
-		return err
+		return nil, fmt.Errorf("failed to initialize round Discord services: %w", err)
 	}
 
 	// Register Discord interactions
@@ -50,12 +53,31 @@ func InitializeRoundModule(
 	deleteround.RegisterHandlers(interactionRegistry, roundDiscord.GetDeleteRoundManager())
 	scoreround.RegisterHandlers(interactionRegistry, roundDiscord.GetScoreRoundManager())
 
-	// Initialize Watermill handlers (no need to register with router here)
-	roundHandlers := roundhandlers.NewRoundHandlers(logger, config, helper, roundDiscord, tracer, discordMetricsService)
-	if roundHandlers == nil {
-		logger.ErrorContext(ctx, "Failed to create round handlers")
-		return fmt.Errorf("failed to create round handlers")
+	// Build Watermill Handlers
+	roundHandlers := roundhandlers.NewRoundHandlers(
+		logger,
+		cfg,
+		helper,
+		roundDiscord,
+		tracer,
+		discordMetrics,
+	)
+
+	// Setup Watermill router
+	roundRouter := roundrouter.NewRoundRouter(
+		logger,
+		router,
+		eventBus,
+		eventBus,
+		cfg,
+		helper,
+		tracer,
+	)
+
+	if err := roundRouter.Configure(ctx, roundHandlers); err != nil {
+		logger.ErrorContext(ctx, "Failed to configure round router", attr.Error(err))
+		return nil, fmt.Errorf("failed to configure round router: %w", err)
 	}
 
-	return nil
+	return roundRouter, nil
 }

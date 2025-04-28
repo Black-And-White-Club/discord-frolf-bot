@@ -1,65 +1,88 @@
 package leaderboardhandlers
 
-// import (
-// 	discordleaderboardevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/leaderboard"
-// 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
-// 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
-// 	"github.com/ThreeDotsLabs/watermill/message"
-// )
+import (
+	"context"
 
-// func (h *LeaderboardHandlers) HandleLeaderboardRetrieveRequest(msg *message.Message) ([]*message.Message, error) {
-// 	ctx := msg.Context()
-// 	h.Logger.Info(ctx, "Handling leaderboard retrieve request", attr.CorrelationIDFromMsg(msg))
-// 	var payload discordleaderboardevents.LeaderboardRetrieveRequestPayload
-// 	if err := h.Helper.UnmarshalPayload(msg, &payload); err != nil {
-// 		return nil, err
-// 	}
-// 	backendPayload := leaderboardevents.GetLeaderboardRequestPayload{}
-// 	backendMsg, err := h.Helper.CreateResultMessage(msg, backendPayload, leaderboardevents.GetLeaderboardRequest)
-// 	if err != nil {
-// 		h.Logger.Error(ctx, "Failed to create backend message", attr.CorrelationIDFromMsg(msg), attr.Error(err))
-// 		return nil, err
-// 	}
-// 	h.Logger.Info(ctx, "Successfully processed leaderboard retrieve request", attr.CorrelationIDFromMsg(msg))
-// 	return []*message.Message{backendMsg}, nil
-// }
+	discordleaderboardevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/leaderboard"
+	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
+	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
+	"github.com/ThreeDotsLabs/watermill/message"
+)
 
-// // HandleLeaderboardData handles both backend.leaderboard.get.response AND backend.leaderboard.updated.
-// func (h *LeaderboardHandlers) HandleLeaderboardData(msg *message.Message) ([]*message.Message, error) {
-// 	ctx := msg.Context()
-// 	h.Logger.Info(ctx, "Handling leaderboard data", attr.CorrelationIDFromMsg(msg), attr.Topic(msg.Metadata.Get("topic")))
-// 	topic := msg.Metadata.Get("topic")
-// 	if topic == leaderboardevents.LeaderboardUpdated {
-// 		backendPayload := leaderboardevents.GetLeaderboardRequestPayload{}
-// 		backendMsg, err := h.Helper.CreateResultMessage(msg, backendPayload, leaderboardevents.GetLeaderboardRequest)
-// 		if err != nil {
-// 			h.Logger.Error(ctx, "Failed to create backend message", attr.CorrelationIDFromMsg(msg), attr.Error(err))
-// 			return nil, err
-// 		}
-// 		h.Logger.Info(ctx, "Requesting full leaderboard after update notification", attr.CorrelationIDFromMsg(msg))
-// 		return []*message.Message{backendMsg}, nil
-// 	}
-// 	var payload leaderboardevents.GetLeaderboardResponsePayload
-// 	if err := h.Helper.UnmarshalPayload(msg, &payload); err != nil {
-// 		return nil, err
-// 	}
-// 	leaderboardData := make([]leaderboardevents.LeaderboardEntry, len(payload.Leaderboard))
-// 	for i, entry := range payload.Leaderboard {
-// 		leaderboardData[i] = leaderboardevents.LeaderboardEntry{
-// 			TagNumber: entry.TagNumber,
-// 			DiscordID: entry.DiscordID,
-// 		}
-// 	}
-// 	// Create the Discord payload.
-// 	discordPayload := discordleaderboardevents.LeaderboardRetrievedPayload{
-// 		Leaderboard: leaderboardData,
-// 	}
-// 	// Create the outgoing message.
-// 	discordMsg, err := h.Helper.CreateResultMessage(msg, discordPayload, discordleaderboardevents.LeaderboardRetrievedTopic)
-// 	if err != nil {
-// 		h.Logger.Error(ctx, "Failed to create discord message", attr.CorrelationIDFromMsg(msg), attr.Error(err))
-// 		return nil, err
-// 	}
-// 	h.Logger.Info(ctx, "Successfully processed leaderboard data", attr.CorrelationIDFromMsg(msg), attr.Topic(msg.Metadata.Get("topic")))
-// 	return []*message.Message{discordMsg}, nil
-// }
+// HandleLeaderboardRetrieveRequest handles a leaderboard retrieve request event from Discord.
+func (h *LeaderboardHandlers) HandleLeaderboardRetrieveRequest(msg *message.Message) ([]*message.Message, error) {
+	return h.handlerWrapper(
+		"HandleLeaderboardRetrieveRequest",
+		&discordleaderboardevents.LeaderboardRetrieveRequestPayload{},
+		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
+			h.Logger.InfoContext(ctx, "Handling leaderboard retrieve request", attr.CorrelationIDFromMsg(msg))
+
+			// Convert to backend payload
+			backendPayload := leaderboardevents.GetLeaderboardRequestPayload{}
+
+			backendMsg, err := h.Helpers.CreateResultMessage(msg, backendPayload, leaderboardevents.GetLeaderboardRequest)
+			if err != nil {
+				h.Logger.ErrorContext(ctx, "Failed to create backend message", attr.Error(err))
+				return nil, err
+			}
+
+			h.Logger.InfoContext(ctx, "Successfully processed leaderboard retrieve request", attr.CorrelationIDFromMsg(msg))
+			return []*message.Message{backendMsg}, nil
+		},
+	)(msg)
+}
+
+// HandleLeaderboardData handles both backend.leaderboard.get.response AND backend.leaderboard.updated.
+func (h *LeaderboardHandlers) HandleLeaderboardData(msg *message.Message) ([]*message.Message, error) {
+	return h.handlerWrapper(
+		"HandleLeaderboardData",
+		nil, // No unmarshal up front — we conditionally unmarshal later based on topic
+		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
+			topic := msg.Metadata.Get("topic")
+
+			h.Logger.InfoContext(ctx, "Handling leaderboard data", attr.CorrelationIDFromMsg(msg), attr.Topic(topic))
+
+			// Special case: If topic is "LeaderboardUpdated", trigger a re-request
+			if topic == leaderboardevents.LeaderboardUpdated {
+				backendPayload := leaderboardevents.GetLeaderboardRequestPayload{}
+
+				backendMsg, err := h.Helpers.CreateResultMessage(msg, backendPayload, leaderboardevents.GetLeaderboardRequest)
+				if err != nil {
+					h.Logger.ErrorContext(ctx, "Failed to create backend message after update", attr.Error(err))
+					return nil, err
+				}
+
+				h.Logger.InfoContext(ctx, "Requesting full leaderboard after update notification", attr.CorrelationIDFromMsg(msg))
+				return []*message.Message{backendMsg}, nil
+			}
+
+			// Otherwise, assume it's a leaderboard response
+			var payloadData leaderboardevents.GetLeaderboardResponsePayload
+			if err := h.Helpers.UnmarshalPayload(msg, &payloadData); err != nil {
+				h.Logger.ErrorContext(ctx, "Failed to unmarshal leaderboard response", attr.Error(err))
+				return nil, err
+			}
+
+			leaderboardData := make([]leaderboardevents.LeaderboardEntry, len(payloadData.Leaderboard))
+			for i, entry := range payloadData.Leaderboard {
+				leaderboardData[i] = leaderboardevents.LeaderboardEntry{
+					TagNumber: entry.TagNumber,
+					UserID:    entry.UserID,
+				}
+			}
+
+			discordPayload := discordleaderboardevents.LeaderboardRetrievedPayload{
+				Leaderboard: leaderboardData,
+			}
+
+			discordMsg, err := h.Helpers.CreateResultMessage(msg, discordPayload, discordleaderboardevents.LeaderboardRetrievedTopic)
+			if err != nil {
+				h.Logger.ErrorContext(ctx, "Failed to create discord message from leaderboard data", attr.Error(err))
+				return nil, err
+			}
+
+			h.Logger.InfoContext(ctx, "Successfully processed leaderboard data", attr.CorrelationIDFromMsg(msg), attr.Topic(topic))
+			return []*message.Message{discordMsg}, nil
+		},
+	)(msg)
+}

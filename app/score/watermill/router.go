@@ -5,13 +5,11 @@ import (
 	"fmt"
 	"log/slog"
 
-	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	scorehandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/score/watermill/handlers"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	scoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/score"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
-	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	tracingfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/tracing"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"github.com/ThreeDotsLabs/watermill/components/metrics"
@@ -56,23 +54,10 @@ func NewScoreRouter(
 }
 
 // Configure sets up the router.
-func (r *ScoreRouter) Configure(
-	session discord.Session,
-	config *config.Config,
-	helper utils.Helpers,
-	tracer trace.Tracer,
-	discordMetrics discordmetrics.DiscordMetrics,
-	eventbus eventbus.EventBus,
-) error {
-	// Create Prometheus metrics builder
+func (r *ScoreRouter) Configure(ctx context.Context, handlers scorehandlers.Handler) error {
 	metricsBuilder := metrics.NewPrometheusMetricsBuilder(prometheus.NewRegistry(), "", "")
-	// Add metrics middleware to the router
 	metricsBuilder.AddPrometheusRouterMetrics(r.Router)
 
-	// Create Score Handlers with their dependencies
-	scoreHandlers := scorehandlers.NewScoreHandlers(r.logger, config, session, helper, tracer, discordMetrics)
-
-	// Add middleware specific to the score module
 	r.Router.AddMiddleware(
 		middleware.CorrelationID,
 		r.middlewareHelper.CommonMetadataMiddleware("discord-score"),
@@ -83,15 +68,15 @@ func (r *ScoreRouter) Configure(
 		tracingfrolfbot.TraceHandler(r.tracer),
 	)
 
-	if err := r.RegisterHandlers(context.Background(), scoreHandlers); err != nil {
-		return fmt.Errorf("failed to register handlers: %w", err)
+	if err := r.RegisterHandlers(ctx, handlers); err != nil {
+		return fmt.Errorf("failed to configure score router: %w", err)
 	}
 	return nil
 }
 
 // RegisterHandlers registers event handlers.
 func (r *ScoreRouter) RegisterHandlers(ctx context.Context, handlers scorehandlers.Handler) error {
-	r.logger.InfoContext(ctx, "Entering Register Handlers for Score")
+	r.logger.InfoContext(ctx, "Registering Score Handlers")
 
 	eventsToHandlers := map[string]message.HandlerFunc{
 		scoreevents.ScoreUpdateRequest: handlers.HandleScoreUpdateRequest,
@@ -105,23 +90,32 @@ func (r *ScoreRouter) RegisterHandlers(ctx context.Context, handlers scorehandle
 			handlerName,
 			topic,
 			r.subscriber,
-			"",  // No direct publish topic
-			nil, // No manual publisher
+			"",
+			nil,
 			func(msg *message.Message) ([]*message.Message, error) {
 				messages, err := handlerFunc(msg)
 				if err != nil {
-					r.logger.ErrorContext(ctx, "Error processing message", attr.String("message_id", msg.UUID), attr.Any("error", err))
+					r.logger.ErrorContext(ctx, "Error processing score message",
+						attr.String("message_id", msg.UUID),
+						attr.Error(err),
+					)
 					return nil, err
 				}
+
 				for _, m := range messages {
 					publishTopic := m.Metadata.Get("topic")
 					if publishTopic != "" {
-						r.logger.InfoContext(ctx, "🚀 Auto-publishing message", attr.String("message_id", m.UUID), attr.String("topic", publishTopic))
+						r.logger.InfoContext(ctx, "Publishing message",
+							attr.String("message_id", m.UUID),
+							attr.String("topic", publishTopic),
+						)
 						if err := r.publisher.Publish(publishTopic, m); err != nil {
 							return nil, fmt.Errorf("failed to publish to %s: %w", publishTopic, err)
 						}
 					} else {
-						r.logger.Warn("⚠️ Message missing topic metadata, dropping", attr.String("message_id", m.UUID))
+						r.logger.WarnContext(ctx, "Message missing topic metadata",
+							attr.String("message_id", m.UUID),
+						)
 					}
 				}
 				return nil, nil

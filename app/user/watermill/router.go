@@ -6,12 +6,10 @@ import (
 	"log/slog"
 
 	discorduserevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/user"
-	userdiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord"
 	userhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/user/watermill/handlers"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
-	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	tracingfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/tracing"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"github.com/ThreeDotsLabs/watermill/components/metrics"
@@ -56,23 +54,10 @@ func NewUserRouter(
 }
 
 // Configure sets up the router.
-func (r *UserRouter) Configure(
-	userDiscord userdiscord.UserDiscordInterface,
-	config *config.Config,
-	helper utils.Helpers,
-	tracer trace.Tracer,
-	discordMetrics discordmetrics.DiscordMetrics, // Expect the interface type directly
-	eventbus eventbus.EventBus,
-) error {
-	// Create Prometheus metrics builder
+func (r *UserRouter) Configure(ctx context.Context, handlers userhandlers.Handler) error {
 	metricsBuilder := metrics.NewPrometheusMetricsBuilder(prometheus.NewRegistry(), "", "")
-	// Add metrics middleware to the router
 	metricsBuilder.AddPrometheusRouterMetrics(r.Router)
 
-	// Create User Handlers with their dependencies
-	userHandlers := userhandlers.NewUserHandlers(r.logger, config, helper, userDiscord, tracer, discordMetrics)
-
-	// Add middleware specific to the user module
 	r.Router.AddMiddleware(
 		middleware.CorrelationID,
 		r.middlewareHelper.CommonMetadataMiddleware("discord-user"),
@@ -83,15 +68,15 @@ func (r *UserRouter) Configure(
 		tracingfrolfbot.TraceHandler(r.tracer),
 	)
 
-	if err := r.RegisterHandlers(context.Background(), userHandlers); err != nil {
-		return fmt.Errorf("failed to register handlers: %w", err)
+	if err := r.RegisterHandlers(ctx, handlers); err != nil {
+		return fmt.Errorf("failed to register user handlers: %w", err)
 	}
 	return nil
 }
 
-// RegisterHandlers registers event handlers.
+// RegisterHandlers wires all event handlers.
 func (r *UserRouter) RegisterHandlers(ctx context.Context, handlers userhandlers.Handler) error {
-	r.logger.InfoContext(ctx, "Entering Register Handlers for User")
+	r.logger.InfoContext(ctx, "Registering User Handlers")
 
 	eventsToHandlers := map[string]message.HandlerFunc{
 		discorduserevents.RoleResponse:             handlers.HandleRoleUpdateResult,
@@ -112,23 +97,31 @@ func (r *UserRouter) RegisterHandlers(ctx context.Context, handlers userhandlers
 			handlerName,
 			topic,
 			r.subscriber,
-			"",  // No direct publish topic
-			nil, // No manual publisher
+			"",
+			nil,
 			func(msg *message.Message) ([]*message.Message, error) {
 				messages, err := handlerFunc(msg)
 				if err != nil {
-					r.logger.ErrorContext(ctx, "Error processing message", attr.String("message_id", msg.UUID), attr.Any("error", err))
+					r.logger.ErrorContext(ctx, "Error processing user message",
+						attr.String("message_id", msg.UUID),
+						attr.Error(err),
+					)
 					return nil, err
 				}
 				for _, m := range messages {
 					publishTopic := m.Metadata.Get("topic")
 					if publishTopic != "" {
-						r.logger.InfoContext(ctx, "🚀 Auto-publishing message", attr.String("message_id", m.UUID), attr.String("topic", publishTopic))
+						r.logger.InfoContext(ctx, "Publishing message",
+							attr.String("message_id", m.UUID),
+							attr.String("topic", publishTopic),
+						)
 						if err := r.publisher.Publish(publishTopic, m); err != nil {
 							return nil, fmt.Errorf("failed to publish to %s: %w", publishTopic, err)
 						}
 					} else {
-						r.logger.Warn("⚠️ Message missing topic metadata, dropping", attr.String("message_id", m.UUID))
+						r.logger.WarnContext(ctx, "Message missing topic metadata",
+							attr.String("message_id", m.UUID),
+						)
 					}
 				}
 				return nil, nil
@@ -138,7 +131,7 @@ func (r *UserRouter) RegisterHandlers(ctx context.Context, handlers userhandlers
 	return nil
 }
 
-// Close stops the router.
+// Close gracefully stops the router.
 func (r *UserRouter) Close() error {
 	return r.Router.Close()
 }

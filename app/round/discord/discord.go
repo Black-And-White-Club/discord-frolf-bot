@@ -55,8 +55,8 @@ func NewRoundDiscord(
 	helper utils.Helpers,
 	config *config.Config,
 	interactionStore storage.ISInterface,
-	tracer trace.Tracer, // Added tracer dependency
-	metrics discordmetrics.DiscordMetrics, // Added metrics dependency
+	tracer trace.Tracer,
+	metrics discordmetrics.DiscordMetrics,
 ) (RoundDiscordInterface, error) {
 	// Pass the new dependencies to the manager constructors
 	createRoundManager := createround.NewCreateRoundManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics)

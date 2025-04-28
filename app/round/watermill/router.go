@@ -55,29 +55,31 @@ func NewRoundRouter(
 }
 
 // Configure sets up the router.
-func (r *RoundRouter) Configure(handlers roundhandlers.Handlers, eventbus eventbus.EventBus) error {
+func (r *RoundRouter) Configure(ctx context.Context, handlers roundhandlers.Handlers) error {
 	// Add Prometheus metrics
 	metricsBuilder := metrics.NewPrometheusMetricsBuilder(prometheus.NewRegistry(), "", "")
 	metricsBuilder.AddPrometheusRouterMetrics(r.Router)
 
 	r.Router.AddMiddleware(
 		middleware.CorrelationID,
-		middleware.Retry{MaxRetries: 3}.Middleware,
 		r.middlewareHelper.CommonMetadataMiddleware("discord-round"),
 		r.middlewareHelper.DiscordMetadataMiddleware(),
 		r.middlewareHelper.RoutingMetadataMiddleware(),
 		middleware.Recoverer,
+		middleware.Retry{MaxRetries: 3}.Middleware,
 		tracingfrolfbot.TraceHandler(r.tracer),
 	)
 
-	if err := r.RegisterHandlers(context.Background(), handlers); err != nil {
-		return fmt.Errorf("failed to register handlers: %w", err)
+	if err := r.RegisterHandlers(ctx, handlers); err != nil {
+		return fmt.Errorf("failed to register round handlers: %w", err)
 	}
 	return nil
 }
 
 // RegisterHandlers registers event handlers.
 func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandlers.Handlers) error {
+	r.logger.InfoContext(ctx, "Registering Round Handlers")
+
 	eventsToHandlers := map[string]message.HandlerFunc{
 		// Creation flow
 		discordroundevents.RoundCreateModalSubmit: handlers.HandleRoundCreateRequested,
@@ -120,7 +122,7 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 				messages, err := handlerFunc(msg)
 				if err != nil {
 					r.logger.ErrorContext(ctx, "Error processing message",
-						slog.String("message_id", msg.UUID),
+						attr.String("message_id", msg.UUID),
 						attr.Error(err),
 					)
 					return nil, err
@@ -130,15 +132,15 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 					publishTopic := m.Metadata.Get("topic")
 					if publishTopic != "" {
 						r.logger.InfoContext(ctx, "Publishing message",
-							slog.String("message_id", m.UUID),
-							slog.String("topic", publishTopic),
+							attr.String("message_id", m.UUID),
+							attr.String("topic", publishTopic),
 						)
 						if err := r.publisher.Publish(publishTopic, m); err != nil {
 							return nil, fmt.Errorf("failed to publish to %s: %w", publishTopic, err)
 						}
 					} else {
 						r.logger.WarnContext(ctx, "Message missing topic metadata",
-							slog.String("message_id", m.UUID),
+							attr.String("message_id", m.UUID),
 						)
 					}
 				}
