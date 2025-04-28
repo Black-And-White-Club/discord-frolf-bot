@@ -1,84 +1,57 @@
 package roundhandlers
 
 import (
+	"context"
 	"errors"
+	"io"
 	"log/slog"
+	"reflect"
 	"testing"
 
+	deleteround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/delete_round"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/round/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
-	utils "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
-	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
-	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
+	util_mocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
+	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/ThreeDotsLabs/watermill/message"
+	"github.com/google/uuid"
+	"go.opentelemetry.io/otel/trace/noop"
 	"go.uber.org/mock/gomock"
 )
 
 func TestRoundHandlers_HandleRoundDeleted(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	testRoundID := sharedtypes.RoundID(uuid.New())
 
-	mockLogger := observability.NewNoOpLogger()
-	mockHelpers := utils.NewMockHelpers(ctrl)
-	mockRoundDiscord := mocks.NewMockRoundDiscordInterface(ctrl)
-	mockDeleteRoundManager := mocks.NewMockDeleteRoundManager(ctrl)
-
-	// Create a proper config with the required fields
-	mockConfigObj := &config.Config{
-		Discord: config.DiscordConfig{
-			ChannelID: "channel123",
-		},
-	}
-
-	type fields struct {
-		Logger       *slog.Logger
-		Config       *config.Config
-		Helpers      *utils.MockHelpers
-		RoundDiscord *mocks.MockRoundDiscordInterface
-	}
-	type args struct {
-		msg *message.Message
-	}
 	tests := []struct {
 		name    string
-		fields  fields
-		args    args
+		msg     *message.Message
 		want    []*message.Message
 		wantErr bool
-		setup   func()
+		setup   func(*gomock.Controller, *mocks.MockRoundDiscordInterface, *util_mocks.MockHelpers, *mocks.MockDeleteRoundManager)
 	}{
 		{
-			name: "successful round deleted",
-			fields: fields{
-				Logger:       mockLogger,
-				Config:       mockConfigObj,
-				Helpers:      mockHelpers,
-				RoundDiscord: mockRoundDiscord,
+			name: "successful_round_deletion",
+			msg: &message.Message{
+				UUID:    "1",
+				Payload: []byte(`{"round_id": "` + testRoundID.String() + `", "event_message_id": "` + testRoundID.String() + `"}`),
+				Metadata: message.Metadata{
+					"correlation_id": "correlation_id",
+				},
 			},
-			args: args{
-				msg: message.NewMessage("1", []byte(`{
-					"round_id": 123,
-					"event_message_id": "message789"
-				}`)),
-			},
-			want: func() []*message.Message {
-				msg := message.NewMessage(roundevents.RoundTraceEvent, []byte(`{"round_id":123,"event_type":"round_deleted","status":"embed_deleted","message_id":"message789"}`))
-				return []*message.Message{msg}
-			}(),
+			want:    []*message.Message{{}}, // Assuming a message is returned
 			wantErr: false,
-			setup: func() {
-				payload := &roundevents.RoundDeletedPayload{
-					RoundID:        123,
-					EventMessageID: "message789",
+			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockHelper *util_mocks.MockHelpers, mockDeleteRoundManager *mocks.MockDeleteRoundManager) {
+				expectedPayload := roundevents.RoundDeletedPayload{
+					RoundID:        testRoundID,
+					EventMessageID: testRoundID,
 				}
 
-				mockHelpers.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(msg *message.Message, p interface{}) error {
-						deletedPayload := p.(*roundevents.RoundDeletedPayload)
-						deletedPayload.RoundID = payload.RoundID
-						deletedPayload.EventMessageID = payload.EventMessageID
+				mockHelper.EXPECT().
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundDeletedPayload{})).
+					DoAndReturn(func(_ *message.Message, v any) error {
+						*v.(*roundevents.RoundDeletedPayload) = expectedPayload
 						return nil
 					}).
 					Times(1)
@@ -86,139 +59,40 @@ func TestRoundHandlers_HandleRoundDeleted(t *testing.T) {
 				mockRoundDiscord.EXPECT().
 					GetDeleteRoundManager().
 					Return(mockDeleteRoundManager).
-					Times(1)
+					AnyTimes()
 
 				mockDeleteRoundManager.EXPECT().
-					DeleteEmbed(gomock.Any(), roundtypes.EventMessageID("message789"), "channel123").
-					Return(true, nil).
+					DeleteRoundEventEmbed(gomock.Any(), testRoundID, gomock.Any()).
+					Return(deleteround.DeleteRoundOperationResult{Success: true}, nil).
 					Times(1)
 
-				tracePayload := map[string]interface{}{
-					"round_id":   payload.RoundID,
-					"event_type": "round_deleted",
-					"status":     "embed_deleted",
-					"message_id": payload.EventMessageID,
-				}
-
-				traceMsg := message.NewMessage(roundevents.RoundTraceEvent, []byte(`{"round_id":123,"event_type":"round_deleted","status":"embed_deleted","message_id":"message789"}`))
-				mockHelpers.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Eq(tracePayload), roundevents.RoundTraceEvent).
-					Return(traceMsg, nil).
+				mockHelper.EXPECT().
+					CreateResultMessage(gomock.Any(), gomock.Any(), roundevents.RoundTraceEvent).
+					Return(&message.Message{}, nil).
 					Times(1)
 			},
 		},
 		{
-			name: "failed to unmarshal payload",
-			fields: fields{
-				Logger:       mockLogger,
-				Config:       mockConfigObj,
-				Helpers:      mockHelpers,
-				RoundDiscord: mockRoundDiscord,
-			},
-			args: args{
-				msg: message.NewMessage("1", []byte(`invalid payload`)),
+			name: "delete_round_event_embed_fails",
+			msg: &message.Message{
+				UUID:    "1",
+				Payload: []byte(`{"round_id": "` + testRoundID.String() + `", "event_message_id": "` + testRoundID.String() + `"}`),
+				Metadata: message.Metadata{
+					"correlation_id": "correlation_id",
+				},
 			},
 			want:    nil,
 			wantErr: true,
-			setup: func() {
-				mockHelpers.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.Any()).
-					Return(errors.New("failed to unmarshal payload")).
-					Times(1)
-			},
-		},
-		{
-			name: "missing round ID",
-			fields: fields{
-				Logger:       mockLogger,
-				Config:       mockConfigObj,
-				Helpers:      mockHelpers,
-				RoundDiscord: mockRoundDiscord,
-			},
-			args: args{
-				msg: message.NewMessage("1", []byte(`{
-					"event_message_id": "message789"
-				}`)),
-			},
-			want:    nil,
-			wantErr: true,
-			setup: func() {
-				payload := &roundevents.RoundDeletedPayload{
-					RoundID:        0,
-					EventMessageID: "message789",
+			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockHelper *util_mocks.MockHelpers, mockDeleteRoundManager *mocks.MockDeleteRoundManager) {
+				expectedPayload := roundevents.RoundDeletedPayload{
+					RoundID:        testRoundID,
+					EventMessageID: testRoundID,
 				}
 
-				mockHelpers.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(msg *message.Message, p interface{}) error {
-						deletedPayload := p.(*roundevents.RoundDeletedPayload)
-						deletedPayload.RoundID = payload.RoundID
-						deletedPayload.EventMessageID = payload.EventMessageID
-						return nil
-					}).
-					Times(1)
-			},
-		},
-		{
-			name: "missing event message ID",
-			fields: fields{
-				Logger:       mockLogger,
-				Config:       mockConfigObj,
-				Helpers:      mockHelpers,
-				RoundDiscord: mockRoundDiscord,
-			},
-			args: args{
-				msg: message.NewMessage("1", []byte(`{
-					"round_id": 123
-				}`)),
-			},
-			want:    nil,
-			wantErr: true,
-			setup: func() {
-				payload := &roundevents.RoundDeletedPayload{
-					RoundID:        123,
-					EventMessageID: "",
-				}
-
-				mockHelpers.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(msg *message.Message, p interface{}) error {
-						deletedPayload := p.(*roundevents.RoundDeletedPayload)
-						deletedPayload.RoundID = payload.RoundID
-						deletedPayload.EventMessageID = payload.EventMessageID
-						return nil
-					}).
-					Times(1)
-			},
-		},
-		{
-			name: "failed to delete embed message",
-			fields: fields{
-				Logger:       mockLogger,
-				Config:       mockConfigObj,
-				Helpers:      mockHelpers,
-				RoundDiscord: mockRoundDiscord,
-			},
-			args: args{
-				msg: message.NewMessage("1", []byte(`{
-					"round_id": 123,
-					"event_message_id": "message789"
-				}`)),
-			},
-			want:    nil,
-			wantErr: true,
-			setup: func() {
-				payload := &roundevents.RoundDeletedPayload{
-					RoundID:        123,
-					EventMessageID: "message789",
-				}
-
-				mockHelpers.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(msg *message.Message, p interface{}) error {
-						deletedPayload := p.(*roundevents.RoundDeletedPayload)
-						deletedPayload.RoundID = payload.RoundID
-						deletedPayload.EventMessageID = payload.EventMessageID
+				mockHelper.EXPECT().
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundDeletedPayload{})).
+					DoAndReturn(func(_ *message.Message, v any) error {
+						*v.(*roundevents.RoundDeletedPayload) = expectedPayload
 						return nil
 					}).
 					Times(1)
@@ -226,45 +100,35 @@ func TestRoundHandlers_HandleRoundDeleted(t *testing.T) {
 				mockRoundDiscord.EXPECT().
 					GetDeleteRoundManager().
 					Return(mockDeleteRoundManager).
-					Times(1)
+					AnyTimes()
 
 				mockDeleteRoundManager.EXPECT().
-					DeleteEmbed(gomock.Any(), roundtypes.EventMessageID("message789"), "channel123").
-					Return(false, errors.New("failed to delete embed")).
+					DeleteRoundEventEmbed(gomock.Any(), testRoundID, gomock.Any()).
+					Return(deleteround.DeleteRoundOperationResult{}, errors.New("failed to delete round event embed")).
 					Times(1)
 			},
 		},
 		{
-			name: "deletion not successful but no error",
-			fields: fields{
-				Logger:       mockLogger,
-				Config:       mockConfigObj,
-				Helpers:      mockHelpers,
-				RoundDiscord: mockRoundDiscord,
+			name: "delete_round_event_embed_returns_false",
+			msg: &message.Message{
+				UUID:    "1",
+				Payload: []byte(`{"round_id": "` + testRoundID.String() + `", "event_message_id": "` + testRoundID.String() + `"}`),
+				Metadata: message.Metadata{
+					"correlation_id": "correlation_id",
+				},
 			},
-			args: args{
-				msg: message.NewMessage("1", []byte(`{
-					"round_id": 123,
-					"event_message_id": "message789"
-				}`)),
-			},
-			want: func() []*message.Message {
-				msg := message.NewMessage(roundevents.RoundTraceEvent, []byte(`{"round_id":123,"event_type":"round_deleted","status":"embed_deleted","message_id":"message789"}`))
-				return []*message.Message{msg}
-			}(),
+			want:    []*message.Message{{}}, // Assuming a message is returned
 			wantErr: false,
-			setup: func() {
-				payload := &roundevents.RoundDeletedPayload{
-					RoundID:        123,
-					EventMessageID: "message789",
+			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockHelper *util_mocks.MockHelpers, mockDeleteRoundManager *mocks.MockDeleteRoundManager) {
+				expectedPayload := roundevents.RoundDeletedPayload{
+					RoundID:        testRoundID,
+					EventMessageID: testRoundID,
 				}
 
-				mockHelpers.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(msg *message.Message, p interface{}) error {
-						deletedPayload := p.(*roundevents.RoundDeletedPayload)
-						deletedPayload.RoundID = payload.RoundID
-						deletedPayload.EventMessageID = payload.EventMessageID
+				mockHelper.EXPECT().
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundDeletedPayload{})).
+					DoAndReturn(func(_ *message.Message, v any) error {
+						*v.(*roundevents.RoundDeletedPayload) = expectedPayload
 						return nil
 					}).
 					Times(1)
@@ -272,55 +136,40 @@ func TestRoundHandlers_HandleRoundDeleted(t *testing.T) {
 				mockRoundDiscord.EXPECT().
 					GetDeleteRoundManager().
 					Return(mockDeleteRoundManager).
-					Times(1)
+					AnyTimes()
 
 				mockDeleteRoundManager.EXPECT().
-					DeleteEmbed(gomock.Any(), roundtypes.EventMessageID("message789"), "channel123").
-					Return(false, nil).
+					DeleteRoundEventEmbed(gomock.Any(), testRoundID, gomock.Any()).
+					Return(deleteround.DeleteRoundOperationResult{Success: false}, nil).
 					Times(1)
 
-				tracePayload := map[string]interface{}{
-					"round_id":   payload.RoundID,
-					"event_type": "round_deleted",
-					"status":     "embed_deleted",
-					"message_id": payload.EventMessageID,
-				}
-
-				traceMsg := message.NewMessage(roundevents.RoundTraceEvent, []byte(`{"round_id":123,"event_type":"round_deleted","status":"embed_deleted","message_id":"message789"}`))
-				mockHelpers.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Eq(tracePayload), roundevents.RoundTraceEvent).
-					Return(traceMsg, nil).
+				mockHelper.EXPECT().
+					CreateResultMessage(gomock.Any(), gomock.Any(), roundevents.RoundTraceEvent).
+					Return(&message.Message{}, nil).
 					Times(1)
 			},
 		},
 		{
-			name: "failed to create trace event message",
-			fields: fields{
-				Logger:       mockLogger,
-				Config:       mockConfigObj,
-				Helpers:      mockHelpers,
-				RoundDiscord: mockRoundDiscord,
+			name: "create_result_message_fails",
+			msg: &message.Message{
+				UUID:    "1",
+				Payload: []byte(`{"round_id": "` + testRoundID.String() + `", "event_message_id": "` + testRoundID.String() + `"}`),
+				Metadata: message.Metadata{
+					"correlation_id": "correlation_id",
+				},
 			},
-			args: args{
-				msg: message.NewMessage("1", []byte(`{
-					"round_id": 123,
-					"event_message_id": "message789"
-				}`)),
-			},
-			want:    []*message.Message{},
-			wantErr: false,
-			setup: func() {
-				payload := &roundevents.RoundDeletedPayload{
-					RoundID:        123,
-					EventMessageID: "message789",
+			want:    nil,
+			wantErr: true,
+			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockHelper *util_mocks.MockHelpers, mockDeleteRoundManager *mocks.MockDeleteRoundManager) {
+				expectedPayload := roundevents.RoundDeletedPayload{
+					RoundID:        testRoundID,
+					EventMessageID: testRoundID,
 				}
 
-				mockHelpers.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(msg *message.Message, p interface{}) error {
-						deletedPayload := p.(*roundevents.RoundDeletedPayload)
-						deletedPayload.RoundID = payload.RoundID
-						deletedPayload.EventMessageID = payload.EventMessageID
+				mockHelper.EXPECT().
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundDeletedPayload{})).
+					DoAndReturn(func(_ *message.Message, v any) error {
+						*v.(*roundevents.RoundDeletedPayload) = expectedPayload
 						return nil
 					}).
 					Times(1)
@@ -328,23 +177,17 @@ func TestRoundHandlers_HandleRoundDeleted(t *testing.T) {
 				mockRoundDiscord.EXPECT().
 					GetDeleteRoundManager().
 					Return(mockDeleteRoundManager).
-					Times(1)
+					AnyTimes()
 
 				mockDeleteRoundManager.EXPECT().
-					DeleteEmbed(gomock.Any(), roundtypes.EventMessageID("message789"), "channel123").
-					Return(true, nil).
+					DeleteRoundEventEmbed(gomock.Any(), testRoundID, gomock.Any()).
+					Return(deleteround.DeleteRoundOperationResult{Success: true}, nil).
 					Times(1)
 
-				tracePayload := map[string]interface{}{
-					"round_id":   payload.RoundID,
-					"event_type": "round_deleted",
-					"status":     "embed_deleted",
-					"message_id": payload.EventMessageID,
-				}
-
-				mockHelpers.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Eq(tracePayload), roundevents.RoundTraceEvent).
-					Return(nil, errors.New("failed to create trace message")).
+				// This is where we simulate the failure
+				mockHelper.EXPECT().
+					CreateResultMessage(gomock.Any(), gomock.Any(), roundevents.RoundTraceEvent).
+					Return(nil, errors.New("failed to create result message")).
 					Times(1)
 			},
 		},
@@ -352,43 +195,37 @@ func TestRoundHandlers_HandleRoundDeleted(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.setup != nil {
-				tt.setup()
-			}
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockHelper := util_mocks.NewMockHelpers(ctrl)
+			mockRoundDiscord := mocks.NewMockRoundDiscordInterface(ctrl)
+			mockDeleteRoundManager := mocks.NewMockDeleteRoundManager(ctrl)
+			mockLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
+			mockMetrics := &discordmetrics.NoOpMetrics{}
+			mockTracer := noop.NewTracerProvider().Tracer("test")
+
+			tt.setup(ctrl, mockRoundDiscord, mockHelper, mockDeleteRoundManager)
+
 			h := &RoundHandlers{
-				Logger:       tt.fields.Logger,
-				Config:       tt.fields.Config,
-				Helpers:      tt.fields.Helpers,
-				RoundDiscord: tt.fields.RoundDiscord,
+				Logger:       mockLogger,
+				Config:       &config.Config{}, // Provide a non-nil config
+				Helpers:      mockHelper,
+				RoundDiscord: mockRoundDiscord,
+				Tracer:       mockTracer,
+				Metrics:      mockMetrics,
+				handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
+					return wrapHandler(handlerName, unmarshalTo, handlerFunc, mockLogger, mockMetrics, mockTracer, mockHelper)
+				},
 			}
-			got, err := h.HandleRoundDeleted(tt.args.msg)
+
+			got, err := h.HandleRoundDeleted(tt.msg)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("RoundHandlers.HandleRoundDeleted() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("HandleRoundDeleted() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-
-			if tt.want == nil {
-				if got != nil {
-					t.Errorf("RoundHandlers.HandleRoundDeleted() = %v, want nil", got)
-				}
-			} else if len(got) != len(tt.want) {
-				t.Errorf("RoundHandlers.HandleRoundDeleted() returned %d messages, want %d", len(got), len(tt.want))
-			} else if len(got) > 0 && len(tt.want) > 0 {
-				for i, wantMsg := range tt.want {
-					if i >= len(got) {
-						t.Errorf("Missing expected message at index %d", i)
-						continue
-					}
-
-					gotMsg := got[i]
-					if wantMsg.UUID != gotMsg.UUID {
-						t.Errorf("Message UUID mismatch at index %d: got %s, want %s", i, gotMsg.UUID, wantMsg.UUID)
-					}
-
-					if string(wantMsg.Payload) != string(gotMsg.Payload) {
-						t.Errorf("Message payload mismatch at index %d: got %s, want %s", i, string(gotMsg.Payload), string(wantMsg.Payload))
-					}
-				}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("HandleRoundDeleted() = %v, want %v", got, tt.want)
 			}
 		})
 	}

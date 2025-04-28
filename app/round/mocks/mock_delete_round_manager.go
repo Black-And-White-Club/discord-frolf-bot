@@ -13,7 +13,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
+	deleteround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/delete_round"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	discordgo "github.com/bwmarrin/discordgo"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -42,29 +43,32 @@ func (m *MockDeleteRoundManager) EXPECT() *MockDeleteRoundManagerMockRecorder {
 	return m.recorder
 }
 
-// DeleteEmbed mocks base method.
-func (m *MockDeleteRoundManager) DeleteEmbed(ctx context.Context, eventMessageID roundtypes.EventMessageID, channelID string) (bool, error) {
+// DeleteRoundEventEmbed mocks base method.
+func (m *MockDeleteRoundManager) DeleteRoundEventEmbed(ctx context.Context, eventMessageID sharedtypes.RoundID, channelID string) (deleteround.DeleteRoundOperationResult, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteEmbed", ctx, eventMessageID, channelID)
-	ret0, _ := ret[0].(bool)
+	ret := m.ctrl.Call(m, "DeleteRoundEventEmbed", ctx, eventMessageID, channelID)
+	ret0, _ := ret[0].(deleteround.DeleteRoundOperationResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// DeleteEmbed indicates an expected call of DeleteEmbed.
-func (mr *MockDeleteRoundManagerMockRecorder) DeleteEmbed(ctx, eventMessageID, channelID any) *gomock.Call {
+// DeleteRoundEventEmbed indicates an expected call of DeleteRoundEventEmbed.
+func (mr *MockDeleteRoundManagerMockRecorder) DeleteRoundEventEmbed(ctx, eventMessageID, channelID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteEmbed", reflect.TypeOf((*MockDeleteRoundManager)(nil).DeleteEmbed), ctx, eventMessageID, channelID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRoundEventEmbed", reflect.TypeOf((*MockDeleteRoundManager)(nil).DeleteRoundEventEmbed), ctx, eventMessageID, channelID)
 }
 
-// HandleDeleteRound mocks base method.
-func (m *MockDeleteRoundManager) HandleDeleteRound(ctx context.Context, i *discordgo.InteractionCreate) {
+// HandleDeleteRoundButton mocks base method.
+func (m *MockDeleteRoundManager) HandleDeleteRoundButton(ctx context.Context, i *discordgo.InteractionCreate) (deleteround.DeleteRoundOperationResult, error) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "HandleDeleteRound", ctx, i)
+	ret := m.ctrl.Call(m, "HandleDeleteRoundButton", ctx, i)
+	ret0, _ := ret[0].(deleteround.DeleteRoundOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
-// HandleDeleteRound indicates an expected call of HandleDeleteRound.
-func (mr *MockDeleteRoundManagerMockRecorder) HandleDeleteRound(ctx, i any) *gomock.Call {
+// HandleDeleteRoundButton indicates an expected call of HandleDeleteRoundButton.
+func (mr *MockDeleteRoundManagerMockRecorder) HandleDeleteRoundButton(ctx, i any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleDeleteRound", reflect.TypeOf((*MockDeleteRoundManager)(nil).HandleDeleteRound), ctx, i)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleDeleteRoundButton", reflect.TypeOf((*MockDeleteRoundManager)(nil).HandleDeleteRoundButton), ctx, i)
 }

@@ -14,12 +14,12 @@ import (
 )
 
 // HandleDeleteRound handles the delete round button interaction.
-func (drm *deleteRoundManager) HandleDeleteRoundCommand(ctx context.Context, i *discordgo.InteractionCreate) (DeleteRoundOperationResult, error) {
-	ctx = discordmetrics.WithValue(ctx, discordmetrics.CommandNameKey, "handle_delete_round_command")
+func (drm *deleteRoundManager) HandleDeleteRoundButton(ctx context.Context, i *discordgo.InteractionCreate) (DeleteRoundOperationResult, error) {
+	ctx = discordmetrics.WithValue(ctx, discordmetrics.CommandNameKey, "handle_delete_round")
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.InteractionType, "button")
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.UserIDKey, i.Member.User.ID)
 
-	drm.logger.InfoContext(ctx, "Handling delete round command",
+	drm.logger.InfoContext(ctx, "Handling delete round",
 		attr.String("interaction_id", i.ID),
 		attr.String("custom_id", i.MessageComponentData().CustomID),
 		attr.UserID(sharedtypes.DiscordID(i.Member.User.ID)))

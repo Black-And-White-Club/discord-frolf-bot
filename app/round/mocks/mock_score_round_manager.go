@@ -13,7 +13,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
+	scoreround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/score_round"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	discordgo "github.com/bwmarrin/discordgo"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -43,9 +44,12 @@ func (m *MockScoreRoundManager) EXPECT() *MockScoreRoundManagerMockRecorder {
 }
 
 // HandleScoreButton mocks base method.
-func (m *MockScoreRoundManager) HandleScoreButton(ctx context.Context, i *discordgo.InteractionCreate) {
+func (m *MockScoreRoundManager) HandleScoreButton(ctx context.Context, i *discordgo.InteractionCreate) (scoreround.ScoreRoundOperationResult, error) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "HandleScoreButton", ctx, i)
+	ret := m.ctrl.Call(m, "HandleScoreButton", ctx, i)
+	ret0, _ := ret[0].(scoreround.ScoreRoundOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // HandleScoreButton indicates an expected call of HandleScoreButton.
@@ -55,9 +59,12 @@ func (mr *MockScoreRoundManagerMockRecorder) HandleScoreButton(ctx, i any) *gomo
 }
 
 // HandleScoreSubmission mocks base method.
-func (m *MockScoreRoundManager) HandleScoreSubmission(ctx context.Context, i *discordgo.InteractionCreate) {
+func (m *MockScoreRoundManager) HandleScoreSubmission(ctx context.Context, i *discordgo.InteractionCreate) (scoreround.ScoreRoundOperationResult, error) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "HandleScoreSubmission", ctx, i)
+	ret := m.ctrl.Call(m, "HandleScoreSubmission", ctx, i)
+	ret0, _ := ret[0].(scoreround.ScoreRoundOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // HandleScoreSubmission indicates an expected call of HandleScoreSubmission.
@@ -67,29 +74,31 @@ func (mr *MockScoreRoundManagerMockRecorder) HandleScoreSubmission(ctx, i any) *
 }
 
 // SendScoreUpdateConfirmation mocks base method.
-func (m *MockScoreRoundManager) SendScoreUpdateConfirmation(channelID string, userID roundtypes.UserID, score *int) error {
+func (m *MockScoreRoundManager) SendScoreUpdateConfirmation(ctx context.Context, channelID string, userID sharedtypes.DiscordID, score *sharedtypes.Score) (scoreround.ScoreRoundOperationResult, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SendScoreUpdateConfirmation", channelID, userID, score)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret := m.ctrl.Call(m, "SendScoreUpdateConfirmation", ctx, channelID, userID, score)
+	ret0, _ := ret[0].(scoreround.ScoreRoundOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // SendScoreUpdateConfirmation indicates an expected call of SendScoreUpdateConfirmation.
-func (mr *MockScoreRoundManagerMockRecorder) SendScoreUpdateConfirmation(channelID, userID, score any) *gomock.Call {
+func (mr *MockScoreRoundManagerMockRecorder) SendScoreUpdateConfirmation(ctx, channelID, userID, score any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendScoreUpdateConfirmation", reflect.TypeOf((*MockScoreRoundManager)(nil).SendScoreUpdateConfirmation), channelID, userID, score)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendScoreUpdateConfirmation", reflect.TypeOf((*MockScoreRoundManager)(nil).SendScoreUpdateConfirmation), ctx, channelID, userID, score)
 }
 
 // SendScoreUpdateError mocks base method.
-func (m *MockScoreRoundManager) SendScoreUpdateError(userID roundtypes.UserID, errorMsg string) error {
+func (m *MockScoreRoundManager) SendScoreUpdateError(ctx context.Context, userID sharedtypes.DiscordID, errorMsg string) (scoreround.ScoreRoundOperationResult, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SendScoreUpdateError", userID, errorMsg)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret := m.ctrl.Call(m, "SendScoreUpdateError", ctx, userID, errorMsg)
+	ret0, _ := ret[0].(scoreround.ScoreRoundOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // SendScoreUpdateError indicates an expected call of SendScoreUpdateError.
-func (mr *MockScoreRoundManagerMockRecorder) SendScoreUpdateError(userID, errorMsg any) *gomock.Call {
+func (mr *MockScoreRoundManagerMockRecorder) SendScoreUpdateError(ctx, userID, errorMsg any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendScoreUpdateError", reflect.TypeOf((*MockScoreRoundManager)(nil).SendScoreUpdateError), userID, errorMsg)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendScoreUpdateError", reflect.TypeOf((*MockScoreRoundManager)(nil).SendScoreUpdateError), ctx, userID, errorMsg)
 }

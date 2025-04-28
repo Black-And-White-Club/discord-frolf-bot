@@ -3,17 +3,18 @@ package scoreround
 import (
 	"context"
 	"errors"
-	"fmt"
+	"strings"
 	"testing"
 
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
-	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	helpersmocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
-	"github.com/Black-And-White-Club/frolf-bot-shared/observability/mocks"
+	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
+	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/bwmarrin/discordgo"
+	"github.com/google/uuid"
 	"go.uber.org/mock/gomock"
 )
 
@@ -21,17 +22,17 @@ func Test_scoreRoundManager_HandleScoreButton(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	testRoundID := uuid.New()
 	mockSession := discordmocks.NewMockSession(ctrl)
 	mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	mockLogger := loggerfrolfbot.NoOpLogger
 	mockHelper := helpersmocks.NewMockHelpers(ctrl)
-	mockConfig := &config.Config{}
+	mockMetrics := &discordmetrics.NoOpMetrics{}
 
-	// Helper function to create a sample interaction with the desired custom ID
-	createButtonInteraction := func(roundID string) *discordgo.InteractionCreate {
+	createInteraction := func(customID string) *discordgo.InteractionCreate {
 		return &discordgo.InteractionCreate{
 			Interaction: &discordgo.Interaction{
-				ID: "button-interaction-123",
+				ID: "interaction-123",
 				Member: &discordgo.Member{
 					User: &discordgo.User{
 						ID:       "user-123",
@@ -39,7 +40,7 @@ func Test_scoreRoundManager_HandleScoreButton(t *testing.T) {
 					},
 				},
 				Data: discordgo.MessageComponentInteractionData{
-					CustomID:      fmt.Sprintf("score_button|%s", roundID),
+					CustomID:      customID,
 					ComponentType: discordgo.ButtonComponent,
 				},
 				Type: discordgo.InteractionMessageComponent,
@@ -48,79 +49,80 @@ func Test_scoreRoundManager_HandleScoreButton(t *testing.T) {
 	}
 
 	tests := []struct {
-		name  string
-		setup func()
-		args  struct {
-			ctx context.Context
-			i   *discordgo.InteractionCreate
-		}
+		name          string
+		setup         func()
+		interaction   *discordgo.InteractionCreate
+		expectedError string
 	}{
 		{
-			name: "successful modal opening",
+			name: "invalid custom ID format",
 			setup: func() {
-				// Expected logger calls
-				mockLogger.EXPECT().
-					Info(gomock.Any(), gomock.Eq("Opening score submission modal"), gomock.Any(), gomock.Any(), gomock.Any()).
-					Times(1)
-
+				// No mocks needed - function should exit early
+			},
+			interaction:   createInteraction("score_button"),
+			expectedError: "invalid custom ID for score button",
+		},
+		{
+			name: "finalized round rejection",
+			setup: func() {
 				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(i *discordgo.Interaction, ir *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
-						if ir.Type != discordgo.InteractionResponseModal {
-							t.Errorf("Expected InteractionResponseModal, got %v", ir.Type)
+					InteractionRespond(gomock.Any(), gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ *discordgo.Interaction, resp *discordgo.InteractionResponse, _ ...any) error {
+						if !strings.Contains(resp.Data.Content, "finalized") {
+							return errors.New("expected finalized message content")
 						}
-
-						if ir.Data.Title != "Submit Your Score" {
-							t.Errorf("Expected 'Submit Your Score', got %s", ir.Data.Title)
-						}
-
-						expectedCustomID := fmt.Sprintf("submit_score_modal|%s|%s", "789", "user-123")
-						if ir.Data.CustomID != expectedCustomID {
-							t.Errorf("Expected CustomID %s, got %s", expectedCustomID, ir.Data.CustomID)
-						}
-
 						return nil
 					}).
 					Times(1)
-
-				// Expected success logger call
-				mockLogger.EXPECT().
-					Info(gomock.Any(), gomock.Eq("Successfully opened score modal"), gomock.Any(), gomock.Any(), gomock.Any()).
-					Times(1)
 			},
-			args: struct {
-				ctx context.Context
-				i   *discordgo.InteractionCreate
-			}{
-				ctx: context.Background(),
-				i:   createButtonInteraction("789"),
-			},
+			interaction:   createInteraction("score_button|" + testRoundID.String() + "|finalized"),
+			expectedError: "",
 		},
 		{
-			name: "interaction respond error",
+			name: "finalized round response error",
 			setup: func() {
-				// Expected logger calls
-				mockLogger.EXPECT().
-					Info(gomock.Any(), gomock.Eq("Opening score submission modal"), gomock.Any(), gomock.Any(), gomock.Any()).
-					Times(1)
-
 				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
+					InteractionRespond(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(errors.New("failed to respond to interaction")).
 					Times(1)
-
-				// Expected error logger call
-				mockLogger.EXPECT().
-					Error(gomock.Any(), gomock.Eq("Failed to open score modal"), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+			},
+			interaction:   createInteraction("score_button|" + testRoundID.String() + "|finalized"),
+			expectedError: "failed to respond to interaction",
+		},
+		{
+			name: "modal response error",
+			setup: func() {
+				mockSession.EXPECT().
+					InteractionRespond(gomock.Any(), gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ *discordgo.Interaction, resp *discordgo.InteractionResponse, _ ...any) error {
+						if resp.Type != discordgo.InteractionResponseModal {
+							return errors.New("expected modal response type")
+						}
+						return errors.New("failed to open modal")
+					}).
 					Times(1)
 			},
-			args: struct {
-				ctx context.Context
-				i   *discordgo.InteractionCreate
-			}{
-				ctx: context.Background(),
-				i:   createButtonInteraction("789"),
+			interaction:   createInteraction("score_button|" + testRoundID.String()),
+			expectedError: "failed to open modal",
+		},
+		{
+			name: "successful modal open",
+			setup: func() {
+				mockSession.EXPECT().
+					InteractionRespond(gomock.Any(), gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ *discordgo.Interaction, resp *discordgo.InteractionResponse, _ ...any) error {
+						if resp.Type != discordgo.InteractionResponseModal {
+							return errors.New("expected modal response type")
+						}
+						if !strings.Contains(resp.Data.CustomID, "submit_score_modal") {
+							return errors.New("expected submit_score_modal in custom ID")
+						}
+						return nil
+					}).
+					Times(1)
 			},
+			interaction:   createInteraction("score_button|" + testRoundID.String()),
+			expectedError: "",
 		},
 	}
 
@@ -135,10 +137,21 @@ func Test_scoreRoundManager_HandleScoreButton(t *testing.T) {
 				publisher: mockPublisher,
 				logger:    mockLogger,
 				helper:    mockHelper,
-				config:    mockConfig,
+				metrics:   mockMetrics,
+				operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (ScoreRoundOperationResult, error)) (ScoreRoundOperationResult, error) {
+					return fn(ctx) // bypass wrapper for testing
+				},
 			}
 
-			srm.HandleScoreButton(tt.args.ctx, tt.args.i)
+			result, err := srm.HandleScoreButton(context.Background(), tt.interaction)
+
+			if tt.expectedError != "" {
+				if err == nil && (result.Error == nil || !strings.Contains(result.Error.Error(), tt.expectedError)) {
+					t.Errorf("expected error containing %q, got %v", tt.expectedError, result.Error)
+				}
+			} else if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
 		})
 	}
 }
@@ -147,381 +160,323 @@ func Test_scoreRoundManager_HandleScoreSubmission(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	testRoundID := uuid.New()
 	mockSession := discordmocks.NewMockSession(ctrl)
 	mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
-	mockLogger := mocks.NewMockLogger(ctrl)
+	mockLogger := loggerfrolfbot.NoOpLogger
 	mockHelper := helpersmocks.NewMockHelpers(ctrl)
-	mockConfig := &config.Config{}
+	mockMetrics := &discordmetrics.NoOpMetrics{}
 
-	// Create a sample modal interaction with customizable values
-	createModalInteraction := func(customID string, scoreValue string) *discordgo.InteractionCreate {
-		textInput := &discordgo.TextInput{
-			CustomID: "score_input",
-			Value:    scoreValue,
-		}
-
-		actionsRow := &discordgo.ActionsRow{
-			Components: []discordgo.MessageComponent{textInput},
-		}
-
+	// Helper function to create a modal interaction with various configurations
+	createModalInteraction := func(customID string, components []discordgo.MessageComponent) *discordgo.InteractionCreate {
 		return &discordgo.InteractionCreate{
 			Interaction: &discordgo.Interaction{
 				ID: "interaction-123",
-				Message: &discordgo.Message{
-					ID: "message-123",
+				Member: &discordgo.Member{
+					User: &discordgo.User{
+						ID:       "user-123",
+						Username: "TestUser",
+					},
 				},
-				ChannelID: "channel-123",
-				Type:      discordgo.InteractionModalSubmit,
 				Data: discordgo.ModalSubmitInteractionData{
 					CustomID:   customID,
-					Components: []discordgo.MessageComponent{actionsRow},
+					Components: components,
 				},
+				Type: discordgo.InteractionModalSubmit,
 			},
 		}
 	}
 
-	tests := []struct {
-		name  string
-		setup func()
-		args  struct {
-			ctx context.Context
-			i   *discordgo.InteractionCreate
+	createTextInput := func(value string) *discordgo.TextInput {
+		return &discordgo.TextInput{
+			CustomID: "score_input",
+			Value:    value,
 		}
+	}
+
+	tests := []struct {
+		name          string
+		setup         func()
+		interaction   *discordgo.InteractionCreate
+		expectedError string
 	}{
-		{
-			name: "successful score submission",
-			setup: func() {
-				// Interaction acknowledge response
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(i *discordgo.Interaction, ir *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
-						if ir.Type != discordgo.InteractionResponseDeferredChannelMessageWithSource {
-							t.Errorf("Expected InteractionResponseDeferredChannelMessageWithSource, got %v", ir.Type)
-						}
-						return nil
-					}).
-					Times(1)
-
-				// Logger for processing score submission
-				mockLogger.EXPECT().
-					Info(gomock.Any(), gomock.Eq("Processing score submission"),
-						gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-					Times(1)
-
-				// Create a mock message object instead of a string
-				mockResultMsg := &message.Message{}
-
-				// Create result message for score update
-				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq("round.score.update.request")).
-					DoAndReturn(func(msg interface{}, payload interface{}, topic string) (*message.Message, error) {
-						// Validate payload
-						p, ok := payload.(roundevents.ScoreUpdateRequestPayload)
-						if !ok {
-							t.Error("Expected ScoreUpdateRequestPayload type")
-						}
-						if p.RoundID != 789 {
-							t.Errorf("Expected RoundID 789, got %v", p.RoundID)
-						}
-						if p.Participant != "user-123" {
-							t.Errorf("Expected Participant user-123, got %v", p.Participant)
-						}
-						if *p.Score != 5 {
-							t.Errorf("Expected Score 5, got %v", *p.Score)
-						}
-						return mockResultMsg, nil
-					}).
-					Times(1)
-
-				// Publish the score update
-				mockPublisher.EXPECT().
-					Publish(gomock.Eq("round.score.update.request"), mockResultMsg).
-					Return(nil).
-					Times(1)
-
-				// Create trace event message
-				mockTraceMsg := &message.Message{}
-				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq("round.trace.event")).
-					Return(mockTraceMsg, nil).
-					Times(1)
-
-				// Publish trace event
-				mockPublisher.EXPECT().
-					Publish(gomock.Eq("round.trace.event"), mockTraceMsg).
-					Times(1)
-
-				// Send confirmation to user
-				mockSession.EXPECT().
-					FollowupMessageCreate(gomock.Any(), true, gomock.Any()).
-					DoAndReturn(func(i *discordgo.Interaction, wait bool, params *discordgo.WebhookParams, opts ...discordgo.RequestOption) (*discordgo.Message, error) {
-						if params.Content != "Your score of 5 has been submitted! You'll receive a confirmation once it's processed." {
-							t.Errorf("Unexpected confirmation message: %s", params.Content)
-						}
-						return nil, nil
-					}).
-					Times(1)
-
-				// Final success log
-				mockLogger.EXPECT().
-					Info(gomock.Any(), gomock.Eq("Score submission processed successfully"),
-						gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-					Times(1)
-			},
-			args: struct {
-				ctx context.Context
-				i   *discordgo.InteractionCreate
-			}{
-				ctx: context.Background(),
-				i:   createModalInteraction("submit_score_modal|789|user-123", "5"),
-			},
-		},
 		{
 			name: "invalid modal custom ID",
 			setup: func() {
-				// Expected logger for invalid custom ID
-				mockLogger.EXPECT().
-					Error(gomock.Any(), gomock.Eq("Invalid modal custom ID"), gomock.Any(), gomock.Any()).
-					Times(1)
-
-				// Expected error response to user
 				mockSession.EXPECT().
 					InteractionRespond(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(i *discordgo.Interaction, ir *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
-						if ir.Type != discordgo.InteractionResponseChannelMessageWithSource {
-							t.Errorf("Expected InteractionResponseChannelMessageWithSource, got %v", ir.Type)
-						}
-						if ir.Data.Content != "Something went wrong with your submission. Please try again." {
-							t.Errorf("Unexpected error message: %s", ir.Data.Content)
-						}
-						return nil
-					}).
+					Return(nil).
 					Times(1)
 			},
-			args: struct {
-				ctx context.Context
-				i   *discordgo.InteractionCreate
-			}{
-				ctx: context.Background(),
-				i:   createModalInteraction("invalid_custom_id", "5"),
-			},
+			interaction: createModalInteraction("invalid_modal_id", []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						createTextInput("5"),
+					},
+				},
+			}),
+			expectedError: "invalid modal custom ID",
 		},
 		{
 			name: "invalid round ID",
 			setup: func() {
-				// Expected logger for invalid round ID
-				mockLogger.EXPECT().
-					Error(gomock.Any(), gomock.Eq("Invalid round ID"), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-					Times(1)
-
-				// Expected error response to user
 				mockSession.EXPECT().
 					InteractionRespond(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(i *discordgo.Interaction, ir *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
-						if ir.Type != discordgo.InteractionResponseChannelMessageWithSource {
-							t.Errorf("Expected InteractionResponseChannelMessageWithSource, got %v", ir.Type)
-						}
-						if ir.Data.Content != "Invalid round information. Please try again." {
-							t.Errorf("Unexpected error message: %s", ir.Data.Content)
-						}
-						return nil
-					}).
+					Return(nil).
 					Times(1)
 			},
-			args: struct {
-				ctx context.Context
-				i   *discordgo.InteractionCreate
-			}{
-				ctx: context.Background(),
-				i:   createModalInteraction("submit_score_modal|not_a_number|user-123", "5"),
-			},
+			interaction: createModalInteraction("submit_score_modal|invalid-uuid|user-123", []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						createTextInput("5"),
+					},
+				},
+			}),
+			expectedError: "invalid round ID",
 		},
 		{
-			name: "error acknowledging interaction",
+			name: "interaction acknowledge error",
 			setup: func() {
-				// Interaction acknowledge error
 				mockSession.EXPECT().
 					InteractionRespond(gomock.Any(), gomock.Any()).
-					Return(errors.New("failed to respond to interaction")).
-					Times(1)
-
-				// Expected error logger
-				mockLogger.EXPECT().
-					Error(gomock.Any(), gomock.Eq("Failed to acknowledge score submission"), gomock.Any(), gomock.Any()).
+					Return(errors.New("failed to acknowledge interaction")).
 					Times(1)
 			},
-			args: struct {
-				ctx context.Context
-				i   *discordgo.InteractionCreate
-			}{
-				ctx: context.Background(),
-				i:   createModalInteraction("submit_score_modal|789|user-123", "5"),
-			},
+			interaction: createModalInteraction("submit_score_modal|"+testRoundID.String()+"|user-123", []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						createTextInput("5"),
+					},
+				},
+			}),
+			expectedError: "failed to acknowledge interaction",
 		},
 		{
-			name: "empty score input",
+			name: "missing score input",
 			setup: func() {
-				// Interaction acknowledge response
 				mockSession.EXPECT().
 					InteractionRespond(gomock.Any(), gomock.Any()).
 					Return(nil).
 					Times(1)
 
-				// Expected error logger
-				mockLogger.EXPECT().
-					Error(gomock.Any(), gomock.Eq("Could not extract score input"), gomock.Any()).
-					Times(1)
-
-				// Error response to user
 				mockSession.EXPECT().
-					FollowupMessageCreate(gomock.Any(), true, gomock.Any()).
-					DoAndReturn(func(i *discordgo.Interaction, wait bool, params *discordgo.WebhookParams, opts ...discordgo.RequestOption) (*discordgo.Message, error) {
-						if params.Content != "Could not read your score. Please try again." {
-							t.Errorf("Unexpected error message: %s", params.Content)
+					FollowupMessageCreate(gomock.Any(), true, gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ *discordgo.Interaction, _ bool, params *discordgo.WebhookParams, _ ...any) (*discordgo.Message, error) {
+						if !strings.Contains(params.Content, "Could not read your score") {
+							return nil, errors.New("expected error message about score input")
 						}
-						return nil, nil
+						return &discordgo.Message{}, nil
 					}).
 					Times(1)
 			},
-			args: struct {
-				ctx context.Context
-				i   *discordgo.InteractionCreate
-			}{
-				ctx: context.Background(),
-				i:   createModalInteraction("submit_score_modal|789|user-123", ""),
-			},
+			interaction:   createModalInteraction("submit_score_modal|"+testRoundID.String()+"|user-123", []discordgo.MessageComponent{}),
+			expectedError: "could not extract score input",
 		},
 		{
 			name: "invalid score format",
 			setup: func() {
-				// Interaction acknowledge response
 				mockSession.EXPECT().
 					InteractionRespond(gomock.Any(), gomock.Any()).
 					Return(nil).
 					Times(1)
 
-				// Expected error logger
-				mockLogger.EXPECT().
-					Error(gomock.Any(), gomock.Eq("Invalid score input"), gomock.Any(), gomock.Any(), gomock.Any()).
-					Times(1)
-
-				// Error response to user
 				mockSession.EXPECT().
-					FollowupMessageCreate(gomock.Any(), true, gomock.Any()).
-					DoAndReturn(func(i *discordgo.Interaction, wait bool, params *discordgo.WebhookParams, opts ...discordgo.RequestOption) (*discordgo.Message, error) {
-						if params.Content != "Invalid score. Please enter a valid number (e.g., -3, 0, +5)." {
-							t.Errorf("Unexpected error message: %s", params.Content)
+					FollowupMessageCreate(gomock.Any(), true, gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ *discordgo.Interaction, _ bool, params *discordgo.WebhookParams, _ ...any) (*discordgo.Message, error) {
+						if !strings.Contains(params.Content, "Invalid score") {
+							return nil, errors.New("expected error message about invalid score")
 						}
-						return nil, nil
+						return &discordgo.Message{}, nil
 					}).
 					Times(1)
 			},
-			args: struct {
-				ctx context.Context
-				i   *discordgo.InteractionCreate
-			}{
-				ctx: context.Background(),
-				i:   createModalInteraction("submit_score_modal|789|user-123", "not_a_number"),
-			},
+			interaction: createModalInteraction("submit_score_modal|"+testRoundID.String()+"|user-123", []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						createTextInput("not-a-number"),
+					},
+				},
+			}),
+			expectedError: "invalid score input",
 		},
 		{
-			name: "error creating result message",
+			name: "create result message error",
 			setup: func() {
-				// Interaction acknowledge response
 				mockSession.EXPECT().
 					InteractionRespond(gomock.Any(), gomock.Any()).
 					Return(nil).
 					Times(1)
 
-				// Logger for processing score submission
-				mockLogger.EXPECT().
-					Info(gomock.Any(), gomock.Eq("Processing score submission"),
-						gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-					Times(1)
-
-				// Create result message error
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq("round.score.update.request")).
-					Return(nil, errors.New("failed to create message")).
+					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(roundevents.RoundScoreUpdateRequest)).
+					Return(nil, errors.New("failed to create result message")).
 					Times(1)
 
-				// Expected error logger
-				mockLogger.EXPECT().
-					Error(gomock.Any(), gomock.Eq("Failed to create result message"), gomock.Any(), gomock.Any()).
-					Times(1)
-
-				// Error response to user
 				mockSession.EXPECT().
-					FollowupMessageCreate(gomock.Any(), true, gomock.Any()).
-					DoAndReturn(func(i *discordgo.Interaction, wait bool, params *discordgo.WebhookParams, opts ...discordgo.RequestOption) (*discordgo.Message, error) {
-						if params.Content != "Something went wrong while submitting your score. Please try again later." {
-							t.Errorf("Unexpected error message: %s", params.Content)
+					FollowupMessageCreate(gomock.Any(), true, gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ *discordgo.Interaction, _ bool, params *discordgo.WebhookParams, _ ...any) (*discordgo.Message, error) {
+						if !strings.Contains(params.Content, "Something went wrong") {
+							return nil, errors.New("expected generic error message")
 						}
-						return nil, nil
+						return &discordgo.Message{}, nil
 					}).
 					Times(1)
 			},
-			args: struct {
-				ctx context.Context
-				i   *discordgo.InteractionCreate
-			}{
-				ctx: context.Background(),
-				i:   createModalInteraction("submit_score_modal|789|user-123", "5"),
-			},
+			interaction: createModalInteraction("submit_score_modal|"+testRoundID.String()+"|user-123", []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						createTextInput("5"),
+					},
+				},
+			}),
+			expectedError: "failed to create result message",
 		},
 		{
-			name: "error publishing message",
+			name: "publish error",
 			setup: func() {
-				// Interaction acknowledge response
 				mockSession.EXPECT().
 					InteractionRespond(gomock.Any(), gomock.Any()).
 					Return(nil).
 					Times(1)
 
-				// Logger for processing score submission
-				mockLogger.EXPECT().
-					Info(gomock.Any(), gomock.Eq("Processing score submission"),
-						gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-					Times(1)
-
-				// Create a mock message object
-				mockResultMsg := &message.Message{}
-
-				// Create result message success
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq("round.score.update.request")).
-					Return(mockResultMsg, nil).
+					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(roundevents.RoundScoreUpdateRequest)).
+					Return(&message.Message{UUID: "msg-123"}, nil).
 					Times(1)
 
-				// Publish error
 				mockPublisher.EXPECT().
-					Publish(gomock.Eq("round.score.update.request"), mockResultMsg).
+					Publish(gomock.Eq(roundevents.RoundScoreUpdateRequest), gomock.Any()).
 					Return(errors.New("failed to publish message")).
 					Times(1)
 
-				// Expected error logger
-				mockLogger.EXPECT().
-					Error(gomock.Any(), gomock.Eq("Failed to publish score update request"), gomock.Any(), gomock.Any()).
-					Times(1)
-
-				// Error response to user
 				mockSession.EXPECT().
-					FollowupMessageCreate(gomock.Any(), true, gomock.Any()).
-					DoAndReturn(func(i *discordgo.Interaction, wait bool, params *discordgo.WebhookParams, opts ...discordgo.RequestOption) (*discordgo.Message, error) {
-						if params.Content != "Failed to submit your score. Please try again later." {
-							t.Errorf("Unexpected error message: %s", params.Content)
+					FollowupMessageCreate(gomock.Any(), true, gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ *discordgo.Interaction, _ bool, params *discordgo.WebhookParams, _ ...any) (*discordgo.Message, error) {
+						if !strings.Contains(params.Content, "Failed to submit") {
+							return nil, errors.New("expected failure message")
 						}
-						return nil, nil
+						return &discordgo.Message{}, nil
 					}).
 					Times(1)
 			},
-			args: struct {
-				ctx context.Context
-				i   *discordgo.InteractionCreate
-			}{
-				ctx: context.Background(),
-				i:   createModalInteraction("submit_score_modal|789|user-123", "5"),
+			interaction: createModalInteraction("submit_score_modal|"+testRoundID.String()+"|user-123", []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						createTextInput("5"),
+					},
+				},
+			}),
+			expectedError: "failed to publish message",
+		},
+		{
+			name: "successful score submission",
+			setup: func() {
+				mockSession.EXPECT().
+					InteractionRespond(gomock.Any(), gomock.Any()).
+					Return(nil).
+					Times(1)
+
+				mockHelper.EXPECT().
+					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(roundevents.RoundScoreUpdateRequest)).
+					Return(&message.Message{UUID: "msg-123"}, nil).
+					Times(1)
+
+				mockPublisher.EXPECT().
+					Publish(gomock.Eq(roundevents.RoundScoreUpdateRequest), gomock.Any()).
+					Return(nil).
+					Times(1)
+
+				// For trace event
+				mockHelper.EXPECT().
+					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(roundevents.RoundTraceEvent)).
+					Return(&message.Message{UUID: "trace-123"}, nil).
+					Times(1)
+
+				mockPublisher.EXPECT().
+					Publish(gomock.Eq(roundevents.RoundTraceEvent), gomock.Any()).
+					Return(nil).
+					Times(1)
+
+				mockSession.EXPECT().
+					FollowupMessageCreate(gomock.Any(), true, gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ *discordgo.Interaction, _ bool, params *discordgo.WebhookParams, _ ...any) (*discordgo.Message, error) {
+						if !strings.Contains(params.Content, "Your score of 5 has been submitted") {
+							return nil, errors.New("expected success message with score")
+						}
+						return &discordgo.Message{}, nil
+					}).
+					Times(1)
 			},
+			interaction: createModalInteraction("submit_score_modal|"+testRoundID.String()+"|user-123", []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						createTextInput("5"),
+					},
+				},
+			}),
+			expectedError: "",
+		},
+		{
+			name: "successful submission with alternate ActionsRow type",
+			setup: func() {
+				mockSession.EXPECT().
+					InteractionRespond(gomock.Any(), gomock.Any()).
+					Return(nil).
+					Times(1)
+
+				mockHelper.EXPECT().
+					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(roundevents.RoundScoreUpdateRequest)).
+					Return(&message.Message{UUID: "msg-123"}, nil).
+					Times(1)
+
+				mockPublisher.EXPECT().
+					Publish(gomock.Eq(roundevents.RoundScoreUpdateRequest), gomock.Any()).
+					Return(nil).
+					Times(1)
+
+				// For trace event
+				mockHelper.EXPECT().
+					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(roundevents.RoundTraceEvent)).
+					Return(&message.Message{UUID: "trace-123"}, nil).
+					Times(1)
+
+				mockPublisher.EXPECT().
+					Publish(gomock.Eq(roundevents.RoundTraceEvent), gomock.Any()).
+					Return(nil).
+					Times(1)
+
+				mockSession.EXPECT().
+					FollowupMessageCreate(gomock.Any(), true, gomock.Any(), gomock.Any()).
+					Return(&discordgo.Message{}, nil).
+					Times(1)
+			},
+			// Using the same interaction but a different component type case from the code
+			interaction: &discordgo.InteractionCreate{
+				Interaction: &discordgo.Interaction{
+					ID: "interaction-123",
+					Member: &discordgo.Member{
+						User: &discordgo.User{
+							ID:       "user-123",
+							Username: "TestUser",
+						},
+					},
+					Data: discordgo.ModalSubmitInteractionData{
+						CustomID: "submit_score_modal|" + testRoundID.String() + "|user-123",
+						Components: []discordgo.MessageComponent{
+							&discordgo.ActionsRow{
+								Components: []discordgo.MessageComponent{
+									&discordgo.TextInput{
+										CustomID: "score_input",
+										Value:    "-3",
+									},
+								},
+							},
+						},
+					},
+					Type: discordgo.InteractionModalSubmit,
+				},
+			},
+			expectedError: "",
 		},
 	}
 
@@ -536,10 +491,24 @@ func Test_scoreRoundManager_HandleScoreSubmission(t *testing.T) {
 				publisher: mockPublisher,
 				logger:    mockLogger,
 				helper:    mockHelper,
-				config:    mockConfig,
+				metrics:   mockMetrics,
+				operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (ScoreRoundOperationResult, error)) (ScoreRoundOperationResult, error) {
+					return fn(ctx) // bypass wrapper for testing
+				},
 			}
 
-			srm.HandleScoreSubmission(tt.args.ctx, tt.args.i)
+			result, _ := srm.HandleScoreSubmission(context.Background(), tt.interaction)
+
+			if tt.expectedError != "" {
+				// Check only the Error field in the result
+				if result.Error == nil {
+					t.Errorf("expected error containing %q, got nil", tt.expectedError)
+				} else if !strings.Contains(result.Error.Error(), tt.expectedError) {
+					t.Errorf("expected error containing %q, got %q", tt.expectedError, result.Error.Error())
+				}
+			} else if result.Error != nil {
+				t.Errorf("unexpected error: %v", result.Error)
+			}
 		})
 	}
 }

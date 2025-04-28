@@ -69,7 +69,7 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 	}
 
 	// Initialize round module
-	err = round.InitializeRoundModule(ctx, bot.Session, registry, bot.EventBus, bot.Logger, bot.Config, utils.NewEventUtil(), utils.NewHelper(bot.Logger), bot.InteractionStore)
+	err = round.InitializeRoundModule(ctx, bot.Session, registry, bot.EventBus, bot.Logger, bot.Config, utilsmocks NewEventUtil(), utils.NewHelper(bot.Logger), bot.InteractionStore)
 	if err != nil {
 		bot.Logger.Error("Failed to initialize round module", attr.Error(err))
 		return err

@@ -166,17 +166,17 @@ func (crm *createRoundManager) HandleCreateRoundModalSubmit(ctx context.Context,
 		// Extract form data
 		data := i.ModalSubmitData()
 		title := strings.TrimSpace(data.Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value)
-		description := strings.TrimSpace(data.Components[1].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value)
+		description := roundtypes.Description(strings.TrimSpace(data.Components[1].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value))
 		startTimeStr := strings.TrimSpace(data.Components[2].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value)
 		timezone := strings.TrimSpace(data.Components[3].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value)
-		location := strings.TrimSpace(data.Components[4].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value)
+		location := roundtypes.Location(strings.TrimSpace(data.Components[4].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value))
 
 		crm.logger.InfoContext(ctx, "Extracted form data",
 			attr.String("title", title),
-			attr.String("description", description),
+			attr.String("description", string(description)),
 			attr.String("start_time", startTimeStr),
 			attr.String("timezone", timezone),
-			attr.String("location", location))
+			attr.String("location", string(location)))
 
 		// Set default timezone to CST if the user didn't provide one
 		if timezone == "" {
@@ -237,9 +237,9 @@ func (crm *createRoundManager) HandleCreateRoundModalSubmit(ctx context.Context,
 		payload := roundevents.CreateRoundRequestedPayload{
 			UserID:      sharedtypes.DiscordID(userID),
 			Title:       roundtypes.Title(title),
-			Description: roundtypes.Description(description),
+			Description: description,
 			StartTime:   startTimeStr,
-			Location:    roundtypes.Location(location),
+			Location:    location,
 			Timezone:    roundtypes.Timezone(timezone),
 		}
 

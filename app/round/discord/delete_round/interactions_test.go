@@ -279,7 +279,7 @@ func Test_deleteRoundManager_HandleDeleteRoundCommand(t *testing.T) {
 				metrics: metrics,
 			}
 
-			result, err := drm.HandleDeleteRoundCommand(tt.args.ctx, tt.args.i)
+			result, err := drm.HandleDeleteRoundButton(tt.args.ctx, tt.args.i)
 
 			if tt.expectErr {
 				if err == nil && result.Error == nil {

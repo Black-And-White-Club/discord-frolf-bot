@@ -115,7 +115,7 @@ func Test_createRoundManager_SendRoundEventEmbed(t *testing.T) {
 					},
 				},
 				operationWrapper: func(ctx context.Context, name string, fn func(context.Context) (CreateRoundOperationResult, error)) (CreateRoundOperationResult, error) {
-					return fn(ctx) // bypass wrapper for testing
+					return fn(ctx)
 				},
 			}
 

@@ -1,64 +1,68 @@
 package roundhandlers
 
 import (
+	"context"
 	"fmt"
 
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	"github.com/ThreeDotsLabs/watermill/message"
+	"github.com/google/uuid"
 )
 
-// HandleRoundDeleted handles the RoundDeleted event by removing the corresponding Discord message.
+// HandleRoundDeleted handles the RoundDeleted event using the standardized wrapper
 func (h *RoundHandlers) HandleRoundDeleted(msg *message.Message) ([]*message.Message, error) {
-	ctx := msg.Context()
-	h.Logger.Info(ctx, "Handling round deleted event", attr.CorrelationIDFromMsg(msg))
+	return h.handlerWrapper(
+		"HandleRoundDeleted",
+		&roundevents.RoundDeletedPayload{},
+		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
+			p := payload.(*roundevents.RoundDeletedPayload)
 
-	// Unmarshal the payload
-	var payload roundevents.RoundDeletedPayload
-	if err := h.Helpers.UnmarshalPayload(msg, &payload); err != nil {
-		h.Logger.Error(ctx, "Failed to unmarshal payload", attr.CorrelationIDFromMsg(msg), attr.Error(err))
-		return nil, fmt.Errorf("failed to unmarshal payload: %w", err)
-	}
+			// Validate input
+			if uuid.UUID(p.RoundID) == uuid.Nil {
+				h.Logger.ErrorContext(ctx, "Missing RoundID in payload", attr.CorrelationIDFromMsg(msg))
+				return nil, fmt.Errorf("missing RoundID in round deleted payload")
+			}
+			if uuid.UUID(p.EventMessageID) == uuid.Nil {
+				h.Logger.ErrorContext(ctx, "Missing EventMessageID in payload", attr.CorrelationIDFromMsg(msg))
+				return nil, fmt.Errorf("event message ID is required but missing for round deleted event")
+			}
 
-	// Validate that RoundID is provided
-	if payload.RoundID == 0 {
-		h.Logger.Error(ctx, "Missing RoundID in payload", attr.CorrelationIDFromMsg(msg))
-		return nil, fmt.Errorf("missing RoundID in round deleted payload")
-	}
+			// Attempt deletion
+			result, err := h.RoundDiscord.GetDeleteRoundManager().DeleteRoundEventEmbed(ctx, p.EventMessageID, h.Config.Discord.ChannelID)
+			if err != nil {
+				h.Logger.ErrorContext(ctx, "Failed to delete round embed message", attr.Error(err))
+				return nil, fmt.Errorf("failed to delete round embed message: %w", err)
+			}
 
-	// Validate that EventMessageID is provided
-	if payload.EventMessageID == "" {
-		h.Logger.Error(ctx, "Missing EventMessageID in payload", attr.CorrelationIDFromMsg(msg))
-		return nil, fmt.Errorf("event message ID is required but missing for round deleted event")
-	}
+			// Assert Success field to bool
+			success, ok := result.Success.(bool)
+			if !ok {
+				h.Logger.ErrorContext(ctx, "Unexpected type for result.Success", attr.CorrelationIDFromMsg(msg))
+				return nil, fmt.Errorf("unexpected type for result.Success in DeleteRoundEventEmbed")
+			}
 
-	// Attempt to delete the Discord embed message
-	success, err := h.RoundDiscord.GetDeleteRoundManager().DeleteEmbed(ctx, payload.EventMessageID, h.Config.Discord.ChannelID)
-	if err != nil {
-		h.Logger.Error(ctx, "Failed to delete round embed message", attr.CorrelationIDFromMsg(msg), attr.Error(err))
-		return nil, fmt.Errorf("failed to delete round embed message: %w", err)
-	}
+			if !success {
+				h.Logger.WarnContext(ctx, "Round embed message was not deleted successfully", attr.RoundID("round_id", p.RoundID))
+			} else {
+				h.Logger.InfoContext(ctx, "Successfully deleted round embed message", attr.RoundID("round_id", p.RoundID))
+			}
 
-	// Log whether the deletion was successful
-	if !success {
-		h.Logger.Warn(ctx, "Round embed message was not deleted successfully", attr.CorrelationIDFromMsg(msg))
-	} else {
-		h.Logger.Info(ctx, "Successfully deleted round embed message", attr.CorrelationIDFromMsg(msg))
-	}
+			// Create trace message
+			tracePayload := map[string]interface{}{
+				"round_id":   p.RoundID,
+				"event_type": "round_deleted",
+				"status":     "embed_deleted",
+				"message_id": p.EventMessageID,
+			}
 
-	// Create a trace event
-	tracePayload := map[string]interface{}{
-		"round_id":   payload.RoundID,
-		"event_type": "round_deleted",
-		"status":     "embed_deleted",
-		"message_id": payload.EventMessageID,
-	}
+			traceMsg, err := h.Helpers.CreateResultMessage(msg, tracePayload, roundevents.RoundTraceEvent)
+			if err != nil {
+				h.Logger.ErrorContext(ctx, "Failed to create trace event", attr.Error(err))
+				return nil, fmt.Errorf("failed to create trace event: %w", err)
+			}
 
-	traceMsg, err := h.Helpers.CreateResultMessage(msg, tracePayload, roundevents.RoundTraceEvent)
-	if err != nil {
-		h.Logger.Error(ctx, "Failed to create trace event", attr.Error(err))
-		return []*message.Message{}, nil
-	}
-
-	return []*message.Message{traceMsg}, nil
+			return []*message.Message{traceMsg}, nil
+		},
+	)(msg)
 }

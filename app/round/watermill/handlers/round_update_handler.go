@@ -1,64 +1,111 @@
 package roundhandlers
 
-// import (
-// 	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
-// 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
-// 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
-// 	"github.com/ThreeDotsLabs/watermill/message"
-// )
+import (
+	"context"
 
-// func (h *RoundHandlers) HandleRoundUpdateRequest(msg *message.Message) ([]*message.Message, error) {
-// 	ctx := msg.Context()
-// 	h.Logger.Info(ctx, "Handling round update request", attr.CorrelationIDFromMsg(msg))
-// 	var payload discordroundevents.DiscordRoundUpdateRequestPayload
-// 	if err := h.Helpers.UnmarshalPayload(msg, &payload); err != nil {
-// 		return nil, err
-// 	}
-// 	// Construct the backend payload.
-// 	backendPayload := roundevents.RoundUpdateRequestPayload{
-// 		RoundID:        payload.RoundID,
-// 		DiscordEventID: payload.MessageID,
-// 	}
-// 	if payload.Title != nil {
-// 		backendPayload.Title = payload.Title
-// 	}
-// 	if payload.Description != nil {
-// 		backendPayload.Description = payload.Description
-// 	}
-// 	if payload.StartTime != nil {
-// 		backendPayload.StartTime = payload.StartTime
-// 	}
-// 	if payload.Location != nil {
-// 		backendPayload.Location = payload.Location
-// 	}
-// 	backendMsg, err := h.Helpers.CreateResultMessage(msg, backendPayload, roundevents.RoundUpdateRequest)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	h.Logger.Info(ctx, "Successfully processed round update request", attr.CorrelationIDFromMsg(msg))
-// 	return []*message.Message{backendMsg}, nil
-// }
-// func (h *RoundHandlers) HandleRoundUpdated(msg *message.Message) ([]*message.Message, error) {
-// 	ctx := msg.Context()
-// 	h.Logger.Info(ctx, "Handling round updated event", attr.CorrelationIDFromMsg(msg))
-// 	var payload roundevents.RoundUpdatedPayload // From the BACKEND
-// 	if err := h.Helpers.UnmarshalPayload(msg, &payload); err != nil {
-// 		return nil, err
-// 	}
-// 	// Construct the *internal* Discord payload for the successful update.
-// 	discordPayload := discordroundevents.DiscordRoundUpdatedPayload{
-// 		RoundID:     payload.RoundID,
-// 		MessageID:   payload.DiscordEventID,
-// 		ChannelID:   payload.ChannelID,
-// 		Title:       payload.Title,
-// 		Description: payload.Description,
-// 		StartTime:   payload.StartTime,
-// 		Location:    payload.Location,
-// 	}
-// 	discordMsg, err := h.Helpers.CreateResultMessage(msg, discordPayload, discordroundevents.RoundUpdatedTopic)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	h.Logger.Info(ctx, "Successfully processed round updated", attr.CorrelationIDFromMsg(msg))
-// 	return []*message.Message{discordMsg}, nil
-// }
+	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
+	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
+	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
+	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
+	"github.com/ThreeDotsLabs/watermill/message"
+)
+
+func (h *RoundHandlers) HandleRoundUpdateRequested(msg *message.Message) ([]*message.Message, error) {
+	return h.handlerWrapper(
+		"HandleRoundUpdateRequested",
+		&discordroundevents.DiscordRoundUpdateRequestPayload{},
+		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
+			updatePayload := payload.(*discordroundevents.DiscordRoundUpdateRequestPayload)
+
+			backendMsg, err := h.Helpers.CreateResultMessage(msg, updatePayload, roundevents.RoundUpdateRequest)
+			if err != nil {
+				h.Logger.ErrorContext(ctx, "Failed to create result message", attr.Error(err))
+				return nil, err
+			}
+
+			return []*message.Message{backendMsg}, nil
+		},
+	)(msg)
+}
+
+func (h *RoundHandlers) HandleRoundUpdated(msg *message.Message) ([]*message.Message, error) {
+	return h.handlerWrapper(
+		"HandleRoundUpdated",
+		&discordroundevents.DiscordRoundUpdatedPayload{},
+		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
+			updatedPayload := payload.(*discordroundevents.DiscordRoundUpdatedPayload)
+
+			// Extract required data
+			roundID := updatedPayload.RoundID
+			channelID := updatedPayload.ChannelID
+
+			// Update the embedded RSVP message
+			title := updatedPayload.Title
+
+			var description *roundtypes.Description
+			if updatedPayload.Description != nil {
+				desc := roundtypes.Description(*updatedPayload.Description)
+				description = &desc
+			}
+
+			var startTime *sharedtypes.StartTime
+			if updatedPayload.StartTime != nil {
+				startTimeValue := sharedtypes.StartTime(*updatedPayload.StartTime)
+				startTime = &startTimeValue
+			}
+
+			location := updatedPayload.Location
+
+			result, err := h.RoundDiscord.GetUpdateRoundManager().UpdateRoundEventEmbed(
+				ctx,
+				channelID,
+				roundID,
+				title,
+				description,
+				startTime,
+				location,
+			)
+			if err != nil {
+				h.Logger.ErrorContext(ctx, "Failed to update round event embed", attr.Error(err))
+				return nil, err
+			}
+
+			if result.Error != nil {
+				h.Logger.ErrorContext(ctx, "Error in result from UpdateRoundEventEmbed", attr.Error(result.Error))
+				return nil, result.Error
+			}
+
+			return nil, nil
+		},
+	)(msg)
+}
+
+func (h *RoundHandlers) HandleRoundUpdateFailed(msg *message.Message) ([]*message.Message, error) {
+	return h.handlerWrapper(
+		"HandleRoundUpdateFailed",
+		&roundevents.RoundUpdateErrorPayload{},
+		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
+			failedPayload := payload.(*roundevents.RoundUpdateErrorPayload)
+
+			// Log the error
+			h.Logger.ErrorContext(ctx, "Round update failed", attr.String("error", failedPayload.Error))
+
+			return nil, nil
+		},
+	)(msg)
+}
+
+func (h *RoundHandlers) HandleRoundUpdateValidationFailed(msg *message.Message) ([]*message.Message, error) {
+	return h.handlerWrapper(
+		"HandleRoundUpdateValidationFailed",
+		&roundevents.RoundUpdateValidatedPayload{},
+		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
+			validatedPayload := payload.(*roundevents.RoundUpdateValidatedPayload)
+
+			h.Logger.InfoContext(ctx, "Round update validated", attr.RoundID("round_id", validatedPayload.RoundUpdateRequestPayload.RoundID))
+
+			return nil, nil
+		},
+	)(msg)
+}

@@ -39,13 +39,12 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 		setupMocks     func(mockSession *discordmocks.MockSession)
 		embedPayload   roundevents.RoundFinalizedEmbedUpdatePayload
 		channelID      string
-		eventMessageID string
-		expectErr      bool // Indicates if *any* error is expected (either in return or in result struct)
+		eventMessageID sharedtypes.RoundID
+		expectErr      bool
 	}{
 		{
 			name: "Successful finalization",
 			setupMocks: func(mockSession *discordmocks.MockSession) {
-				// Mock User calls for TransformRoundToFinalizedScorecard
 				mockSession.EXPECT().
 					User(gomock.Any()).
 					Return(&discordgo.User{Username: "TestUser"}, nil).
@@ -56,19 +55,17 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 					Return(&discordgo.Member{Nick: ""}, nil).
 					AnyTimes()
 
-				// Mock the channel message edit
 				mockSession.EXPECT().
 					ChannelMessageEditComplex(gomock.Any()).
 					DoAndReturn(func(edit *discordgo.MessageEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
-						// Validate edit matches what we expect - compare against tt.eventMessageID
-						if edit.Channel != "test-channel" || edit.ID != "test-message" { // Use hardcoded values from test case for comparison
+						// Compare against the actual UUID string
+						if edit.Channel != "test-channel" || edit.ID != testRoundID.String() {
 							t.Errorf("Unexpected edit parameters: got %+v, want channel=%s, id=%s",
-								edit, "test-channel", "test-message")
+								edit, "test-channel", testRoundID.String())
 						}
 
-						// Return a mock message with the embed
 						return &discordgo.Message{
-							ID:     "test-message",
+							ID:     edit.ID, // Use the same ID that was passed in
 							Embeds: *edit.Embeds,
 						}, nil
 					}).
@@ -88,7 +85,7 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 				EventMessageID: (*sharedtypes.RoundID)(&testRoundID),
 			},
 			channelID:      "test-channel",
-			eventMessageID: "test-message", // Use hardcoded value here to match mock expectation
+			eventMessageID: testRoundID,
 			expectErr:      false,
 		},
 		{
@@ -104,7 +101,6 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 					Return(&discordgo.Member{Nick: ""}, nil).
 					AnyTimes()
 
-				// Mock the channel message edit to fail
 				mockSession.EXPECT().
 					ChannelMessageEditComplex(gomock.Any()).
 					Return(nil, fmt.Errorf("discord API error")).
@@ -119,7 +115,7 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 				EventMessageID: (*sharedtypes.RoundID)(&testRoundID),
 			},
 			channelID:      "test-channel",
-			eventMessageID: "test-message", // Use hardcoded value here
+			eventMessageID: testRoundID,
 			expectErr:      true,
 		},
 		{
@@ -130,7 +126,6 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 					Return(nil, fmt.Errorf("user not found")).
 					AnyTimes()
 
-				// Still expect the message edit call, as TransformRoundToFinalizedScorecard handles the user fetch error internally
 				mockSession.EXPECT().
 					ChannelMessageEditComplex(gomock.Any()).
 					Return(&discordgo.Message{ID: "test-message"}, nil).
@@ -150,8 +145,8 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 				EventMessageID: (*sharedtypes.RoundID)(&testRoundID),
 			},
 			channelID:      "test-channel",
-			eventMessageID: "test-message", // Use hardcoded value here
-			expectErr:      false,          // Transform error is logged, but the outer function doesn't return an error
+			eventMessageID: testRoundID,
+			expectErr:      false,
 		},
 		{
 			name: "Missing channel ID",
@@ -165,7 +160,7 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 				EventMessageID: (*sharedtypes.RoundID)(&testRoundID),
 			},
 			channelID:      "",
-			eventMessageID: "test-message", // Use hardcoded value here
+			eventMessageID: testRoundID,
 			expectErr:      true,
 		},
 		{
@@ -173,14 +168,14 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 			setupMocks: func(mockSession *discordmocks.MockSession) {
 			},
 			embedPayload: roundevents.RoundFinalizedEmbedUpdatePayload{
-				RoundID:        sharedtypes.RoundID(testRoundID),
+				RoundID:        testRoundID,
 				Title:          "Test Round",
 				Location:       (*roundtypes.Location)(strPtr("Test Course")),
 				StartTime:      (*sharedtypes.StartTime)(timePtr(fixedTime)),
 				EventMessageID: (*sharedtypes.RoundID)(&testRoundID),
 			},
 			channelID:      "test-channel",
-			eventMessageID: "",
+			eventMessageID: sharedtypes.RoundID(uuid.Nil),
 			expectErr:      true,
 		},
 		{
@@ -195,7 +190,7 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 				EventMessageID: (*sharedtypes.RoundID)(&testRoundID),
 			},
 			channelID:      "test-channel",
-			eventMessageID: "test-message", // Use hardcoded value here
+			eventMessageID: testRoundID,
 			expectErr:      true,
 		},
 	}
@@ -217,40 +212,33 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 				logger:  mockLogger,
 				config:  mockConfig,
 				operationWrapper: func(ctx context.Context, name string, fn func(ctx context.Context) (FinalizeRoundOperationResult, error)) (FinalizeRoundOperationResult, error) {
-					// Call the actual logic function directly for testing
 					return fn(ctx)
 				},
 			}
 
-			// Handle the nil session case
 			if tt.name == "Nil session" {
 				frm.session = nil
 			}
 
-			// Setup the specific test case mocks
 			if tt.setupMocks != nil {
 				tt.setupMocks(mockSession)
 			}
 
 			// Call the function
 			ctx := context.Background()
-			got, err := frm.FinalizeScorecardEmbed(ctx, tt.eventMessageID, tt.channelID, tt.embedPayload)
+			got, err := frm.FinalizeScorecardEmbed(ctx, sharedtypes.RoundID(tt.eventMessageID), tt.channelID, tt.embedPayload)
 
-			// Check error expectation: check both the returned error and the error in the result struct
 			hasError := err != nil || got.Error != nil
 			if hasError != tt.expectErr {
 				t.Errorf("FinalizeScorecardEmbed() error expectation mismatch. Returned error: %v, Result error: %v, wantErr: %v", err, got.Error, tt.expectErr)
 				return
 			}
 
-			// If no error is expected, verify that the operation succeeded
 			if !tt.expectErr {
-				// Check that the result struct does not contain an error
 				if got.Error != nil {
 					t.Errorf("FinalizeScorecardEmbed() = %v, expected success, got error in result: %v", got, got.Error)
 				}
 
-				// Check if Success contains something meaningful (assuming success means Success field is not nil)
 				if got.Success == nil {
 					t.Errorf("FinalizeScorecardEmbed() Success field is nil, expected a value on success")
 				}

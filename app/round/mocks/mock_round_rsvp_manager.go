@@ -13,7 +13,9 @@ import (
 	context "context"
 	reflect "reflect"
 
+	roundrsvp "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/round_rsvp"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	discordgo "github.com/bwmarrin/discordgo"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -43,9 +45,12 @@ func (m *MockRoundRsvpManager) EXPECT() *MockRoundRsvpManagerMockRecorder {
 }
 
 // HandleRoundResponse mocks base method.
-func (m *MockRoundRsvpManager) HandleRoundResponse(ctx context.Context, i *discordgo.InteractionCreate) {
+func (m *MockRoundRsvpManager) HandleRoundResponse(ctx context.Context, i *discordgo.InteractionCreate) (roundrsvp.RoundRsvpOperationResult, error) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "HandleRoundResponse", ctx, i)
+	ret := m.ctrl.Call(m, "HandleRoundResponse", ctx, i)
+	ret0, _ := ret[0].(roundrsvp.RoundRsvpOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // HandleRoundResponse indicates an expected call of HandleRoundResponse.
@@ -55,9 +60,12 @@ func (mr *MockRoundRsvpManagerMockRecorder) HandleRoundResponse(ctx, i any) *gom
 }
 
 // InteractionJoinRoundLate mocks base method.
-func (m *MockRoundRsvpManager) InteractionJoinRoundLate(ctx context.Context, i *discordgo.InteractionCreate) {
+func (m *MockRoundRsvpManager) InteractionJoinRoundLate(ctx context.Context, i *discordgo.InteractionCreate) (roundrsvp.RoundRsvpOperationResult, error) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "InteractionJoinRoundLate", ctx, i)
+	ret := m.ctrl.Call(m, "InteractionJoinRoundLate", ctx, i)
+	ret0, _ := ret[0].(roundrsvp.RoundRsvpOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // InteractionJoinRoundLate indicates an expected call of InteractionJoinRoundLate.
@@ -67,15 +75,16 @@ func (mr *MockRoundRsvpManagerMockRecorder) InteractionJoinRoundLate(ctx, i any)
 }
 
 // UpdateRoundEventEmbed mocks base method.
-func (m *MockRoundRsvpManager) UpdateRoundEventEmbed(channelID string, messageID roundtypes.EventMessageID, acceptedParticipants, declinedParticipants, tentativeParticipants []roundtypes.Participant) error {
+func (m *MockRoundRsvpManager) UpdateRoundEventEmbed(ctx context.Context, channelID string, messageID sharedtypes.RoundID, acceptedParticipants, declinedParticipants, tentativeParticipants []roundtypes.Participant) (roundrsvp.RoundRsvpOperationResult, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateRoundEventEmbed", channelID, messageID, acceptedParticipants, declinedParticipants, tentativeParticipants)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret := m.ctrl.Call(m, "UpdateRoundEventEmbed", ctx, channelID, messageID, acceptedParticipants, declinedParticipants, tentativeParticipants)
+	ret0, _ := ret[0].(roundrsvp.RoundRsvpOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // UpdateRoundEventEmbed indicates an expected call of UpdateRoundEventEmbed.
-func (mr *MockRoundRsvpManagerMockRecorder) UpdateRoundEventEmbed(channelID, messageID, acceptedParticipants, declinedParticipants, tentativeParticipants any) *gomock.Call {
+func (mr *MockRoundRsvpManagerMockRecorder) UpdateRoundEventEmbed(ctx, channelID, messageID, acceptedParticipants, declinedParticipants, tentativeParticipants any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateRoundEventEmbed", reflect.TypeOf((*MockRoundRsvpManager)(nil).UpdateRoundEventEmbed), channelID, messageID, acceptedParticipants, declinedParticipants, tentativeParticipants)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateRoundEventEmbed", reflect.TypeOf((*MockRoundRsvpManager)(nil).UpdateRoundEventEmbed), ctx, channelID, messageID, acceptedParticipants, declinedParticipants, tentativeParticipants)
 }

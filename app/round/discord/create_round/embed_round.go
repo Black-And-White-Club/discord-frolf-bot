@@ -79,6 +79,11 @@ func (crm *createRoundManager) SendRoundEventEmbed(channelID string, title round
 						CustomID: fmt.Sprintf("round_tentative|%s", roundID),
 					},
 					discordgo.Button{
+						Label:    "Edit",
+						Style:    discordgo.PrimaryButton,
+						CustomID: fmt.Sprintf("round_edit|%s", roundID),
+					},
+					discordgo.Button{
 						Label:    "Delete 🗑️",
 						Style:    discordgo.DangerButton,
 						CustomID: fmt.Sprintf("round_delete|%s", roundID),

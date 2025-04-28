@@ -10,97 +10,94 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-// TransformRoundToScorecard transforms the round event embed into a scorecard format
-// showing participants with placeholder for scores
-func (srm *startRoundManager) TransformRoundToScorecard(payload *roundevents.DiscordRoundStartPayload) (*discordgo.MessageEmbed, []discordgo.MessageComponent, error) {
-	// Convert time for Discord formatting
-	timeValue := time.Time(*payload.StartTime)
-	unixTimestamp := timeValue.Unix()
+// TransformRoundToScorecard uses the operation wrapper.
+func (m *startRoundManager) TransformRoundToScorecard(ctx context.Context, payload *roundevents.DiscordRoundStartPayload) (StartRoundOperationResult, error) {
+	return m.operationWrapper(ctx, "TransformRoundToScorecard", func(ctx context.Context) (StartRoundOperationResult, error) {
+		timeValue := time.Time(*payload.StartTime)
+		unixTimestamp := timeValue.Unix()
 
-	// Create participant fields
-	participantFields := make([]*discordgo.MessageEmbedField, 0, len(payload.Participants))
+		participantFields := make([]*discordgo.MessageEmbedField, 0, len(payload.Participants))
 
-	// Add field for each participant
-	for _, participant := range payload.Participants {
-		// Get the participant's display name
-		user, err := srm.session.User(string(participant.UserID))
-		if err != nil {
-			srm.logger.Error(context.TODO(), "Failed to get participant info", attr.Error(err), attr.String("user_id", string(participant.UserID)))
-			continue
+		for _, participant := range payload.Participants {
+			user, err := m.session.User(string(participant.UserID))
+			if err != nil {
+				m.logger.ErrorContext(ctx, "Failed to get participant info", attr.Error(err), attr.String("user_id", string(participant.UserID)))
+				continue
+			}
+
+			username := user.Username
+			if member, err := m.session.GuildMember(m.config.Discord.GuildID, string(participant.UserID)); err == nil && member.Nick != "" {
+				username = member.Nick
+			}
+
+			scoreDisplay := "Score: --"
+			if participant.Score != nil {
+				scoreDisplay = fmt.Sprintf("Score: %+d", *participant.Score)
+			}
+
+			participantFields = append(participantFields, &discordgo.MessageEmbedField{
+				Name:   fmt.Sprintf("🏌️ %s", username),
+				Value:  scoreDisplay,
+				Inline: true,
+			})
 		}
 
-		username := user.Username
-		if member, err := srm.session.GuildMember("guild-123", string(participant.UserID)); err == nil && member.Nick != "" {
-			username = member.Nick
+		var locationStr string
+		if payload.Location != nil {
+			locationStr = string(*payload.Location)
 		}
 
-		// Determine score display
-		scoreDisplay := "Score: --"
-		if participant.Score != nil {
-			scoreDisplay = fmt.Sprintf("Score: %+d", *participant.Score)
-		}
-
-		// Add field for this participant with score
-		participantFields = append(participantFields, &discordgo.MessageEmbedField{
-			Name:   fmt.Sprintf("🏌️ %s", username),
-			Value:  scoreDisplay,
-			Inline: true,
-		})
-	}
-
-	// Get location string safely
-	var locationStr string
-	if payload.Location != nil {
-		locationStr = string(*payload.Location)
-	}
-
-	// Construct the embed
-	embed := &discordgo.MessageEmbed{
-		Title:       fmt.Sprintf("**%s** - Round Started", payload.Title),
-		Description: fmt.Sprintf("Round at %s has started!", locationStr),
-		Color:       0x00AA00, // Green for active round
-		Fields: append([]*discordgo.MessageEmbedField{
-			{
-				Name:  "📅 Started",
-				Value: fmt.Sprintf("<t:%d:f>", unixTimestamp),
-			},
-			{
-				Name:  "📍 Location",
-				Value: locationStr,
-			},
-		}, participantFields...),
-		Footer: &discordgo.MessageEmbedFooter{
-			Text: "Round in progress. Use the buttons below to join or record your score.",
-		},
-		Timestamp: time.Now().Format(time.RFC3339),
-	}
-
-	// Create components for score entry and joining
-	// Using a single action row with two buttons for best mobile compatibility
-	components := []discordgo.MessageComponent{
-		discordgo.ActionsRow{
-			Components: []discordgo.MessageComponent{
-				discordgo.Button{
-					Label:    "Enter Score",
-					Style:    discordgo.PrimaryButton,
-					CustomID: fmt.Sprintf("round_enter_score|round-%d", payload.RoundID),
-					Emoji: &discordgo.ComponentEmoji{
-						Name: "Enter Score",
-						ID:   "💰",
-					},
+		embed := &discordgo.MessageEmbed{
+			Title:       fmt.Sprintf("**%s** - Round Started", payload.Title),
+			Description: fmt.Sprintf("Round at %s has started!", locationStr),
+			Color:       0x00AA00,
+			Fields: append([]*discordgo.MessageEmbedField{
+				{
+					Name:  "📅 Started",
+					Value: fmt.Sprintf("<t:%d:f>", unixTimestamp),
 				},
-				discordgo.Button{
-					Label:    "Join Round LATE",
-					Style:    discordgo.SecondaryButton,
-					CustomID: fmt.Sprintf("round_join_late|round-%d", payload.RoundID),
-					Emoji: &discordgo.ComponentEmoji{
-						Name: "Join Round LATE",
-						ID:   "🦇",
+				{
+					Name:  "📍 Location",
+					Value: locationStr,
+				},
+			}, participantFields...),
+			Footer: &discordgo.MessageEmbedFooter{
+				Text: "Round in progress. Use the buttons below to join or record your score.",
+			},
+			Timestamp: time.Now().Format(time.RFC3339),
+		}
+
+		components := []discordgo.MessageComponent{
+			discordgo.ActionsRow{
+				Components: []discordgo.MessageComponent{
+					discordgo.Button{
+						Label:    "Enter Score",
+						Style:    discordgo.PrimaryButton,
+						CustomID: fmt.Sprintf("round_enter_score|%s", payload.RoundID),
+						Emoji: &discordgo.ComponentEmoji{
+							Name: "💰",
+						},
+					},
+					discordgo.Button{
+						Label:    "Join Round LATE",
+						Style:    discordgo.SecondaryButton,
+						CustomID: fmt.Sprintf("round_join_late|%s", payload.RoundID),
+						Emoji: &discordgo.ComponentEmoji{
+							Name: "🦇",
+						},
 					},
 				},
 			},
-		},
-	}
+		}
 
-	return embed, components, nil
+		return StartRoundOperationResult{
+			Success: struct {
+				Embed      *discordgo.MessageEmbed
+				Components []discordgo.MessageComponent
+			}{
+				Embed:      embed,
+				Components: components,
+			},
+		}, nil
+	})
 }

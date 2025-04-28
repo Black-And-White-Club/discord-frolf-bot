@@ -1,9 +1,8 @@
 package round
 
-// app/round/module.go
-
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
@@ -18,7 +17,9 @@ import (
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
+	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
+	"go.opentelemetry.io/otel"
 )
 
 // InitializeRoundModule initializes the Round domain module.
@@ -29,14 +30,17 @@ func InitializeRoundModule(
 	publisher eventbus.EventBus,
 	logger *slog.Logger,
 	config *config.Config,
-	eventUtil utils.EventUtil,
 	helper utils.Helpers,
 	interactionStore storage.ISInterface,
+	discordMetricsService discordmetrics.DiscordMetrics,
 ) error {
+	// Initialize Tracer
+	tracer := otel.Tracer("round-module")
+
 	// Initialize Discord services
-	roundDiscord, err := rounddiscord.NewRoundDiscord(ctx, session, publisher, logger, helper, config, interactionStore)
+	roundDiscord, err := rounddiscord.NewRoundDiscord(ctx, session, publisher, logger, helper, config, interactionStore, tracer, discordMetricsService)
 	if err != nil {
-		logger.Error(ctx, "Failed to initialize user Discord services", attr.Error(err))
+		logger.ErrorContext(ctx, "Failed to initialize round Discord services", attr.Error(err))
 		return err
 	}
 
@@ -47,6 +51,11 @@ func InitializeRoundModule(
 	scoreround.RegisterHandlers(interactionRegistry, roundDiscord.GetScoreRoundManager())
 
 	// Initialize Watermill handlers (no need to register with router here)
-	roundhandlers.NewRoundHandlers(logger, config, eventUtil, helper, roundDiscord)
+	roundHandlers := roundhandlers.NewRoundHandlers(logger, config, helper, roundDiscord, tracer, discordMetricsService)
+	if roundHandlers == nil {
+		logger.ErrorContext(ctx, "Failed to create round handlers")
+		return fmt.Errorf("failed to create round handlers")
+	}
+
 	return nil
 }

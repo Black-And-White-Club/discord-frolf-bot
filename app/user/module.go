@@ -32,7 +32,7 @@ func InitializeUserModule(
 	config *config.Config,
 	helper utils.Helpers,
 	interactionStore storage.ISInterface,
-	discordMetricsService discordmetrics.DiscordMetrics, // Inject Discord metrics
+	discordMetricsService discordmetrics.DiscordMetrics,
 ) error {
 	// Initialize Tracer
 	tracer := otel.Tracer("user-module")

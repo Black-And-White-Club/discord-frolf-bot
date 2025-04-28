@@ -19,6 +19,7 @@ import (
 	roundrsvp "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/round_rsvp"
 	scoreround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/score_round"
 	startround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/start_round"
+	updateround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/update_round"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -142,4 +143,18 @@ func (m *MockRoundDiscordInterface) GetStartRoundManager() startround.StartRound
 func (mr *MockRoundDiscordInterfaceMockRecorder) GetStartRoundManager() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStartRoundManager", reflect.TypeOf((*MockRoundDiscordInterface)(nil).GetStartRoundManager))
+}
+
+// GetUpdateRoundManager mocks base method.
+func (m *MockRoundDiscordInterface) GetUpdateRoundManager() updateround.UpdateRoundManager {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUpdateRoundManager")
+	ret0, _ := ret[0].(updateround.UpdateRoundManager)
+	return ret0
+}
+
+// GetUpdateRoundManager indicates an expected call of GetUpdateRoundManager.
+func (mr *MockRoundDiscordInterfaceMockRecorder) GetUpdateRoundManager() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUpdateRoundManager", reflect.TypeOf((*MockRoundDiscordInterface)(nil).GetUpdateRoundManager))
 }

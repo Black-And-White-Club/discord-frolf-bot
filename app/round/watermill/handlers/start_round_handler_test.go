@@ -1,342 +1,186 @@
 package roundhandlers
 
 import (
+	"context"
 	"errors"
+	"io"
 	"log/slog"
+	"reflect"
 	"testing"
 
+	startround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/start_round"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/round/mocks"
+	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
-	utils "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
-	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
-	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
+	util_mocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
+	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/ThreeDotsLabs/watermill/message"
+	"github.com/google/uuid"
+	"go.opentelemetry.io/otel/trace/noop"
 	"go.uber.org/mock/gomock"
 )
 
 func TestRoundHandlers_HandleRoundStarted(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	testRoundID := sharedtypes.RoundID(uuid.New())
+	testChannelID := "channel123"
+	testEventMessageID := testRoundID
 
-	mockLogger := observability.NewNoOpLogger()
-	mockHelpers := utils.NewMockHelpers(ctrl)
-	mockRoundDiscord := mocks.NewMockRoundDiscordInterface(ctrl)
-	mockStartRoundManager := mocks.NewMockStartRoundManager(ctrl)
-
-	type fields struct {
-		Logger       *slog.Logger
-		Helpers      *utils.MockHelpers
-		RoundDiscord *mocks.MockRoundDiscordInterface
-	}
-	type args struct {
-		msg *message.Message
-	}
 	tests := []struct {
 		name    string
-		fields  fields
-		args    args
+		msg     *message.Message
 		want    []*message.Message
 		wantErr bool
-		setup   func()
+		setup   func(*gomock.Controller, *util_mocks.MockHelpers, *mocks.MockRoundDiscordInterface, *mocks.MockStartRoundManager)
 	}{
 		{
-			name: "successful round start",
-			fields: fields{
-				Logger:       mockLogger,
-				Helpers:      mockHelpers,
-				RoundDiscord: mockRoundDiscord,
+			name: "successful_round_start",
+			msg: &message.Message{
+				UUID: "1",
+				Payload: []byte(`{
+					"event_message_id": "` + testEventMessageID.String() + `",
+					"discord_channel_id": "` + testChannelID + `",
+					"round_id": "` + testRoundID.String() + `"
+				}`),
 			},
-			args: args{
-				msg: message.NewMessage("1", []byte(`{
-					"round_id": 123,
-					"round_title": "Test Round",
-					"user_ids": ["user1", "user2"],
-					"discord_channel_id": "channel123",
-					"discord_guild_id": "guild456",
-					"event_message_id": "message789"
-				}`)),
-			},
-			want: func() []*message.Message {
-				msg := message.NewMessage(roundevents.RoundTraceEvent, []byte(`{"round_id":123,"event_type":"round_started","status":"scorecard_updated","message_id":"message789"}`))
-				return []*message.Message{msg}
-			}(),
+			want:    []*message.Message{{}},
 			wantErr: false,
-			setup: func() {
-				payload := &roundevents.DiscordRoundStartPayload{
-					RoundID: 123,
-					Title:   "Test Round",
-					Participants: []roundevents.RoundParticipant{
-						{
-							UserID:    "user1",
-							TagNumber: nil,
-							Response:  roundtypes.ResponseAccept,
-							Score:     nil,
-						},
-						{
-							UserID:    "user2",
-							TagNumber: nil,
-							Response:  roundtypes.ResponseAccept,
-							Score:     nil,
-						},
-					}, DiscordChannelID: "channel123",
-					DiscordGuildID: "guild456",
-					EventMessageID: "message789",
+			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockStartRoundManager *mocks.MockStartRoundManager) {
+				expectedPayload := roundevents.DiscordRoundStartPayload{
+					EventMessageID:   testEventMessageID,
+					DiscordChannelID: testChannelID,
+					RoundID:          testRoundID,
 				}
 
-				mockHelpers.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(msg *message.Message, p interface{}) error {
-						startPayload := p.(*roundevents.DiscordRoundStartPayload)
-						startPayload.RoundID = payload.RoundID
-						startPayload.Title = payload.Title
-						startPayload.Participants = payload.Participants
-						startPayload.DiscordChannelID = payload.DiscordChannelID
-						startPayload.DiscordGuildID = payload.DiscordGuildID
-						startPayload.EventMessageID = payload.EventMessageID
+				mockHelper.EXPECT().
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.DiscordRoundStartPayload{})).
+					DoAndReturn(func(_ *message.Message, v any) error {
+						*v.(*roundevents.DiscordRoundStartPayload) = expectedPayload
 						return nil
 					}).
 					Times(1)
 
-				mockRoundDiscord.EXPECT().
-					GetStartRoundManager().
-					Return(mockStartRoundManager).
-					Times(1)
-
+				// Return a zero value of StartRoundOperationResult
 				mockStartRoundManager.EXPECT().
-					UpdateRoundToScorecard(gomock.Any(), "channel123", "message789", gomock.Any()).
-					Return(nil).
+					UpdateRoundToScorecard(gomock.Any(), testChannelID, testEventMessageID.String(), &expectedPayload).
+					Return(startround.StartRoundOperationResult{}, nil).
 					Times(1)
 
-				tracePayload := map[string]interface{}{
-					"round_id":   payload.RoundID,
-					"event_type": "round_started",
-					"status":     "scorecard_updated",
-					"message_id": payload.EventMessageID,
-				}
-
-				traceMsg := message.NewMessage(roundevents.RoundTraceEvent, []byte(`{"round_id":123,"event_type":"round_started","status":"scorecard_updated","message_id":"message789"}`))
-				mockHelpers.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Eq(tracePayload), roundevents.RoundTraceEvent).
-					Return(traceMsg, nil).
+				mockHelper.EXPECT().
+					CreateResultMessage(gomock.Any(), gomock.Any(), roundevents.RoundTraceEvent).
+					Return(&message.Message{}, nil).
 					Times(1)
 			},
 		},
 		{
-			name: "failed to unmarshal payload",
-			fields: fields{
-				Logger:       mockLogger,
-				Helpers:      mockHelpers,
-				RoundDiscord: mockRoundDiscord,
-			},
-			args: args{
-				msg: message.NewMessage("1", []byte(`invalid payload`)),
+			name: "invalid_payload_type",
+			msg: &message.Message{
+				UUID:    "2",
+				Payload: []byte(`{}`),
 			},
 			want:    nil,
 			wantErr: true,
-			setup: func() {
-				mockHelpers.EXPECT().
+			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockStartRoundManager *mocks.MockStartRoundManager) {
+				mockHelper.EXPECT().
 					UnmarshalPayload(gomock.Any(), gomock.Any()).
-					Return(errors.New("failed to unmarshal payload")).
+					Return(errors.New("invalid payload type")).
 					Times(1)
 			},
 		},
 		{
-			name: "missing event message ID",
-			fields: fields{
-				Logger:       mockLogger,
-				Helpers:      mockHelpers,
-				RoundDiscord: mockRoundDiscord,
-			},
-			args: args{
-				msg: message.NewMessage("1", []byte(`{
-							"round_id": 123,
-							"title": "Test Round",
-							"discord_channel_id": "channel123",
-							"discord_guild_id": "guild456",
-							"event_message_id": ""
-					}`)),
+			name: "missing_event_message_id",
+			msg: &message.Message{
+				UUID: "3",
+				Payload: []byte(`{
+					"discord_channel_id": "` + testChannelID + `",
+					"round_id": "` + testRoundID.String() + `"
+				}`),
 			},
 			want:    nil,
 			wantErr: true,
-			setup: func() {
-				payload := &roundevents.DiscordRoundStartPayload{
-					RoundID: 123,
-					Title:   "Test Round",
-					Participants: []roundevents.RoundParticipant{
-						{
-							UserID:    "user1",
-							TagNumber: nil,
-							Response:  roundtypes.ResponseAccept,
-							Score:     nil,
-						},
-						{
-							UserID:    "user2",
-							TagNumber: nil,
-							Response:  roundtypes.ResponseAccept,
-							Score:     nil,
-						},
-					},
-					DiscordChannelID: "channel123",
-					DiscordGuildID:   "guild456",
-					EventMessageID:   "",
+			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockStartRoundManager *mocks.MockStartRoundManager) {
+				expectedPayload := roundevents.DiscordRoundStartPayload{
+					DiscordChannelID: testChannelID,
+					RoundID:          testRoundID,
 				}
 
-				mockHelpers.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(msg *message.Message, p interface{}) error {
-						startPayload := p.(*roundevents.DiscordRoundStartPayload)
-						startPayload.RoundID = payload.RoundID
-						startPayload.Title = payload.Title
-						startPayload.Participants = payload.Participants
-						startPayload.DiscordChannelID = payload.DiscordChannelID
-						startPayload.DiscordGuildID = payload.DiscordGuildID
-						startPayload.EventMessageID = payload.EventMessageID
+				mockHelper.EXPECT().
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.DiscordRoundStartPayload{})).
+					DoAndReturn(func(_ *message.Message, v any) error {
+						*v.(*roundevents.DiscordRoundStartPayload) = expectedPayload
 						return nil
 					}).
 					Times(1)
 			},
 		},
 		{
-			name: "failed to update round to scorecard",
-			fields: fields{
-				Logger:       mockLogger,
-				Helpers:      mockHelpers,
-				RoundDiscord: mockRoundDiscord,
-			},
-			args: args{
-				msg: message.NewMessage("1", []byte(`{
-							"round_id": 123,
-							"title": "Test Round",
-							"discord_channel_id": "channel123",
-							"discord_guild_id": "guild456",
-							"event_message_id": "message789"
-					}`)),
+			name: "update_round_to_scorecard_error",
+			msg: &message.Message{
+				UUID: "4",
+				Payload: []byte(`{
+					"event_message_id": "` + testEventMessageID.String() + `",
+					"discord_channel_id": "` + testChannelID + `",
+					"round_id": "` + testRoundID.String() + `"
+				}`),
 			},
 			want:    nil,
 			wantErr: true,
-			setup: func() {
-				payload := &roundevents.DiscordRoundStartPayload{
-					RoundID: 123,
-					Title:   "Test Round",
-					Participants: []roundevents.RoundParticipant{
-						{
-							UserID:    "user1",
-							TagNumber: nil,
-							Response:  roundtypes.ResponseAccept,
-							Score:     nil,
-						},
-						{
-							UserID:    "user2",
-							TagNumber: nil,
-							Response:  roundtypes.ResponseAccept,
-							Score:     nil,
-						},
-					},
-					DiscordChannelID: "channel123",
-					DiscordGuildID:   "guild456",
-					EventMessageID:   "message789",
+			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockStartRoundManager *mocks.MockStartRoundManager) {
+				expectedPayload := roundevents.DiscordRoundStartPayload{
+					EventMessageID:   testEventMessageID,
+					DiscordChannelID: testChannelID,
+					RoundID:          testRoundID,
 				}
 
-				mockHelpers.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(msg *message.Message, p interface{}) error {
-						startPayload := p.(*roundevents.DiscordRoundStartPayload)
-						startPayload.RoundID = payload.RoundID
-						startPayload.Title = payload.Title
-						startPayload.Participants = payload.Participants
-						startPayload.DiscordChannelID = payload.DiscordChannelID
-						startPayload.DiscordGuildID = payload.DiscordGuildID
-						startPayload.EventMessageID = payload.EventMessageID
+				mockHelper.EXPECT().
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.DiscordRoundStartPayload{})).
+					DoAndReturn(func(_ *message.Message, v any) error {
+						*v.(*roundevents.DiscordRoundStartPayload) = expectedPayload
 						return nil
 					}).
 					Times(1)
 
-				mockRoundDiscord.EXPECT().
-					GetStartRoundManager().
-					Return(mockStartRoundManager).
-					Times(1)
-
 				mockStartRoundManager.EXPECT().
-					UpdateRoundToScorecard(gomock.Any(), "channel123", "message789", gomock.Any()).
-					Return(errors.New("failed to update round to scorecard")).
+					UpdateRoundToScorecard(gomock.Any(), testChannelID, testEventMessageID.String(), &expectedPayload).
+					Return(startround.StartRoundOperationResult{}, errors.New("update failed")).
 					Times(1)
 			},
 		},
 		{
-			name: "failed to create trace event message",
-			fields: fields{
-				Logger:       mockLogger,
-				Helpers:      mockHelpers,
-				RoundDiscord: mockRoundDiscord,
+			name: "create_trace_message_error",
+			msg: &message.Message{
+				UUID: "5",
+				Payload: []byte(`{
+					"event_message_id": "` + testEventMessageID.String() + `",
+					"discord_channel_id": "` + testChannelID + `",
+					"round_id": "` + testRoundID.String() + `"
+				}`),
 			},
-			args: args{
-				msg: message.NewMessage("1", []byte(`{
-							"round_id": 123,
-							"title": "Test Round",
-							"discord_channel_id": "channel123",
-							"discord_guild_id": "guild456",
-							"event_message_id": "message789"
-					}`)),
-			},
-			want:    []*message.Message{},
-			wantErr: false,
-			setup: func() {
-				payload := &roundevents.DiscordRoundStartPayload{
-					RoundID: 123,
-					Title:   "Test Round",
-					Participants: []roundevents.RoundParticipant{
-						{
-							UserID:    "user1",
-							TagNumber: nil,
-							Response:  roundtypes.ResponseAccept,
-							Score:     nil,
-						},
-						{
-							UserID:    "user2",
-							TagNumber: nil,
-							Response:  roundtypes.ResponseAccept,
-							Score:     nil,
-						},
-					},
-					DiscordChannelID: "channel123",
-					DiscordGuildID:   "guild456",
-					EventMessageID:   "message789",
+			want:    nil,
+			wantErr: true,
+			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockStartRoundManager *mocks.MockStartRoundManager) {
+				expectedPayload := roundevents.DiscordRoundStartPayload{
+					EventMessageID:   testEventMessageID,
+					DiscordChannelID: testChannelID,
+					RoundID:          testRoundID,
 				}
 
-				mockHelpers.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(msg *message.Message, p interface{}) error {
-						startPayload := p.(*roundevents.DiscordRoundStartPayload)
-						startPayload.RoundID = payload.RoundID
-						startPayload.Title = payload.Title
-						startPayload.Participants = payload.Participants
-						startPayload.DiscordChannelID = payload.DiscordChannelID
-						startPayload.DiscordGuildID = payload.DiscordGuildID
-						startPayload.EventMessageID = payload.EventMessageID
+				mockHelper.EXPECT().
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.DiscordRoundStartPayload{})).
+					DoAndReturn(func(_ *message.Message, v any) error {
+						*v.(*roundevents.DiscordRoundStartPayload) = expectedPayload
 						return nil
 					}).
 					Times(1)
 
-				mockRoundDiscord.EXPECT().
-					GetStartRoundManager().
-					Return(mockStartRoundManager).
-					Times(1)
-
 				mockStartRoundManager.EXPECT().
-					UpdateRoundToScorecard(gomock.Any(), "channel123", "message789", gomock.Any()).
-					Return(nil).
+					UpdateRoundToScorecard(gomock.Any(), testChannelID, testEventMessageID.String(), &expectedPayload).
+					Return(startround.StartRoundOperationResult{}, nil).
 					Times(1)
 
-				tracePayload := map[string]interface{}{
-					"round_id":   payload.RoundID,
-					"event_type": "round_started",
-					"status":     "scorecard_updated",
-					"message_id": payload.EventMessageID,
-				}
-
-				mockHelpers.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Eq(tracePayload), roundevents.RoundTraceEvent).
-					Return(nil, errors.New("failed to create trace message")).
+				mockHelper.EXPECT().
+					CreateResultMessage(gomock.Any(), gomock.Any(), roundevents.RoundTraceEvent).
+					Return(nil, errors.New("trace creation failed")).
 					Times(1)
 			},
 		},
@@ -344,42 +188,42 @@ func TestRoundHandlers_HandleRoundStarted(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.setup != nil {
-				tt.setup()
-			}
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockHelper := util_mocks.NewMockHelpers(ctrl)
+			mockRoundDiscord := mocks.NewMockRoundDiscordInterface(ctrl)
+			mockStartRoundManager := mocks.NewMockStartRoundManager(ctrl)
+			mockLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
+			mockMetrics := &discordmetrics.NoOpMetrics{}
+			mockTracer := noop.NewTracerProvider().Tracer("test")
+
+			tt.setup(ctrl, mockHelper, mockRoundDiscord, mockStartRoundManager)
+
+			mockRoundDiscord.EXPECT().
+				GetStartRoundManager().
+				Return(mockStartRoundManager).
+				AnyTimes()
+
 			h := &RoundHandlers{
-				Logger:       tt.fields.Logger,
-				Helpers:      tt.fields.Helpers,
-				RoundDiscord: tt.fields.RoundDiscord,
+				Logger:       mockLogger,
+				Config:       &config.Config{},
+				Helpers:      mockHelper,
+				RoundDiscord: mockRoundDiscord,
+				Tracer:       mockTracer,
+				Metrics:      mockMetrics,
+				handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
+					return wrapHandler(handlerName, unmarshalTo, handlerFunc, mockLogger, mockMetrics, mockTracer, mockHelper)
+				},
 			}
-			got, err := h.HandleRoundStarted(tt.args.msg)
+
+			got, err := h.HandleRoundStarted(tt.msg)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("RoundHandlers.HandleRoundStarted() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-
-			if tt.want == nil {
-				if got != nil {
-					t.Errorf("RoundHandlers.HandleRoundStarted() = %v, want nil", got)
-				}
-			} else if len(got) != len(tt.want) {
-				t.Errorf("RoundHandlers.HandleRoundStarted() returned %d messages, want %d", len(got), len(tt.want))
-			} else if len(got) > 0 && len(tt.want) > 0 {
-				for i, wantMsg := range tt.want {
-					if i >= len(got) {
-						t.Errorf("Missing expected message at index %d", i)
-						continue
-					}
-
-					gotMsg := got[i]
-					if wantMsg.UUID != gotMsg.UUID {
-						t.Errorf("Message UUID mismatch at index %d: got %s, want %s", i, gotMsg.UUID, wantMsg.UUID)
-					}
-
-					if string(wantMsg.Payload) != string(gotMsg.Payload) {
-						t.Errorf("Message payload mismatch at index %d: got %s, want %s", i, string(gotMsg.Payload), string(wantMsg.Payload))
-					}
-				}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("RoundHandlers.HandleRoundStarted() = %v, want %v", got, tt.want)
 			}
 		})
 	}

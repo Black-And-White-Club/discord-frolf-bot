@@ -23,7 +23,7 @@ import (
 
 // DeleteRoundManager defines the interface for delete round operations.
 type DeleteRoundManager interface {
-	HandleDeleteRoundCommand(ctx context.Context, i *discordgo.InteractionCreate) (DeleteRoundOperationResult, error)
+	HandleDeleteRoundButton(ctx context.Context, i *discordgo.InteractionCreate) (DeleteRoundOperationResult, error)
 	DeleteRoundEventEmbed(ctx context.Context, eventMessageID sharedtypes.RoundID, channelID string) (DeleteRoundOperationResult, error)
 }
 

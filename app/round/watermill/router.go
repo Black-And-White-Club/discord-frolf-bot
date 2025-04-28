@@ -10,11 +10,14 @@ import (
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
-	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
+	tracingfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/tracing"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
+	"github.com/ThreeDotsLabs/watermill/components/metrics"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/message/router/middleware"
+	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // RoundRouter handles routing for round module events.
@@ -25,13 +28,20 @@ type RoundRouter struct {
 	publisher        eventbus.EventBus
 	config           *config.Config
 	helper           utils.Helpers
-	tracer           observability.Tracer
+	tracer           trace.Tracer
 	middlewareHelper utils.MiddlewareHelpers
 }
 
 // NewRoundRouter creates a new RoundRouter.
-
-func NewRoundRouter(logger *slog.Logger, router *message.Router, subscriber eventbus.EventBus, publisher eventbus.EventBus, config *config.Config, helper utils.Helpers, tracer observability.Tracer) *RoundRouter {
+func NewRoundRouter(
+	logger *slog.Logger,
+	router *message.Router,
+	subscriber eventbus.EventBus,
+	publisher eventbus.EventBus,
+	config *config.Config,
+	helper utils.Helpers,
+	tracer trace.Tracer,
+) *RoundRouter {
 	return &RoundRouter{
 		logger:           logger,
 		Router:           router,
@@ -46,15 +56,20 @@ func NewRoundRouter(logger *slog.Logger, router *message.Router, subscriber even
 
 // Configure sets up the router.
 func (r *RoundRouter) Configure(handlers roundhandlers.Handlers, eventbus eventbus.EventBus) error {
+	// Add Prometheus metrics
+	metricsBuilder := metrics.NewPrometheusMetricsBuilder(prometheus.NewRegistry(), "", "")
+	metricsBuilder.AddPrometheusRouterMetrics(r.Router)
+
 	r.Router.AddMiddleware(
+		middleware.CorrelationID,
 		middleware.Retry{MaxRetries: 3}.Middleware,
 		r.middlewareHelper.CommonMetadataMiddleware("discord-round"),
 		r.middlewareHelper.DiscordMetadataMiddleware(),
 		r.middlewareHelper.RoutingMetadataMiddleware(),
 		middleware.Recoverer,
-		r.tracer.TraceHandler,
-		observability.LokiLoggingMiddleware(r.logger),
+		tracingfrolfbot.TraceHandler(r.tracer),
 	)
+
 	if err := r.RegisterHandlers(context.Background(), handlers); err != nil {
 		return fmt.Errorf("failed to register handlers: %w", err)
 	}
@@ -64,42 +79,57 @@ func (r *RoundRouter) Configure(handlers roundhandlers.Handlers, eventbus eventb
 // RegisterHandlers registers event handlers.
 func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandlers.Handlers) error {
 	eventsToHandlers := map[string]message.HandlerFunc{
-		discordroundevents.RoundCreateModalSubmit:       handlers.HandleRoundCreateRequested,
-		discordroundevents.RoundCreatedTopic:            handlers.HandleRoundCreated,
-		discordroundevents.RoundStartedTopic:            handlers.HandleRoundStarted,
+		// Creation flow
+		discordroundevents.RoundCreateModalSubmit: handlers.HandleRoundCreateRequested,
+		roundevents.RoundCreated:                  handlers.HandleRoundCreated,
+		roundevents.RoundCreationFailed:           handlers.HandleRoundCreationFailed,
+		roundevents.RoundValidationFailed:         handlers.HandleRoundValidationFailed,
+
+		// Update flow
+		discordroundevents.RoundUpdateRequestTopic: handlers.HandleRoundUpdateRequested,
+		roundevents.RoundUpdated:                   handlers.HandleRoundUpdated,
+		roundevents.RoundUpdateError:               handlers.HandleRoundUpdateFailed,
+		roundevents.RoundUpdateValidated:           handlers.HandleRoundUpdateValidationFailed,
+
+		// Participation
 		discordroundevents.RoundParticipantJoinReqTopic: handlers.HandleRoundParticipantJoinRequest,
 		roundevents.RoundParticipantJoined:              handlers.HandleRoundParticipantJoined,
-		discordroundevents.RoundValidationFailed:        handlers.HandleRoundValidationFailed,
-		// discordroundevents.RoundUpdateRequestTopic:           handlers.HandleRoundUpdateRequest,
-		// discordroundevents.RoundUpdatedTopic:                 handlers.HandleRoundUpdated,
-		discordroundevents.RoundDeletedTopic: handlers.HandleRoundDeleted,
-		roundevents.DiscordRoundFinalized:    handlers.HandleRoundFinalized,
-		// discordroundevents.RoundReminderTopic:                handlers.HandleRoundReminder,
-		// discordroundevents.RoundScoreUpdateRequestTopic:      handlers.HandleRoundScoreUpdateRequest,
+
+		// Scoring
 		roundevents.RoundParticipantScoreUpdated: handlers.HandleParticipantScoreUpdated,
 		roundevents.RoundScoreUpdateError:        handlers.HandleScoreUpdateError,
-		roundevents.RoundCreationFailed:          handlers.HandleRoundCreationFailed,
+
+		// Lifecycle
+		discordroundevents.RoundDeletedTopic: handlers.HandleRoundDeleted,
+		roundevents.DiscordRoundFinalized:    handlers.HandleRoundFinalized,
+		roundevents.RoundStarted:             handlers.HandleRoundStarted,
+
+		// Reminders
+		roundevents.RoundReminder: handlers.HandleRoundReminder,
 	}
+
 	for topic, handlerFunc := range eventsToHandlers {
 		handlerName := fmt.Sprintf("discord-round.%s", topic)
 		r.Router.AddHandler(
 			handlerName,
 			topic,
 			r.subscriber,
-			"",  // ❌ No direct publish topic
-			nil, // ❌ No manual publisher
+			"",
+			nil,
 			func(msg *message.Message) ([]*message.Message, error) {
 				messages, err := handlerFunc(msg)
 				if err != nil {
-					// Log the error and return it to trigger the retry logic
-					slog.Error("Error processing message", slog.String("message_id", msg.UUID), attr.Error(err))
+					r.logger.ErrorContext(ctx, "Error processing message",
+						slog.String("message_id", msg.UUID),
+						attr.Error(err),
+					)
 					return nil, err
 				}
-				// Automatically publish messages based on metadata
+
 				for _, m := range messages {
 					publishTopic := m.Metadata.Get("topic")
 					if publishTopic != "" {
-						slog.Info("🚀 Auto-publishing message",
+						r.logger.InfoContext(ctx, "Publishing message",
 							slog.String("message_id", m.UUID),
 							slog.String("topic", publishTopic),
 						)
@@ -107,12 +137,12 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 							return nil, fmt.Errorf("failed to publish to %s: %w", publishTopic, err)
 						}
 					} else {
-						slog.Warn("⚠️ Message missing topic metadata, dropping.",
+						r.logger.WarnContext(ctx, "Message missing topic metadata",
 							slog.String("message_id", m.UUID),
 						)
 					}
 				}
-				return nil, nil // ✅ No messages returned, they're published instead
+				return nil, nil
 			},
 		)
 	}

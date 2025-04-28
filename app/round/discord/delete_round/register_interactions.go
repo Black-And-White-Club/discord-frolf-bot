@@ -44,6 +44,6 @@ func RegisterHandlers(registry *interactions.Registry, manager DeleteRoundManage
 		}
 
 		slog.Info("✅ Button matched! Processing delete request.", attr.String("round_id", roundUUID.String()))
-		manager.HandleDeleteRoundCommand(ctx, i)
+		manager.HandleDeleteRoundButton(ctx, i)
 	})
 }
