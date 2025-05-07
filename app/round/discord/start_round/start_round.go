@@ -14,6 +14,7 @@ import (
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
+	"github.com/bwmarrin/discordgo"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
@@ -28,7 +29,7 @@ type StartRoundOperationResult struct {
 
 // StartRoundManager defines the interface for create round operations.
 type StartRoundManager interface {
-	TransformRoundToScorecard(ctx context.Context, payload *roundevents.DiscordRoundStartPayload) (StartRoundOperationResult, error)
+	TransformRoundToScorecard(ctx context.Context, payload *roundevents.DiscordRoundStartPayload, existingEmbed *discordgo.MessageEmbed) (StartRoundOperationResult, error)
 	UpdateRoundToScorecard(ctx context.Context, channelID, messageID string, payload *roundevents.DiscordRoundStartPayload) (StartRoundOperationResult, error)
 }
 

@@ -151,8 +151,9 @@ type CreateRoundOperationResult struct {
 	Error   error
 }
 
-// createEvent creates and marshals a Watermill message.
-func (crm *createRoundManager) createEvent(ctx context.Context, topic string, payload interface{}, i *discordgo.InteractionCreate) (*message.Message, error) {
+// createEvent creates and marshals a Watermill message and assigns a correlation ID.
+func (crm *createRoundManager) createEvent(ctx context.Context, topic string, payload interface{}, i *discordgo.InteractionCreate) (*message.Message, string, error) {
+	correlationID := watermill.NewUUID()
 	newEvent := message.NewMessage(watermill.NewUUID(), nil)
 
 	if newEvent.Metadata == nil {
@@ -162,10 +163,11 @@ func (crm *createRoundManager) createEvent(ctx context.Context, topic string, pa
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		crm.logger.ErrorContext(ctx, "Failed to marshal payload in createEvent", attr.Error(err))
-		return nil, fmt.Errorf("failed to marshal payload: %w", err)
+		return nil, "", fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
 	newEvent.Payload = payloadBytes
+	newEvent.Metadata.Set("correlation_id", correlationID)
 	newEvent.Metadata.Set("handler_name", "Create Round")
 	newEvent.Metadata.Set("topic", topic)
 	newEvent.Metadata.Set("domain", "discord")
@@ -173,5 +175,5 @@ func (crm *createRoundManager) createEvent(ctx context.Context, topic string, pa
 	newEvent.Metadata.Set("interaction_token", i.Interaction.Token)
 	newEvent.Metadata.Set("guild_id", crm.config.Discord.GuildID)
 
-	return newEvent, nil
+	return newEvent, correlationID, nil
 }

@@ -24,7 +24,7 @@ import (
 func TestRoundHandlers_HandleRoundStarted(t *testing.T) {
 	testRoundID := sharedtypes.RoundID(uuid.New())
 	testChannelID := "channel123"
-	testEventMessageID := testRoundID
+	testEventMessageID := "12345"
 
 	tests := []struct {
 		name    string
@@ -38,7 +38,7 @@ func TestRoundHandlers_HandleRoundStarted(t *testing.T) {
 			msg: &message.Message{
 				UUID: "1",
 				Payload: []byte(`{
-					"event_message_id": "` + testEventMessageID.String() + `",
+					"event_message_id": "` + testEventMessageID + `",
 					"discord_channel_id": "` + testChannelID + `",
 					"round_id": "` + testRoundID.String() + `"
 				}`),
@@ -62,7 +62,7 @@ func TestRoundHandlers_HandleRoundStarted(t *testing.T) {
 
 				// Return a zero value of StartRoundOperationResult
 				mockStartRoundManager.EXPECT().
-					UpdateRoundToScorecard(gomock.Any(), testChannelID, testEventMessageID.String(), &expectedPayload).
+					UpdateRoundToScorecard(gomock.Any(), testChannelID, testEventMessageID, &expectedPayload).
 					Return(startround.StartRoundOperationResult{}, nil).
 					Times(1)
 
@@ -118,7 +118,7 @@ func TestRoundHandlers_HandleRoundStarted(t *testing.T) {
 			msg: &message.Message{
 				UUID: "4",
 				Payload: []byte(`{
-					"event_message_id": "` + testEventMessageID.String() + `",
+					"event_message_id": "` + testEventMessageID + `",
 					"discord_channel_id": "` + testChannelID + `",
 					"round_id": "` + testRoundID.String() + `"
 				}`),
@@ -141,7 +141,7 @@ func TestRoundHandlers_HandleRoundStarted(t *testing.T) {
 					Times(1)
 
 				mockStartRoundManager.EXPECT().
-					UpdateRoundToScorecard(gomock.Any(), testChannelID, testEventMessageID.String(), &expectedPayload).
+					UpdateRoundToScorecard(gomock.Any(), testChannelID, testEventMessageID, &expectedPayload).
 					Return(startround.StartRoundOperationResult{}, errors.New("update failed")).
 					Times(1)
 			},
@@ -151,7 +151,7 @@ func TestRoundHandlers_HandleRoundStarted(t *testing.T) {
 			msg: &message.Message{
 				UUID: "5",
 				Payload: []byte(`{
-					"event_message_id": "` + testEventMessageID.String() + `",
+					"event_message_id": "` + testEventMessageID + `",
 					"discord_channel_id": "` + testChannelID + `",
 					"round_id": "` + testRoundID.String() + `"
 				}`),
@@ -174,7 +174,7 @@ func TestRoundHandlers_HandleRoundStarted(t *testing.T) {
 					Times(1)
 
 				mockStartRoundManager.EXPECT().
-					UpdateRoundToScorecard(gomock.Any(), testChannelID, testEventMessageID.String(), &expectedPayload).
+					UpdateRoundToScorecard(gomock.Any(), testChannelID, testEventMessageID, &expectedPayload).
 					Return(startround.StartRoundOperationResult{}, nil).
 					Times(1)
 

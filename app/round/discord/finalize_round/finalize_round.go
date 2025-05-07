@@ -13,7 +13,6 @@ import (
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
-	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"github.com/bwmarrin/discordgo"
 	"go.opentelemetry.io/otel/attribute"
@@ -24,7 +23,7 @@ import (
 // FinalizeRoundManager defines the interface for finalize round operations.
 type FinalizeRoundManager interface {
 	TransformRoundToFinalizedScorecard(payload roundevents.RoundFinalizedEmbedUpdatePayload) (*discordgo.MessageEmbed, []discordgo.MessageComponent, error)
-	FinalizeScorecardEmbed(ctx context.Context, eventMessageID sharedtypes.RoundID, channelID string, embedPayload roundevents.RoundFinalizedEmbedUpdatePayload) (FinalizeRoundOperationResult, error)
+	FinalizeScorecardEmbed(ctx context.Context, eventMessageID string, channelID string, embedPayload roundevents.RoundFinalizedEmbedUpdatePayload) (FinalizeRoundOperationResult, error)
 }
 
 type finalizeRoundManager struct {

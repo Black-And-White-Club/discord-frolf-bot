@@ -357,7 +357,7 @@ func TestRoundHandlers_HandleRoundParticipantJoinRequest(t *testing.T) {
 
 func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 	testRoundID := sharedtypes.RoundID(uuid.New())
-	testMessageID := testRoundID
+	testMessageID := "12345"
 	testChannelID := "test-channel-id"
 
 	tag1 := sharedtypes.TagNumber(1)
@@ -375,7 +375,7 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 				UUID: "1",
 				Payload: []byte(`{
             "round_id": "` + testRoundID.String() + `",
-            "event_message_id": "` + testMessageID.String() + `",
+            "event_message_id": "` + testMessageID + `",
             "accepted_participants": [{"user_id": "user1", "tag_number": 1}],
             "declined_participants": [{"user_id": "user2"}],
             "tentative_participants": [{"user_id": "user3"}]
@@ -431,7 +431,7 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 				UUID: "2",
 				Payload: []byte(`{
             "round_id": "` + testRoundID.String() + `",
-            "event_message_id": "` + testMessageID.String() + `",
+            "event_message_id": "` + testMessageID + `",
             "accepted_participants": [{"user_id": "user1", "tag_number": 1}],
             "declined_participants": [{"user_id": "user2"}],
             "tentative_participants": [{"user_id": "user3"}],
@@ -490,7 +490,7 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 				UUID: "3",
 				Payload: []byte(`{
             "round_id": "` + testRoundID.String() + `",
-            "event_message_id": "` + testMessageID.String() + `",
+            "event_message_id": "` + testMessageID + `",
             "accepted_participants": [{"user_id": "user1", "tag_number": 1}],
             "declined_participants": [{"user_id": "user2"}],
             "tentative_participants": [{"user_id": "user3"}]

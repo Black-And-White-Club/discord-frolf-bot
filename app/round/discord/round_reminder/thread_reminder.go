@@ -8,9 +8,7 @@ import (
 
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
-	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
-	"github.com/google/uuid"
 )
 
 // SendRoundReminder processes the Discord round reminder event and creates a thread with mentions
@@ -21,8 +19,8 @@ func (rm *roundReminderManager) SendRoundReminder(ctx context.Context, payload *
 			attr.String("reminder_type", payload.ReminderType),
 			attr.String("channel_id", payload.DiscordChannelID))
 
-		messageID := payload.EventMessageID
-		if messageID == sharedtypes.RoundID(uuid.Nil) {
+		discordMessageID := payload.EventMessageID
+		if discordMessageID == "" {
 			err := fmt.Errorf("no message ID provided in payload")
 			rm.logger.ErrorContext(ctx, err.Error(), attr.RoundID("round_id", payload.RoundID))
 			return RoundReminderOperationResult{Error: err}, err
@@ -43,12 +41,12 @@ func (rm *roundReminderManager) SendRoundReminder(ctx context.Context, payload *
 			Type: discordgo.ChannelTypeGuildPublicThread,
 		}
 
-		thread, err := rm.session.MessageThreadStartComplex(payload.DiscordChannelID, messageID.String(), threadData)
+		thread, err := rm.session.MessageThreadStartComplex(payload.DiscordChannelID, discordMessageID, threadData)
 		if err != nil {
 			if strings.Contains(err.Error(), "Thread already exists") {
 				rm.logger.WarnContext(ctx, "Thread already exists, attempting to get existing thread",
 					attr.String("channel_id", payload.DiscordChannelID),
-					attr.String("message_id", messageID.String()))
+					attr.String("message_id", discordMessageID))
 
 				threads, err := rm.session.ThreadsActive(payload.DiscordGuildID)
 				if err != nil {
@@ -83,7 +81,7 @@ func (rm *roundReminderManager) SendRoundReminder(ctx context.Context, payload *
 				err = fmt.Errorf("failed to create thread: %w", err)
 				rm.logger.ErrorContext(ctx, err.Error(),
 					attr.String("channel_id", payload.DiscordChannelID),
-					attr.String("message_id", messageID.String()),
+					attr.String("message_id", discordMessageID),
 					attr.Error(err))
 				return RoundReminderOperationResult{Error: err}, err
 			}

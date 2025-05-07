@@ -5,9 +5,7 @@ import (
 	"fmt"
 
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
-	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/ThreeDotsLabs/watermill/message"
-	"github.com/google/uuid"
 )
 
 // HandleRoundStarted updates the Discord embed when a round starts.
@@ -21,15 +19,15 @@ func (h *RoundHandlers) HandleRoundStarted(msg *message.Message) ([]*message.Mes
 				return nil, fmt.Errorf("invalid payload type for HandleRoundStarted")
 			}
 
-			if startPayload.EventMessageID == sharedtypes.RoundID(uuid.Nil) {
+			if startPayload.EventMessageID == "" {
 				return nil, fmt.Errorf("missing event message ID in round start payload")
 			}
 
 			// Convert EventMessageID to string
-			eventMessageID := startPayload.EventMessageID.String()
+			eventMessageID := startPayload.EventMessageID
 
 			// Capture both return values from UpdateRoundToScorecard
-			_, err := h.RoundDiscord.GetStartRoundManager().UpdateRoundToScorecard(ctx, startPayload.DiscordChannelID, eventMessageID, startPayload)
+			_, err := h.RoundDiscord.GetStartRoundManager().UpdateRoundToScorecard(ctx, h.Config.Discord.ChannelID, eventMessageID, startPayload)
 			if err != nil {
 				return nil, fmt.Errorf("failed to update round to scorecard: %w", err)
 			}

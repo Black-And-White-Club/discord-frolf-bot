@@ -2,8 +2,8 @@ package signup
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"log/slog"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
@@ -120,60 +120,13 @@ func (sm *signupManager) HandleSignupReactionAdd(ctx context.Context, r *discord
 	return result, err
 }
 
+// New handler for the button press
 func (sm *signupManager) HandleSignupButtonPress(ctx context.Context, i *discordgo.InteractionCreate) (SignupOperationResult, error) {
-	// Early validation checks
-	if i == nil || i.Interaction == nil {
-		return SignupOperationResult{Error: errors.New("interaction is nil or incomplete")}, nil
+	result, err := sm.SendSignupModal(ctx, i)
+	if err != nil {
+		slog.Error("❌ Failed to send signup modal", attr.Error(err))
+	} else {
+		slog.Info("✅ Successfully called SendSignupModal")
 	}
-
-	// Context enrichment
-	ctx = discordmetrics.WithValue(ctx, discordmetrics.CommandNameKey, "handle_signup_button_press")
-	ctx = discordmetrics.WithValue(ctx, discordmetrics.InteractionType, "button")
-
-	if i.Interaction.Member == nil || (i.Interaction.Member.User == nil && i.Interaction.User == nil) {
-		return SignupOperationResult{Error: errors.New("user is nil in interaction")}, nil
-	}
-
-	// Extract user ID from either Member.User or direct User field
-	userID := ""
-	if i.Interaction.Member != nil && i.Interaction.Member.User != nil {
-		userID = i.Interaction.Member.User.ID
-	} else if i.Interaction.User != nil {
-		userID = i.Interaction.User.ID
-	}
-	ctx = discordmetrics.WithValue(ctx, discordmetrics.UserIDKey, userID)
-
-	// Check context cancellation before proceeding
-	if err := ctx.Err(); err != nil {
-		return SignupOperationResult{Error: err}, err
-	}
-
-	// Validate interaction type
-	if i.Interaction.Type != discordgo.InteractionMessageComponent {
-		return SignupOperationResult{Error: errors.New("unsupported interaction type")}, nil
-	}
-
-	// Extract and validate the button ID
-	data, ok := i.Interaction.Data.(*discordgo.MessageComponentInteractionData)
-	if !ok || data.CustomID != "signup-button" {
-		return SignupOperationResult{Error: errors.New("unsupported button custom ID")}, nil
-	}
-
-	// Wrap the operation with minimal error handling
-	return sm.operationWrapper(ctx, "handle_signup_button_press", func(ctx context.Context) (SignupOperationResult, error) {
-		err := sm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseModal,
-			Data: &discordgo.InteractionResponseData{
-				CustomID: "signup-modal",
-				Title:    "Sign Up Form",
-				// Components would be defined here...
-			},
-		})
-		if err != nil {
-			// Return the original error directly without wrapping it
-			return SignupOperationResult{Error: err}, err
-		}
-
-		return SignupOperationResult{Success: "modal sent"}, nil
-	})
+	return result, err
 }

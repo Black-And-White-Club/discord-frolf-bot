@@ -26,6 +26,7 @@ type ScoreRoundManager interface {
 	HandleScoreSubmission(ctx context.Context, i *discordgo.InteractionCreate) (ScoreRoundOperationResult, error)
 	SendScoreUpdateConfirmation(ctx context.Context, channelID string, userID sharedtypes.DiscordID, score *sharedtypes.Score) (ScoreRoundOperationResult, error)
 	SendScoreUpdateError(ctx context.Context, userID sharedtypes.DiscordID, errorMsg string) (ScoreRoundOperationResult, error)
+	UpdateScoreEmbed(ctx context.Context, channelID, messageID string, userID sharedtypes.DiscordID, score *sharedtypes.Score) (ScoreRoundOperationResult, error)
 }
 
 // scoreRoundManager implements the ScoreRoundManager interface.

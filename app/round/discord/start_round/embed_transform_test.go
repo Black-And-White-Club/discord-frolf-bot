@@ -226,7 +226,7 @@ func Test_startRoundManager_TransformRoundToScorecard(t *testing.T) {
 			}
 
 			// Call the function
-			result, err := srm.TransformRoundToScorecard(context.Background(), tt.payload)
+			result, err := srm.TransformRoundToScorecard(context.Background(), tt.payload, tt.expectedEmbed)
 
 			// Check error expectation
 			if tt.expectError && err == nil {

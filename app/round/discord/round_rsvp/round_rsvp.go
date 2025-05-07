@@ -14,7 +14,6 @@ import (
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
-	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"github.com/bwmarrin/discordgo"
 	"go.opentelemetry.io/otel/attribute"
@@ -25,7 +24,7 @@ import (
 // RoundRsvpManager defines the interface for round RSVP operations.
 type RoundRsvpManager interface {
 	HandleRoundResponse(ctx context.Context, i *discordgo.InteractionCreate) (RoundRsvpOperationResult, error)
-	UpdateRoundEventEmbed(ctx context.Context, channelID string, messageID sharedtypes.RoundID, acceptedParticipants, declinedParticipants, tentativeParticipants []roundtypes.Participant) (RoundRsvpOperationResult, error)
+	UpdateRoundEventEmbed(ctx context.Context, channelID string, messageID string, acceptedParticipants, declinedParticipants, tentativeParticipants []roundtypes.Participant) (RoundRsvpOperationResult, error)
 	InteractionJoinRoundLate(ctx context.Context, i *discordgo.InteractionCreate) (RoundRsvpOperationResult, error)
 }
 

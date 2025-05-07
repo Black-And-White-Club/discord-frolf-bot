@@ -6,6 +6,7 @@ import (
 	discordleaderboardevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/leaderboard"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
+	leaderboardtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/leaderboard"
 	"github.com/ThreeDotsLabs/watermill/message"
 )
 
@@ -63,9 +64,9 @@ func (h *LeaderboardHandlers) HandleLeaderboardData(msg *message.Message) ([]*me
 				return nil, err
 			}
 
-			leaderboardData := make([]leaderboardevents.LeaderboardEntry, len(payloadData.Leaderboard))
+			leaderboardData := make([]leaderboardtypes.LeaderboardEntry, len(payloadData.Leaderboard))
 			for i, entry := range payloadData.Leaderboard {
-				leaderboardData[i] = leaderboardevents.LeaderboardEntry{
+				leaderboardData[i] = leaderboardtypes.LeaderboardEntry{
 					TagNumber: entry.TagNumber,
 					UserID:    entry.UserID,
 				}

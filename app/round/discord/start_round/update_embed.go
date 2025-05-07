@@ -10,10 +10,8 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-// UpdateRoundToScorecard uses the operation wrapper to update a round event embed.
 func (m *startRoundManager) UpdateRoundToScorecard(ctx context.Context, channelID, messageID string, payload *roundevents.DiscordRoundStartPayload) (StartRoundOperationResult, error) {
 	return m.operationWrapper(ctx, "UpdateRoundToScorecard", func(ctx context.Context) (StartRoundOperationResult, error) {
-		// Validate inputs before proceeding
 		if channelID == "" {
 			err := errors.New("missing channel ID")
 			m.logger.ErrorContext(ctx, "Missing channel ID for UpdateRoundToScorecard")
@@ -25,17 +23,27 @@ func (m *startRoundManager) UpdateRoundToScorecard(ctx context.Context, channelI
 			return StartRoundOperationResult{Error: err}, nil
 		}
 
-		transformResult, err := m.TransformRoundToScorecard(ctx, payload)
+		// 🆕 Fetch existing message
+		existingMsg, err := m.session.ChannelMessage(channelID, messageID)
 		if err != nil {
-			// This error indicates a problem with the wrapper itself, not the transformation logic
+			m.logger.ErrorContext(ctx, "Failed to fetch existing message for UpdateRoundToScorecard",
+				attr.Error(err), attr.String("message_id", messageID))
+			return StartRoundOperationResult{Error: fmt.Errorf("failed to fetch existing message: %w", err)}, nil
+		}
+
+		// 🆕 Pass current embed to the transformer
+		existingEmbed := &discordgo.MessageEmbed{}
+		if len(existingMsg.Embeds) > 0 {
+			existingEmbed = existingMsg.Embeds[0]
+		}
+
+		transformResult, err := m.TransformRoundToScorecard(ctx, payload, existingEmbed)
+		if err != nil {
 			m.logger.ErrorContext(ctx, "Failed to run TransformRoundToScorecard wrapper", attr.Error(err))
 			return StartRoundOperationResult{}, fmt.Errorf("failed to run TransformRoundToScorecard wrapper: %w", err)
 		}
-
-		// Check for an error within the result of TransformRoundToScorecard
 		if transformResult.Error != nil {
 			m.logger.ErrorContext(ctx, "TransformRoundToScorecard returned error in result", attr.Error(transformResult.Error))
-			// Return the error from the transformation in the result struct
 			return StartRoundOperationResult{Error: fmt.Errorf("transformation failed: %w", transformResult.Error)}, nil
 		}
 
@@ -44,27 +52,20 @@ func (m *startRoundManager) UpdateRoundToScorecard(ctx context.Context, channelI
 			Components []discordgo.MessageComponent
 		})
 		if !ok {
-			// Handle unexpected type from TransformRoundToScorecard success
 			err := errors.New("unexpected success type from TransformRoundToScorecard")
 			m.logger.ErrorContext(ctx, "Unexpected type from TransformRoundToScorecard success", attr.Error(err))
 			return StartRoundOperationResult{Error: err}, nil
 		}
 
-		embed := transformedData.Embed
-		components := transformedData.Components
-
-		// Update the message with new embed and components
 		_, err = m.session.ChannelMessageEditComplex(&discordgo.MessageEdit{
 			Channel:    channelID,
 			ID:         messageID,
-			Embeds:     &[]*discordgo.MessageEmbed{embed},
-			Components: &components,
+			Embeds:     &[]*discordgo.MessageEmbed{transformedData.Embed},
+			Components: &transformedData.Components,
 		})
 		if err != nil {
-			// If updating the message failed, return an error in the result struct.
 			m.logger.ErrorContext(ctx, "Failed to update round embed to scorecard",
-				attr.Error(err),
-				attr.String("message_id", messageID))
+				attr.Error(err), attr.String("message_id", messageID))
 			return StartRoundOperationResult{Error: fmt.Errorf("failed to update round embed: %w", err)}, nil
 		}
 
@@ -72,7 +73,6 @@ func (m *startRoundManager) UpdateRoundToScorecard(ctx context.Context, channelI
 			attr.String("message_id", messageID),
 			attr.String("channel_id", channelID))
 
-		// Return a successful result
 		return StartRoundOperationResult{Success: true}, nil
 	})
 }

@@ -23,7 +23,13 @@ func (rrm *roundRsvpManager) HandleRoundResponse(ctx context.Context, i *discord
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.InteractionType, "button")
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.UserIDKey, i.Member.User.ID)
 
-	rrm.logger.InfoContext(ctx, "Handling round RSVP", attr.UserID(sharedtypes.DiscordID(i.Member.User.ID)))
+	rrm.logger.InfoContext(ctx, "Handling round RSVP",
+		attr.UserID(sharedtypes.DiscordID(i.Member.User.ID)))
+
+	rrm.logger.InfoContext(ctx, "Processing RSVP interaction",
+		attr.String("interaction_id", i.ID),
+		attr.String("discord_message_id", i.Message.ID),
+	)
 
 	return rrm.operationWrapper(ctx, "handle_round_response", func(ctx context.Context) (RoundRsvpOperationResult, error) {
 		user := i.Member.User
@@ -57,19 +63,19 @@ func (rrm *roundRsvpManager) HandleRoundResponse(ctx context.Context, i *discord
 			return RoundRsvpOperationResult{Error: fmt.Errorf("failed to parse round UUID: %w", err)}, nil
 		}
 
-		tagNumber := sharedtypes.TagNumber(0)
+		var tagNumberPtr *sharedtypes.TagNumber = nil
 
 		payload := roundevents.ParticipantJoinRequestPayload{
 			RoundID:   sharedtypes.RoundID(roundUUID),
 			UserID:    sharedtypes.DiscordID(user.ID),
 			Response:  response,
-			TagNumber: &tagNumber,
+			TagNumber: tagNumberPtr,
 		}
 
 		msg := &message.Message{
 			Metadata: message.Metadata{
-				"correlation_id": i.ID,
-				"topic":          discordroundevents.RoundParticipantJoinReqTopic,
+				"discord_message_id": i.Message.ID,
+				"topic":              discordroundevents.RoundParticipantJoinReqTopic,
 			},
 		}
 
@@ -134,8 +140,8 @@ func (rrm *roundRsvpManager) InteractionJoinRoundLate(ctx context.Context, i *di
 
 		msg := &message.Message{
 			Metadata: message.Metadata{
-				"correlation_id": i.ID,
-				"topic":          discordroundevents.RoundParticipantJoinReqTopic,
+				"discord_message_id": i.Message.ID,
+				"topic":              discordroundevents.RoundParticipantJoinReqTopic,
 			},
 		}
 

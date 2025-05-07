@@ -52,7 +52,7 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 		name          string
 		setup         func()
 		channelID     string
-		messageID     sharedtypes.RoundID
+		messageID     string
 		accepted      []roundtypes.Participant
 		declined      []roundtypes.Participant
 		tentative     []roundtypes.Participant
@@ -85,7 +85,7 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 					Times(1)
 			},
 			channelID: "channel-123",
-			messageID: testRoundID,
+			messageID: "12345",
 			accepted: []roundtypes.Participant{
 				{UserID: "user-123", TagNumber: intPtr(1)},
 			},
@@ -101,7 +101,7 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 					Times(1)
 			},
 			channelID:     "channel-123",
-			messageID:     testRoundID,
+			messageID:     "12345",
 			accepted:      []roundtypes.Participant{},
 			declined:      []roundtypes.Participant{},
 			tentative:     []roundtypes.Participant{},
@@ -116,7 +116,7 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 					Times(1)
 			},
 			channelID:     "channel-123",
-			messageID:     testRoundID,
+			messageID:     "12345",
 			accepted:      []roundtypes.Participant{},
 			declined:      []roundtypes.Participant{},
 			tentative:     []roundtypes.Participant{},
@@ -134,7 +134,7 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 					Times(1)
 			},
 			channelID:     "channel-123",
-			messageID:     testRoundID,
+			messageID:     "12345",
 			accepted:      []roundtypes.Participant{},
 			declined:      []roundtypes.Participant{},
 			tentative:     []roundtypes.Participant{},
@@ -157,7 +157,7 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 					Times(1)
 			},
 			channelID:     "channel-123",
-			messageID:     testRoundID,
+			messageID:     "12345",
 			accepted:      []roundtypes.Participant{},
 			declined:      []roundtypes.Participant{},
 			tentative:     []roundtypes.Participant{},
@@ -185,7 +185,7 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 					Times(1)
 			},
 			channelID: "channel-123",
-			messageID: testRoundID,
+			messageID: "12345",
 			accepted: []roundtypes.Participant{
 				{UserID: "user-123", TagNumber: intPtr(1)},
 			},
@@ -215,12 +215,12 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 					Times(1)
 
 				mockSession.EXPECT().
-					ChannelMessageEditEmbed("channel-123", testRoundID.String(), gomock.Any()).
+					ChannelMessageEditEmbed("channel-123", "12345", gomock.Any()).
 					Return(&discordgo.Message{ID: testRoundID.String()}, nil).
 					Times(1)
 			},
 			channelID: "channel-123",
-			messageID: testRoundID,
+			messageID: "12345",
 			accepted: []roundtypes.Participant{
 				{UserID: "user-123", TagNumber: intPtr(1)},
 			},

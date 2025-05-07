@@ -1,7 +1,7 @@
 package leaderboardevents
 
 import (
-	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
+	leaderboardtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/leaderboard"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 )
 
@@ -26,9 +26,9 @@ type LeaderboardRetrieveRequestPayload struct {
 
 // Corrected LeaderboardRetrievedPayload
 type LeaderboardRetrievedPayload struct {
-	Leaderboard []leaderboardevents.LeaderboardEntry `json:"leaderboard"`
-	ChannelID   string                               `json:"channel_id"`
-	MessageID   string                               `json:"message_id"`
+	Leaderboard []leaderboardtypes.LeaderboardEntry `json:"leaderboard"`
+	ChannelID   string                              `json:"channel_id"`
+	MessageID   string                              `json:"message_id"`
 }
 type LeaderboardTagAssignRequestPayload struct {
 	TargetUserID sharedtypes.DiscordID `json:"target_user_id"`

@@ -10,6 +10,7 @@ import (
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
+	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/bwmarrin/discordgo"
 	"github.com/google/uuid"
@@ -104,14 +105,13 @@ func (srm *scoreRoundManager) HandleScoreSubmission(ctx context.Context, i *disc
 
 	return srm.operationWrapper(ctx, "handle_score_submission", func(ctx context.Context) (ScoreRoundOperationResult, error) {
 		data := i.ModalSubmitData()
-		correlationID := i.ID
 
 		// Validate modal custom ID
 		parts := strings.Split(data.CustomID, "|")
 		srm.logger.DebugContext(ctx, "Splitting modal custom ID", "customID", data.CustomID, "parts", parts)
 		if len(parts) < 3 {
 			err := fmt.Errorf("invalid modal custom ID: %s", data.CustomID)
-			srm.logger.ErrorContext(ctx, "Invalid modal custom ID", attr.Error(err), attr.String("correlation_id", correlationID))
+			srm.logger.ErrorContext(ctx, "Invalid modal custom ID", attr.Error(err))
 
 			err = srm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -127,13 +127,13 @@ func (srm *scoreRoundManager) HandleScoreSubmission(ctx context.Context, i *disc
 			return ScoreRoundOperationResult{Error: fmt.Errorf("invalid modal custom ID")}, nil
 		}
 
-		// Parse round ID
+		// Parse round ID and User ID from custom ID
 		roundIDStr, userID := parts[1], parts[2]
-		srm.logger.DebugContext(ctx, "Parsing round ID", "roundIDStr", roundIDStr)
+		srm.logger.DebugContext(ctx, "Parsing round ID and user ID from custom ID", "roundIDStr", roundIDStr, "userID", userID)
 		roundID, err := uuid.Parse(roundIDStr)
 		if err != nil {
 			err = fmt.Errorf("invalid round ID: %s", roundIDStr)
-			srm.logger.ErrorContext(ctx, "Invalid round ID", attr.Error(err), attr.String("user_id", userID), attr.String("correlation_id", correlationID))
+			srm.logger.ErrorContext(ctx, "Invalid round ID format", attr.Error(err), attr.String("user_id", userID))
 
 			err = srm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -149,8 +149,8 @@ func (srm *scoreRoundManager) HandleScoreSubmission(ctx context.Context, i *disc
 			return ScoreRoundOperationResult{Error: fmt.Errorf("invalid round ID")}, nil
 		}
 
-		// Acknowledge the interaction
-		srm.logger.DebugContext(ctx, "Acknowledging interaction")
+		// Acknowledge the interaction as deferred ephemeral message update
+		srm.logger.DebugContext(ctx, "Acknowledging score submission interaction")
 		err = srm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
@@ -158,31 +158,24 @@ func (srm *scoreRoundManager) HandleScoreSubmission(ctx context.Context, i *disc
 			},
 		})
 		if err != nil {
-			srm.logger.ErrorContext(ctx, "Failed to acknowledge score submission", attr.Error(err), attr.String("correlation_id", correlationID))
+			srm.logger.ErrorContext(ctx, "Failed to acknowledge score submission", attr.Error(err))
 			return ScoreRoundOperationResult{Error: err}, nil
 		}
 
-		// Extract score input
+		// Extract score input from modal components
 		var scoreStr string
-		if len(data.Components) > 0 {
-			if actionsRow, ok := data.Components[0].(*discordgo.ActionsRow); ok && len(actionsRow.Components) > 0 {
-				if textInput, ok := actionsRow.Components[0].(*discordgo.TextInput); ok {
-					scoreStr = strings.TrimSpace(textInput.Value)
-				}
-			} else if actionsRow, ok := data.Components[0].(discordgo.ActionsRow); ok && len(actionsRow.Components) > 0 {
-				if textInput, ok := actionsRow.Components[0].(discordgo.TextInput); ok {
-					scoreStr = strings.TrimSpace(textInput.Value)
-				} else if textInput, ok := actionsRow.Components[0].(*discordgo.TextInput); ok {
-					scoreStr = strings.TrimSpace(textInput.Value)
-				}
+		if len(data.Components) > 0 && len(data.Components[0].(*discordgo.ActionsRow).Components) > 0 {
+			if textInput, ok := data.Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput); ok {
+				scoreStr = strings.TrimSpace(textInput.Value)
 			}
 		}
 		srm.logger.DebugContext(ctx, "Extracted score input", "scoreStr", scoreStr)
 
 		if scoreStr == "" {
-			err := fmt.Errorf("could not extract score input")
-			srm.logger.ErrorContext(ctx, "Could not extract score input", attr.Error(err), attr.String("correlation_id", correlationID))
+			err := fmt.Errorf("could not extract score input from modal")
+			srm.logger.ErrorContext(ctx, "Could not extract score input", attr.Error(err))
 
+			// Send followup error message
 			_, err = srm.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
 				Content: "Could not read your score. Please try again.",
 				Flags:   discordgo.MessageFlagsEphemeral,
@@ -198,9 +191,10 @@ func (srm *scoreRoundManager) HandleScoreSubmission(ctx context.Context, i *disc
 		srm.logger.DebugContext(ctx, "Converting score string to integer", "scoreStr", scoreStr)
 		score, err := strconv.Atoi(scoreStr)
 		if err != nil {
-			err = fmt.Errorf("invalid score input: %s", scoreStr)
-			srm.logger.ErrorContext(ctx, "Invalid score input", attr.Error(err), attr.String("correlation_id", correlationID))
+			err = fmt.Errorf("invalid score input format: %s", scoreStr)
+			srm.logger.ErrorContext(ctx, "Invalid score input format", attr.Error(err), attr.String("score_str", scoreStr))
 
+			// Send followup error message
 			_, err = srm.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
 				Content: "Invalid score. Please enter a valid number (e.g., -3, 0, +5).",
 				Flags:   discordgo.MessageFlagsEphemeral,
@@ -215,23 +209,24 @@ func (srm *scoreRoundManager) HandleScoreSubmission(ctx context.Context, i *disc
 		// Store the score as sharedtypes.Score
 		scoreValue := sharedtypes.Score(score)
 
-		// Publish the score update request to backend
+		// Prepare the payload for the backend ScoreUpdateRequest
 		payload := roundevents.ScoreUpdateRequestPayload{
 			RoundID:     sharedtypes.RoundID(roundID),
 			Participant: sharedtypes.DiscordID(userID),
-			Score:       &scoreValue,
-		}
-		msg := message.NewMessage(correlationID, nil)
-		msg.Metadata = message.Metadata{
-			"correlation_id": correlationID,
-			"topic":          roundevents.RoundScoreUpdateRequest,
+			Score:       &scoreValue, // Pass pointer to score value
 		}
 
-		srm.logger.DebugContext(ctx, "Creating result message")
+		msg := message.NewMessage(watermill.NewUUID(), nil)
+		msg.Metadata.Set("topic", roundevents.RoundScoreUpdateRequest) // Set the topic in metadata
+		msg.Metadata.Set("discord_message_id", i.Message.ID)           // <-- Set the original Discord message ID here!
+
+		srm.logger.DebugContext(ctx, "Creating result message for ScoreUpdateRequest with metadata")
+		// Use the message created with metadata. CreateResultMessage likely copies metadata.
 		resultMsg, err := srm.helper.CreateResultMessage(msg, payload, roundevents.RoundScoreUpdateRequest)
 		if err != nil {
-			srm.logger.ErrorContext(ctx, "Failed to create result message", attr.Error(err), attr.String("correlation_id", correlationID))
+			srm.logger.ErrorContext(ctx, "Failed to create result message for ScoreUpdateRequest", attr.Error(err))
 
+			// Send followup error message
 			_, err = srm.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
 				Content: "Something went wrong while submitting your score. Please try again later.",
 				Flags:   discordgo.MessageFlagsEphemeral,
@@ -244,10 +239,12 @@ func (srm *scoreRoundManager) HandleScoreSubmission(ctx context.Context, i *disc
 		}
 
 		srm.logger.DebugContext(ctx, "Publishing score update request")
+		// Publish the message
 		err = srm.publisher.Publish(roundevents.RoundScoreUpdateRequest, resultMsg)
 		if err != nil {
-			srm.logger.ErrorContext(ctx, "Failed to publish score update request", attr.Error(err), attr.String("correlation_id", correlationID))
+			srm.logger.ErrorContext(ctx, "Failed to publish score update request", attr.Error(err))
 
+			// Send followup error message
 			_, err = srm.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
 				Content: "Failed to submit your score. Please try again later.",
 				Flags:   discordgo.MessageFlagsEphemeral,
@@ -259,38 +256,43 @@ func (srm *scoreRoundManager) HandleScoreSubmission(ctx context.Context, i *disc
 			return ScoreRoundOperationResult{Error: fmt.Errorf("failed to publish message")}, nil
 		}
 
-		// Add trace event for score submission
+		// Add trace event for score submission (Optional, metadata includes message ID now)
 		tracePayload := map[string]interface{}{
 			"round_id":       roundID,
 			"participant_id": userID,
 			"score":          score,
 			"channel_id":     i.ChannelID,
 			"status":         "score_submitted",
+			// The message ID is already in the metadata copied from 'msg'
 		}
 
 		srm.logger.DebugContext(ctx, "Creating trace event message")
+		// Create trace message. Metadata from 'msg' (including correlation_id and discord_message_id) should be copied by CreateResultMessage.
 		traceMsg, err := srm.helper.CreateResultMessage(msg, tracePayload, roundevents.RoundTraceEvent)
 		if err == nil {
 			srm.logger.DebugContext(ctx, "Publishing trace event")
 			srm.publisher.Publish(roundevents.RoundTraceEvent, traceMsg)
+		} else {
+			srm.logger.ErrorContext(ctx, "Failed to create trace event message for score submission", attr.Error(err))
 		}
 
-		// Send confirmation to user
+		// Send confirmation to user via followup message
 		srm.logger.DebugContext(ctx, "Sending confirmation to user")
 		_, err = srm.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
 			Content: fmt.Sprintf("Your score of %d has been submitted! You'll receive a confirmation once it's processed.", score),
 			Flags:   discordgo.MessageFlagsEphemeral,
 		})
 		if err != nil {
-			srm.logger.ErrorContext(ctx, "Failed to send followup message", attr.Error(err))
+			srm.logger.ErrorContext(ctx, "Failed to send followup confirmation message", attr.Error(err))
 			return ScoreRoundOperationResult{Error: err}, nil
 		}
 
-		srm.logger.InfoContext(ctx, "Score submission processed successfully",
+		srm.logger.InfoContext(ctx, "Score submission processed successfully, request published",
 			attr.RoundID("round_id", sharedtypes.RoundID(roundID)),
 			attr.String("user_id", userID),
 			attr.Int("score", score),
-			attr.String("correlation_id", correlationID))
+			attr.String("discord_message_id", i.Message.ID), // Log the original message ID for context
+		)
 
 		return ScoreRoundOperationResult{Success: "Score submission processed successfully"}, nil
 	})

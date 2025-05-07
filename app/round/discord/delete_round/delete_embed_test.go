@@ -9,8 +9,6 @@ import (
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
-	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
-	"github.com/google/uuid"
 	"go.uber.org/mock/gomock"
 )
 
@@ -19,7 +17,7 @@ func Test_deleteRoundManager_DeleteRoundEventEmbed(t *testing.T) {
 		name            string
 		setup           func(mockSession *discordmocks.MockSession)
 		channelID       string
-		eventMessageID  sharedtypes.RoundID
+		eventMessageID  string
 		expectedErr     bool
 		expectedError   string
 		expectedSuccess bool
@@ -33,7 +31,7 @@ func Test_deleteRoundManager_DeleteRoundEventEmbed(t *testing.T) {
 					Times(1)
 			},
 			channelID:       "channel-123",
-			eventMessageID:  sharedtypes.RoundID(uuid.MustParse("b5e99f92-5b9e-4b94-a787-8b5f94977592")),
+			eventMessageID:  "12345",
 			expectedErr:     false,
 			expectedSuccess: true,
 		},
@@ -43,7 +41,7 @@ func Test_deleteRoundManager_DeleteRoundEventEmbed(t *testing.T) {
 				// No expectations, function should return before calling discordgo
 			},
 			channelID:       "",
-			eventMessageID:  sharedtypes.RoundID(uuid.MustParse("b5e99f92-5b9e-4b94-a787-8b5f94977592")),
+			eventMessageID:  "12345",
 			expectedErr:     true,
 			expectedError:   "channelID or eventMessageID is missing",
 			expectedSuccess: false,
@@ -54,7 +52,7 @@ func Test_deleteRoundManager_DeleteRoundEventEmbed(t *testing.T) {
 				// No expectations, function should return before calling discordgo
 			},
 			channelID:       "channel-123",
-			eventMessageID:  sharedtypes.RoundID(uuid.Nil),
+			eventMessageID:  "",
 			expectedErr:     true,
 			expectedError:   "channelID or eventMessageID is missing",
 			expectedSuccess: false,
@@ -68,7 +66,7 @@ func Test_deleteRoundManager_DeleteRoundEventEmbed(t *testing.T) {
 					Times(1)
 			},
 			channelID:       "channel-123",
-			eventMessageID:  sharedtypes.RoundID(uuid.MustParse("b5e99f92-5b9e-4b94-a787-8b5f94977592")),
+			eventMessageID:  "12345",
 			expectedErr:     true,
 			expectedError:   "failed to delete message: message not found",
 			expectedSuccess: false,

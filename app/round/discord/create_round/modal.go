@@ -13,7 +13,6 @@ import (
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
-	"github.com/google/uuid"
 )
 
 func (crm *createRoundManager) SendCreateRoundModal(ctx context.Context, i *discordgo.InteractionCreate) (CreateRoundOperationResult, error) {
@@ -155,6 +154,12 @@ func (crm *createRoundManager) HandleCreateRoundModalSubmit(ctx context.Context,
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.InteractionType, "modal_submit")
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.GuildIDKey, i.GuildID)
 
+	if i.Message != nil {
+		ctx = discordmetrics.WithValue(ctx, discordmetrics.MessageIDKey, i.Message.ID)
+	} else {
+		ctx = discordmetrics.WithValue(ctx, discordmetrics.MessageIDKey, "modal_submission")
+	}
+
 	return crm.operationWrapper(ctx, "handle_create_round_modal_submit", func(ctx context.Context) (CreateRoundOperationResult, error) {
 		// Check for context cancellation first
 		if err := ctx.Err(); err != nil {
@@ -245,17 +250,16 @@ func (crm *createRoundManager) HandleCreateRoundModalSubmit(ctx context.Context,
 
 		crm.logger.InfoContext(ctx, "Publishing event for Modal validation", attr.Any("payload", payload))
 
-		correlationID := uuid.New().String()
+		msg, correlationID, err := crm.createEvent(ctx, discordroundevents.RoundCreateModalSubmit, payload, i)
+		if err != nil {
+			createErr := fmt.Errorf("failed to create event: %w", err)
+			return CreateRoundOperationResult{Error: createErr}, createErr
+		}
+
 		err = crm.interactionStore.Set(correlationID, i.Interaction, 15*time.Minute)
 		if err != nil {
 			storeErr := fmt.Errorf("failed to store interaction: %w", err)
 			return CreateRoundOperationResult{Error: storeErr}, storeErr
-		}
-
-		msg, err := crm.createEvent(ctx, discordroundevents.RoundCreateModalSubmit, payload, i)
-		if err != nil {
-			createErr := fmt.Errorf("failed to create event: %w", err)
-			return CreateRoundOperationResult{Error: createErr}, createErr
 		}
 
 		// Set the correlation ID in the message metadata before publishing

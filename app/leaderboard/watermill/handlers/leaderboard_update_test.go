@@ -15,6 +15,7 @@ import (
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	util_mocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"go.opentelemetry.io/otel/trace/noop"
 	"go.uber.org/mock/gomock"
@@ -41,7 +42,7 @@ func TestLeaderboardHandlers_HandleLeaderboardUpdated(t *testing.T) {
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockLeaderboardDiscord *mocks.MockLeaderboardDiscordInterface, mockHelper *util_mocks.MockHelpers, cfg *config.Config) {
 				expectedPayload := leaderboardevents.LeaderboardUpdatedPayload{
-					LeaderboardData: map[int]string{
+					LeaderboardData: map[sharedtypes.TagNumber]sharedtypes.DiscordID{
 						1: "user1",
 						2: "user2",
 						3: "user3",
@@ -106,7 +107,7 @@ func TestLeaderboardHandlers_HandleLeaderboardUpdated(t *testing.T) {
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockLeaderboardDiscord *mocks.MockLeaderboardDiscordInterface, mockHelper *util_mocks.MockHelpers, cfg *config.Config) {
 				expectedPayload := leaderboardevents.LeaderboardUpdatedPayload{
-					LeaderboardData: map[int]string{},
+					LeaderboardData: map[sharedtypes.TagNumber]sharedtypes.DiscordID{},
 				}
 
 				// Make sure this is called by the wrapper
@@ -136,7 +137,7 @@ func TestLeaderboardHandlers_HandleLeaderboardUpdated(t *testing.T) {
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockLeaderboardDiscord *mocks.MockLeaderboardDiscordInterface, mockHelper *util_mocks.MockHelpers, cfg *config.Config) {
 				expectedPayload := leaderboardevents.LeaderboardUpdatedPayload{
-					LeaderboardData: map[int]string{
+					LeaderboardData: map[sharedtypes.TagNumber]sharedtypes.DiscordID{
 						1: "user1",
 						2: "user2",
 					},
@@ -172,7 +173,7 @@ func TestLeaderboardHandlers_HandleLeaderboardUpdated(t *testing.T) {
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockLeaderboardDiscord *mocks.MockLeaderboardDiscordInterface, mockHelper *util_mocks.MockHelpers, cfg *config.Config) {
 				expectedPayload := leaderboardevents.LeaderboardUpdatedPayload{
-					LeaderboardData: map[int]string{
+					LeaderboardData: map[sharedtypes.TagNumber]sharedtypes.DiscordID{
 						1: "user1",
 						2: "user2",
 					},
@@ -214,7 +215,7 @@ func TestLeaderboardHandlers_HandleLeaderboardUpdated(t *testing.T) {
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockLeaderboardDiscord *mocks.MockLeaderboardDiscordInterface, mockHelper *util_mocks.MockHelpers, cfg *config.Config) {
 				expectedPayload := leaderboardevents.LeaderboardUpdatedPayload{
-					LeaderboardData: map[int]string{
+					LeaderboardData: map[sharedtypes.TagNumber]sharedtypes.DiscordID{
 						1: "user1",
 						2: "user2",
 					},
@@ -258,7 +259,7 @@ func TestLeaderboardHandlers_HandleLeaderboardUpdated(t *testing.T) {
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockLeaderboardDiscord *mocks.MockLeaderboardDiscordInterface, mockHelper *util_mocks.MockHelpers, cfg *config.Config) {
 				expectedPayload := leaderboardevents.LeaderboardUpdatedPayload{
-					LeaderboardData: map[int]string{
+					LeaderboardData: map[sharedtypes.TagNumber]sharedtypes.DiscordID{
 						1: "user1",
 						2: "user2",
 					},

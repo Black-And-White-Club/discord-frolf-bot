@@ -41,7 +41,7 @@ func Test_roundReminderManager_SendRoundReminder(t *testing.T) {
 		ReminderType:     "1-hour",
 		DiscordChannelID: "channel-123",
 		DiscordGuildID:   "guild-id",
-		EventMessageID:   sharedtypes.RoundID(uuid.New()),
+		EventMessageID:   "12345",
 		StartTime:        (*sharedtypes.StartTime)(&sampleTime),
 		Location:         (*roundtypes.Location)(&sampleLocation),
 	}
@@ -183,7 +183,7 @@ func Test_roundReminderManager_SendRoundReminder(t *testing.T) {
 				ReminderType:     "1-hour",
 				DiscordChannelID: "channel-123",
 				DiscordGuildID:   "guild-id",
-				EventMessageID:   sharedtypes.RoundID(uuid.Nil),
+				EventMessageID:   "12345",
 				StartTime:        (*sharedtypes.StartTime)(&sampleTime),
 				Location:         (*roundtypes.Location)(&sampleLocation),
 			},

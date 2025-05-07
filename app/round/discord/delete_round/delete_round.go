@@ -13,7 +13,6 @@ import (
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
-	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"github.com/bwmarrin/discordgo"
 	"go.opentelemetry.io/otel/attribute"
@@ -24,7 +23,7 @@ import (
 // DeleteRoundManager defines the interface for delete round operations.
 type DeleteRoundManager interface {
 	HandleDeleteRoundButton(ctx context.Context, i *discordgo.InteractionCreate) (DeleteRoundOperationResult, error)
-	DeleteRoundEventEmbed(ctx context.Context, eventMessageID sharedtypes.RoundID, channelID string) (DeleteRoundOperationResult, error)
+	DeleteRoundEventEmbed(ctx context.Context, discordMessageID string, channelID string) (DeleteRoundOperationResult, error)
 }
 
 type deleteRoundManager struct {
