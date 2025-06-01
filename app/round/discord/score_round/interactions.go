@@ -20,11 +20,32 @@ import (
 func (srm *scoreRoundManager) HandleScoreButton(ctx context.Context, i *discordgo.InteractionCreate) (ScoreRoundOperationResult, error) {
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.CommandNameKey, "handle_score_button")
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.InteractionType, "button")
-	ctx = discordmetrics.WithValue(ctx, discordmetrics.UserIDKey, i.Member.User.ID)
 
-	srm.logger.InfoContext(ctx, "Handling score button interaction", attr.UserID(sharedtypes.DiscordID(i.Member.User.ID)))
+	// Add nil checks before accessing user ID
+	var userID string
+	if i.Member != nil && i.Member.User != nil {
+		userID = i.Member.User.ID
+		ctx = discordmetrics.WithValue(ctx, discordmetrics.UserIDKey, userID)
+	} else if i.User != nil {
+		userID = i.User.ID
+		ctx = discordmetrics.WithValue(ctx, discordmetrics.UserIDKey, userID)
+	} else {
+		return ScoreRoundOperationResult{Error: fmt.Errorf("unable to determine user from interaction")}, nil
+	}
+
+	srm.logger.InfoContext(ctx, "Handling score button interaction", attr.UserID(sharedtypes.DiscordID(userID)))
 
 	return srm.operationWrapper(ctx, "handle_score_button", func(ctx context.Context) (ScoreRoundOperationResult, error) {
+		// Get user from either Member or direct User field
+		var user *discordgo.User
+		if i.Member != nil && i.Member.User != nil {
+			user = i.Member.User
+		} else if i.User != nil {
+			user = i.User
+		} else {
+			return ScoreRoundOperationResult{Error: fmt.Errorf("unable to determine user from interaction")}, nil
+		}
+
 		customIDParts := strings.Split(i.MessageComponentData().CustomID, "|")
 		if len(customIDParts) < 2 {
 			err := fmt.Errorf("invalid custom ID for score button: %s", i.MessageComponentData().CustomID)
@@ -38,7 +59,7 @@ func (srm *scoreRoundManager) HandleScoreButton(ctx context.Context, i *discordg
 		if strings.Contains(i.MessageComponentData().CustomID, "finalized") {
 			srm.logger.InfoContext(ctx, "Attempted score submission on a finalized round",
 				attr.String("round_id", roundID),
-				attr.String("user_id", i.Member.User.ID))
+				attr.String("user_id", user.ID))
 
 			err := srm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -55,14 +76,14 @@ func (srm *scoreRoundManager) HandleScoreButton(ctx context.Context, i *discordg
 
 		srm.logger.InfoContext(ctx, "Opening score submission modal",
 			attr.String("round_id", roundID),
-			attr.String("user_id", i.Member.User.ID),
+			attr.String("user_id", user.ID),
 			attr.String("correlation_id", i.ID))
 
 		err := srm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseModal,
 			Data: &discordgo.InteractionResponseData{
 				Title:    "Submit Your Score",
-				CustomID: fmt.Sprintf("submit_score_modal|%s|%s", roundID, i.Member.User.ID),
+				CustomID: fmt.Sprintf("submit_score_modal|%s|%s", roundID, user.ID),
 				Components: []discordgo.MessageComponent{
 					discordgo.ActionsRow{
 						Components: []discordgo.MessageComponent{
@@ -82,14 +103,14 @@ func (srm *scoreRoundManager) HandleScoreButton(ctx context.Context, i *discordg
 			srm.logger.ErrorContext(ctx, "Failed to open score modal",
 				attr.Error(err),
 				attr.String("round_id", roundID),
-				attr.String("user_id", i.Member.User.ID),
+				attr.String("user_id", user.ID),
 				attr.String("correlation_id", i.ID))
 			return ScoreRoundOperationResult{Error: err}, nil
 		}
 
 		srm.logger.InfoContext(ctx, "Successfully opened score modal",
 			attr.String("round_id", roundID),
-			attr.String("user_id", i.Member.User.ID),
+			attr.String("user_id", user.ID),
 			attr.String("correlation_id", i.ID))
 
 		return ScoreRoundOperationResult{Success: "Score modal opened successfully"}, nil
@@ -99,9 +120,20 @@ func (srm *scoreRoundManager) HandleScoreButton(ctx context.Context, i *discordg
 func (srm *scoreRoundManager) HandleScoreSubmission(ctx context.Context, i *discordgo.InteractionCreate) (ScoreRoundOperationResult, error) {
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.CommandNameKey, "handle_score_submission")
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.InteractionType, "modal")
-	ctx = discordmetrics.WithValue(ctx, discordmetrics.UserIDKey, i.Member.User.ID)
 
-	srm.logger.InfoContext(ctx, "Handling score submission", attr.UserID(sharedtypes.DiscordID(i.Member.User.ID)))
+	// Add nil checks before accessing user ID
+	var userID string
+	if i.Member != nil && i.Member.User != nil {
+		userID = i.Member.User.ID
+		ctx = discordmetrics.WithValue(ctx, discordmetrics.UserIDKey, userID)
+	} else if i.User != nil {
+		userID = i.User.ID
+		ctx = discordmetrics.WithValue(ctx, discordmetrics.UserIDKey, userID)
+	} else {
+		return ScoreRoundOperationResult{Error: fmt.Errorf("unable to determine user from interaction")}, nil
+	}
+
+	srm.logger.InfoContext(ctx, "Handling score submission", attr.UserID(sharedtypes.DiscordID(userID)))
 
 	return srm.operationWrapper(ctx, "handle_score_submission", func(ctx context.Context) (ScoreRoundOperationResult, error) {
 		data := i.ModalSubmitData()
@@ -128,12 +160,12 @@ func (srm *scoreRoundManager) HandleScoreSubmission(ctx context.Context, i *disc
 		}
 
 		// Parse round ID and User ID from custom ID
-		roundIDStr, userID := parts[1], parts[2]
-		srm.logger.DebugContext(ctx, "Parsing round ID and user ID from custom ID", "roundIDStr", roundIDStr, "userID", userID)
+		roundIDStr, userIDFromModal := parts[1], parts[2]
+		srm.logger.DebugContext(ctx, "Parsing round ID and user ID from custom ID", "roundIDStr", roundIDStr, "userID", userIDFromModal)
 		roundID, err := uuid.Parse(roundIDStr)
 		if err != nil {
 			err = fmt.Errorf("invalid round ID: %s", roundIDStr)
-			srm.logger.ErrorContext(ctx, "Invalid round ID format", attr.Error(err), attr.String("user_id", userID))
+			srm.logger.ErrorContext(ctx, "Invalid round ID format", attr.Error(err), attr.String("user_id", userIDFromModal))
 
 			err = srm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -164,9 +196,24 @@ func (srm *scoreRoundManager) HandleScoreSubmission(ctx context.Context, i *disc
 
 		// Extract score input from modal components
 		var scoreStr string
-		if len(data.Components) > 0 && len(data.Components[0].(*discordgo.ActionsRow).Components) > 0 {
-			if textInput, ok := data.Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput); ok {
-				scoreStr = strings.TrimSpace(textInput.Value)
+		if len(data.Components) > 0 {
+			// Handle both pointer and value types for ActionsRow
+			var actionsRow *discordgo.ActionsRow
+			switch component := data.Components[0].(type) {
+			case *discordgo.ActionsRow:
+				actionsRow = component
+			case discordgo.ActionsRow:
+				actionsRow = &component
+			}
+
+			if actionsRow != nil && len(actionsRow.Components) > 0 {
+				// Handle both pointer and value types for TextInput
+				switch textComponent := actionsRow.Components[0].(type) {
+				case *discordgo.TextInput:
+					scoreStr = strings.TrimSpace(textComponent.Value)
+				case discordgo.TextInput:
+					scoreStr = strings.TrimSpace(textComponent.Value)
+				}
 			}
 		}
 		srm.logger.DebugContext(ctx, "Extracted score input", "scoreStr", scoreStr)
@@ -212,13 +259,17 @@ func (srm *scoreRoundManager) HandleScoreSubmission(ctx context.Context, i *disc
 		// Prepare the payload for the backend ScoreUpdateRequest
 		payload := roundevents.ScoreUpdateRequestPayload{
 			RoundID:     sharedtypes.RoundID(roundID),
-			Participant: sharedtypes.DiscordID(userID),
+			Participant: sharedtypes.DiscordID(userIDFromModal),
 			Score:       &scoreValue, // Pass pointer to score value
 		}
 
 		msg := message.NewMessage(watermill.NewUUID(), nil)
 		msg.Metadata.Set("topic", roundevents.RoundScoreUpdateRequest) // Set the topic in metadata
-		msg.Metadata.Set("discord_message_id", i.Message.ID)           // <-- Set the original Discord message ID here!
+
+		// Add nil check for Message before accessing ID
+		if i.Message != nil {
+			msg.Metadata.Set("discord_message_id", i.Message.ID) // Set the original Discord message ID here!
+		}
 
 		srm.logger.DebugContext(ctx, "Creating result message for ScoreUpdateRequest with metadata")
 		// Use the message created with metadata. CreateResultMessage likely copies metadata.
@@ -259,7 +310,7 @@ func (srm *scoreRoundManager) HandleScoreSubmission(ctx context.Context, i *disc
 		// Add trace event for score submission (Optional, metadata includes message ID now)
 		tracePayload := map[string]interface{}{
 			"round_id":       roundID,
-			"participant_id": userID,
+			"participant_id": userIDFromModal,
 			"score":          score,
 			"channel_id":     i.ChannelID,
 			"status":         "score_submitted",
@@ -287,11 +338,17 @@ func (srm *scoreRoundManager) HandleScoreSubmission(ctx context.Context, i *disc
 			return ScoreRoundOperationResult{Error: err}, nil
 		}
 
+		// Add nil check for Message before accessing ID in logs
+		var messageID string
+		if i.Message != nil {
+			messageID = i.Message.ID
+		}
+
 		srm.logger.InfoContext(ctx, "Score submission processed successfully, request published",
 			attr.RoundID("round_id", sharedtypes.RoundID(roundID)),
-			attr.String("user_id", userID),
+			attr.String("user_id", userIDFromModal),
 			attr.Int("score", score),
-			attr.String("discord_message_id", i.Message.ID), // Log the original message ID for context
+			attr.String("discord_message_id", messageID), // Log the original message ID for context
 		)
 
 		return ScoreRoundOperationResult{Success: "Score submission processed successfully"}, nil

@@ -55,7 +55,7 @@ func TestLeaderboardHandlers_HandleTagAssignRequest(t *testing.T) {
 				expectedPayload := leaderboardevents.TagAssignmentRequestedPayload{
 					UserID:     sharedtypes.DiscordID("user123"),
 					TagNumber:  &testTagNumber,
-					UpdateID:   testMessageID.String(),
+					UpdateID:   sharedtypes.RoundID(testMessageID),
 					Source:     "manual",
 					UpdateType: "new_tag",
 				}
@@ -82,7 +82,66 @@ func TestLeaderboardHandlers_HandleTagAssignRequest(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
-				mockHelper.EXPECT().UnmarshalPayload(gomock.Any(), gomock.Any()).Return(nil).Times(1)
+				mockHelper.EXPECT().UnmarshalPayload(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(msg *message.Message, v interface{}) error {
+						payload := v.(*discordleaderboardevents.LeaderboardTagAssignRequestPayload)
+						*payload = discordleaderboardevents.LeaderboardTagAssignRequestPayload{
+							TargetUserID: sharedtypes.DiscordID(""),
+							RequestorID:  "req456",
+							TagNumber:    sharedtypes.TagNumber(0),
+							ChannelID:    "",
+							MessageID:    "",
+						}
+						return nil
+					}).Times(1)
+			},
+		},
+		{
+			name: "empty_message_id",
+			msg: &message.Message{
+				UUID:     "test-uuid",
+				Metadata: message.Metadata{"correlation_id": "test-correlation"},
+				Payload:  []byte(`{"target_user_id":"user123","requestor_id":"req456","tag_number":5,"channel_id":"chan789","message_id":""}`),
+			},
+			want:    nil,
+			wantErr: true,
+			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
+				mockHelper.EXPECT().UnmarshalPayload(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(msg *message.Message, v interface{}) error {
+						payload := v.(*discordleaderboardevents.LeaderboardTagAssignRequestPayload)
+						*payload = discordleaderboardevents.LeaderboardTagAssignRequestPayload{
+							TargetUserID: sharedtypes.DiscordID("user123"),
+							RequestorID:  "req456",
+							TagNumber:    testTagNumber,
+							ChannelID:    "chan789",
+							MessageID:    "",
+						}
+						return nil
+					}).Times(1)
+			},
+		},
+		{
+			name: "invalid_message_id_format",
+			msg: &message.Message{
+				UUID:     "test-uuid",
+				Metadata: message.Metadata{"correlation_id": "test-correlation"},
+				Payload:  []byte(`{"target_user_id":"user123","requestor_id":"req456","tag_number":5,"channel_id":"chan789","message_id":"invalid-uuid"}`),
+			},
+			want:    nil,
+			wantErr: true,
+			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
+				mockHelper.EXPECT().UnmarshalPayload(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(msg *message.Message, v interface{}) error {
+						payload := v.(*discordleaderboardevents.LeaderboardTagAssignRequestPayload)
+						*payload = discordleaderboardevents.LeaderboardTagAssignRequestPayload{
+							TargetUserID: sharedtypes.DiscordID("user123"),
+							RequestorID:  "req456",
+							TagNumber:    testTagNumber,
+							ChannelID:    "chan789",
+							MessageID:    "invalid-uuid",
+						}
+						return nil
+					}).Times(1)
 			},
 		},
 		{
@@ -90,12 +149,34 @@ func TestLeaderboardHandlers_HandleTagAssignRequest(t *testing.T) {
 			msg: &message.Message{
 				UUID:     "test-uuid",
 				Metadata: message.Metadata{"correlation_id": "test-correlation"},
-				Payload:  []byte(`{"target_user_id":"user123","requestor_id":"req456","tag_number":5,"channel_id":"chan789","message_id":"msg012"}`),
+				Payload:  []byte(`{"target_user_id":"user123","requestor_id":"req456","tag_number":5,"channel_id":"chan789","message_id":"` + testMessageID.String() + `"}`),
 			},
 			want:    nil,
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
-				mockHelper.EXPECT().UnmarshalPayload(gomock.Any(), gomock.Any()).Return(nil).Times(1)
+				mockHelper.EXPECT().UnmarshalPayload(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(msg *message.Message, v interface{}) error {
+						payload := v.(*discordleaderboardevents.LeaderboardTagAssignRequestPayload)
+						*payload = discordleaderboardevents.LeaderboardTagAssignRequestPayload{
+							TargetUserID: sharedtypes.DiscordID("user123"),
+							RequestorID:  "req456",
+							TagNumber:    testTagNumber,
+							ChannelID:    "chan789",
+							MessageID:    testMessageID.String(),
+						}
+						return nil
+					}).Times(1)
+
+				expectedPayload := leaderboardevents.TagAssignmentRequestedPayload{
+					UserID:     sharedtypes.DiscordID("user123"),
+					TagNumber:  &testTagNumber,
+					UpdateID:   sharedtypes.RoundID(testMessageID),
+					Source:     "manual",
+					UpdateType: "new_tag",
+				}
+
+				mockHelper.EXPECT().CreateResultMessage(gomock.Any(), expectedPayload, leaderboardevents.LeaderboardTagAssignmentRequested).
+					Return(nil, errors.New("failed to create message")).Times(1)
 			},
 		},
 	}

@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
+	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/ThreeDotsLabs/watermill/message"
 )
@@ -14,22 +16,24 @@ import (
 func (h *RoundHandlers) HandleRoundParticipantJoinRequest(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleRoundParticipantJoinRequest",
-		&roundevents.ParticipantJoinRequestPayload{},
+		&discordroundevents.DiscordRoundParticipantJoinRequestPayload{}, // Fix: Use the correct Discord payload type
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			p := payload.(*roundevents.ParticipantJoinRequestPayload)
+			p := payload.(*discordroundevents.DiscordRoundParticipantJoinRequestPayload) // Fix: Cast to correct type
 
 			// Extract the response from the message metadata
-			// responseStr := msg.Metadata.Get("response")
-			// switch p.Response {
-			// case roundtypes.ResponseAccept:
-			// 	p.Response
-			// case roundtypes.ResponseDecline:
-			// 	p.Response
-			// case roundtypes.ResponseTentative:
-			// 	p.Response
-			// default:
-			// 	return nil, fmt.Errorf("unexpected response metadata value: %q", p.Response)
-			// }
+			responseStr := msg.Metadata.Get("response")
+			var response roundtypes.Response
+			switch responseStr {
+			case "accepted":
+				response = roundtypes.ResponseAccept
+			case "declined":
+				response = roundtypes.ResponseDecline
+			case "tentative":
+				response = roundtypes.ResponseTentative
+			default:
+				// Default to accepted if invalid/missing response
+				response = roundtypes.ResponseAccept
+			}
 
 			// Check if this is a late join (defaults to false if not set)
 			joinedLate := false
@@ -37,14 +41,15 @@ func (h *RoundHandlers) HandleRoundParticipantJoinRequest(msg *message.Message) 
 				joinedLate = *p.JoinedLate
 			}
 
-			var tagNumberPtr *sharedtypes.TagNumber = nil
+			// Set tag number to 0 (backend will assign actual tag numbers)
+			tagNumber := sharedtypes.TagNumber(0)
 
 			// Construct the backend payload
 			backendPayload := roundevents.ParticipantJoinRequestPayload{
-				RoundID:    sharedtypes.RoundID(p.RoundID),
-				UserID:     sharedtypes.DiscordID(p.UserID),
-				Response:   p.Response,
-				TagNumber:  tagNumberPtr,
+				RoundID:    p.RoundID,
+				UserID:     p.UserID,
+				Response:   response,
+				TagNumber:  &tagNumber,
 				JoinedLate: &joinedLate,
 			}
 
@@ -57,6 +62,7 @@ func (h *RoundHandlers) HandleRoundParticipantJoinRequest(msg *message.Message) 
 			h.Logger.InfoContext(ctx, "Successfully processed participant join request",
 				attr.CorrelationIDFromMsg(msg),
 				attr.Bool("joined_late", joinedLate),
+				attr.String("response", responseStr),
 			)
 
 			return []*message.Message{backendMsg}, nil

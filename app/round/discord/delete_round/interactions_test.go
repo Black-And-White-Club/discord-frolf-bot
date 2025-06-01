@@ -20,7 +20,7 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-func Test_deleteRoundManager_HandleDeleteRoundCommand(t *testing.T) {
+func Test_deleteRoundManager_HandleDeleteRoundButton(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -47,6 +47,9 @@ func Test_deleteRoundManager_HandleDeleteRoundCommand(t *testing.T) {
 					ComponentType: discordgo.ButtonComponent,
 				},
 				Type: discordgo.InteractionMessageComponent,
+				Message: &discordgo.Message{
+					ID: "message-123",
+				},
 			},
 		}
 	}
@@ -81,6 +84,7 @@ func Test_deleteRoundManager_HandleDeleteRoundCommand(t *testing.T) {
 
 				roundUUID := uuid.MustParse("00000000-0000-0000-0000-0000000003b1") // Example UUID
 				expectedPayload := createExpectedPayload(sharedtypes.RoundID(roundUUID))
+
 				mockHelper.EXPECT().
 					CreateResultMessage(gomock.Any(), gomock.Eq(expectedPayload), gomock.Eq(roundevents.RoundDeleteRequest)).
 					Return(&message.Message{UUID: "msg-456"}, nil).
@@ -95,8 +99,6 @@ func Test_deleteRoundManager_HandleDeleteRoundCommand(t *testing.T) {
 					FollowupMessageCreate(gomock.Any(), gomock.Eq(true), gomock.Any()).
 					Return(&discordgo.Message{ID: "message-456"}, nil).
 					Times(1)
-
-				// mockLogger.EXPECT().InfoContext(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes() // Remove this
 			},
 			args: struct {
 				ctx context.Context
@@ -111,7 +113,7 @@ func Test_deleteRoundManager_HandleDeleteRoundCommand(t *testing.T) {
 		{
 			name: "invalid custom ID format",
 			setup: func() {
-				// mockLogger.EXPECT().ErrorContext(gomock.Any(), gomock.Any(), gomock.Any()).Times(1) // Remove this
+				// No mock expectations for this test case
 			},
 			args: struct {
 				ctx context.Context
@@ -130,7 +132,6 @@ func Test_deleteRoundManager_HandleDeleteRoundCommand(t *testing.T) {
 					FollowupMessageCreate(gomock.Any(), gomock.Eq(true), gomock.Any()).
 					Return(&discordgo.Message{ID: "message-456"}, nil).
 					Times(1)
-				// mockLogger.EXPECT().ErrorContext(gomock.Any(), gomock.Any(), gomock.Any()).Times(1) // Remove this
 			},
 			args: struct {
 				ctx context.Context
@@ -150,7 +151,6 @@ func Test_deleteRoundManager_HandleDeleteRoundCommand(t *testing.T) {
 					InteractionRespond(gomock.Any(), gomock.Any()).
 					Return(errors.New("failed to respond to interaction")).
 					Times(1)
-				// mockLogger.EXPECT().ErrorContext(gomock.Any(), gomock.Any(), gomock.Any()).Times(1) // Remove this
 			},
 			args: struct {
 				ctx context.Context
@@ -179,7 +179,6 @@ func Test_deleteRoundManager_HandleDeleteRoundCommand(t *testing.T) {
 					FollowupMessageCreate(gomock.Any(), gomock.Eq(true), gomock.Any()).
 					Return(&discordgo.Message{ID: "message-456"}, nil).
 					Times(1)
-				// mockLogger.EXPECT().ErrorContext(gomock.Any(), gomock.Any(), gomock.Any()).Times(1) // Remove this
 			},
 			args: struct {
 				ctx context.Context
@@ -213,7 +212,6 @@ func Test_deleteRoundManager_HandleDeleteRoundCommand(t *testing.T) {
 					FollowupMessageCreate(gomock.Any(), gomock.Eq(true), gomock.Any()).
 					Return(&discordgo.Message{ID: "message-456"}, nil).
 					Times(1)
-				// mockLogger.EXPECT().ErrorContext(gomock.Any(), gomock.Any(), gomock.Any()).Times(1) // Remove this
 			},
 			args: struct {
 				ctx context.Context
@@ -247,7 +245,6 @@ func Test_deleteRoundManager_HandleDeleteRoundCommand(t *testing.T) {
 					FollowupMessageCreate(gomock.Any(), gomock.Eq(true), gomock.Any()).
 					Return(nil, errors.New("failed to send followup message")).
 					Times(1)
-				// mockLogger.EXPECT().ErrorContext(gomock.Any(), gomock.Any(), gomock.Any()).Times(1) // Remove this
 			},
 			args: struct {
 				ctx context.Context

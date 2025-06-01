@@ -15,7 +15,6 @@ import (
 
 	roundrsvp "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/round_rsvp"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
-	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	discordgo "github.com/bwmarrin/discordgo"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -75,7 +74,7 @@ func (mr *MockRoundRsvpManagerMockRecorder) InteractionJoinRoundLate(ctx, i any)
 }
 
 // UpdateRoundEventEmbed mocks base method.
-func (m *MockRoundRsvpManager) UpdateRoundEventEmbed(ctx context.Context, channelID string, messageID sharedtypes.RoundID, acceptedParticipants, declinedParticipants, tentativeParticipants []roundtypes.Participant) (roundrsvp.RoundRsvpOperationResult, error) {
+func (m *MockRoundRsvpManager) UpdateRoundEventEmbed(ctx context.Context, channelID, messageID string, acceptedParticipants, declinedParticipants, tentativeParticipants []roundtypes.Participant) (roundrsvp.RoundRsvpOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateRoundEventEmbed", ctx, channelID, messageID, acceptedParticipants, declinedParticipants, tentativeParticipants)
 	ret0, _ := ret[0].(roundrsvp.RoundRsvpOperationResult)

@@ -7,6 +7,7 @@ import (
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	"github.com/bwmarrin/discordgo"
+	"github.com/google/uuid"
 )
 
 // FinalizeScorecardEmbed updates the round embed when a round is finalized
@@ -19,7 +20,8 @@ func (frm *finalizeRoundManager) FinalizeScorecardEmbed(ctx context.Context, eve
 			return FinalizeRoundOperationResult{Error: err}, err // Return both result and error
 		}
 
-		if eventMessageID == "" || channelID == "" {
+		// Check for empty or nil UUID string
+		if eventMessageID == "" || channelID == "" || eventMessageID == uuid.Nil.String() {
 			err := fmt.Errorf("missing channel or message ID for finalization update")
 			frm.logger.ErrorContext(ctx, "Missing channel or message ID for finalization update")
 			return FinalizeRoundOperationResult{Error: err}, err // Return both result and error

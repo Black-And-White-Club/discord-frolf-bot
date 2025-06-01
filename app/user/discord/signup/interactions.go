@@ -3,7 +3,6 @@ package signup
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
@@ -122,11 +121,34 @@ func (sm *signupManager) HandleSignupReactionAdd(ctx context.Context, r *discord
 
 // New handler for the button press
 func (sm *signupManager) HandleSignupButtonPress(ctx context.Context, i *discordgo.InteractionCreate) (SignupOperationResult, error) {
-	result, err := sm.SendSignupModal(ctx, i)
-	if err != nil {
-		slog.Error("❌ Failed to send signup modal", attr.Error(err))
-	} else {
-		slog.Info("✅ Successfully called SendSignupModal")
+	ctx = discordmetrics.WithValue(ctx, discordmetrics.CommandNameKey, "handle_signup_button")
+	ctx = discordmetrics.WithValue(ctx, discordmetrics.InteractionType, "button")
+
+	if i != nil && i.Interaction != nil && i.Interaction.GuildID != "" {
+		ctx = discordmetrics.WithValue(ctx, discordmetrics.GuildIDKey, i.Interaction.GuildID)
 	}
-	return result, err
+
+	// Extract user ID for metrics
+	var userID string
+	if i != nil && i.Interaction != nil {
+		if i.Interaction.Member != nil && i.Interaction.Member.User != nil {
+			userID = i.Interaction.Member.User.ID
+		} else if i.Interaction.User != nil {
+			userID = i.Interaction.User.ID
+		}
+		if userID != "" {
+			ctx = discordmetrics.WithValue(ctx, discordmetrics.UserIDKey, userID)
+		}
+	}
+
+	return sm.operationWrapper(ctx, "handle_signup_button_press", func(ctx context.Context) (SignupOperationResult, error) {
+		result, err := sm.SendSignupModal(ctx, i)
+		if err != nil {
+			sm.logger.ErrorContext(ctx, "❌ Failed to send signup modal", attr.Error(err))
+			return SignupOperationResult{Error: err}, nil
+		} else {
+			sm.logger.InfoContext(ctx, "✅ Successfully called SendSignupModal")
+		}
+		return result, nil
+	})
 }

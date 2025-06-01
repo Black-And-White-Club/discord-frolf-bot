@@ -269,25 +269,30 @@ func (m *startRoundManager) TransformRoundToScorecard(ctx context.Context, paylo
 				Name:  fieldNameLocation,
 				Value: locationStr,
 			},
-			{
-				Name:   fieldNameAccepted,
-				Value:  placeholderNoParticipants,
-				Inline: false,
-			},
-			{
-				Name:   fieldNameTentative,
-				Value:  placeholderNoParticipants,
-				Inline: false,
-			},
-			// Add fields for other statuses here
 		}
 
-		// Populate the status fields if lists are not empty
-		if len(acceptedLines) > 0 {
-			embedFields[2].Value = strings.Join(acceptedLines, "\n")
-		}
-		if len(tentativeLines) > 0 {
-			embedFields[3].Value = strings.Join(tentativeLines, "\n")
+		// Only add status fields if there are participants
+		if len(participantsMap) > 0 {
+			embedFields = append(embedFields,
+				&discordgo.MessageEmbedField{
+					Name:   fieldNameAccepted,
+					Value:  placeholderNoParticipants,
+					Inline: false,
+				},
+				&discordgo.MessageEmbedField{
+					Name:   fieldNameTentative,
+					Value:  placeholderNoParticipants,
+					Inline: false,
+				},
+			)
+
+			// Populate the status fields if lists are not empty
+			if len(acceptedLines) > 0 {
+				embedFields[2].Value = strings.Join(acceptedLines, "\n")
+			}
+			if len(tentativeLines) > 0 {
+				embedFields[3].Value = strings.Join(tentativeLines, "\n")
+			}
 		}
 		// Populate other status fields if applicable (adjust index)
 

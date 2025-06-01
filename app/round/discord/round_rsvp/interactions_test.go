@@ -44,6 +44,9 @@ func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
 					ComponentType: discordgo.ButtonComponent,
 				},
 				Type: discordgo.InteractionMessageComponent,
+				Message: &discordgo.Message{
+					ID: "message-123",
+				},
 			},
 		}
 	}
@@ -61,7 +64,7 @@ func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
 			name: "interaction respond error",
 			setup: func() {
 				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any(), gomock.Any()).
+					InteractionRespond(gomock.Any(), gomock.Any()).
 					Return(errors.New("failed to respond to interaction")).
 					Times(1)
 			},
@@ -214,6 +217,9 @@ func Test_roundRsvpManager_InteractionJoinRoundLate(t *testing.T) {
 					ComponentType: discordgo.ButtonComponent,
 				},
 				Type: discordgo.InteractionMessageComponent,
+				Message: &discordgo.Message{
+					ID: "message-123",
+				},
 			},
 		}
 	}

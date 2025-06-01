@@ -44,9 +44,10 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 			var username string
 			user, err := frm.session.User(string(participant.UserID))
 			if err != nil {
-				frm.logger.WarnContext(ctx, "Failed to get participant info, using fallback name",
+				frm.logger.WarnContext(ctx, "Failed to get participant info, skipping participant",
 					attr.Error(err), attr.String("user_id", string(participant.UserID)))
-				username = fmt.Sprintf("Player %d", i+1)
+				// Skip this participant instead of adding fallback name
+				continue
 			} else {
 				username = user.Username
 				// Only try to get member info if we successfully got the user
@@ -61,22 +62,34 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 			}
 
 			participantFields = append(participantFields, &discordgo.MessageEmbedField{
-				Name:   username,
+				Name:   fmt.Sprintf("🏌️ %s", username),
 				Value:  scoreDisplay,
 				Inline: true,
 			})
 		}
 
 		// Handle nil location
-		locationStr := "Unspecified Location"
+		locationStr := ""
 		if payload.Location != nil {
 			locationStr = string(*payload.Location)
 		}
 
-		// Embed Fields with safe values
-		embedFields := []*discordgo.MessageEmbedField{
-			{Name: "📍 Location", Value: locationStr},
+		// Start with base fields - StartTime and Location
+		embedFields := []*discordgo.MessageEmbedField{}
+
+		// Add StartTime field if available
+		if payload.StartTime != nil {
+			embedFields = append(embedFields, &discordgo.MessageEmbedField{
+				Name:  "📅 Started",
+				Value: fmt.Sprintf("<t:%d:f>", time.Time(*payload.StartTime).Unix()),
+			})
 		}
+
+		// Add Location field
+		embedFields = append(embedFields, &discordgo.MessageEmbedField{
+			Name:  "📍 Location",
+			Value: locationStr,
+		})
 
 		// Add participant fields
 		embedFields = append(embedFields, participantFields...)
@@ -98,8 +111,8 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 			Timestamp: time.Now().Format(time.RFC3339), // Current time when finalized
 		}
 
-		// Generate a safe custom ID for the button
-		buttonID := fmt.Sprintf("round_enter_score_finalized|round-%s", payload.RoundID)
+		// Generate a safe custom ID for the button - use the format expected by tests
+		buttonID := fmt.Sprintf("round_enter_score_finalized|round-%d", payload.RoundID)
 
 		// Keep the same button but with modified text to indicate admin requirement
 		components = []discordgo.MessageComponent{

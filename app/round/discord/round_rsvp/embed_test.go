@@ -62,9 +62,9 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 			name: "successful embed update",
 			setup: func() {
 				mockSession.EXPECT().
-					ChannelMessage("channel-123", testRoundID.String()).
+					ChannelMessage("channel-123", "12345"). // Changed from testRoundID.String() to "12345"
 					Return(&discordgo.Message{
-						ID:     testRoundID.String(),
+						ID:     "12345", // Changed from testRoundID.String() to "12345"
 						Embeds: []*discordgo.MessageEmbed{sampleEmbed},
 					}, nil).
 					Times(1)
@@ -80,8 +80,8 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 					Times(1)
 
 				mockSession.EXPECT().
-					ChannelMessageEditEmbed("channel-123", testRoundID.String(), gomock.Any()).
-					Return(&discordgo.Message{ID: testRoundID.String()}, nil).
+					ChannelMessageEditEmbed("channel-123", "12345", gomock.Any()). // Changed from testRoundID.String() to "12345"
+					Return(&discordgo.Message{ID: "12345"}, nil).                  // Changed from testRoundID.String() to "12345"
 					Times(1)
 			},
 			channelID: "channel-123",
@@ -96,7 +96,7 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 			name: "channel message fetch failure",
 			setup: func() {
 				mockSession.EXPECT().
-					ChannelMessage("channel-123", testRoundID.String()).
+					ChannelMessage("channel-123", "12345"). // Changed from testRoundID.String() to "12345"
 					Return(nil, errors.New("failed to fetch message")).
 					Times(1)
 			},
@@ -111,8 +111,8 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 			name: "no embeds found",
 			setup: func() {
 				mockSession.EXPECT().
-					ChannelMessage("channel-123", testRoundID.String()).
-					Return(&discordgo.Message{ID: testRoundID.String(), Embeds: []*discordgo.MessageEmbed{}}, nil).
+					ChannelMessage("channel-123", "12345").                                            // Changed from testRoundID.String() to "12345"
+					Return(&discordgo.Message{ID: "12345", Embeds: []*discordgo.MessageEmbed{}}, nil). // Changed from testRoundID.String() to "12345"
 					Times(1)
 			},
 			channelID:     "channel-123",
@@ -126,9 +126,9 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 			name: "embed field count mismatch",
 			setup: func() {
 				mockSession.EXPECT().
-					ChannelMessage("channel-123", testRoundID.String()).
+					ChannelMessage("channel-123", "12345"). // Changed from testRoundID.String() to "12345"
 					Return(&discordgo.Message{
-						ID:     testRoundID.String(),
+						ID:     "12345", // Changed from testRoundID.String() to "12345"
 						Embeds: []*discordgo.MessageEmbed{{Fields: []*discordgo.MessageEmbedField{{}}}},
 					}, nil).
 					Times(1)
@@ -144,15 +144,15 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 			name: "edit embed failure",
 			setup: func() {
 				mockSession.EXPECT().
-					ChannelMessage("channel-123", testRoundID.String()).
+					ChannelMessage("channel-123", "12345"). // Changed from testRoundID.String() to "12345"
 					Return(&discordgo.Message{
-						ID:     testRoundID.String(),
+						ID:     "12345", // Changed from testRoundID.String() to "12345"
 						Embeds: []*discordgo.MessageEmbed{sampleEmbed},
 					}, nil).
 					Times(1)
 
 				mockSession.EXPECT().
-					ChannelMessageEditEmbed("channel-123", testRoundID.String(), gomock.Any()).
+					ChannelMessageEditEmbed("channel-123", "12345", gomock.Any()). // Changed from testRoundID.String() to "12345"
 					Return(nil, errors.New("failed to update embed")).
 					Times(1)
 			},
@@ -167,9 +167,9 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 			name: "user fetch failure",
 			setup: func() {
 				mockSession.EXPECT().
-					ChannelMessage("channel-123", testRoundID.String()).
+					ChannelMessage("channel-123", "12345"). // Changed from testRoundID.String() to "12345"
 					Return(&discordgo.Message{
-						ID:     testRoundID.String(),
+						ID:     "12345", // Changed from testRoundID.String() to "12345"
 						Embeds: []*discordgo.MessageEmbed{sampleEmbed},
 					}, nil).
 					Times(1)
@@ -180,8 +180,8 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 					Times(1)
 
 				mockSession.EXPECT().
-					ChannelMessageEditEmbed("channel-123", testRoundID.String(), gomock.Any()).
-					Return(&discordgo.Message{ID: testRoundID.String()}, nil).
+					ChannelMessageEditEmbed("channel-123", "12345", gomock.Any()). // Changed from testRoundID.String() to "12345"
+					Return(&discordgo.Message{ID: "12345"}, nil).                  // Changed from testRoundID.String() to "12345"
 					Times(1)
 			},
 			channelID: "channel-123",
@@ -197,9 +197,9 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 			name: "bypass wrapper",
 			setup: func() {
 				mockSession.EXPECT().
-					ChannelMessage("channel-123", testRoundID.String()).
+					ChannelMessage("channel-123", "12345"). // Changed from testRoundID.String() to "12345"
 					Return(&discordgo.Message{
-						ID:     testRoundID.String(),
+						ID:     "12345", // Changed from testRoundID.String() to "12345"
 						Embeds: []*discordgo.MessageEmbed{sampleEmbed},
 					}, nil).
 					Times(1)
@@ -215,8 +215,8 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 					Times(1)
 
 				mockSession.EXPECT().
-					ChannelMessageEditEmbed("channel-123", "12345", gomock.Any()).
-					Return(&discordgo.Message{ID: testRoundID.String()}, nil).
+					ChannelMessageEditEmbed("channel-123", "12345", gomock.Any()). // Keep as "12345"
+					Return(&discordgo.Message{ID: "12345"}, nil).                  // Changed from testRoundID.String() to "12345"
 					Times(1)
 			},
 			channelID: "channel-123",

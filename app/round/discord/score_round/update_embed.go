@@ -6,9 +6,6 @@ import (
 	"regexp"
 	"strings"
 
-	// Added for parseInt
-
-	// Import roundevents for RoundParticipant/payload types
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord" // Import roundtypes for Response
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
@@ -42,20 +39,36 @@ type ParticipantDataFromEmbed struct {
 // 1: User ID from <@ID> or <@!ID>
 // 2: Tag Number from " Tag: N" (if present)
 // 3: Score string from " — Score: +/-N" or " — Score: --" (if present)
-// Copied from startround
-var participantLineRegex = regexp.MustCompile(`<@!?(\d+)>` + // Capture User ID
-	`(?:` + `\s+` + tagPrefix + `\s*(\d+))?.*?` + // Optionally capture Tag Number, expecting space before Tag:
-	`(?:—\s*` + scorePrefix + `\s*([^—]*))?`) // Optionally capture Score string
-
+// participantLineRegex extracts User ID from <@ID>, and optionally " Tag: N" and " — Score: +/-N".
+// Updated to handle alphanumeric user IDs and different dash characters
+var participantLineRegex = regexp.MustCompile(`<@!?([a-zA-Z0-9]+)>` + // Capture User ID (allow alphanumeric for tests)
+	`(?:\s+` + tagPrefix + `\s*(\d+))?` + // Optionally capture Tag Number with flexible whitespace
+	`(?:\s*[—–-]\s*` + scorePrefix + `\s*([+\-]?\d+|` + scoreNoData + `))?`) // Optionally capture Score string, handle different dash types
 // parseParticipantLine attempts to extract UserID, Score, and TagNumber from an embed line string.
 // It relies on the presence of a Discord user mention (<@USER_ID>) for UserID extraction.
 // It attempts to parse " Tag: N" and "— Score: +/-N".
 // Returns UserID, Score (*sharedtypes.Score), TagNumber (*sharedtypes.TagNumber), and success boolean.
 // Copied from startround, added context and logger for internal logging
+// parseParticipantLine attempts to extract UserID, Score, and TagNumber from an embed line string.
 func (srm *scoreRoundManager) parseParticipantLine(ctx context.Context, line string) (sharedtypes.DiscordID, *sharedtypes.Score, *sharedtypes.TagNumber, bool) {
+	srm.logger.DebugContext(ctx, "Parsing participant line",
+		attr.String("line", line),
+		attr.String("line_bytes", fmt.Sprintf("%#v", line)), // Show actual bytes
+	)
+
 	match := participantLineRegex.FindStringSubmatch(line)
+	srm.logger.DebugContext(ctx, "Regex match result",
+		attr.Any("matches", match),
+		attr.Int("match_count", len(match)),
+		attr.String("regex_pattern", participantLineRegex.String()),
+	)
+
 	if len(match) < 2 || match[1] == "" {
 		// Must find a User ID mention
+		srm.logger.DebugContext(ctx, "No user ID found in line",
+			attr.String("line", line),
+			attr.String("regex_pattern", participantLineRegex.String()),
+		)
 		return "", nil, nil, false
 	}
 	userID := sharedtypes.DiscordID(match[1])
@@ -63,16 +76,20 @@ func (srm *scoreRoundManager) parseParticipantLine(ctx context.Context, line str
 	var tagNumber *sharedtypes.TagNumber // Initialize tagNumber as nil
 	if len(match) > 2 && match[2] != "" {
 		// Found and captured a tag number
-		parsedTag, err := parseInt(match[2]) // Assuming parseInt helper exists
+		parsedTag, err := parseInt(match[2])
 		if err == nil {
 			typedTag := sharedtypes.TagNumber(parsedTag)
 			tagNumber = &typedTag
+			srm.logger.DebugContext(ctx, "Parsed tag number",
+				attr.String("tag_str", match[2]),
+				attr.Int("tag_value", parsedTag),
+			)
 		} else {
-			// Log a warning if tag number was found but couldn't be parsed
 			srm.logger.WarnContext(ctx, "Could not parse tag number from line in UpdateScoreEmbed",
 				attr.String("tag_str", match[2]),
 				attr.String("line", line),
-				attr.String("user_id_attempt", string(userID)), // Include user ID if parsed
+				attr.String("user_id_attempt", string(userID)),
+				attr.Error(err),
 			)
 		}
 	}
@@ -81,21 +98,33 @@ func (srm *scoreRoundManager) parseParticipantLine(ctx context.Context, line str
 	if len(match) > 3 && match[3] != "" {
 		// Found and captured a score string
 		scoreStr := strings.TrimSpace(match[3])
+		srm.logger.DebugContext(ctx, "Found score string", attr.String("score_str", scoreStr))
+
 		if scoreStr != scoreNoData {
-			parsedScore, err := parseInt(scoreStr) // Assuming parseInt helper exists
+			parsedScore, err := parseInt(scoreStr)
 			if err == nil {
 				typedScore := sharedtypes.Score(parsedScore)
 				score = &typedScore
+				srm.logger.DebugContext(ctx, "Parsed score",
+					attr.String("score_str", scoreStr),
+					attr.Int("score_value", parsedScore),
+				)
 			} else {
-				// Log a warning if score string was found but couldn't be parsed
 				srm.logger.WarnContext(ctx, "Could not parse score from line in UpdateScoreEmbed",
 					attr.String("score_str", scoreStr),
 					attr.String("line", line),
-					attr.String("user_id_attempt", string(userID)), // Include user ID if parsed
+					attr.String("user_id_attempt", string(userID)),
+					attr.Error(err),
 				)
 			}
 		}
 	}
+
+	srm.logger.DebugContext(ctx, "Parsed participant line successfully",
+		attr.String("user_id", string(userID)),
+		attr.Any("tag_number", tagNumber),
+		attr.Any("score", score),
+	)
 
 	return userID, score, tagNumber, true
 }
@@ -157,10 +186,23 @@ func (srm *scoreRoundManager) UpdateScoreEmbed(ctx context.Context, channelID, m
 
 		for i, field := range embed.Fields {
 			fieldNameLower := strings.ToLower(field.Name)
-			if strings.Contains(fieldNameLower, "accepted") || strings.Contains(fieldNameLower, "tentative") { // Add other statuses if needed
+			// Check for participant status fields - be more inclusive
+			if strings.Contains(fieldNameLower, "accepted") ||
+				strings.Contains(fieldNameLower, "tentative") ||
+				strings.Contains(fieldNameLower, "declined") ||
+				strings.Contains(fieldNameLower, "participants") ||
+				strings.Contains(fieldNameLower, "✅") ||
+				strings.Contains(fieldNameLower, "❓") ||
+				strings.Contains(fieldNameLower, "❌") {
 				participantFields = append(participantFields, field)
 				// Store the index of the original field
 				fieldNameMap[field.Name] = i
+
+				srm.logger.DebugContext(ctx, "Found participant field for score update",
+					attr.String("field_name", field.Name),
+					attr.String("field_value", field.Value),
+					attr.Int("field_index", i),
+				)
 			}
 		}
 
@@ -178,16 +220,31 @@ func (srm *scoreRoundManager) UpdateScoreEmbed(ctx context.Context, channelID, m
 		updatedFieldValues := map[string]string{} // Map field name to its new value
 
 		for _, field := range participantFields {
+			srm.logger.DebugContext(ctx, "Processing field for score update",
+				attr.String("field_name", field.Name),
+				attr.String("field_value", field.Value),
+				attr.String("target_user_id", string(userID)),
+			)
+
 			originalLines := strings.Split(field.Value, "\n")
 			newLines := []string{}
 
 			if strings.TrimSpace(field.Value) == "" || field.Value == placeholderNoParticipants {
 				// If the field is empty or placeholder, the user isn't in this status list
 				updatedFieldValues[field.Name] = field.Value // Keep as is
+				srm.logger.DebugContext(ctx, "Field is empty or placeholder, skipping",
+					attr.String("field_name", field.Name),
+				)
 				continue
 			}
 
-			for _, line := range originalLines {
+			for lineIdx, line := range originalLines {
+				srm.logger.DebugContext(ctx, "Processing line in field",
+					attr.String("field_name", field.Name),
+					attr.Int("line_index", lineIdx),
+					attr.String("line", line),
+				)
+
 				parsedUserID, parsedScore, parsedTagNumber, ok := srm.parseParticipantLine(ctx, line)
 
 				if !ok {
@@ -201,14 +258,24 @@ func (srm *scoreRoundManager) UpdateScoreEmbed(ctx context.Context, channelID, m
 					continue
 				}
 
+				srm.logger.DebugContext(ctx, "Successfully parsed line",
+					attr.String("parsed_user_id", string(parsedUserID)),
+					attr.String("target_user_id", string(userID)),
+					attr.Bool("is_match", parsedUserID == userID),
+				)
+
 				// Check if this line belongs to the user whose score is being updated
 				if parsedUserID == userID {
 					userFoundAndScoreUpdated = true // Mark that the user was found in any relevant field
+					srm.logger.DebugContext(ctx, "Found target user, updating score",
+						attr.String("user_id", string(userID)),
+						attr.String("field_name", field.Name),
+					)
 
 					// Format the updated line with the new score, preserving the tag number
-					scoreDisplayPart := fmt.Sprintf("— %s %s", scorePrefix, scoreNoData)
+					scoreDisplayPart := fmt.Sprintf(" — %s %s", scorePrefix, scoreNoData)
 					if score != nil {
-						scoreDisplayPart = fmt.Sprintf("— %s %+d", scorePrefix, *score)
+						scoreDisplayPart = fmt.Sprintf(" — %s %+d", scorePrefix, *score)
 					}
 
 					tagDisplayPart := ""
@@ -231,9 +298,9 @@ func (srm *scoreRoundManager) UpdateScoreEmbed(ctx context.Context, channelID, m
 				} else {
 					// If it's not the user being updated, keep their original line format (by re-parsing and formatting)
 					// This ensures consistent formatting and preserves their original data
-					scoreDisplayPart := fmt.Sprintf("— %s %s", scorePrefix, scoreNoData)
+					scoreDisplayPart := fmt.Sprintf(" — %s %s", scorePrefix, scoreNoData)
 					if parsedScore != nil {
-						scoreDisplayPart = fmt.Sprintf("— %s %+d", scorePrefix, *parsedScore) // Use parsed score
+						scoreDisplayPart = fmt.Sprintf(" — %s %+d", scorePrefix, *parsedScore) // Use parsed score
 					}
 
 					tagDisplayPart := ""

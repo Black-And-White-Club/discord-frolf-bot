@@ -82,7 +82,7 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 						Score:  intPtr(72),
 					},
 				},
-				EventMessageID: (*sharedtypes.RoundID)(&testRoundID),
+				EventMessageID: testRoundID.String(),
 			},
 			channelID:      "test-channel",
 			eventMessageID: testRoundID,
@@ -112,7 +112,7 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 				Location:       (*roundtypes.Location)(strPtr("Test Course")),
 				StartTime:      (*sharedtypes.StartTime)(timePtr(fixedTime)),
 				Participants:   []roundtypes.Participant{},
-				EventMessageID: (*sharedtypes.RoundID)(&testRoundID),
+				EventMessageID: testRoundID.String(),
 			},
 			channelID:      "test-channel",
 			eventMessageID: testRoundID,
@@ -142,7 +142,7 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 						Score:  intPtr(72),
 					},
 				},
-				EventMessageID: (*sharedtypes.RoundID)(&testRoundID),
+				EventMessageID: testRoundID.String(),
 			},
 			channelID:      "test-channel",
 			eventMessageID: testRoundID,
@@ -157,7 +157,7 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 				Title:          "Test Round",
 				Location:       (*roundtypes.Location)(strPtr("Test Course")),
 				StartTime:      (*sharedtypes.StartTime)(timePtr(fixedTime)),
-				EventMessageID: (*sharedtypes.RoundID)(&testRoundID),
+				EventMessageID: testRoundID.String(),
 			},
 			channelID:      "",
 			eventMessageID: testRoundID,
@@ -172,7 +172,7 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 				Title:          "Test Round",
 				Location:       (*roundtypes.Location)(strPtr("Test Course")),
 				StartTime:      (*sharedtypes.StartTime)(timePtr(fixedTime)),
-				EventMessageID: (*sharedtypes.RoundID)(&testRoundID),
+				EventMessageID: testRoundID.String(),
 			},
 			channelID:      "test-channel",
 			eventMessageID: sharedtypes.RoundID(uuid.Nil),
@@ -187,7 +187,7 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 				Title:          "Test Round",
 				Location:       (*roundtypes.Location)(strPtr("Test Course")),
 				StartTime:      (*sharedtypes.StartTime)(timePtr(fixedTime)),
-				EventMessageID: (*sharedtypes.RoundID)(&testRoundID),
+				EventMessageID: testRoundID.String(),
 			},
 			channelID:      "test-channel",
 			eventMessageID: testRoundID,
@@ -226,7 +226,7 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 
 			// Call the function
 			ctx := context.Background()
-			got, err := frm.FinalizeScorecardEmbed(ctx, sharedtypes.RoundID(tt.eventMessageID), tt.channelID, tt.embedPayload)
+			got, err := frm.FinalizeScorecardEmbed(ctx, tt.eventMessageID.String(), tt.channelID, tt.embedPayload)
 
 			hasError := err != nil || got.Error != nil
 			if hasError != tt.expectErr {

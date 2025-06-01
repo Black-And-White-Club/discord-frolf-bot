@@ -102,3 +102,18 @@ func (mr *MockScoreRoundManagerMockRecorder) SendScoreUpdateError(ctx, userID, e
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendScoreUpdateError", reflect.TypeOf((*MockScoreRoundManager)(nil).SendScoreUpdateError), ctx, userID, errorMsg)
 }
+
+// UpdateScoreEmbed mocks base method.
+func (m *MockScoreRoundManager) UpdateScoreEmbed(ctx context.Context, channelID, messageID string, userID sharedtypes.DiscordID, score *sharedtypes.Score) (scoreround.ScoreRoundOperationResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateScoreEmbed", ctx, channelID, messageID, userID, score)
+	ret0, _ := ret[0].(scoreround.ScoreRoundOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateScoreEmbed indicates an expected call of UpdateScoreEmbed.
+func (mr *MockScoreRoundManagerMockRecorder) UpdateScoreEmbed(ctx, channelID, messageID, userID, score any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateScoreEmbed", reflect.TypeOf((*MockScoreRoundManager)(nil).UpdateScoreEmbed), ctx, channelID, messageID, userID, score)
+}

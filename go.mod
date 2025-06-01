@@ -1,11 +1,11 @@
 module github.com/Black-And-White-Club/discord-frolf-bot
 
-go 1.24.0
+go 1.24.3
 
 require (
-	github.com/Black-And-White-Club/frolf-bot-shared v0.0.39
+	github.com/Black-And-White-Club/frolf-bot-shared v0.0.42
 	github.com/ThreeDotsLabs/watermill v1.4.6
-	github.com/bwmarrin/discordgo v0.28.1
+	github.com/bwmarrin/discordgo v0.29.0
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/prometheus/client_golang v1.22.0

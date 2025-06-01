@@ -15,6 +15,7 @@ import (
 
 	startround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/start_round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
+	discordgo "github.com/bwmarrin/discordgo"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -43,18 +44,18 @@ func (m *MockStartRoundManager) EXPECT() *MockStartRoundManagerMockRecorder {
 }
 
 // TransformRoundToScorecard mocks base method.
-func (m *MockStartRoundManager) TransformRoundToScorecard(ctx context.Context, payload *roundevents.DiscordRoundStartPayload) (startround.StartRoundOperationResult, error) {
+func (m *MockStartRoundManager) TransformRoundToScorecard(ctx context.Context, payload *roundevents.DiscordRoundStartPayload, existingEmbed *discordgo.MessageEmbed) (startround.StartRoundOperationResult, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "TransformRoundToScorecard", ctx, payload)
+	ret := m.ctrl.Call(m, "TransformRoundToScorecard", ctx, payload, existingEmbed)
 	ret0, _ := ret[0].(startround.StartRoundOperationResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // TransformRoundToScorecard indicates an expected call of TransformRoundToScorecard.
-func (mr *MockStartRoundManagerMockRecorder) TransformRoundToScorecard(ctx, payload any) *gomock.Call {
+func (mr *MockStartRoundManagerMockRecorder) TransformRoundToScorecard(ctx, payload, existingEmbed any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TransformRoundToScorecard", reflect.TypeOf((*MockStartRoundManager)(nil).TransformRoundToScorecard), ctx, payload)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TransformRoundToScorecard", reflect.TypeOf((*MockStartRoundManager)(nil).TransformRoundToScorecard), ctx, payload, existingEmbed)
 }
 
 // UpdateRoundToScorecard mocks base method.

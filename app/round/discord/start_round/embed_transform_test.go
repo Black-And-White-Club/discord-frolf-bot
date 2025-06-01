@@ -71,7 +71,6 @@ func Test_startRoundManager_TransformRoundToScorecard(t *testing.T) {
 				Footer: &discordgo.MessageEmbedFooter{
 					Text: "Round in progress. Use the buttons below to join or record your score.",
 				},
-				// Timestamp will be checked separately
 			},
 			expectedComponents: []discordgo.MessageComponent{
 				discordgo.ActionsRow{
@@ -98,29 +97,9 @@ func Test_startRoundManager_TransformRoundToScorecard(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "Round with participants (no nicknames)",
+			name: "Round with accepted participants",
 			setup: func(mockSession *discordmocks.MockSession) {
-				// Mock User calls
-				mockSession.EXPECT().
-					User("user-123").
-					Return(&discordgo.User{Username: "TestUser1"}, nil).
-					Times(1)
-
-				mockSession.EXPECT().
-					User("user-456").
-					Return(&discordgo.User{Username: "TestUser2"}, nil).
-					Times(1)
-
-				// Mock GuildMember calls - no nicknames
-				mockSession.EXPECT().
-					GuildMember("guild-id", "user-123").
-					Return(&discordgo.Member{Nick: ""}, nil).
-					Times(1)
-
-				mockSession.EXPECT().
-					GuildMember("guild-id", "user-456").
-					Return(&discordgo.Member{Nick: ""}, nil).
-					Times(1)
+				// No mock calls needed since the function uses Discord mentions directly
 			},
 			payload: &roundevents.DiscordRoundStartPayload{
 				RoundID:   testRoundID,
@@ -132,11 +111,13 @@ func Test_startRoundManager_TransformRoundToScorecard(t *testing.T) {
 						UserID:    "user-123",
 						TagNumber: nil,
 						Score:     nil,
+						Response:  roundtypes.ResponseAccept,
 					},
 					{
 						UserID:    "user-456",
 						TagNumber: nil,
 						Score:     nil,
+						Response:  roundtypes.ResponseAccept,
 					},
 				},
 			},
@@ -154,20 +135,19 @@ func Test_startRoundManager_TransformRoundToScorecard(t *testing.T) {
 						Value: "Test Course",
 					},
 					{
-						Name:   "🏌️ TestUser1",
-						Value:  "Score: --",
-						Inline: true,
+						Name:   "✅ Accepted",
+						Value:  "<@user-123> — Score: --\n<@user-456> — Score: --",
+						Inline: false,
 					},
 					{
-						Name:   "🏌️ TestUser2",
-						Value:  "Score: --",
-						Inline: true,
+						Name:   "🤔 Tentative",
+						Value:  "*No participants*",
+						Inline: false,
 					},
 				},
 				Footer: &discordgo.MessageEmbedFooter{
 					Text: "Round in progress. Use the buttons below to join or record your score.",
 				},
-				// Timestamp will be checked separately
 			},
 			expectedComponents: []discordgo.MessageComponent{
 				discordgo.ActionsRow{
@@ -193,7 +173,166 @@ func Test_startRoundManager_TransformRoundToScorecard(t *testing.T) {
 			},
 			expectError: false,
 		},
-		// Add other test cases here...
+		{
+			name: "Round with mixed participant responses",
+			setup: func(mockSession *discordmocks.MockSession) {
+				// No mock calls needed
+			},
+			payload: &roundevents.DiscordRoundStartPayload{
+				RoundID:   testRoundID,
+				Title:     "Mixed Round",
+				Location:  (*roundtypes.Location)(strPtr("Test Course")),
+				StartTime: (*sharedtypes.StartTime)(timePtr(fixedTime)),
+				Participants: []roundevents.RoundParticipant{
+					{
+						UserID:    "user-123",
+						TagNumber: nil,
+						Score:     nil,
+						Response:  roundtypes.ResponseAccept,
+					},
+					{
+						UserID:    "user-456",
+						TagNumber: nil,
+						Score:     nil,
+						Response:  roundtypes.ResponseTentative,
+					},
+					{
+						UserID:    "user-789",
+						TagNumber: nil,
+						Score:     nil,
+						Response:  roundtypes.ResponseAccept,
+					},
+				},
+			},
+			expectedEmbed: &discordgo.MessageEmbed{
+				Title:       "**Mixed Round** - Round Started",
+				Description: "Round at Test Course has started!",
+				Color:       0x00AA00,
+				Fields: []*discordgo.MessageEmbedField{
+					{
+						Name:  "📅 Started",
+						Value: fmt.Sprintf("<t:%d:f>", fixedTime.Unix()),
+					},
+					{
+						Name:  "📍 Location",
+						Value: "Test Course",
+					},
+					{
+						Name:   "✅ Accepted",
+						Value:  "<@user-123> — Score: --\n<@user-789> — Score: --",
+						Inline: false,
+					},
+					{
+						Name:   "🤔 Tentative",
+						Value:  "<@user-456> — Score: --",
+						Inline: false,
+					},
+				},
+				Footer: &discordgo.MessageEmbedFooter{
+					Text: "Round in progress. Use the buttons below to join or record your score.",
+				},
+			},
+			expectedComponents: []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						discordgo.Button{
+							Label:    "Enter Score",
+							Style:    discordgo.PrimaryButton,
+							CustomID: fmt.Sprintf("round_enter_score|%s", testRoundID),
+							Emoji: &discordgo.ComponentEmoji{
+								Name: "💰",
+							},
+						},
+						discordgo.Button{
+							Label:    "Join Round LATE",
+							Style:    discordgo.SecondaryButton,
+							CustomID: fmt.Sprintf("round_join_late|%s", testRoundID),
+							Emoji: &discordgo.ComponentEmoji{
+								Name: "🦇",
+							},
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "Round with participants with tag numbers",
+			setup: func(mockSession *discordmocks.MockSession) {
+				// No mock calls needed
+			},
+			payload: &roundevents.DiscordRoundStartPayload{
+				RoundID:   testRoundID,
+				Title:     "Tagged Round",
+				Location:  (*roundtypes.Location)(strPtr("Test Course")),
+				StartTime: (*sharedtypes.StartTime)(timePtr(fixedTime)),
+				Participants: []roundevents.RoundParticipant{
+					{
+						UserID:    "user-123",
+						TagNumber: func() *sharedtypes.TagNumber { t := sharedtypes.TagNumber(1); return &t }(),
+						Score:     nil,
+						Response:  roundtypes.ResponseAccept,
+					},
+					{
+						UserID:    "user-456",
+						TagNumber: func() *sharedtypes.TagNumber { t := sharedtypes.TagNumber(2); return &t }(),
+						Score:     nil,
+						Response:  roundtypes.ResponseAccept,
+					},
+				},
+			},
+			expectedEmbed: &discordgo.MessageEmbed{
+				Title:       "**Tagged Round** - Round Started",
+				Description: "Round at Test Course has started!",
+				Color:       0x00AA00,
+				Fields: []*discordgo.MessageEmbedField{
+					{
+						Name:  "📅 Started",
+						Value: fmt.Sprintf("<t:%d:f>", fixedTime.Unix()),
+					},
+					{
+						Name:  "📍 Location",
+						Value: "Test Course",
+					},
+					{
+						Name:   "✅ Accepted",
+						Value:  "<@user-123> Tag: 1 — Score: --\n<@user-456> Tag: 2 — Score: --",
+						Inline: false,
+					},
+					{
+						Name:   "🤔 Tentative",
+						Value:  "*No participants*",
+						Inline: false,
+					},
+				},
+				Footer: &discordgo.MessageEmbedFooter{
+					Text: "Round in progress. Use the buttons below to join or record your score.",
+				},
+			},
+			expectedComponents: []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						discordgo.Button{
+							Label:    "Enter Score",
+							Style:    discordgo.PrimaryButton,
+							CustomID: fmt.Sprintf("round_enter_score|%s", testRoundID),
+							Emoji: &discordgo.ComponentEmoji{
+								Name: "💰",
+							},
+						},
+						discordgo.Button{
+							Label:    "Join Round LATE",
+							Style:    discordgo.SecondaryButton,
+							CustomID: fmt.Sprintf("round_join_late|%s", testRoundID),
+							Emoji: &discordgo.ComponentEmoji{
+								Name: "🦇",
+							},
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -226,7 +365,7 @@ func Test_startRoundManager_TransformRoundToScorecard(t *testing.T) {
 			}
 
 			// Call the function
-			result, err := srm.TransformRoundToScorecard(context.Background(), tt.payload, tt.expectedEmbed)
+			result, err := srm.TransformRoundToScorecard(context.Background(), tt.payload, nil)
 
 			// Check error expectation
 			if tt.expectError && err == nil {
@@ -268,26 +407,43 @@ func Test_startRoundManager_TransformRoundToScorecard(t *testing.T) {
 				origTimestamp := gotEmbed.Timestamp
 				gotEmbed.Timestamp = ""
 
-				// Do field by field comparison except timestamp
-				if !reflect.DeepEqual(gotEmbed.Title, tt.expectedEmbed.Title) {
-					t.Errorf("Title mismatch: got %v, want %v", gotEmbed.Title, tt.expectedEmbed.Title)
+				// Do detailed field comparison
+				if gotEmbed.Title != tt.expectedEmbed.Title {
+					t.Errorf("Title mismatch: got %q, want %q", gotEmbed.Title, tt.expectedEmbed.Title)
 				}
-				if !reflect.DeepEqual(gotEmbed.Description, tt.expectedEmbed.Description) {
-					t.Errorf("Description mismatch: got %v, want %v", gotEmbed.Description, tt.expectedEmbed.Description)
+				if gotEmbed.Description != tt.expectedEmbed.Description {
+					t.Errorf("Description mismatch: got %q, want %q", gotEmbed.Description, tt.expectedEmbed.Description)
 				}
-				if !reflect.DeepEqual(gotEmbed.Color, tt.expectedEmbed.Color) {
-					t.Errorf("Color mismatch: got %v, want %v", gotEmbed.Color, tt.expectedEmbed.Color)
+				if gotEmbed.Color != tt.expectedEmbed.Color {
+					t.Errorf("Color mismatch: got %d, want %d", gotEmbed.Color, tt.expectedEmbed.Color)
 				}
-				if !reflect.DeepEqual(gotEmbed.Fields, tt.expectedEmbed.Fields) {
-					t.Errorf("Fields mismatch: got %v, want %v", gotEmbed.Fields, tt.expectedEmbed.Fields)
+
+				// Compare fields
+				if len(gotEmbed.Fields) != len(tt.expectedEmbed.Fields) {
+					t.Errorf("Fields length mismatch: got %d, want %d", len(gotEmbed.Fields), len(tt.expectedEmbed.Fields))
+				} else {
+					for i, gotField := range gotEmbed.Fields {
+						expectedField := tt.expectedEmbed.Fields[i]
+						if gotField.Name != expectedField.Name {
+							t.Errorf("Field[%d] Name mismatch: got %q, want %q", i, gotField.Name, expectedField.Name)
+						}
+						if gotField.Value != expectedField.Value {
+							t.Errorf("Field[%d] Value mismatch: got %q, want %q", i, gotField.Value, expectedField.Value)
+						}
+						if gotField.Inline != expectedField.Inline {
+							t.Errorf("Field[%d] Inline mismatch: got %t, want %t", i, gotField.Inline, expectedField.Inline)
+						}
+					}
 				}
+
+				// Compare footer
 				if !reflect.DeepEqual(gotEmbed.Footer, tt.expectedEmbed.Footer) {
-					t.Errorf("Footer mismatch: got %v, want %v", gotEmbed.Footer, tt.expectedEmbed.Footer)
+					t.Errorf("Footer mismatch: got %+v, want %+v", gotEmbed.Footer, tt.expectedEmbed.Footer)
 				}
 
 				// Compare components
 				if !reflect.DeepEqual(gotComponents, tt.expectedComponents) {
-					t.Errorf("Components mismatch: got %v, want %v", gotComponents, tt.expectedComponents)
+					t.Errorf("Components mismatch: got %+v, want %+v", gotComponents, tt.expectedComponents)
 				}
 
 				// Set timestamp back after tests

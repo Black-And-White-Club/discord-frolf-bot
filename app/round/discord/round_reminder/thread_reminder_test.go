@@ -183,7 +183,7 @@ func Test_roundReminderManager_SendRoundReminder(t *testing.T) {
 				ReminderType:     "1-hour",
 				DiscordChannelID: "channel-123",
 				DiscordGuildID:   "guild-id",
-				EventMessageID:   "12345",
+				EventMessageID:   "", // This should be empty to trigger the error
 				StartTime:        (*sharedtypes.StartTime)(&sampleTime),
 				Location:         (*roundtypes.Location)(&sampleLocation),
 			},

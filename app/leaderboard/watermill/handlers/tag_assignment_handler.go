@@ -9,6 +9,7 @@ import (
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/ThreeDotsLabs/watermill/message"
+	"github.com/google/uuid"
 )
 
 // HandleTagAssignRequest translates a Discord tag assignment request to a backend request.
@@ -37,10 +38,26 @@ func (h *LeaderboardHandlers) HandleTagAssignRequest(msg *message.Message) ([]*m
 				return nil, err
 			}
 
+			// Validate and parse messageID as UUID for UpdateID
+			if messageID == "" {
+				err := fmt.Errorf("messageID is required but was empty")
+				h.Logger.ErrorContext(ctx, err.Error(), attr.CorrelationIDFromMsg(msg))
+				return nil, err
+			}
+
+			updateID, err := uuid.Parse(messageID)
+			if err != nil {
+				h.Logger.ErrorContext(ctx, "Invalid messageID format",
+					attr.CorrelationIDFromMsg(msg),
+					attr.String("messageID", messageID),
+					attr.Error(err))
+				return nil, fmt.Errorf("invalid messageID format '%s': %w", messageID, err)
+			}
+
 			backendPayload := leaderboardevents.TagAssignmentRequestedPayload{
 				UserID:     sharedtypes.DiscordID(targetUserID),
 				TagNumber:  &tagNumber,
-				UpdateID:   messageID,
+				UpdateID:   sharedtypes.RoundID(updateID),
 				Source:     "manual",
 				UpdateType: "new_tag",
 			}

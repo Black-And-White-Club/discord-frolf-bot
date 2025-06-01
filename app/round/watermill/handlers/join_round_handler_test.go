@@ -374,14 +374,15 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 			msg: &message.Message{
 				UUID: "1",
 				Payload: []byte(`{
-            "round_id": "` + testRoundID.String() + `",
-            "event_message_id": "` + testMessageID + `",
-            "accepted_participants": [{"user_id": "user1", "tag_number": 1}],
-            "declined_participants": [{"user_id": "user2"}],
-            "tentative_participants": [{"user_id": "user3"}]
-        }`),
+					"round_id": "` + testRoundID.String() + `",
+					"event_message_id": "` + testMessageID + `",
+					"accepted_participants": [{"user_id": "user1", "tag_number": 1}],
+					"declined_participants": [{"user_id": "user2"}],
+					"tentative_participants": [{"user_id": "user3"}]
+			}`),
 				Metadata: message.Metadata{
-					"correlation_id": "correlation_id",
+					"correlation_id":     "correlation_id",
+					"discord_message_id": testMessageID, // Add the required metadata
 				},
 			},
 			want:    nil,
@@ -412,7 +413,7 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 				mockRoundRsvpManager.EXPECT().UpdateRoundEventEmbed(
 					gomock.Any(),
 					testChannelID,
-					testMessageID,
+					testMessageID, // This should now match the metadata value
 					[]roundtypes.Participant{
 						{UserID: "user1", TagNumber: &tag1, Response: roundtypes.ResponseAccept},
 					},
@@ -430,15 +431,16 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 			msg: &message.Message{
 				UUID: "2",
 				Payload: []byte(`{
-            "round_id": "` + testRoundID.String() + `",
-            "event_message_id": "` + testMessageID + `",
-            "accepted_participants": [{"user_id": "user1", "tag_number": 1}],
-            "declined_participants": [{"user_id": "user2"}],
-            "tentative_participants": [{"user_id": "user3"}],
-            "joined_late": true
-        }`),
+					"round_id": "` + testRoundID.String() + `",
+					"event_message_id": "` + testMessageID + `",
+					"accepted_participants": [{"user_id": "user1", "tag_number": 1}],
+					"declined_participants": [{"user_id": "user2"}],
+					"tentative_participants": [{"user_id": "user3"}],
+					"joined_late": true
+			}`),
 				Metadata: message.Metadata{
-					"correlation_id": "correlation_id",
+					"correlation_id":     "correlation_id",
+					"discord_message_id": testMessageID, // Add the required metadata
 				},
 			},
 			want:    nil,
@@ -471,7 +473,7 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 				mockRoundRsvpManager.EXPECT().UpdateRoundEventEmbed(
 					gomock.Any(),
 					testChannelID,
-					testMessageID,
+					testMessageID, // This should now match the metadata value
 					[]roundtypes.Participant{
 						{UserID: "user1", TagNumber: &tag1},
 					},
@@ -489,14 +491,15 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 			msg: &message.Message{
 				UUID: "3",
 				Payload: []byte(`{
-            "round_id": "` + testRoundID.String() + `",
-            "event_message_id": "` + testMessageID + `",
-            "accepted_participants": [{"user_id": "user1", "tag_number": 1}],
-            "declined_participants": [{"user_id": "user2"}],
-            "tentative_participants": [{"user_id": "user3"}]
-        }`),
+					"round_id": "` + testRoundID.String() + `",
+					"event_message_id": "` + testMessageID + `",
+					"accepted_participants": [{"user_id": "user1", "tag_number": 1}],
+					"declined_participants": [{"user_id": "user2"}],
+					"tentative_participants": [{"user_id": "user3"}]
+			}`),
 				Metadata: message.Metadata{
-					"correlation_id": "correlation_id",
+					"correlation_id":     "correlation_id",
+					"discord_message_id": testMessageID, // Add the required metadata
 				},
 			},
 			want:    nil,
@@ -527,7 +530,7 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 				mockRoundRsvpManager.EXPECT().UpdateRoundEventEmbed(
 					gomock.Any(),
 					testChannelID,
-					testMessageID,
+					testMessageID, // This should now match the metadata value
 					[]roundtypes.Participant{
 						{UserID: "user1", TagNumber: &tag1, Response: roundtypes.ResponseAccept},
 					},
@@ -538,6 +541,63 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 						{UserID: "user3", Response: roundtypes.ResponseTentative},
 					},
 				).Return(roundrsvp.RoundRsvpOperationResult{}, errors.New("failed to update embed")).Times(1)
+			},
+		},
+		{
+			name: "missing_discord_message_id",
+			msg: &message.Message{
+				UUID: "4",
+				Payload: []byte(`{
+					"round_id": "` + testRoundID.String() + `",
+					"event_message_id": "` + testMessageID + `",
+					"accepted_participants": [{"user_id": "user1", "tag_number": 1}],
+					"declined_participants": [{"user_id": "user2"}],
+					"tentative_participants": [{"user_id": "user3"}]
+			}`),
+				Metadata: message.Metadata{
+					"correlation_id": "correlation_id",
+					// Missing discord_message_id
+				},
+			},
+			want:    nil,
+			wantErr: false, // Function continues with empty messageID
+			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockRoundRsvpManager *mocks.MockRoundRsvpManager, mockConfig *config.Config) {
+				mockHelper.EXPECT().
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.ParticipantJoinedPayload{})).
+					DoAndReturn(func(_ *message.Message, v any) error {
+						*v.(*roundevents.ParticipantJoinedPayload) = roundevents.ParticipantJoinedPayload{
+							RoundID:        testRoundID,
+							EventMessageID: testMessageID,
+							AcceptedParticipants: []roundtypes.Participant{
+								{UserID: "user1", TagNumber: &tag1, Response: roundtypes.ResponseAccept},
+							},
+							DeclinedParticipants: []roundtypes.Participant{
+								{UserID: "user2", Response: roundtypes.ResponseDecline},
+							},
+							TentativeParticipants: []roundtypes.Participant{
+								{UserID: "user3", Response: roundtypes.ResponseTentative},
+							},
+						}
+						return nil
+					}).
+					Times(1)
+
+				mockConfig.Discord.ChannelID = testChannelID
+				mockRoundDiscord.EXPECT().GetRoundRsvpManager().Return(mockRoundRsvpManager).Times(1)
+				mockRoundRsvpManager.EXPECT().UpdateRoundEventEmbed(
+					gomock.Any(),
+					testChannelID,
+					"", // Empty messageID when metadata is missing
+					[]roundtypes.Participant{
+						{UserID: "user1", TagNumber: &tag1, Response: roundtypes.ResponseAccept},
+					},
+					[]roundtypes.Participant{
+						{UserID: "user2", Response: roundtypes.ResponseDecline},
+					},
+					[]roundtypes.Participant{
+						{UserID: "user3", Response: roundtypes.ResponseTentative},
+					},
+				).Return(roundrsvp.RoundRsvpOperationResult{}, nil).Times(1)
 			},
 		},
 	}

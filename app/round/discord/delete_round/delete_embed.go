@@ -27,12 +27,11 @@ func (drm *deleteRoundManager) DeleteRoundEventEmbed(ctx context.Context, discor
 		err := drm.session.ChannelMessageDelete(channelID, discordMessageID)
 		if err != nil {
 			// Provide more context in the wrapped error
-			wrappedErr := fmt.Errorf("failed to delete Discord message %s in channel %s: %w", discordMessageID, channelID, err)
+			wrappedErr := fmt.Errorf("failed to delete message: %w", err)
 			drm.logger.ErrorContext(ctx, "Discord API call failed to delete message",
 				attr.String("channel_id", channelID),
 				attr.String("discord_message_id", discordMessageID),
 				attr.Error(wrappedErr))
-
 			return DeleteRoundOperationResult{Error: wrappedErr, Success: false}, nil
 		}
 

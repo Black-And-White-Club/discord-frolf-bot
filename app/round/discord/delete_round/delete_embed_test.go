@@ -15,7 +15,7 @@ import (
 func Test_deleteRoundManager_DeleteRoundEventEmbed(t *testing.T) {
 	tests := []struct {
 		name            string
-		setup           func(mockSession *discordmocks.MockSession)
+		setup           func(mockSession *discordmocks.MockSession, eventMessageID string)
 		channelID       string
 		eventMessageID  string
 		expectedErr     bool
@@ -24,9 +24,9 @@ func Test_deleteRoundManager_DeleteRoundEventEmbed(t *testing.T) {
 	}{
 		{
 			name: "successful delete",
-			setup: func(mockSession *discordmocks.MockSession) {
+			setup: func(mockSession *discordmocks.MockSession, eventMessageID string) {
 				mockSession.EXPECT().
-					ChannelMessageDelete("channel-123", "b5e99f92-5b9e-4b94-a787-8b5f94977592").
+					ChannelMessageDelete("channel-123", eventMessageID).
 					Return(nil).
 					Times(1)
 			},
@@ -37,38 +37,38 @@ func Test_deleteRoundManager_DeleteRoundEventEmbed(t *testing.T) {
 		},
 		{
 			name: "missing channel ID",
-			setup: func(mockSession *discordmocks.MockSession) {
+			setup: func(mockSession *discordmocks.MockSession, eventMessageID string) {
 				// No expectations, function should return before calling discordgo
 			},
 			channelID:       "",
 			eventMessageID:  "12345",
 			expectedErr:     true,
-			expectedError:   "channelID or eventMessageID is missing",
+			expectedError:   "channelID or discordMessageID is missing",
 			expectedSuccess: false,
 		},
 		{
 			name: "missing event message ID",
-			setup: func(mockSession *discordmocks.MockSession) {
+			setup: func(mockSession *discordmocks.MockSession, eventMessageID string) {
 				// No expectations, function should return before calling discordgo
 			},
 			channelID:       "channel-123",
 			eventMessageID:  "",
 			expectedErr:     true,
-			expectedError:   "channelID or eventMessageID is missing",
+			expectedError:   "channelID or discordMessageID is missing",
 			expectedSuccess: false,
 		},
 		{
 			name: "failed to delete message",
-			setup: func(mockSession *discordmocks.MockSession) {
+			setup: func(mockSession *discordmocks.MockSession, eventMessageID string) {
 				mockSession.EXPECT().
-					ChannelMessageDelete("channel-123", "b5e99f92-5b9e-4b94-a787-8b5f94977592").
+					ChannelMessageDelete("channel-123", eventMessageID).
 					Return(errors.New("message not found")).
 					Times(1)
 			},
 			channelID:       "channel-123",
 			eventMessageID:  "12345",
 			expectedErr:     true,
-			expectedError:   "failed to delete message: message not found",
+			expectedError:   "failed to delete message",
 			expectedSuccess: false,
 		},
 	}
@@ -79,7 +79,7 @@ func Test_deleteRoundManager_DeleteRoundEventEmbed(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockSession := discordmocks.NewMockSession(ctrl)
-			tt.setup(mockSession)
+			tt.setup(mockSession, tt.eventMessageID)
 
 			dem := &deleteRoundManager{
 				session: mockSession,
@@ -111,7 +111,7 @@ func Test_deleteRoundManager_DeleteRoundEventEmbed(t *testing.T) {
 						t.Errorf("%s: Expected error containing: %q, got: %q", tt.name, tt.expectedError, actualError)
 					}
 				}
-				if result.Success == true { // Corrected check for boolean value
+				if result.Success == true {
 					t.Errorf("%s: Expected Success to be false, got true", tt.name)
 				}
 			} else {

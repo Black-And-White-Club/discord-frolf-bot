@@ -15,7 +15,6 @@ import (
 
 	finalizeround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/finalize_round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
-	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	discordgo "github.com/bwmarrin/discordgo"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -45,7 +44,7 @@ func (m *MockFinalizeRoundManager) EXPECT() *MockFinalizeRoundManagerMockRecorde
 }
 
 // FinalizeScorecardEmbed mocks base method.
-func (m *MockFinalizeRoundManager) FinalizeScorecardEmbed(ctx context.Context, eventMessageID sharedtypes.RoundID, channelID string, embedPayload roundevents.RoundFinalizedEmbedUpdatePayload) (finalizeround.FinalizeRoundOperationResult, error) {
+func (m *MockFinalizeRoundManager) FinalizeScorecardEmbed(ctx context.Context, eventMessageID, channelID string, embedPayload roundevents.RoundFinalizedEmbedUpdatePayload) (finalizeround.FinalizeRoundOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FinalizeScorecardEmbed", ctx, eventMessageID, channelID, embedPayload)
 	ret0, _ := ret[0].(finalizeround.FinalizeRoundOperationResult)

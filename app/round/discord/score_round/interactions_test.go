@@ -281,7 +281,7 @@ func Test_scoreRoundManager_HandleScoreSubmission(t *testing.T) {
 					Times(1)
 
 				mockSession.EXPECT().
-					FollowupMessageCreate(gomock.Any(), true, gomock.Any(), gomock.Any()).
+					FollowupMessageCreate(gomock.Any(), true, gomock.Any()).
 					DoAndReturn(func(_ *discordgo.Interaction, _ bool, params *discordgo.WebhookParams, _ ...any) (*discordgo.Message, error) {
 						if !strings.Contains(params.Content, "Invalid score") {
 							return nil, errors.New("expected error message about invalid score")

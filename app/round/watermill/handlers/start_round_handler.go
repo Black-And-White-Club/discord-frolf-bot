@@ -23,11 +23,18 @@ func (h *RoundHandlers) HandleRoundStarted(msg *message.Message) ([]*message.Mes
 				return nil, fmt.Errorf("missing event message ID in round start payload")
 			}
 
+			// Use the channel ID from the payload instead of config
+			channelID := startPayload.DiscordChannelID
+			if channelID == "" {
+				// Fallback to config if payload channel ID is empty
+				channelID = h.Config.Discord.ChannelID
+			}
+
 			// Convert EventMessageID to string
 			eventMessageID := startPayload.EventMessageID
 
 			// Capture both return values from UpdateRoundToScorecard
-			_, err := h.RoundDiscord.GetStartRoundManager().UpdateRoundToScorecard(ctx, h.Config.Discord.ChannelID, eventMessageID, startPayload)
+			_, err := h.RoundDiscord.GetStartRoundManager().UpdateRoundToScorecard(ctx, channelID, eventMessageID, startPayload)
 			if err != nil {
 				return nil, fmt.Errorf("failed to update round to scorecard: %w", err)
 			}

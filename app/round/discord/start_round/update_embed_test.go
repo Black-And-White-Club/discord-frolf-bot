@@ -44,6 +44,15 @@ func Test_startRoundManager_UpdateRoundToScorecard(t *testing.T) {
 		{
 			name: "Successful update",
 			setupMocks: func(mockSession *discordmocks.MockSession) {
+				// Mock the channel message fetch
+				mockSession.EXPECT().
+					ChannelMessage("test-channel", "test-message").
+					Return(&discordgo.Message{
+						ID:     "test-message",
+						Embeds: []*discordgo.MessageEmbed{},
+					}, nil).
+					Times(1)
+
 				// Mock the channel message edit
 				mockSession.EXPECT().
 					ChannelMessageEditComplex(gomock.Any()).
@@ -84,6 +93,15 @@ func Test_startRoundManager_UpdateRoundToScorecard(t *testing.T) {
 		{
 			name: "Edit message fails",
 			setupMocks: func(mockSession *discordmocks.MockSession) {
+				// Mock the channel message fetch
+				mockSession.EXPECT().
+					ChannelMessage("test-channel", "test-message").
+					Return(&discordgo.Message{
+						ID:     "test-message",
+						Embeds: []*discordgo.MessageEmbed{},
+					}, nil).
+					Times(1)
+
 				// Mock User and GuildMember calls
 				mockSession.EXPECT().
 					User(gomock.Any()).
@@ -115,6 +133,15 @@ func Test_startRoundManager_UpdateRoundToScorecard(t *testing.T) {
 		{
 			name: "TransformRoundToScorecard fails",
 			setupMocks: func(mockSession *discordmocks.MockSession) {
+				// Mock the channel message fetch
+				mockSession.EXPECT().
+					ChannelMessage("test-channel", "test-message").
+					Return(&discordgo.Message{
+						ID:     "test-message",
+						Embeds: []*discordgo.MessageEmbed{},
+					}, nil).
+					Times(1)
+
 				// Mock User call to fail, but note the method continues despite this
 				mockSession.EXPECT().
 					User(gomock.Any()).
@@ -148,6 +175,26 @@ func Test_startRoundManager_UpdateRoundToScorecard(t *testing.T) {
 			channelID: "test-channel",
 			messageID: "test-message",
 			expectErr: false, // Changed to false since the operation will succeed
+		},
+		{
+			name: "Fetch existing message fails",
+			setupMocks: func(mockSession *discordmocks.MockSession) {
+				// Mock the channel message fetch to fail
+				mockSession.EXPECT().
+					ChannelMessage("test-channel", "test-message").
+					Return(nil, fmt.Errorf("message not found")).
+					Times(1)
+			},
+			payload: &roundevents.DiscordRoundStartPayload{
+				RoundID:      testRoundID,
+				Title:        "Test Round",
+				Location:     (*roundtypes.Location)(strPtr("Test Course")),
+				StartTime:    (*sharedtypes.StartTime)(timePtr(fixedTime)),
+				Participants: []roundevents.RoundParticipant{},
+			},
+			channelID: "test-channel",
+			messageID: "test-message",
+			expectErr: true,
 		},
 		{
 			name: "Missing channel ID",

@@ -19,6 +19,7 @@ import (
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/ThreeDotsLabs/watermill/message"
+	"github.com/bwmarrin/discordgo"
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel/trace/noop"
 	"go.uber.org/mock/gomock"
@@ -194,7 +195,8 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 				UUID:    "1",
 				Payload: []byte(`{"round_id": "` + testRoundID.String() + `", "title": "Test Round", "description": "Test Description", "location": "Test Location", "start_time": "2024-01-01T12:00:00Z", "user_id": "user_id"}`),
 				Metadata: message.Metadata{
-					"correlation_id": "correlation_id",
+					"correlation_id":             "correlation_id",
+					"interaction_correlation_id": "correlation_id", // Function looks for this key
 				},
 			},
 			want:    []*message.Message{{}}, // Assuming a message is returned
@@ -227,18 +229,27 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 					Return(mockCreateRoundManager).
 					AnyTimes()
 
+				// Mock UpdateInteractionResponse call
 				mockCreateRoundManager.EXPECT().
 					UpdateInteractionResponse(gomock.Any(), "correlation_id", gomock.Any()).
 					Return(createround.CreateRoundOperationResult{}, nil).
 					Times(1)
 
+				// Mock SendRoundEventEmbed call with proper return value
+				mockDiscordMessage := &discordgo.Message{
+					ID:        "discord-message-123",
+					ChannelID: "1344376922888474625",
+				}
 				mockCreateRoundManager.EXPECT().
 					SendRoundEventEmbed(
 						gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
 					).
-					Return(createround.CreateRoundOperationResult{}, nil).
+					Return(createround.CreateRoundOperationResult{
+						Success: mockDiscordMessage, // Return actual discord message
+					}, nil).
 					Times(1)
 
+				// Mock CreateResultMessage call
 				mockHelper.EXPECT().
 					CreateResultMessage(gomock.Any(), gomock.Any(), roundevents.RoundEventMessageIDUpdate).
 					Return(&message.Message{}, nil).
@@ -251,11 +262,12 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 				UUID:    "1",
 				Payload: []byte(`{"round_id": "` + testRoundID.String() + `", "title": "Test Round", "description": "Test Description", "location": "Test Location", "start_time": "2024-01-01T12:00:00Z", "user_id": "user_id"}`),
 				Metadata: message.Metadata{
-					"correlation_id": "correlation_id",
+					"correlation_id":             "correlation_id",
+					"interaction_correlation_id": "correlation_id",
 				},
 			},
-			want:    nil,
-			wantErr: true,
+			want:    []*message.Message{{}}, // Function continues even if UpdateInteractionResponse fails
+			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockHelper *util_mocks.MockHelpers) {
 				expectedPayload := roundevents.RoundCreatedPayload{
 					BaseRoundPayload: roundtypes.BaseRoundPayload{
@@ -284,9 +296,30 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 					Return(mockCreateRoundManager).
 					AnyTimes()
 
+				// Mock UpdateInteractionResponse to fail
 				mockCreateRoundManager.EXPECT().
 					UpdateInteractionResponse(gomock.Any(), "correlation_id", gomock.Any()).
 					Return(createround.CreateRoundOperationResult{}, errors.New("failed to update interaction response")).
+					Times(1)
+
+				// Mock SendRoundEventEmbed call - function continues despite UpdateInteractionResponse failure
+				mockDiscordMessage := &discordgo.Message{
+					ID:        "discord-message-123",
+					ChannelID: "1344376922888474625",
+				}
+				mockCreateRoundManager.EXPECT().
+					SendRoundEventEmbed(
+						gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
+					).
+					Return(createround.CreateRoundOperationResult{
+						Success: mockDiscordMessage,
+					}, nil).
+					Times(1)
+
+				// Mock CreateResultMessage call
+				mockHelper.EXPECT().
+					CreateResultMessage(gomock.Any(), gomock.Any(), roundevents.RoundEventMessageIDUpdate).
+					Return(&message.Message{}, nil).
 					Times(1)
 			},
 		},
@@ -296,7 +329,8 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 				UUID:    "1",
 				Payload: []byte(`{"round_id": "` + testRoundID.String() + `", "title": "Test Round", "description": "Test Description", "location": "Test Location", "start_time": "2024-01-01T12:00:00Z", "user_id": "user_id"}`),
 				Metadata: message.Metadata{
-					"correlation_id": "correlation_id",
+					"correlation_id":             "correlation_id",
+					"interaction_correlation_id": "correlation_id",
 				},
 			},
 			want:    nil,
@@ -329,11 +363,13 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 					Return(mockCreateRoundManager).
 					AnyTimes()
 
+				// Mock UpdateInteractionResponse call
 				mockCreateRoundManager.EXPECT().
 					UpdateInteractionResponse(gomock.Any(), "correlation_id", gomock.Any()).
 					Return(createround.CreateRoundOperationResult{}, nil).
 					Times(1)
 
+				// Mock SendRoundEventEmbed to fail
 				mockCreateRoundManager.EXPECT().
 					SendRoundEventEmbed(
 						gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
@@ -348,7 +384,8 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 				UUID:    "1",
 				Payload: []byte(`{"round_id": "` + testRoundID.String() + `", "title": "Test Round", "description": "Test Description", "location": "Test Location", "start_time": "2024-01-01T12:00:00Z", "user_id": "user_id"}`),
 				Metadata: message.Metadata{
-					"correlation_id": "correlation_id",
+					"correlation_id":             "correlation_id",
+					"interaction_correlation_id": "correlation_id",
 				},
 			},
 			want:    nil,
@@ -381,11 +418,13 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 					Return(mockCreateRoundManager).
 					AnyTimes()
 
+				// Mock UpdateInteractionResponse call
 				mockCreateRoundManager.EXPECT().
 					UpdateInteractionResponse(gomock.Any(), "correlation_id", gomock.Any()).
 					Return(createround.CreateRoundOperationResult{}, nil).
 					Times(1)
 
+				// Mock SendRoundEventEmbed to return result with error
 				result := createround.CreateRoundOperationResult{Error: errors.New("error in result")}
 				mockCreateRoundManager.EXPECT().
 					SendRoundEventEmbed(
@@ -401,7 +440,8 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 				UUID:    "1",
 				Payload: []byte(`{"round_id": "` + testRoundID.String() + `", "title": "Test Round", "description": "Test Description", "location": "Test Location", "start_time": "2024-01-01T12:00:00Z", "user_id": "user_id"}`),
 				Metadata: message.Metadata{
-					"correlation_id": "correlation_id",
+					"correlation_id":             "correlation_id",
+					"interaction_correlation_id": "correlation_id",
 				},
 			},
 			want:    nil,
@@ -434,21 +474,93 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 					Return(mockCreateRoundManager).
 					AnyTimes()
 
+				// Mock UpdateInteractionResponse call
 				mockCreateRoundManager.EXPECT().
 					UpdateInteractionResponse(gomock.Any(), "correlation_id", gomock.Any()).
 					Return(createround.CreateRoundOperationResult{}, nil).
 					Times(1)
 
+				// Mock SendRoundEventEmbed to succeed
+				mockDiscordMessage := &discordgo.Message{
+					ID:        "discord-message-123",
+					ChannelID: "1344376922888474625",
+				}
 				mockCreateRoundManager.EXPECT().
 					SendRoundEventEmbed(
 						gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
 					).
-					Return(createround.CreateRoundOperationResult{}, nil).
+					Return(createround.CreateRoundOperationResult{
+						Success: mockDiscordMessage,
+					}, nil).
 					Times(1)
 
+				// Mock CreateResultMessage to fail
 				mockHelper.EXPECT().
 					CreateResultMessage(gomock.Any(), gomock.Any(), roundevents.RoundEventMessageIDUpdate).
 					Return(nil, errors.New("failed to create result message")).
+					Times(1)
+			},
+		},
+		{
+			name: "missing_interaction_correlation_id",
+			msg: &message.Message{
+				UUID:    "1",
+				Payload: []byte(`{"round_id": "` + testRoundID.String() + `", "title": "Test Round", "description": "Test Description", "location": "Test Location", "start_time": "2024-01-01T12:00:00Z", "user_id": "user_id"}`),
+				Metadata: message.Metadata{
+					"correlation_id": "correlation_id",
+					// Missing interaction_correlation_id
+				},
+			},
+			want:    []*message.Message{{}},
+			wantErr: false,
+			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockHelper *util_mocks.MockHelpers) {
+				expectedPayload := roundevents.RoundCreatedPayload{
+					BaseRoundPayload: roundtypes.BaseRoundPayload{
+						RoundID:     testRoundID,
+						Title:       roundtypes.Title("Test Round"),
+						Description: roundtypes.DescriptionPtr("Test Description"),
+						Location:    roundtypes.LocationPtr("Test Location"),
+						StartTime:   &startTime,
+						UserID:      sharedtypes.DiscordID("user_id"),
+					},
+					ChannelID: "1344376922888474625",
+				}
+
+				mockHelper.EXPECT().
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundCreatedPayload{})).
+					DoAndReturn(func(_ *message.Message, v any) error {
+						*v.(*roundevents.RoundCreatedPayload) = expectedPayload
+						return nil
+					}).
+					Times(1)
+
+				mockCreateRoundManager := mocks.NewMockCreateRoundManager(ctrl)
+
+				mockRoundDiscord.EXPECT().
+					GetCreateRoundManager().
+					Return(mockCreateRoundManager).
+					AnyTimes()
+
+				// No UpdateInteractionResponse call expected since interaction_correlation_id is missing
+
+				// Mock SendRoundEventEmbed to succeed
+				mockDiscordMessage := &discordgo.Message{
+					ID:        "discord-message-123",
+					ChannelID: "1344376922888474625",
+				}
+				mockCreateRoundManager.EXPECT().
+					SendRoundEventEmbed(
+						gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
+					).
+					Return(createround.CreateRoundOperationResult{
+						Success: mockDiscordMessage,
+					}, nil).
+					Times(1)
+
+				// Mock CreateResultMessage call
+				mockHelper.EXPECT().
+					CreateResultMessage(gomock.Any(), gomock.Any(), roundevents.RoundEventMessageIDUpdate).
+					Return(&message.Message{}, nil).
 					Times(1)
 			},
 		},
