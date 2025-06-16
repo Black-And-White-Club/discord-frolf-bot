@@ -408,7 +408,7 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 					}).
 					Times(1)
 
-				mockConfig.Discord.ChannelID = testChannelID
+				mockConfig.Discord.EventChannelID = testChannelID
 				mockRoundDiscord.EXPECT().GetRoundRsvpManager().Return(mockRoundRsvpManager).Times(1)
 				mockRoundRsvpManager.EXPECT().UpdateRoundEventEmbed(
 					gomock.Any(),
@@ -468,7 +468,7 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 					}).
 					Times(1)
 
-				mockConfig.Discord.ChannelID = testChannelID
+				mockConfig.Discord.EventChannelID = testChannelID
 				mockRoundDiscord.EXPECT().GetRoundRsvpManager().Return(mockRoundRsvpManager).Times(1)
 				mockRoundRsvpManager.EXPECT().UpdateRoundEventEmbed(
 					gomock.Any(),
@@ -525,7 +525,7 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 					}).
 					Times(1)
 
-				mockConfig.Discord.ChannelID = testChannelID
+				mockConfig.Discord.EventChannelID = testChannelID
 				mockRoundDiscord.EXPECT().GetRoundRsvpManager().Return(mockRoundRsvpManager).Times(1)
 				mockRoundRsvpManager.EXPECT().UpdateRoundEventEmbed(
 					gomock.Any(),
@@ -582,7 +582,7 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 					}).
 					Times(1)
 
-				mockConfig.Discord.ChannelID = testChannelID
+				mockConfig.Discord.EventChannelID = testChannelID
 				mockRoundDiscord.EXPECT().GetRoundRsvpManager().Return(mockRoundRsvpManager).Times(1)
 				mockRoundRsvpManager.EXPECT().UpdateRoundEventEmbed(
 					gomock.Any(),

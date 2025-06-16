@@ -36,6 +36,7 @@ type Handlers interface {
 	HandleRoundUpdateFailed(msg *message.Message) ([]*message.Message, error)
 	HandleRoundUpdateValidationFailed(msg *message.Message) ([]*message.Message, error)
 	HandleRoundParticipantRemoved(msg *message.Message) ([]*message.Message, error)
+	HandleTagsUpdatedForScheduledRounds(msg *message.Message) ([]*message.Message, error)
 }
 
 // RoundHandlers handles round-related events.

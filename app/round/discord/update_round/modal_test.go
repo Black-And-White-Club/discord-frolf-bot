@@ -15,6 +15,7 @@ import (
 	utilsmocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
 	"go.opentelemetry.io/otel/trace/noop"
 	"go.uber.org/mock/gomock"
@@ -187,7 +188,8 @@ func Test_updateRoundManager_SendupdateRoundModal(t *testing.T) {
 				operationWrapper: testOperationWrapper,
 			}
 
-			result, err := urm.SendUpdateRoundModal(tt.ctx, tt.args)
+			testRoundID := sharedtypes.RoundID("test-round-id")
+			result, err := urm.SendUpdateRoundModal(tt.ctx, tt.args, testRoundID)
 
 			// Check for error
 			if tt.wantErrMsg != "" {

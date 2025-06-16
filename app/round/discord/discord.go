@@ -12,6 +12,7 @@ import (
 	roundrsvp "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/round_rsvp"
 	scoreround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/score_round"
 	startround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/start_round"
+	tagupdates "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/tag_updates"
 	updateround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/update_round"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
@@ -31,6 +32,7 @@ type RoundDiscordInterface interface {
 	GetFinalizeRoundManager() finalizeround.FinalizeRoundManager
 	GetDeleteRoundManager() deleteround.DeleteRoundManager
 	GetUpdateRoundManager() updateround.UpdateRoundManager
+	GetTagUpdateManager() tagupdates.TagUpdateManager
 }
 
 // RoundDiscord encapsulates all Round Discord services.
@@ -43,6 +45,7 @@ type RoundDiscord struct {
 	FinalizeRoundManager finalizeround.FinalizeRoundManager
 	DeleteRoundManager   deleteround.DeleteRoundManager
 	UpdateRoundManager   updateround.UpdateRoundManager
+	TagUpdateManager     tagupdates.TagUpdateManager
 }
 
 // NewRoundDiscord creates a new RoundDiscord instance.
@@ -67,6 +70,7 @@ func NewRoundDiscord(
 	finalizeRoundManager := finalizeround.NewFinalizeRoundManager(session, publisher, logger, helper, config, tracer, metrics)
 	deleteRoundManager := deleteround.NewDeleteRoundManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics)
 	updateRoundManager := updateround.NewUpdateRoundManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics)
+	tagUpdateManager := tagupdates.NewTagUpdateManager(session, publisher, logger, helper, config, tracer, metrics)
 
 	return &RoundDiscord{
 		CreateRoundManager:   createRoundManager,
@@ -77,6 +81,7 @@ func NewRoundDiscord(
 		FinalizeRoundManager: finalizeRoundManager,
 		DeleteRoundManager:   deleteRoundManager,
 		UpdateRoundManager:   updateRoundManager,
+		TagUpdateManager:     tagUpdateManager,
 	}, nil
 }
 
@@ -118,4 +123,8 @@ func (rd *RoundDiscord) GetDeleteRoundManager() deleteround.DeleteRoundManager {
 // GetUpdateRoundManager returns the UpdateRoundManager.
 func (rd *RoundDiscord) GetUpdateRoundManager() updateround.UpdateRoundManager {
 	return rd.UpdateRoundManager
+}
+
+func (rd *RoundDiscord) GetTagUpdateManager() tagupdates.TagUpdateManager {
+	return rd.TagUpdateManager
 }

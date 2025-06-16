@@ -15,8 +15,8 @@ SCORE_DIR := ./app/score
 
 # Mocks for User Domain
 mocks-user: mocks-user-discord mocks-user-handlers mocks-user-role-manager mocks-user-signup-manager
-mocks-round: mocks-create-round-manager mocks-round-rsvp-manager mocks-round-discord mocks-round-reminder-manager mocks-start-round-manager mocks-score-round-manager mocks-finalize-round-manager mocks-delete-round-manager mocks-update-round-manager
-mocks-leaderboard: mocks-leaderboard-discord mocks-leaderboard-update-manager
+mocks-round: mocks-create-round-manager mocks-round-rsvp-manager mocks-round-discord mocks-round-reminder-manager mocks-start-round-manager mocks-score-round-manager mocks-finalize-round-manager mocks-delete-round-manager mocks-update-round-manager mocks-tag-update-manager
+mocks-leaderboard: mocks-leaderboard-discord mocks-leaderboard-update-manager mocks-leaderboard-tag-claim
 
 mocks-user-discord:
 	$(MOCKGEN) -source=$(USER_DIR)/discord/discord.go -destination=$(USER_DIR)/mocks/mock_user_discord.go -package=mocks
@@ -46,10 +46,13 @@ mocks-delete-round-manager:
 	$(MOCKGEN) -source=$(ROUND_DIR)/discord/delete_round/delete_round.go -destination=$(ROUND_DIR)/mocks/mock_delete_round_manager.go -package=mocks
 mocks-update-round-manager:
 	$(MOCKGEN) -source=$(ROUND_DIR)/discord/update_round/update_round.go -destination=$(ROUND_DIR)/mocks/mock_update_round_manager.go -package=mocks
-# Mocks for other domains (if needed, add here)
+mocks-tag-update-manager:
+	$(MOCKGEN) -source=$(ROUND_DIR)/discord/tag_updates/tag_updates.go -destination=$(ROUND_DIR)/mocks/mock_tag_update_manager.go -package=mocks
 
 #Mocks for Leaderboard Domain
 mocks-leaderboard-discord:
 	$(MOCKGEN) -source=$(LB_DIR)/discord/discord.go -destination=$(LB_DIR)/mocks/mock_leaderboard_discord.go -package=mocks
 mocks-leaderboard-update-manager:
 	$(MOCKGEN) -source=$(LB_DIR)/discord/leaderboard_updated/leaderboard_updated.go -destination=$(LB_DIR)/mocks/mock_leaderboard_updated_manager.go -package=mocks
+mocks-leaderboard-tag-claim:
+	$(MOCKGEN) -source=$(LB_DIR)/discord/claim_tag/claim_tag.go -destination=$(LB_DIR)/mocks/mock_claim_tag.go -package=mocks

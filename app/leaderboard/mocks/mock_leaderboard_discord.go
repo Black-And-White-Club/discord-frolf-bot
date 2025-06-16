@@ -12,6 +12,7 @@ package mocks
 import (
 	reflect "reflect"
 
+	claimtag "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/claim_tag"
 	leaderboardupdated "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/leaderboard_updated"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -38,6 +39,20 @@ func NewMockLeaderboardDiscordInterface(ctrl *gomock.Controller) *MockLeaderboar
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockLeaderboardDiscordInterface) EXPECT() *MockLeaderboardDiscordInterfaceMockRecorder {
 	return m.recorder
+}
+
+// GetClaimTagManager mocks base method.
+func (m *MockLeaderboardDiscordInterface) GetClaimTagManager() claimtag.ClaimTagManager {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetClaimTagManager")
+	ret0, _ := ret[0].(claimtag.ClaimTagManager)
+	return ret0
+}
+
+// GetClaimTagManager indicates an expected call of GetClaimTagManager.
+func (mr *MockLeaderboardDiscordInterfaceMockRecorder) GetClaimTagManager() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetClaimTagManager", reflect.TypeOf((*MockLeaderboardDiscordInterface)(nil).GetClaimTagManager))
 }
 
 // GetLeaderboardUpdateManager mocks base method.

@@ -90,7 +90,7 @@ func (r *LeaderboardRouter) RegisterHandlers(ctx context.Context, handlers leade
 		leaderboardevents.GetTagNumberResponse:                          handlers.HandleGetTagByDiscordIDResponse,
 
 		// Leaderboard updates
-		leaderboardevents.LeaderboardUpdated:               handlers.HandleLeaderboardUpdated,
+		leaderboardevents.LeaderboardUpdated:               handlers.HandleBatchTagAssigned,
 		discordleaderboardevents.LeaderboardRetrievedTopic: handlers.HandleLeaderboardData,
 
 		// Tag swaps

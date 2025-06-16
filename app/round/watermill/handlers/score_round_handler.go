@@ -10,7 +10,6 @@ import (
 )
 
 // HandleParticipantScoreUpdated handles a successful participant score update event from the backend.
-// HandleParticipantScoreUpdated handles a successful participant score update event from the backend.
 // It now calls the scoreround.UpdateScoreEmbed function to update the scorecard.
 // The incoming payload no longer needs the full participant list.
 func (h *RoundHandlers) HandleParticipantScoreUpdated(msg *message.Message) ([]*message.Message, error) {
@@ -30,8 +29,8 @@ func (h *RoundHandlers) HandleParticipantScoreUpdated(msg *message.Message) ([]*
 			// Use ChannelID from config if payload ChannelID is empty (as a fallback)
 			// Or rely solely on payload if backend guarantees population
 			channelID := updatePayload.ChannelID
-			if channelID == "" && h.Config != nil && h.Config.Discord.ChannelID != "" {
-				channelID = h.Config.Discord.ChannelID
+			if channelID == "" && h.Config != nil && h.Config.Discord.EventChannelID != "" {
+				channelID = h.Config.Discord.EventChannelID
 			}
 
 			h.Logger.InfoContext(ctx, "Received ParticipantScoreUpdated event", // Updated log message

@@ -256,7 +256,7 @@ func TestRoundHandlers_HandleRoundFinalized(t *testing.T) {
 				Logger: mockLogger,
 				Config: &config.Config{
 					Discord: config.DiscordConfig{
-						ChannelID: "1234", // Add the channel ID to config
+						EventChannelID: "1234", // Add the channel ID to config
 					},
 				},
 				Helpers:      mockHelper,

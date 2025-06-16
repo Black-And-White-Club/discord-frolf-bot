@@ -3,12 +3,10 @@ package updateround
 import (
 	"context"
 	"log/slog"
-	"strings"
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/interactions"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	"github.com/bwmarrin/discordgo"
-	"github.com/google/uuid"
 )
 
 // RegisterHandlers registers interaction handlers for updating rounds.
@@ -20,30 +18,36 @@ func RegisterHandlers(registry *interactions.Registry, manager UpdateRoundManage
 
 	slog.Info("RegisterHandlers is registering handlers for UpdateRoundManager")
 
-	registry.RegisterHandler("round_edit", func(ctx context.Context, i *discordgo.InteractionCreate) {
+	// Register Edit button handler
+	registry.RegisterHandler("round_edit|", func(ctx context.Context, i *discordgo.InteractionCreate) {
 		customID := i.MessageComponentData().CustomID
-		slog.Info("Checking edit button interaction", attr.String("custom_id", customID))
+		slog.Info("Edit button interaction received", attr.String("custom_id", customID))
 
-		if !strings.HasPrefix(customID, "round_edit|") {
-			slog.Warn("Unexpected button interaction", attr.String("custom_id", customID))
-			return
-		}
+		result, err := manager.HandleEditRoundButton(ctx, i)
+		slog.Info("HandleEditRoundButton completed",
+			attr.Any("result", result),
+			attr.Error(err))
+	})
 
-		// Extract the UUID string
-		roundIDStr := strings.TrimPrefix(customID, "round_edit|")
+	// Register Modal submission handler (THIS WAS MISSING!)
+	registry.RegisterHandler("update_round_modal|", func(ctx context.Context, i *discordgo.InteractionCreate) {
+		customID := i.ModalSubmitData().CustomID
+		slog.Info("Update round modal submission received", attr.String("custom_id", customID))
 
-		// Parse the UUID properly
-		roundUUID, err := uuid.Parse(roundIDStr)
-		if err != nil {
-			slog.Error("Invalid Round ID format",
-				attr.String("custom_id", customID),
-				attr.String("round_id_string", roundIDStr),
-				attr.Error(err))
-			return
-		}
+		result, err := manager.HandleUpdateRoundModalSubmit(ctx, i)
+		slog.Info("HandleUpdateRoundModalSubmit completed",
+			attr.Any("result", result),
+			attr.Error(err))
+	})
 
-		slog.Info("Button matched! Processing edit request.", attr.String("round_id", roundUUID.String()))
+	// Register Modal cancel handler (if you have one)
+	registry.RegisterHandler("update_round_modal_cancel|", func(ctx context.Context, i *discordgo.InteractionCreate) {
+		customID := i.MessageComponentData().CustomID
+		slog.Info("Update round modal cancel received", attr.String("custom_id", customID))
 
-		manager.HandleEditRoundButton(ctx, i)
+		result, err := manager.HandleUpdateRoundModalCancel(ctx, i)
+		slog.Info("HandleUpdateRoundModalCancel completed",
+			attr.Any("result", result),
+			attr.Error(err))
 	})
 }

@@ -228,7 +228,7 @@ func (crm *createRoundManager) HandleCreateRoundModalSubmit(ctx context.Context,
 		err := crm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
-				Content:    "Round creation request received. Please wait for confirmation.",
+				Content:    "Round creation request received",
 				Flags:      discordgo.MessageFlagsEphemeral,
 				Components: []discordgo.MessageComponent{},
 			},

@@ -12,6 +12,7 @@ import (
 	deleteround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/delete_round"
 	roundrsvp "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/round_rsvp"
 	scoreround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/score_round"
+	updateround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/update_round"
 	roundrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/round/watermill"
 	roundhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/round/watermill/handlers"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
@@ -52,6 +53,7 @@ func InitializeRoundModule(
 	roundrsvp.RegisterHandlers(interactionRegistry, roundDiscord.GetRoundRsvpManager())
 	deleteround.RegisterHandlers(interactionRegistry, roundDiscord.GetDeleteRoundManager())
 	scoreround.RegisterHandlers(interactionRegistry, roundDiscord.GetScoreRoundManager())
+	updateround.RegisterHandlers(interactionRegistry, roundDiscord.GetUpdateRoundManager()) // ADD THIS LINE
 
 	// Build Watermill Handlers
 	roundHandlers := roundhandlers.NewRoundHandlers(

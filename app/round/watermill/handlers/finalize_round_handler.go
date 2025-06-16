@@ -25,7 +25,7 @@ func (h *RoundHandlers) HandleRoundFinalized(msg *message.Message) ([]*message.M
 				)
 				return nil, fmt.Errorf("invalid payload type for HandleRoundFinalized (Discord)")
 			}
-			discordChannelID := h.Config.Discord.ChannelID
+			discordChannelID := h.Config.Discord.EventChannelID
 			// Validate input payload - check for mandatory fields
 			if uuid.UUID(p.RoundID) == uuid.Nil {
 				h.Logger.ErrorContext(ctx, "Missing RoundID in payload for Discord Finalized", attr.CorrelationIDFromMsg(msg)) // Assuming CorrelationIDFromMsg helper

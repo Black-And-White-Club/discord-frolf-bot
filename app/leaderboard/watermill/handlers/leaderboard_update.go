@@ -7,44 +7,43 @@ import (
 
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
-	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/ThreeDotsLabs/watermill/message"
 
 	leaderboardupdated "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/leaderboard_updated"
 )
 
-// HandleLeaderboardUpdated handles the LeaderboardUpdated event by sending an embedded leaderboard message.
-func (h *LeaderboardHandlers) HandleLeaderboardUpdated(msg *message.Message) ([]*message.Message, error) {
+// HandleBatchTagAssigned handles batch tag assignment completions and sends leaderboard embed
+func (h *LeaderboardHandlers) HandleBatchTagAssigned(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
-		"HandleLeaderboardUpdated",
-		&leaderboardevents.LeaderboardUpdatedPayload{},
+		"HandleBatchTagAssigned",
+		&leaderboardevents.BatchTagAssignedPayload{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			updatedPayload := payload.(*leaderboardevents.LeaderboardUpdatedPayload)
+			batchPayload := payload.(*leaderboardevents.BatchTagAssignedPayload)
 
-			h.Logger.InfoContext(ctx, "Handling leaderboard updated event", attr.CorrelationIDFromMsg(msg))
+			h.Logger.InfoContext(ctx, "Handling batch tag assigned event", attr.CorrelationIDFromMsg(msg))
 
-			if len(updatedPayload.LeaderboardData) == 0 {
-				h.Logger.WarnContext(ctx, "Received empty leaderboard data", attr.CorrelationIDFromMsg(msg))
+			if len(batchPayload.Assignments) == 0 {
+				h.Logger.WarnContext(ctx, "Received empty batch assignment data", attr.CorrelationIDFromMsg(msg))
 				return nil, nil
 			}
 
-			channelID := h.Config.Discord.ChannelID
+			channelID := h.Config.Discord.LeaderboardChannelID
 			if channelID == "" {
 				err := fmt.Errorf("missing Discord Channel ID in config")
 				h.Logger.ErrorContext(ctx, err.Error(), attr.CorrelationIDFromMsg(msg))
 				return nil, err
 			}
 
-			// Convert leaderboard data
+			// Convert batch assignments to leaderboard entries
 			var leaderboardEntries []leaderboardupdated.LeaderboardEntry
-			for rank, userID := range updatedPayload.LeaderboardData {
+			for _, assignment := range batchPayload.Assignments {
 				leaderboardEntries = append(leaderboardEntries, leaderboardupdated.LeaderboardEntry{
-					Rank:   sharedtypes.TagNumber(rank),
-					UserID: sharedtypes.DiscordID(userID),
+					Rank:   assignment.TagNumber, // TagNumber is the rank/position
+					UserID: assignment.UserID,
 				})
 			}
 
-			// Sort by rank
+			// Sort by rank (tag number)
 			sort.Slice(leaderboardEntries, func(i, j int) bool {
 				return leaderboardEntries[i].Rank < leaderboardEntries[j].Rank
 			})
@@ -65,14 +64,19 @@ func (h *LeaderboardHandlers) HandleLeaderboardUpdated(msg *message.Message) ([]
 				return nil, result.Error
 			}
 
-			h.Logger.InfoContext(ctx, "Successfully sent leaderboard embed", attr.CorrelationIDFromMsg(msg))
+			h.Logger.InfoContext(ctx, "Successfully sent leaderboard embed for batch assignment",
+				attr.CorrelationIDFromMsg(msg),
+				attr.Int("assignment_count", batchPayload.AssignmentCount),
+				attr.String("batch_id", batchPayload.BatchID),
+			)
 
 			// Create a trace event
 			tracePayload := map[string]interface{}{
-				"event_type":  "leaderboard_updated",
+				"event_type":  "batch_assignment_completed",
 				"status":      "embed_sent",
 				"channel_id":  channelID,
-				"entry_count": len(updatedPayload.LeaderboardData),
+				"entry_count": len(batchPayload.Assignments),
+				"batch_id":    batchPayload.BatchID,
 			}
 
 			traceMsg, err := h.Helpers.CreateResultMessage(msg, tracePayload, leaderboardevents.LeaderboardTraceEvent)

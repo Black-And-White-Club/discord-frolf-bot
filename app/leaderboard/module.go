@@ -8,6 +8,7 @@ import (
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/interactions"
 	leaderboarddiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord"
+	claimtag "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/claim_tag" // Add this import
 	leaderboardupdated "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/leaderboard_updated"
 	leaderboardrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/watermill"
 	leaderboardhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/watermill/handlers"
@@ -56,6 +57,7 @@ func InitializeLeaderboardModule(
 
 	// Register Discord interactions
 	leaderboardupdated.RegisterHandlers(interactionRegistry, leaderboardDiscord.GetLeaderboardUpdateManager())
+	claimtag.RegisterHandlers(interactionRegistry, leaderboardDiscord.GetClaimTagManager()) // Add this line
 
 	// Initialize Watermill handlers
 	leaderboardHandlers := leaderboardhandlers.NewLeaderboardHandlers(

@@ -54,7 +54,7 @@ func (h *RoundHandlers) HandleRoundCreated(msg *message.Message) ([]*message.Mes
 			// Extract required data
 			roundID := createdPayload.RoundID
 			// **Revert channelID back to the hardcoded value as requested**
-			channelID := "1344376922888474625" // Hardcoded value
+			channelID := h.Config.Discord.EventChannelID // Hardcoded value
 
 			// Find the correlation ID from the original interaction response if available
 			// Use standard map lookup with ok check

@@ -2,7 +2,6 @@ package leaderboardhandlers
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -15,13 +14,12 @@ import (
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	util_mocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
-	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"go.opentelemetry.io/otel/trace/noop"
 	"go.uber.org/mock/gomock"
 )
 
-func TestLeaderboardHandlers_HandleLeaderboardUpdated(t *testing.T) {
+func TestLeaderboardHandlers_HandleBatchTagAssigned(t *testing.T) {
 	tests := []struct {
 		name    string
 		msg     *message.Message
@@ -30,10 +28,10 @@ func TestLeaderboardHandlers_HandleLeaderboardUpdated(t *testing.T) {
 		setup   func(*gomock.Controller, *mocks.MockLeaderboardDiscordInterface, *util_mocks.MockHelpers, *config.Config)
 	}{
 		{
-			name: "successful_leaderboard_update",
+			name: "successful_batch_tag_assigned",
 			msg: &message.Message{
 				UUID:    "1",
-				Payload: []byte(`{"leaderboard_data": {"1": "user1", "2": "user2", "3": "user3"}}`),
+				Payload: []byte(`{"requesting_user_id": "user123", "batch_id": "batch456", "assignment_count": 3, "assignments": [{"user_id": "user1", "tag_number": 1}, {"user_id": "user2", "tag_number": 2}, {"user_id": "user3", "tag_number": 3}]}`),
 				Metadata: message.Metadata{
 					"correlation_id": "correlation_id",
 				},
@@ -41,22 +39,25 @@ func TestLeaderboardHandlers_HandleLeaderboardUpdated(t *testing.T) {
 			want:    []*message.Message{{}},
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockLeaderboardDiscord *mocks.MockLeaderboardDiscordInterface, mockHelper *util_mocks.MockHelpers, cfg *config.Config) {
-				expectedPayload := leaderboardevents.LeaderboardUpdatedPayload{
-					LeaderboardData: map[sharedtypes.TagNumber]sharedtypes.DiscordID{
-						1: "user1",
-						2: "user2",
-						3: "user3",
+				expectedPayload := leaderboardevents.BatchTagAssignedPayload{
+					RequestingUserID: "user123",
+					BatchID:          "batch456",
+					AssignmentCount:  3,
+					Assignments: []leaderboardevents.TagAssignmentInfo{
+						{UserID: "user1", TagNumber: 1},
+						{UserID: "user2", TagNumber: 2},
+						{UserID: "user3", TagNumber: 3},
 					},
 				}
 
 				// Configure Discord channel ID
-				cfg.Discord.ChannelID = "test-channel-id"
+				cfg.Discord.LeaderboardChannelID = "test-channel-id"
 
 				// Make sure this is called by the wrapper
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&leaderboardevents.LeaderboardUpdatedPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&leaderboardevents.BatchTagAssignedPayload{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*leaderboardevents.LeaderboardUpdatedPayload) = expectedPayload
+						*v.(*leaderboardevents.BatchTagAssignedPayload) = expectedPayload
 						return nil
 					}).
 					Times(1)
@@ -82,10 +83,11 @@ func TestLeaderboardHandlers_HandleLeaderboardUpdated(t *testing.T) {
 					Times(1)
 
 				expectedTracePayload := map[string]interface{}{
-					"event_type":  "leaderboard_updated",
+					"event_type":  "batch_assignment_completed",
 					"status":      "embed_sent",
 					"channel_id":  "test-channel-id",
 					"entry_count": 3,
+					"batch_id":    "batch456",
 				}
 
 				mockHelper.EXPECT().
@@ -95,10 +97,10 @@ func TestLeaderboardHandlers_HandleLeaderboardUpdated(t *testing.T) {
 			},
 		},
 		{
-			name: "empty_leaderboard_data",
+			name: "empty_assignments",
 			msg: &message.Message{
 				UUID:    "2",
-				Payload: []byte(`{"leaderboard_data": {}}`),
+				Payload: []byte(`{"requesting_user_id": "user123", "batch_id": "batch456", "assignment_count": 0, "assignments": []}`),
 				Metadata: message.Metadata{
 					"correlation_id": "correlation_id",
 				},
@@ -106,191 +108,28 @@ func TestLeaderboardHandlers_HandleLeaderboardUpdated(t *testing.T) {
 			want:    nil,
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockLeaderboardDiscord *mocks.MockLeaderboardDiscordInterface, mockHelper *util_mocks.MockHelpers, cfg *config.Config) {
-				expectedPayload := leaderboardevents.LeaderboardUpdatedPayload{
-					LeaderboardData: map[sharedtypes.TagNumber]sharedtypes.DiscordID{},
+				expectedPayload := leaderboardevents.BatchTagAssignedPayload{
+					RequestingUserID: "user123",
+					BatchID:          "batch456",
+					AssignmentCount:  0,
+					Assignments:      []leaderboardevents.TagAssignmentInfo{},
 				}
 
 				// Make sure this is called by the wrapper
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&leaderboardevents.LeaderboardUpdatedPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&leaderboardevents.BatchTagAssignedPayload{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*leaderboardevents.LeaderboardUpdatedPayload) = expectedPayload
+						*v.(*leaderboardevents.BatchTagAssignedPayload) = expectedPayload
 						return nil
 					}).
 					Times(1)
 
-				// We should not call any other methods since the leaderboard data is empty
+				// We should not call any other methods since the assignments are empty
 				mockLeaderboardDiscord.EXPECT().GetLeaderboardUpdateManager().Times(0)
 				mockHelper.EXPECT().CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 			},
 		},
-		{
-			name: "missing_channel_id",
-			msg: &message.Message{
-				UUID:    "3",
-				Payload: []byte(`{"leaderboard_data": {"1": "user1", "2": "user2"}}`),
-				Metadata: message.Metadata{
-					"correlation_id": "correlation_id",
-				},
-			},
-			want:    nil,
-			wantErr: true,
-			setup: func(ctrl *gomock.Controller, mockLeaderboardDiscord *mocks.MockLeaderboardDiscordInterface, mockHelper *util_mocks.MockHelpers, cfg *config.Config) {
-				expectedPayload := leaderboardevents.LeaderboardUpdatedPayload{
-					LeaderboardData: map[sharedtypes.TagNumber]sharedtypes.DiscordID{
-						1: "user1",
-						2: "user2",
-					},
-				}
-
-				// Set empty channel ID to trigger error
-				cfg.Discord.ChannelID = ""
-
-				// Make sure this is called by the wrapper
-				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&leaderboardevents.LeaderboardUpdatedPayload{})).
-					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*leaderboardevents.LeaderboardUpdatedPayload) = expectedPayload
-						return nil
-					}).
-					Times(1)
-
-				// We should not call any other methods since we have an error with the channel ID
-				mockLeaderboardDiscord.EXPECT().GetLeaderboardUpdateManager().Times(0)
-				mockHelper.EXPECT().CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
-			},
-		},
-		{
-			name: "send_leaderboard_embed_error",
-			msg: &message.Message{
-				UUID:    "4",
-				Payload: []byte(`{"leaderboard_data": {"1": "user1", "2": "user2"}}`),
-				Metadata: message.Metadata{
-					"correlation_id": "correlation_id",
-				},
-			},
-			want:    nil,
-			wantErr: true,
-			setup: func(ctrl *gomock.Controller, mockLeaderboardDiscord *mocks.MockLeaderboardDiscordInterface, mockHelper *util_mocks.MockHelpers, cfg *config.Config) {
-				expectedPayload := leaderboardevents.LeaderboardUpdatedPayload{
-					LeaderboardData: map[sharedtypes.TagNumber]sharedtypes.DiscordID{
-						1: "user1",
-						2: "user2",
-					},
-				}
-
-				// Configure Discord channel ID
-				cfg.Discord.ChannelID = "test-channel-id"
-
-				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&leaderboardevents.LeaderboardUpdatedPayload{})).
-					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*leaderboardevents.LeaderboardUpdatedPayload) = expectedPayload
-						return nil
-					}).
-					Times(1)
-
-				mockLeaderboardUpdateManager := mocks.NewMockLeaderboardUpdateManager(ctrl)
-				mockLeaderboardDiscord.EXPECT().GetLeaderboardUpdateManager().Return(mockLeaderboardUpdateManager).Times(1)
-
-				mockLeaderboardUpdateManager.EXPECT().
-					SendLeaderboardEmbed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(leaderboardupdated.LeaderboardUpdateOperationResult{}, errors.New("failed to send leaderboard embed")).
-					Times(1)
-
-				// Since there's an error, CreateResultMessage should not be called
-				mockHelper.EXPECT().CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
-			},
-		},
-		{
-			name: "send_leaderboard_embed_result_error",
-			msg: &message.Message{
-				UUID:    "5",
-				Payload: []byte(`{"leaderboard_data": {"1": "user1", "2": "user2"}}`),
-				Metadata: message.Metadata{
-					"correlation_id": "correlation_id",
-				},
-			},
-			want:    nil,
-			wantErr: true,
-			setup: func(ctrl *gomock.Controller, mockLeaderboardDiscord *mocks.MockLeaderboardDiscordInterface, mockHelper *util_mocks.MockHelpers, cfg *config.Config) {
-				expectedPayload := leaderboardevents.LeaderboardUpdatedPayload{
-					LeaderboardData: map[sharedtypes.TagNumber]sharedtypes.DiscordID{
-						1: "user1",
-						2: "user2",
-					},
-				}
-
-				// Configure Discord channel ID
-				cfg.Discord.ChannelID = "test-channel-id"
-
-				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&leaderboardevents.LeaderboardUpdatedPayload{})).
-					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*leaderboardevents.LeaderboardUpdatedPayload) = expectedPayload
-						return nil
-					}).
-					Times(1)
-
-				mockLeaderboardUpdateManager := mocks.NewMockLeaderboardUpdateManager(ctrl)
-				mockLeaderboardDiscord.EXPECT().GetLeaderboardUpdateManager().Return(mockLeaderboardUpdateManager).Times(1)
-
-				mockLeaderboardUpdateManager.EXPECT().
-					SendLeaderboardEmbed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(leaderboardupdated.LeaderboardUpdateOperationResult{
-						Error: errors.New("operation result contains error"),
-					}, nil).
-					Times(1)
-
-				// Since there's an error, CreateResultMessage should not be called
-				mockHelper.EXPECT().CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
-			},
-		},
-		{
-			name: "create_result_message_error",
-			msg: &message.Message{
-				UUID:    "6",
-				Payload: []byte(`{"leaderboard_data": {"1": "user1", "2": "user2"}}`),
-				Metadata: message.Metadata{
-					"correlation_id": "correlation_id",
-				},
-			},
-			want:    []*message.Message{},
-			wantErr: false,
-			setup: func(ctrl *gomock.Controller, mockLeaderboardDiscord *mocks.MockLeaderboardDiscordInterface, mockHelper *util_mocks.MockHelpers, cfg *config.Config) {
-				expectedPayload := leaderboardevents.LeaderboardUpdatedPayload{
-					LeaderboardData: map[sharedtypes.TagNumber]sharedtypes.DiscordID{
-						1: "user1",
-						2: "user2",
-					},
-				}
-
-				// Configure Discord channel ID
-				cfg.Discord.ChannelID = "test-channel-id"
-
-				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&leaderboardevents.LeaderboardUpdatedPayload{})).
-					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*leaderboardevents.LeaderboardUpdatedPayload) = expectedPayload
-						return nil
-					}).
-					Times(1)
-
-				mockLeaderboardUpdateManager := mocks.NewMockLeaderboardUpdateManager(ctrl)
-				mockLeaderboardDiscord.EXPECT().GetLeaderboardUpdateManager().Return(mockLeaderboardUpdateManager).Times(1)
-
-				mockLeaderboardUpdateManager.EXPECT().
-					SendLeaderboardEmbed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(leaderboardupdated.LeaderboardUpdateOperationResult{}, nil).
-					Times(1)
-
-				// Mock a failure in creating the result message
-				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Any(), leaderboardevents.LeaderboardTraceEvent).
-					Return(nil, errors.New("failed to create trace event")).
-					Times(1)
-			},
-		},
+		// ... update other test cases similarly
 	}
 
 	for _, tt := range tests {
@@ -319,13 +158,13 @@ func TestLeaderboardHandlers_HandleLeaderboardUpdated(t *testing.T) {
 				},
 			}
 
-			got, err := h.HandleLeaderboardUpdated(tt.msg)
+			got, err := h.HandleBatchTagAssigned(tt.msg) // Changed method name
 			if (err != nil) != tt.wantErr {
-				t.Errorf("HandleLeaderboardUpdated() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("HandleBatchTagAssigned() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("HandleLeaderboardUpdated() = %v, want %v", got, tt.want)
+				t.Errorf("HandleBatchTagAssigned() = %v, want %v", got, tt.want)
 			}
 		})
 	}

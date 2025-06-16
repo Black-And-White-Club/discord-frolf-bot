@@ -4,11 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
-	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
-	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/ThreeDotsLabs/watermill/message"
 )
 
@@ -16,44 +13,28 @@ import (
 func (h *RoundHandlers) HandleRoundParticipantJoinRequest(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleRoundParticipantJoinRequest",
-		&discordroundevents.DiscordRoundParticipantJoinRequestPayload{}, // Fix: Use the correct Discord payload type
+		&roundevents.ParticipantJoinRequestPayload{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			p := payload.(*discordroundevents.DiscordRoundParticipantJoinRequestPayload) // Fix: Cast to correct type
+			p := payload.(*roundevents.ParticipantJoinRequestPayload)
 
-			// Extract the response from the message metadata
-			responseStr := msg.Metadata.Get("response")
-			var response roundtypes.Response
-			switch responseStr {
-			case "accepted":
-				response = roundtypes.ResponseAccept
-			case "declined":
-				response = roundtypes.ResponseDecline
-			case "tentative":
-				response = roundtypes.ResponseTentative
-			default:
-				// Default to accepted if invalid/missing response
-				response = roundtypes.ResponseAccept
-			}
+			response := p.Response
 
-			// Check if this is a late join (defaults to false if not set)
+			// Check if this is a late join
 			joinedLate := false
 			if p.JoinedLate != nil {
 				joinedLate = *p.JoinedLate
 			}
-
-			// Set tag number to 0 (backend will assign actual tag numbers)
-			tagNumber := sharedtypes.TagNumber(0)
 
 			// Construct the backend payload
 			backendPayload := roundevents.ParticipantJoinRequestPayload{
 				RoundID:    p.RoundID,
 				UserID:     p.UserID,
 				Response:   response,
-				TagNumber:  &tagNumber,
+				TagNumber:  p.TagNumber,
 				JoinedLate: &joinedLate,
 			}
 
-			// Create a message to send to the backend
+			// Create message to send to backend
 			backendMsg, err := h.Helpers.CreateResultMessage(msg, backendPayload, roundevents.RoundParticipantJoinRequest)
 			if err != nil {
 				return nil, err
@@ -62,7 +43,7 @@ func (h *RoundHandlers) HandleRoundParticipantJoinRequest(msg *message.Message) 
 			h.Logger.InfoContext(ctx, "Successfully processed participant join request",
 				attr.CorrelationIDFromMsg(msg),
 				attr.Bool("joined_late", joinedLate),
-				attr.String("response", responseStr),
+				attr.String("response", string(response)),
 			)
 
 			return []*message.Message{backendMsg}, nil
@@ -77,10 +58,8 @@ func (h *RoundHandlers) HandleRoundParticipantJoined(msg *message.Message) ([]*m
 		"HandleRoundParticipantJoined",
 		&roundevents.ParticipantJoinedPayload{}, // Unmarshal target
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			// The payload variable is now the unmarshalled *roundevents.ParticipantJoinedPayload
 			p := payload.(*roundevents.ParticipantJoinedPayload)
 
-			// --- Add logs here to inspect the unmarshalled payload ---
 			h.Logger.InfoContext(ctx, "Received ParticipantJoinedPayload",
 				attr.CorrelationIDFromMsg(msg),
 				attr.RoundID("round_id", p.RoundID),
@@ -90,9 +69,8 @@ func (h *RoundHandlers) HandleRoundParticipantJoined(msg *message.Message) ([]*m
 				attr.Any("accepted_participants_payload", p.AcceptedParticipants), // Log content of accepted list
 				// Add logging for other lists if needed, but accepted is the key one here
 			)
-			// --- End added logs ---
 
-			channelID := h.Config.Discord.ChannelID // Assuming Config is available
+			channelID := h.Config.Discord.EventChannelID // Assuming Config is available
 			messageID := msg.Metadata.Get("discord_message_id")
 
 			// Determine if this was a late join
@@ -101,24 +79,46 @@ func (h *RoundHandlers) HandleRoundParticipantJoined(msg *message.Message) ([]*m
 				joinedLate = *p.JoinedLate
 			}
 
-			// Update the Discord embed with the new participant information
-			// This is where the (potentially empty) slices from the payload are passed
-			result, err := h.RoundDiscord.GetRoundRsvpManager().UpdateRoundEventEmbed( // Assuming RoundDiscord is available
-				ctx,
-				channelID,
-				messageID,
-				p.AcceptedParticipants,
-				p.DeclinedParticipants,
-				p.TentativeParticipants,
-			)
+			var result interface{}
+			var err error
+
+			// If this is a late join, the round has started and we need to update a scorecard embed
+			// If not a late join, it's still an RSVP embed
+			if joinedLate {
+				h.Logger.InfoContext(ctx, "Processing late join - using scorecard logic",
+					attr.CorrelationIDFromMsg(msg),
+					attr.Bool("joined_late", joinedLate),
+					attr.Any("joined_late_pointer", p.JoinedLate))
+
+				// Use scorecard embed update for started rounds - add late participant to scorecard
+				result, err = h.RoundDiscord.GetScoreRoundManager().AddLateParticipantToScorecard(
+					ctx,
+					channelID,
+					messageID,
+					p.AcceptedParticipants, // These are already Participant structs with Accept response
+				)
+			} else {
+				h.Logger.InfoContext(ctx, "Processing regular join - using RSVP logic",
+					attr.CorrelationIDFromMsg(msg),
+					attr.Bool("joined_late", joinedLate),
+					attr.Any("joined_late_pointer", p.JoinedLate))
+
+				// Use RSVP embed update for rounds that haven't started
+				result, err = h.RoundDiscord.GetRoundRsvpManager().UpdateRoundEventEmbed(
+					ctx,
+					channelID,
+					messageID,
+					p.AcceptedParticipants,
+					p.DeclinedParticipants,
+					p.TentativeParticipants,
+				)
+			}
+
 			if err != nil {
 				h.Logger.ErrorContext(ctx, "Failed to update round event embed",
 					attr.CorrelationIDFromMsg(msg), // Add correlation ID to error log
 					attr.Error(err),
 				)
-				// You might want to return a message indicating failure back to the user in Discord
-				// return nil, err // Return the error so handlerWrapper logs failure
-				// Or publish a failure event
 				return nil, err // Re-throw the error
 			}
 
@@ -136,66 +136,69 @@ func (h *RoundHandlers) HandleRoundParticipantJoined(msg *message.Message) ([]*m
 }
 
 func (h *RoundHandlers) HandleRoundParticipantRemoved(msg *message.Message) ([]*message.Message, error) {
-	// Use the common handler wrapper for tracing, metrics, and error handling
 	return h.handlerWrapper(
-		"HandleRoundParticipantRemoved",          // Handler name
-		&roundevents.ParticipantRemovedPayload{}, // Target payload type for this event
+		"HandleRoundParticipantRemoved",
+		&roundevents.ParticipantRemovedPayload{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			// Unmarshal the specific payload for participant removal
 			p := payload.(*roundevents.ParticipantRemovedPayload)
 
-			// Log the received payload, including the counts of the lists
 			h.Logger.InfoContext(ctx, "Received RoundParticipantRemoved event",
 				attr.CorrelationIDFromMsg(msg),
 				attr.String("round_id", p.RoundID.String()),
-				attr.String("user_id", string(p.UserID)),                          // Log the user ID that was removed
-				attr.Int("accepted_count_payload", len(p.AcceptedParticipants)),   // Log count from payload
-				attr.Int("declined_count_payload", len(p.DeclinedParticipants)),   // Log count from payload
-				attr.Int("tentative_count_payload", len(p.TentativeParticipants)), // Log count from payload
-				// Optionally log content of lists if needed for debugging
-				// attr.Any("accepted_participants_payload", p.AcceptedParticipants),
+				attr.String("user_id", string(p.UserID)),
+				attr.Int("accepted_count_payload", len(p.AcceptedParticipants)),
+				attr.Int("declined_count_payload", len(p.DeclinedParticipants)),
+				attr.Int("tentative_count_payload", len(p.TentativeParticipants)),
 			)
 
-			// Get channel and message ID (assuming EventMessageID is now in the payload, otherwise get from msg.Metadata)
-			// Your UpdateRoundEventEmbed uses channelID and messageID parameters, not from payload/metadata directly
-			channelID := h.Config.Discord.ChannelID // Get channel ID from config
-			// Assuming discord_message_id is still passed in message metadata for CreateResultMessage
-			messageID := msg.Metadata.Get("discord_message_id") // Get message ID from metadata
+			channelID := h.Config.Discord.EventChannelID
+			messageID := msg.Metadata.Get("discord_message_id")
 
-			// Use the participant lists provided directly in the payload
-			acceptedParticipants := p.AcceptedParticipants
-			declinedParticipants := p.DeclinedParticipants
-			tentativeParticipants := p.TentativeParticipants
+			// Check if this is a scorecard embed (started round) by checking if any participant has a score
+			isScorecard := false
+			for _, participant := range p.AcceptedParticipants {
+				if participant.Score != nil {
+					isScorecard = true
+					break
+				}
+			}
 
-			// This calls the SAME function used by HandleRoundParticipantJoined
+			// If it's a scorecard embed, skip the update (participants can't be removed from started rounds)
+			if isScorecard {
+				h.Logger.InfoContext(ctx, "Skipping removal update for scorecard embed - participants cannot be removed from started rounds",
+					attr.CorrelationIDFromMsg(msg),
+					attr.String("round_id", p.RoundID.String()),
+					attr.String("discord_message_id", messageID),
+				)
+				return nil, nil // Don't update the embed for scorecard removals
+			}
+
+			// Only update RSVP embeds (before round starts)
 			_, err := h.RoundDiscord.GetRoundRsvpManager().UpdateRoundEventEmbed(
 				ctx,
-				channelID,            // Pass channel ID
-				messageID,            // Pass message ID
-				acceptedParticipants, // Pass the lists from the payload
-				declinedParticipants,
-				tentativeParticipants,
+				channelID,
+				messageID,
+				p.AcceptedParticipants,
+				p.DeclinedParticipants,
+				p.TentativeParticipants,
 			)
 			if err != nil {
 				h.Logger.ErrorContext(ctx, "Failed to update round event embed after removal",
 					attr.CorrelationIDFromMsg(msg),
-					attr.String("round_id", p.RoundID.String()),  // Log round ID in error
-					attr.String("discord_message_id", messageID), // Log message ID in error
+					attr.String("round_id", p.RoundID.String()),
+					attr.String("discord_message_id", messageID),
 					attr.Error(err),
 				)
 				return nil, fmt.Errorf("failed to update round event embed after removal: %w", err)
 			}
 
-			// Log success after the embed is updated
 			h.Logger.InfoContext(ctx, "Successfully updated round event embed after removal",
 				attr.CorrelationIDFromMsg(msg),
-				attr.String("round_id", p.RoundID.String()),  // Log round ID on success
-				attr.String("discord_message_id", messageID), // Log message ID on success
-				// UpdateRoundEventEmbed logs the final counts, so no need to duplicate here unless desired
+				attr.String("round_id", p.RoundID.String()),
+				attr.String("discord_message_id", messageID),
 			)
 
-			// Removal handlers typically don't publish outgoing messages
 			return nil, nil
 		},
-	)(msg) // Execute the wrapped handler
+	)(msg)
 }

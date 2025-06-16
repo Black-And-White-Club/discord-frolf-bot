@@ -14,6 +14,7 @@ import (
 	reflect "reflect"
 
 	scoreround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/score_round"
+	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	discordgo "github.com/bwmarrin/discordgo"
 	gomock "go.uber.org/mock/gomock"
@@ -41,6 +42,21 @@ func NewMockScoreRoundManager(ctrl *gomock.Controller) *MockScoreRoundManager {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockScoreRoundManager) EXPECT() *MockScoreRoundManagerMockRecorder {
 	return m.recorder
+}
+
+// AddLateParticipantToScorecard mocks base method.
+func (m *MockScoreRoundManager) AddLateParticipantToScorecard(ctx context.Context, channelID, messageID string, participants []roundtypes.Participant) (scoreround.ScoreRoundOperationResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddLateParticipantToScorecard", ctx, channelID, messageID, participants)
+	ret0, _ := ret[0].(scoreround.ScoreRoundOperationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AddLateParticipantToScorecard indicates an expected call of AddLateParticipantToScorecard.
+func (mr *MockScoreRoundManagerMockRecorder) AddLateParticipantToScorecard(ctx, channelID, messageID, participants any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddLateParticipantToScorecard", reflect.TypeOf((*MockScoreRoundManager)(nil).AddLateParticipantToScorecard), ctx, channelID, messageID, participants)
 }
 
 // HandleScoreButton mocks base method.

@@ -39,6 +39,6 @@ func RegisterHandlers(registry *interactions.Registry, manager RoundRsvpManager)
 			attr.String("custom_id", i.MessageComponentData().CustomID),
 			attr.String("interaction_id", i.ID),
 			attr.String("user", i.Member.User.Username))
-		manager.HandleRoundResponse(ctx, i)
+		manager.InteractionJoinRoundLate(ctx, i)
 	})
 }

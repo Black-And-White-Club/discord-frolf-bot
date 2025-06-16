@@ -16,7 +16,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (urm *updateRoundManager) SendUpdateRoundModal(ctx context.Context, i *discordgo.InteractionCreate) (UpdateRoundOperationResult, error) {
+func (urm *updateRoundManager) SendUpdateRoundModal(ctx context.Context, i *discordgo.InteractionCreate, roundID sharedtypes.RoundID) (UpdateRoundOperationResult, error) {
 	var opErr error
 
 	if err := ctx.Err(); err != nil {
@@ -49,14 +49,29 @@ func (urm *updateRoundManager) SendUpdateRoundModal(ctx context.Context, i *disc
 		if err := ctx.Err(); err != nil {
 			return UpdateRoundOperationResult{Error: err}, err
 		}
-		urm.logger.InfoContext(ctx, "Sending update round modal", attr.UserID(sharedtypes.DiscordID(userID)))
+		urm.logger.InfoContext(ctx, "Sending update round modal",
+			attr.UserID(sharedtypes.DiscordID(userID)),
+			attr.RoundID("round_id", roundID))
+
+		// ✅ Get the original message ID from the button interaction
+		var messageID string
+		if i.Message != nil {
+			messageID = i.Message.ID
+		}
+
+		urm.logger.InfoContext(ctx, "DEBUG: Including message ID in modal CustomID",
+			attr.String("message_id", messageID),
+			attr.RoundID("round_id", roundID))
+
+		// ✅ Include both roundID and messageID in CustomID
+		customID := fmt.Sprintf("update_round_modal|%s|%s", roundID, messageID)
 
 		// Send the modal as the initial response
 		err := urm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseModal,
 			Data: &discordgo.InteractionResponseData{
-				Title:    "update Round",
-				CustomID: "update_round_modal",
+				Title:    "Update Round",
+				CustomID: customID, // ✅ Now includes message ID
 				Components: []discordgo.MessageComponent{
 					discordgo.ActionsRow{
 						Components: []discordgo.MessageComponent{
@@ -163,8 +178,64 @@ func (urm *updateRoundManager) HandleUpdateRoundModalSubmit(ctx context.Context,
 
 		urm.logger.InfoContext(ctx, "Handling update round modal submission", attr.UserID(sharedtypes.DiscordID(userID)))
 
-		// Extract form data
+		// Extract roundID and messageID from modal CustomID
 		data := i.ModalSubmitData()
+		customID := data.CustomID
+		urm.logger.InfoContext(ctx, "Processing modal submission", attr.String("custom_id", customID))
+
+		parts := strings.Split(customID, "|")
+		if len(parts) < 3 { // ✅ Now expecting 3 parts: modal_name|roundID|messageID
+			err := fmt.Errorf("invalid modal custom_id format: %s (expected 3 parts)", customID)
+			urm.logger.ErrorContext(ctx, err.Error())
+
+			// Respond with error message
+			if respErr := urm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "Invalid modal format. Please try again.",
+					Flags:   discordgo.MessageFlagsEphemeral,
+				},
+			}); respErr != nil {
+				urm.logger.ErrorContext(ctx, "Failed to respond with error", attr.Error(respErr))
+			}
+
+			return UpdateRoundOperationResult{Error: err}, err
+		}
+
+		// ✅ Extract both roundID and messageID
+		urm.logger.InfoContext(ctx, "DEBUG: Extracted parts from CustomID",
+			attr.String("full_custom_id", customID),
+			attr.String("round_id_part", parts[1]),
+			attr.String("message_id_part", parts[2]))
+
+		roundUUID, err := uuid.Parse(parts[1])
+		if err != nil {
+			err := fmt.Errorf("invalid UUID in modal custom_id: %w", err)
+			urm.logger.ErrorContext(ctx, err.Error())
+
+			// Respond with error message
+			if respErr := urm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "Invalid round ID. Please try again.",
+					Flags:   discordgo.MessageFlagsEphemeral,
+				},
+			}); respErr != nil {
+				urm.logger.ErrorContext(ctx, "Failed to respond with error", attr.Error(respErr))
+			}
+
+			return UpdateRoundOperationResult{Error: err}, err
+		}
+		roundID := sharedtypes.RoundID(roundUUID)
+		messageID := parts[2] // ✅ Extract message ID from CustomID
+
+		// ✅ Add debugging here too
+		urm.logger.InfoContext(ctx, "DEBUG: Parsed roundID and messageID",
+			attr.RoundID("round_id", roundID),
+			attr.String("round_id_string", roundID.String()),
+			attr.String("message_id", messageID))
+
+		// Extract form data
 		title := roundtypes.Title(strings.TrimSpace(data.Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value))
 		description := roundtypes.Description(strings.TrimSpace(data.Components[1].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value))
 		startTimeStr := strings.TrimSpace(data.Components[2].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value)
@@ -172,6 +243,7 @@ func (urm *updateRoundManager) HandleUpdateRoundModalSubmit(ctx context.Context,
 		location := roundtypes.Location(strings.TrimSpace(data.Components[4].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value))
 
 		urm.logger.InfoContext(ctx, "Extracted form data",
+			attr.RoundID("round_id", roundID),
 			attr.String("title", string(title)),
 			attr.String("description", string(description)),
 			attr.String("start_time", startTimeStr),
@@ -220,10 +292,10 @@ func (urm *updateRoundManager) HandleUpdateRoundModalSubmit(ctx context.Context,
 		}
 
 		// Acknowledge receipt of the modal submission
-		err := urm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		err = urm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
-				Content:    "Round update request received. Please wait for confirmation.",
+				Content:    "Round update request received.",
 				Flags:      discordgo.MessageFlagsEphemeral,
 				Components: []discordgo.MessageComponent{},
 			},
@@ -233,9 +305,12 @@ func (urm *updateRoundManager) HandleUpdateRoundModalSubmit(ctx context.Context,
 			return UpdateRoundOperationResult{Error: acknowledgeErr}, acknowledgeErr
 		}
 
-		// Publish event for backend validation
+		// ✅ Publish event for backend validation with correct messageID
 		payload := roundevents.UpdateRoundRequestedPayload{
+			RoundID:     roundID,
 			UserID:      sharedtypes.DiscordID(userID),
+			ChannelID:   i.ChannelID,
+			MessageID:   messageID, // ✅ Use the correct message ID from CustomID
 			Title:       &title,
 			Description: &description,
 			StartTime:   &startTimeStr,
@@ -243,7 +318,11 @@ func (urm *updateRoundManager) HandleUpdateRoundModalSubmit(ctx context.Context,
 			Timezone:    &timezone,
 		}
 
-		urm.logger.InfoContext(ctx, "Publishing event for Modal validation", attr.Any("payload", payload))
+		// ✅ Add debugging for payload
+		urm.logger.InfoContext(ctx, "DEBUG: Final payload being published",
+			attr.Any("payload", payload),
+			attr.RoundID("payload_round_id", payload.RoundID),
+			attr.String("payload_message_id", messageID))
 
 		correlationID := uuid.New().String()
 		err = urm.interactionStore.Set(correlationID, i.Interaction, 15*time.Minute)
@@ -252,7 +331,7 @@ func (urm *updateRoundManager) HandleUpdateRoundModalSubmit(ctx context.Context,
 			return UpdateRoundOperationResult{Error: storeErr}, storeErr
 		}
 
-		msg, err := urm.createEvent(ctx, discordroundevents.RoundUpdateModalSubmit, payload, i)
+		msg, err := urm.createEvent(ctx, discordroundevents.RoundUpdateRequestTopic, payload, i)
 		if err != nil {
 			updateErr := fmt.Errorf("failed to update event: %w", err)
 			return UpdateRoundOperationResult{Error: updateErr}, updateErr
@@ -262,7 +341,7 @@ func (urm *updateRoundManager) HandleUpdateRoundModalSubmit(ctx context.Context,
 		msg.Metadata.Set("correlation_id", correlationID)
 		msg.Metadata.Set("user_id", userID)
 
-		if err := urm.publisher.Publish(discordroundevents.RoundUpdateModalSubmit, msg); err != nil {
+		if err := urm.publisher.Publish(discordroundevents.RoundUpdateRequestTopic, msg); err != nil {
 			publishErr := fmt.Errorf("failed to publish event: %w", err)
 			return UpdateRoundOperationResult{Error: publishErr}, publishErr
 		}

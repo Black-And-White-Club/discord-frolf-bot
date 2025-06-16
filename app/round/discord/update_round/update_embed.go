@@ -10,10 +10,10 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-func (urm *updateRoundManager) UpdateRoundEventEmbed(ctx context.Context, channelID string, messageID sharedtypes.RoundID, title *roundtypes.Title, description *roundtypes.Description, startTime *sharedtypes.StartTime, location *roundtypes.Location) (UpdateRoundOperationResult, error) {
+func (urm *updateRoundManager) UpdateRoundEventEmbed(ctx context.Context, channelID string, messageID string, title *roundtypes.Title, description *roundtypes.Description, startTime *sharedtypes.StartTime, location *roundtypes.Location) (UpdateRoundOperationResult, error) {
 	return urm.operationWrapper(ctx, "UpdateRoundEventEmbed", func(ctx context.Context) (UpdateRoundOperationResult, error) {
 		// Fetch the original message first to get existing data
-		msg, err := urm.session.ChannelMessage(channelID, messageID.String())
+		msg, err := urm.session.ChannelMessage(channelID, messageID)
 		if err != nil {
 			return UpdateRoundOperationResult{Error: fmt.Errorf("failed to fetch message: %w", err)}, err
 		}
@@ -104,7 +104,7 @@ func (urm *updateRoundManager) UpdateRoundEventEmbed(ctx context.Context, channe
 		}
 
 		// Update the message only if there are changes
-		updatedMsg, err := urm.session.ChannelMessageEditEmbed(channelID, messageID.String(), updatedEmbed)
+		updatedMsg, err := urm.session.ChannelMessageEditEmbed(channelID, messageID, updatedEmbed)
 		if err != nil {
 			return UpdateRoundOperationResult{Error: fmt.Errorf("failed to update embed: %w", err)}, err
 		}

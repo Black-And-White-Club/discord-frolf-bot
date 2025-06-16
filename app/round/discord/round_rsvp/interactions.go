@@ -13,7 +13,7 @@ import (
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
-	"github.com/ThreeDotsLabs/watermill/message"
+	wmmessage "github.com/ThreeDotsLabs/watermill/message"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -78,6 +78,11 @@ func (rrm *roundRsvpManager) HandleRoundResponse(ctx context.Context, i *discord
 			return RoundRsvpOperationResult{Error: fmt.Errorf("unknown response type: %s", customID)}, nil
 		}
 
+		rrm.logger.InfoContext(ctx, "RSVP DEBUG",
+			attr.String("custom_id", customID),
+			attr.String("response", string(response)),
+			attr.String("user_id", user.ID),
+		)
 		if err := rrm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseDeferredMessageUpdate,
 		}); err != nil {
@@ -98,8 +103,8 @@ func (rrm *roundRsvpManager) HandleRoundResponse(ctx context.Context, i *discord
 			TagNumber: tagNumberPtr,
 		}
 
-		msg := &message.Message{
-			Metadata: message.Metadata{
+		msg := &wmmessage.Message{
+			Metadata: wmmessage.Metadata{
 				"discord_message_id": messageID, // Use the safely extracted messageID
 				"topic":              discordroundevents.RoundParticipantJoinReqTopic,
 			},
@@ -168,6 +173,46 @@ func (rrm *roundRsvpManager) InteractionJoinRoundLate(ctx context.Context, i *di
 			return RoundRsvpOperationResult{Error: fmt.Errorf("failed to parse round UUID: %w", err)}, nil
 		}
 
+		// Check if user is already participating by fetching the current embed
+		message, err := rrm.session.ChannelMessage(i.ChannelID, i.Message.ID)
+		if err != nil {
+			return RoundRsvpOperationResult{Error: fmt.Errorf("failed to fetch current message: %w", err)}, nil
+		}
+
+		if len(message.Embeds) > 0 {
+			embed := message.Embeds[0]
+
+			// Check if user is already in any of the embed fields
+			userAlreadyJoined := false
+			for _, field := range embed.Fields {
+				if strings.Contains(field.Value, fmt.Sprintf("<@%s>", user.ID)) {
+					userAlreadyJoined = true
+					break
+				}
+			}
+
+			if userAlreadyJoined {
+				// User is already in the round, send ephemeral message
+				err := rrm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseChannelMessageWithSource,
+					Data: &discordgo.InteractionResponseData{
+						Content: "You have already joined this round!",
+						Flags:   discordgo.MessageFlagsEphemeral,
+					},
+				})
+				if err != nil {
+					return RoundRsvpOperationResult{Error: err}, nil
+				}
+
+				rrm.logger.InfoContext(ctx, "User attempted to join round they're already in",
+					attr.UserID(sharedtypes.DiscordID(user.ID)),
+					attr.String("round_id", roundUUID.String()))
+
+				return RoundRsvpOperationResult{Success: "User already joined"}, nil
+			}
+		}
+
+		// User is not already in the round, proceed with join logic
 		if err := rrm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseDeferredMessageUpdate,
 		}); err != nil {
@@ -191,8 +236,8 @@ func (rrm *roundRsvpManager) InteractionJoinRoundLate(ctx context.Context, i *di
 			messageID = i.Message.ID
 		}
 
-		msg := &message.Message{
-			Metadata: message.Metadata{
+		msg := &wmmessage.Message{
+			Metadata: wmmessage.Metadata{
 				"discord_message_id": messageID, // Use the safely extracted messageID
 				"topic":              discordroundevents.RoundParticipantJoinReqTopic,
 			},
@@ -214,6 +259,10 @@ func (rrm *roundRsvpManager) InteractionJoinRoundLate(ctx context.Context, i *di
 		if err != nil {
 			return RoundRsvpOperationResult{Error: err}, nil
 		}
+
+		rrm.logger.InfoContext(ctx, "Successfully processed late join request",
+			attr.UserID(sharedtypes.DiscordID(user.ID)),
+			attr.String("round_id", roundUUID.String()))
 
 		return RoundRsvpOperationResult{Success: "Late join successfully processed"}, nil
 	})

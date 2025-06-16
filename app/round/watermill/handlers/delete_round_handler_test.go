@@ -306,7 +306,7 @@ func TestRoundHandlers_HandleRoundDeleted(t *testing.T) {
 				Logger: mockLogger,
 				Config: &config.Config{ // Provide a non-nil config with a Discord channel ID
 					Discord: config.DiscordConfig{
-						ChannelID: "dummy_channel_id", // Provide a dummy channel ID for the config
+						EventChannelID: "dummy_channel_id", // Provide a dummy channel ID for the config
 					},
 				},
 				Helpers:      mockHelper,

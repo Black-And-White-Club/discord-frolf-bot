@@ -239,7 +239,7 @@ func TestRoundHandlers_HandleParticipantScoreUpdated(t *testing.T) {
 				Logger: mockLogger,
 				Config: &config.Config{
 					Discord: config.DiscordConfig{
-						ChannelID: "config-channel", // Add config channel for fallback test
+						EventChannelID: "config-channel", // Add config channel for fallback test
 					},
 				},
 				Helpers:      mockHelper,

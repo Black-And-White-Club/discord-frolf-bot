@@ -27,9 +27,9 @@ import (
 
 // UpdateRoundManager defines the interface for update round operations.
 type UpdateRoundManager interface {
-	UpdateRoundEventEmbed(ctx context.Context, channelID string, messageID sharedtypes.RoundID, title *roundtypes.Title, description *roundtypes.Description, startTime *sharedtypes.StartTime, location *roundtypes.Location) (UpdateRoundOperationResult, error)
+	UpdateRoundEventEmbed(ctx context.Context, channelID string, messageID string, title *roundtypes.Title, description *roundtypes.Description, startTime *sharedtypes.StartTime, location *roundtypes.Location) (UpdateRoundOperationResult, error)
 	HandleEditRoundButton(ctx context.Context, i *discordgo.InteractionCreate) (UpdateRoundOperationResult, error)
-	SendUpdateRoundModal(ctx context.Context, i *discordgo.InteractionCreate) (UpdateRoundOperationResult, error)
+	SendUpdateRoundModal(ctx context.Context, i *discordgo.InteractionCreate, roundID sharedtypes.RoundID) (UpdateRoundOperationResult, error)
 	HandleUpdateRoundModalSubmit(ctx context.Context, i *discordgo.InteractionCreate) (UpdateRoundOperationResult, error)
 	HandleUpdateRoundModalCancel(ctx context.Context, i *discordgo.InteractionCreate) (UpdateRoundOperationResult, error)
 }

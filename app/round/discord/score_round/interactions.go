@@ -253,6 +253,26 @@ func (srm *scoreRoundManager) HandleScoreSubmission(ctx context.Context, i *disc
 			return ScoreRoundOperationResult{Error: fmt.Errorf("invalid score input")}, nil
 		}
 
+		// Validate score range
+		if score < -36 || score > 72 {
+			err := fmt.Errorf("score out of range: %d. Score must be between -36 and 72", score)
+			srm.logger.ErrorContext(ctx, "Score out of valid range",
+				attr.Error(err),
+				attr.Int("score", score),
+				attr.String("user_id", userIDFromModal))
+
+			// Respond to modal with error message
+			_, err = srm.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+				Content: fmt.Sprintf("Invalid score: %d. Scores must be between -36 and +72.", score),
+				Flags:   discordgo.MessageFlagsEphemeral,
+			})
+			if err != nil {
+				srm.logger.ErrorContext(ctx, "Failed to send followup message", attr.Error(err))
+				return ScoreRoundOperationResult{Error: err}, nil
+			}
+			return ScoreRoundOperationResult{Error: fmt.Errorf("score out of range")}, nil
+		}
+
 		// Store the score as sharedtypes.Score
 		scoreValue := sharedtypes.Score(score)
 
@@ -330,7 +350,7 @@ func (srm *scoreRoundManager) HandleScoreSubmission(ctx context.Context, i *disc
 		// Send confirmation to user via followup message
 		srm.logger.DebugContext(ctx, "Sending confirmation to user")
 		_, err = srm.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
-			Content: fmt.Sprintf("Your score of %d has been submitted! You'll receive a confirmation once it's processed.", score),
+			Content: fmt.Sprintf("Your score of %d has been submitted!", score),
 			Flags:   discordgo.MessageFlagsEphemeral,
 		})
 		if err != nil {

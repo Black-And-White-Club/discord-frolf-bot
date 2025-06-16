@@ -20,7 +20,7 @@ import (
 // Handlers defines the interface for leaderboard handlers.
 type Handlers interface {
 	// Leaderboard Updates
-	HandleLeaderboardUpdated(msg *message.Message) ([]*message.Message, error)
+	HandleBatchTagAssigned(msg *message.Message) ([]*message.Message, error)
 	HandleLeaderboardRetrieveRequest(msg *message.Message) ([]*message.Message, error)
 	HandleLeaderboardData(msg *message.Message) ([]*message.Message, error)
 

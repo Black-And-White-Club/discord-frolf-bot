@@ -66,7 +66,6 @@ func (r *RoundRouter) Configure(ctx context.Context, handlers roundhandlers.Hand
 		r.middlewareHelper.DiscordMetadataMiddleware(),
 		r.middlewareHelper.RoutingMetadataMiddleware(),
 		middleware.Recoverer,
-		middleware.Retry{MaxRetries: 2}.Middleware,
 		tracingfrolfbot.TraceHandler(r.tracer),
 	)
 
@@ -89,28 +88,29 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 
 		// Update flow
 		discordroundevents.RoundUpdateRequestTopic: handlers.HandleRoundUpdateRequested,
-		roundevents.RoundUpdated:                   handlers.HandleRoundUpdated,
-		roundevents.RoundUpdateError:               handlers.HandleRoundUpdateFailed,
-		roundevents.RoundUpdateValidated:           handlers.HandleRoundUpdateValidationFailed,
+		roundevents.RoundScheduleUpdate:            handlers.HandleRoundUpdated,
+		roundevents.RoundScheduled:                 handlers.HandleRoundUpdateFailed,
 
 		// Participation
 		discordroundevents.RoundParticipantJoinReqTopic: handlers.HandleRoundParticipantJoinRequest,
 		roundevents.RoundParticipantRemoved:             handlers.HandleRoundParticipantRemoved,
 
 		// Scoring
-		roundevents.RoundParticipantScoreUpdated: handlers.HandleParticipantScoreUpdated,
-		roundevents.RoundScoreUpdateError:        handlers.HandleScoreUpdateError,
+		roundevents.DiscordParticipantScoreUpdated: handlers.HandleParticipantScoreUpdated,
+		roundevents.RoundScoreUpdateError:          handlers.HandleScoreUpdateError,
 
 		// Lifecycle
 		discordroundevents.RoundDeletedTopic: handlers.HandleRoundDeleted,
 		roundevents.DiscordRoundFinalized:    handlers.HandleRoundFinalized,
-		roundevents.RoundStarted:             handlers.HandleRoundStarted,
+		roundevents.DiscordRoundStarted:      handlers.HandleRoundStarted,
 
 		// Tag handling
 		roundevents.RoundParticipantJoined: handlers.HandleRoundParticipantJoined,
 
 		// Reminders
-		roundevents.RoundReminder: handlers.HandleRoundReminder,
+		roundevents.DiscordRoundReminder: handlers.HandleRoundReminder,
+
+		roundevents.TagsUpdatedForScheduledRounds: handlers.HandleTagsUpdatedForScheduledRounds,
 	}
 
 	for topic, handlerFunc := range eventsToHandlers {

@@ -3,6 +3,7 @@ package finalizeround
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
@@ -30,8 +31,14 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 			attr.RoundID("round_id", payload.RoundID),
 			attr.String("title", string(payload.Title)))
 
-		// Create participant fields with appropriate nil checks
-		participantFields := make([]*discordgo.MessageEmbedField, 0, len(payload.Participants))
+		// Create a slice to hold participants with their user info for sorting
+		type participantWithUser struct {
+			UserID   string
+			Username string
+			Score    *sharedtypes.Score
+		}
+
+		participantsWithUsers := make([]participantWithUser, 0, len(payload.Participants))
 
 		for i, participant := range payload.Participants {
 			// Check if UserID is valid
@@ -46,7 +53,6 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 			if err != nil {
 				frm.logger.WarnContext(ctx, "Failed to get participant info, skipping participant",
 					attr.Error(err), attr.String("user_id", string(participant.UserID)))
-				// Skip this participant instead of adding fallback name
 				continue
 			} else {
 				username = user.Username
@@ -56,13 +62,81 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 				}
 			}
 
+			participantsWithUsers = append(participantsWithUsers, participantWithUser{
+				UserID:   string(participant.UserID),
+				Username: username,
+				Score:    participant.Score,
+			})
+		}
+
+		// Sort participants by score (best score first - in frolf, lower is better)
+		sort.Slice(participantsWithUsers, func(i, j int) bool {
+			// Handle nil scores - put them at the end
+			if participantsWithUsers[i].Score == nil && participantsWithUsers[j].Score == nil {
+				return false // maintain original order for equal elements
+			}
+			if participantsWithUsers[i].Score == nil {
+				return false // nil scores go to the end
+			}
+			if participantsWithUsers[j].Score == nil {
+				return true // non-nil scores come first
+			}
+			// Lower scores are better in frolf
+			return *participantsWithUsers[i].Score < *participantsWithUsers[j].Score
+		})
+
+		// Create participant fields with ranking emojis
+		participantFields := make([]*discordgo.MessageEmbedField, 0, len(participantsWithUsers))
+		totalParticipants := len(participantsWithUsers)
+
+		for i, participant := range participantsWithUsers {
 			scoreDisplay := "Score: --"
 			if participant.Score != nil {
 				scoreDisplay = fmt.Sprintf("Score: %+d", *participant.Score)
 			}
 
+			// Determine emoji based on position and total participants
+			var emoji string
+			switch totalParticipants {
+			case 1:
+				emoji = "😢" // Just sad emoji for solo play
+			case 2:
+				if i == 0 {
+					emoji = "🥇" // Winner gets gold
+				} else {
+					emoji = "🗑️" // Loser gets trash can
+				}
+			case 3:
+				switch i {
+				case 0:
+					emoji = "🥇" // 1st place
+				case 1:
+					emoji = "🥈" // 2nd place
+				case 2:
+					emoji = "🗑️" // Last place gets trash can
+				}
+			default: // 4 or more participants
+				switch i {
+				case 0:
+					emoji = "🥇" // 1st place
+				case 1:
+					emoji = "🥈" // 2nd place
+				case 2:
+					emoji = "🥉" // 3rd place
+				case totalParticipants - 1:
+					emoji = "🗑️" // Last place gets trash can
+				default:
+					emoji = "🏌️" // Everyone else gets golf emoji
+				}
+			}
+
+			// Only apply ranking emojis to participants with scores
+			if participant.Score == nil {
+				emoji = "🏌️" // Default emoji for no score
+			}
+
 			participantFields = append(participantFields, &discordgo.MessageEmbedField{
-				Name:   fmt.Sprintf("🏌️ %s", username),
+				Name:   fmt.Sprintf("%s %s", emoji, participant.Username),
 				Value:  scoreDisplay,
 				Inline: true,
 			})

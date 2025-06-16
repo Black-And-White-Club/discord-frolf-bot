@@ -90,22 +90,22 @@ func (mr *MockUpdateRoundManagerMockRecorder) HandleUpdateRoundModalSubmit(ctx, 
 }
 
 // SendUpdateRoundModal mocks base method.
-func (m *MockUpdateRoundManager) SendUpdateRoundModal(ctx context.Context, i *discordgo.InteractionCreate) (updateround.UpdateRoundOperationResult, error) {
+func (m *MockUpdateRoundManager) SendUpdateRoundModal(ctx context.Context, i *discordgo.InteractionCreate, roundID sharedtypes.RoundID) (updateround.UpdateRoundOperationResult, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SendUpdateRoundModal", ctx, i)
+	ret := m.ctrl.Call(m, "SendUpdateRoundModal", ctx, i, roundID)
 	ret0, _ := ret[0].(updateround.UpdateRoundOperationResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // SendUpdateRoundModal indicates an expected call of SendUpdateRoundModal.
-func (mr *MockUpdateRoundManagerMockRecorder) SendUpdateRoundModal(ctx, i any) *gomock.Call {
+func (mr *MockUpdateRoundManagerMockRecorder) SendUpdateRoundModal(ctx, i, roundID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendUpdateRoundModal", reflect.TypeOf((*MockUpdateRoundManager)(nil).SendUpdateRoundModal), ctx, i)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendUpdateRoundModal", reflect.TypeOf((*MockUpdateRoundManager)(nil).SendUpdateRoundModal), ctx, i, roundID)
 }
 
 // UpdateRoundEventEmbed mocks base method.
-func (m *MockUpdateRoundManager) UpdateRoundEventEmbed(ctx context.Context, channelID string, messageID sharedtypes.RoundID, title *roundtypes.Title, description *roundtypes.Description, startTime *sharedtypes.StartTime, location *roundtypes.Location) (updateround.UpdateRoundOperationResult, error) {
+func (m *MockUpdateRoundManager) UpdateRoundEventEmbed(ctx context.Context, channelID, messageID string, title *roundtypes.Title, description *roundtypes.Description, startTime *sharedtypes.StartTime, location *roundtypes.Location) (updateround.UpdateRoundOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateRoundEventEmbed", ctx, channelID, messageID, title, description, startTime, location)
 	ret0, _ := ret[0].(updateround.UpdateRoundOperationResult)

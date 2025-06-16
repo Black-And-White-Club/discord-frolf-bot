@@ -161,6 +161,10 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 		return fmt.Errorf("leaderboard module initialization failed: %w", err)
 	}
 
+	if err := discord.RegisterCommands(bot.Session, bot.Logger, bot.Config.Discord.GuildID); err != nil {
+		return fmt.Errorf("failed to register commands with Discord: %w", err)
+	}
+
 	// Register Discord handlers
 	discordgoSession.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		bot.Logger.Info("Handling interaction", attr.String("type", i.Type.String()))

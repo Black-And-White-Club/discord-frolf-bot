@@ -1,4 +1,4 @@
-package scoreround
+package tagupdates
 
 import (
 	"context"
@@ -7,60 +7,57 @@ import (
 	"log/slog"
 	"time"
 
-	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	discordgo "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
+	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
-	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
-	"github.com/bwmarrin/discordgo"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
 )
 
-// ScoreRoundManager defines the interface for create round operations.
-type ScoreRoundManager interface {
-	HandleScoreButton(ctx context.Context, i *discordgo.InteractionCreate) (ScoreRoundOperationResult, error)
-	HandleScoreSubmission(ctx context.Context, i *discordgo.InteractionCreate) (ScoreRoundOperationResult, error)
-	SendScoreUpdateConfirmation(ctx context.Context, channelID string, userID sharedtypes.DiscordID, score *sharedtypes.Score) (ScoreRoundOperationResult, error)
-	SendScoreUpdateError(ctx context.Context, userID sharedtypes.DiscordID, errorMsg string) (ScoreRoundOperationResult, error)
-	UpdateScoreEmbed(ctx context.Context, channelID, messageID string, userID sharedtypes.DiscordID, score *sharedtypes.Score) (ScoreRoundOperationResult, error)
-	AddLateParticipantToScorecard(ctx context.Context, channelID, messageID string, participants []roundtypes.Participant) (ScoreRoundOperationResult, error)
+// TagUpdateManager defines the interface for tag update operations.
+type TagUpdateManager interface {
+	UpdateDiscordEmbedsWithTagChanges(ctx context.Context, payload roundevents.TagsUpdatedForScheduledRoundsPayload, tagUpdates map[sharedtypes.DiscordID]*sharedtypes.TagNumber) (TagUpdateOperationResult, error)
+	UpdateTagsInEmbed(ctx context.Context, channelID, messageID string, tagUpdates map[sharedtypes.DiscordID]*sharedtypes.TagNumber) (TagUpdateOperationResult, error)
 }
 
-// scoreRoundManager implements the ScoreRoundManager interface.
-type scoreRoundManager struct {
-	session          discord.Session
+// TagUpdateOperationResult represents the result of a tag update operation.
+type TagUpdateOperationResult struct {
+	Success interface{}
+	Failure interface{}
+	Error   error
+}
+
+type tagUpdateManager struct {
+	session          discordgo.Session
 	publisher        eventbus.EventBus
 	logger           *slog.Logger
 	helper           utils.Helpers
 	config           *config.Config
 	tracer           trace.Tracer
 	metrics          discordmetrics.DiscordMetrics
-	operationWrapper func(ctx context.Context, opName string, fn func(ctx context.Context) (ScoreRoundOperationResult, error)) (ScoreRoundOperationResult, error)
+	operationWrapper func(ctx context.Context, opName string, fn func(ctx context.Context) (TagUpdateOperationResult, error)) (TagUpdateOperationResult, error)
 }
 
-// NewScoreRoundManager creates a new ScoreRoundManager instance.
-func NewScoreRoundManager(
-	session discord.Session,
+// NewTagUpdateManager creates a new TagUpdateManager.
+func NewTagUpdateManager(
+	session discordgo.Session,
 	publisher eventbus.EventBus,
 	logger *slog.Logger,
 	helper utils.Helpers,
 	config *config.Config,
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
-) ScoreRoundManager {
+) TagUpdateManager {
 	if logger != nil {
-		logger.InfoContext(context.Background(), "Creating ScoreRoundManager",
-			attr.Any("session", session),
-			attr.Any("publisher", publisher),
-			attr.Any("config", config),
-		)
+		logger.InfoContext(context.Background(), "Creating TagUpdateManager")
 	}
-	return &scoreRoundManager{
+	return &tagUpdateManager{
 		session:   session,
 		publisher: publisher,
 		logger:    logger,
@@ -68,23 +65,23 @@ func NewScoreRoundManager(
 		config:    config,
 		tracer:    tracer,
 		metrics:   metrics,
-		operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (ScoreRoundOperationResult, error)) (ScoreRoundOperationResult, error) {
-			return wrapScoreRoundOperation(ctx, opName, fn, logger, tracer, metrics)
+		operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (TagUpdateOperationResult, error)) (TagUpdateOperationResult, error) {
+			return wrapTagUpdateOperation(ctx, opName, fn, logger, tracer, metrics)
 		},
 	}
 }
 
-// wrapScoreRoundOperation adds tracing, metrics, and error handling for operations.
-func wrapScoreRoundOperation(
+// wrapTagUpdateOperation adds tracing, metrics, and error handling for operations.
+func wrapTagUpdateOperation(
 	ctx context.Context,
 	operationName string,
-	fn func(ctx context.Context) (ScoreRoundOperationResult, error),
+	fn func(ctx context.Context) (TagUpdateOperationResult, error),
 	logger *slog.Logger,
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
-) (ScoreRoundOperationResult, error) {
+) (TagUpdateOperationResult, error) {
 	if fn == nil {
-		return ScoreRoundOperationResult{Error: errors.New("operation function is nil")}, nil
+		return TagUpdateOperationResult{Error: errors.New("operation function is nil")}, nil
 	}
 
 	if tracer == nil {
@@ -134,7 +131,7 @@ func wrapScoreRoundOperation(
 		if localMetrics != nil {
 			localMetrics.RecordAPIError(ctx, operationName, "operation_error")
 		}
-		return ScoreRoundOperationResult{Error: wrapped}, wrapped
+		return TagUpdateOperationResult{Error: wrapped}, wrapped
 	}
 
 	if result.Error != nil {
@@ -148,20 +145,3 @@ func wrapScoreRoundOperation(
 
 	return result, nil
 }
-
-// ScoreRoundOperationResult is the standard result container for operations.
-type ScoreRoundOperationResult struct {
-	Success interface{}
-	Failure interface{}
-	Error   error
-}
-
-// userHasRole checks if a user has a specific Discord role
-// func userHasRole(userRoles []string, requiredRoleID string) bool {
-// 	for _, roleID := range userRoles {
-// 		if roleID == requiredRoleID {
-// 			return true
-// 		}
-// 	}
-// 	return false
-// }

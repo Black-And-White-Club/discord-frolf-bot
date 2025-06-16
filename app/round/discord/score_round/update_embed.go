@@ -8,6 +8,7 @@ import (
 
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord" // Import roundtypes for Response
+	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
 )
@@ -385,6 +386,196 @@ func (srm *scoreRoundManager) UpdateScoreEmbed(ctx context.Context, channelID, m
 			attr.String("channel_id", channelID),
 			attr.String("message_id", messageID),
 		)
+
+		return ScoreRoundOperationResult{Success: updatedMsg}, nil
+	})
+}
+
+// AddLateParticipantToScorecard adds a late-joining participant to the scorecard embed
+// It adds the participant to the appropriate field, creating participant fields if they don't exist
+func (srm *scoreRoundManager) AddLateParticipantToScorecard(ctx context.Context, channelID, messageID string, participants []roundtypes.Participant) (ScoreRoundOperationResult, error) {
+	ctx = discordmetrics.WithValue(ctx, discordmetrics.CommandNameKey, "add_late_participant")
+
+	return srm.operationWrapper(ctx, "add_late_participant", func(ctx context.Context) (ScoreRoundOperationResult, error) {
+		if srm.session == nil {
+			return ScoreRoundOperationResult{Error: fmt.Errorf("session is nil")}, nil
+		}
+
+		// 1. Fetch the existing message and embed
+		message, err := srm.session.ChannelMessage(channelID, messageID)
+		if err != nil {
+			srm.logger.ErrorContext(ctx, "Failed to fetch message for late participant addition",
+				attr.Error(err),
+				attr.String("channel_id", channelID),
+				attr.String("message_id", messageID))
+			return ScoreRoundOperationResult{Error: err}, fmt.Errorf("failed to fetch message: %w", err)
+		}
+
+		if len(message.Embeds) == 0 {
+			srm.logger.WarnContext(ctx, "No embeds found in message for late participant addition",
+				attr.String("channel_id", channelID),
+				attr.String("message_id", messageID))
+			return ScoreRoundOperationResult{Success: "No embeds found to update"}, nil
+		}
+
+		// Assuming the scorecard is the first embed
+		embed := message.Embeds[0]
+
+		srm.logger.DebugContext(ctx, "Current embed structure",
+			attr.Int("total_fields", len(embed.Fields)))
+
+		for i, field := range embed.Fields {
+			srm.logger.DebugContext(ctx, "Existing field",
+				attr.Int("index", i),
+				attr.String("name", field.Name),
+				attr.String("value_preview", field.Value))
+		}
+
+		// 2. Find or create the accepted participants field
+		acceptedFieldIndex := -1
+		tentativeFieldIndex := -1
+
+		// First, try to find existing participant fields
+		for i, field := range embed.Fields {
+			fieldName := field.Name
+			fieldNameLower := strings.ToLower(fieldName)
+
+			if fieldName == "✅ Accepted" || strings.Contains(fieldNameLower, "accepted") {
+				acceptedFieldIndex = i
+				srm.logger.InfoContext(ctx, "Found existing accepted field",
+					attr.Int("index", i),
+					attr.String("name", fieldName))
+			}
+
+			if fieldName == "🤔 Tentative" || strings.Contains(fieldNameLower, "tentative") {
+				tentativeFieldIndex = i
+				srm.logger.InfoContext(ctx, "Found existing tentative field",
+					attr.Int("index", i),
+					attr.String("name", fieldName))
+			}
+		}
+
+		// If participant fields don't exist, create them
+		if acceptedFieldIndex == -1 || tentativeFieldIndex == -1 {
+			srm.logger.InfoContext(ctx, "Creating missing participant fields",
+				attr.Bool("need_accepted", acceptedFieldIndex == -1),
+				attr.Bool("need_tentative", tentativeFieldIndex == -1))
+
+			// Add the missing fields
+			if acceptedFieldIndex == -1 {
+				embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+					Name:   "✅ Accepted",
+					Value:  placeholderNoParticipants,
+					Inline: false,
+				})
+				acceptedFieldIndex = len(embed.Fields) - 1
+			}
+
+			if tentativeFieldIndex == -1 {
+				embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+					Name:   "🤔 Tentative",
+					Value:  placeholderNoParticipants,
+					Inline: false,
+				})
+				tentativeFieldIndex = len(embed.Fields) - 1
+			}
+		}
+
+		// 3. Process each participant and add to appropriate field
+		addedCount := 0
+		for _, participant := range participants {
+			var targetFieldIndex int
+			var fieldName string
+
+			// Determine which field to add the participant to based on their response
+			switch participant.Response {
+			case roundtypes.ResponseAccept:
+				targetFieldIndex = acceptedFieldIndex
+				fieldName = "✅ Accepted"
+			case roundtypes.ResponseTentative:
+				targetFieldIndex = tentativeFieldIndex
+				fieldName = "🤔 Tentative"
+			default:
+				srm.logger.WarnContext(ctx, "Participant has unsupported response type for scorecard",
+					attr.String("user_id", string(participant.UserID)),
+					attr.String("response", string(participant.Response)))
+				continue
+			}
+
+			// Get existing lines from the target field
+			targetField := embed.Fields[targetFieldIndex]
+			existingLines := []string{}
+
+			if strings.TrimSpace(targetField.Value) != "" && targetField.Value != placeholderNoParticipants {
+				existingLines = strings.Split(targetField.Value, "\n")
+			}
+
+			// Check if participant already exists in this field
+			participantExists := false
+			participantIDStr := string(participant.UserID)
+
+			for _, line := range existingLines {
+				if strings.Contains(line, participantIDStr) {
+					participantExists = true
+					srm.logger.DebugContext(ctx, "Participant already exists in field",
+						attr.String("user_id", participantIDStr),
+						attr.String("field_name", fieldName),
+						attr.String("existing_line", line))
+					break
+				}
+			}
+
+			if !participantExists {
+				// Format new participant line: <@USER_ID> Tag: N — Score: --
+				tagDisplayPart := ""
+				if participant.TagNumber != nil && *participant.TagNumber > 0 {
+					tagDisplayPart = fmt.Sprintf(" %s %d", tagPrefix, *participant.TagNumber)
+				}
+
+				scoreDisplayPart := fmt.Sprintf(" — %s %s", scorePrefix, scoreNoData)
+				if participant.Score != nil {
+					scoreDisplayPart = fmt.Sprintf(" — %s %+d", scorePrefix, *participant.Score)
+				}
+
+				newParticipantLine := fmt.Sprintf("<@%s>%s%s", participant.UserID, tagDisplayPart, scoreDisplayPart)
+				existingLines = append(existingLines, newParticipantLine)
+
+				// Update the field value
+				embed.Fields[targetFieldIndex].Value = strings.Join(existingLines, "\n")
+				addedCount++
+
+				srm.logger.InfoContext(ctx, "Added late participant to scorecard",
+					attr.String("user_id", participantIDStr),
+					attr.String("field_name", fieldName),
+					attr.String("line", newParticipantLine),
+					attr.Any("tag_number", participant.TagNumber),
+					attr.Any("score", participant.Score))
+			}
+		}
+
+		// 4. Edit the Discord message with the modified embed
+		edit := &discordgo.MessageEdit{
+			Channel: channelID,
+			ID:      messageID,
+		}
+		edit.SetEmbeds([]*discordgo.MessageEmbed{embed})
+
+		updatedMsg, err := srm.session.ChannelMessageEditComplex(edit)
+		if err != nil {
+			srm.logger.ErrorContext(ctx, "Failed to update message with late participant",
+				attr.Error(err),
+				attr.String("channel_id", channelID),
+				attr.String("message_id", messageID),
+				attr.Int("participants_attempted", len(participants)))
+			return ScoreRoundOperationResult{Error: err}, fmt.Errorf("failed to edit message: %w", err)
+		}
+
+		srm.logger.InfoContext(ctx, "Successfully added late participant(s) to scorecard",
+			attr.String("channel_id", channelID),
+			attr.String("message_id", messageID),
+			attr.Int("participants_processed", len(participants)),
+			attr.Int("participants_added", addedCount),
+			attr.Int("final_field_count", len(embed.Fields)))
 
 		return ScoreRoundOperationResult{Success: updatedMsg}, nil
 	})

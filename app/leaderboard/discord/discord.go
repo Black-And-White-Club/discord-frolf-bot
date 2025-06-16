@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	discordgo "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	claimtag "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/claim_tag"
 	leaderboardupdated "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/leaderboard_updated"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
@@ -17,11 +18,13 @@ import (
 // LeaderboardDiscordInterface defines the interface for LeaderboardDiscord.
 type LeaderboardDiscordInterface interface {
 	GetLeaderboardUpdateManager() leaderboardupdated.LeaderboardUpdateManager
+	GetClaimTagManager() claimtag.ClaimTagManager
 }
 
 // LeaderboardDiscord encapsulates all leaderboard-related Discord services.
 type LeaderboardDiscord struct {
 	LeaderboardUpdateManager leaderboardupdated.LeaderboardUpdateManager
+	ClaimTagManager          claimtag.ClaimTagManager
 }
 
 // NewLeaderboardDiscord creates a new LeaderboardDiscord instance.
@@ -38,12 +41,20 @@ func NewLeaderboardDiscord(
 ) (LeaderboardDiscordInterface, error) {
 	leaderboardUpdateManager := leaderboardupdated.NewLeaderboardUpdateManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics)
 
+	claimTagManager := claimtag.NewClaimTagManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics)
+
 	return &LeaderboardDiscord{
 		LeaderboardUpdateManager: leaderboardUpdateManager,
+		ClaimTagManager:          claimTagManager,
 	}, nil
 }
 
 // GetLeaderboardUpdateManager returns the LeaderboardUpdateManager.
 func (ld *LeaderboardDiscord) GetLeaderboardUpdateManager() leaderboardupdated.LeaderboardUpdateManager {
 	return ld.LeaderboardUpdateManager
+}
+
+// GetClaimTagManager returns the ClaimTagManager.
+func (ld *LeaderboardDiscord) GetClaimTagManager() claimtag.ClaimTagManager {
+	return ld.ClaimTagManager
 }
