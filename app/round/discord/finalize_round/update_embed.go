@@ -3,9 +3,11 @@ package finalizeround
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
+	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	"github.com/bwmarrin/discordgo"
 	"github.com/google/uuid"
 )
@@ -25,6 +27,37 @@ func (frm *finalizeRoundManager) FinalizeScorecardEmbed(ctx context.Context, eve
 			err := fmt.Errorf("missing channel or message ID for finalization update")
 			frm.logger.ErrorContext(ctx, "Missing channel or message ID for finalization update")
 			return FinalizeRoundOperationResult{Error: err}, err // Return both result and error
+		}
+
+		// 🆕 Fetch existing message to preserve original location if payload location is empty
+		existingMsg, err := frm.session.ChannelMessage(channelID, eventMessageID)
+		if err != nil {
+			frm.logger.ErrorContext(ctx, "Failed to fetch existing message for finalization",
+				attr.Error(err),
+				attr.String("discord_message_id", eventMessageID),
+				attr.String("channel_id", channelID))
+			return FinalizeRoundOperationResult{Error: fmt.Errorf("failed to fetch existing message: %w", err)}, fmt.Errorf("failed to fetch existing message: %w", err)
+		}
+
+		// Extract location from existing embed if payload doesn't have it
+		originalLocation := ""
+		if len(existingMsg.Embeds) > 0 {
+			existingEmbed := existingMsg.Embeds[0]
+			for _, field := range existingEmbed.Fields {
+				if strings.Contains(strings.ToLower(field.Name), "location") || field.Name == "📍 Location" {
+					originalLocation = field.Value
+					break
+				}
+			}
+		}
+
+		// Update payload location if it's empty but we have an original location
+		if (embedPayload.Location == nil || string(*embedPayload.Location) == "") && originalLocation != "" {
+			location := roundtypes.Location(originalLocation)
+			embedPayload.Location = &location
+			frm.logger.InfoContext(ctx, "Preserved original location from existing embed",
+				attr.String("original_location", originalLocation),
+				attr.RoundID("round_id", embedPayload.RoundID))
 		}
 
 		// Transform the round payload data into a Discord embed and components

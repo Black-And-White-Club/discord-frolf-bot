@@ -142,11 +142,17 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 			})
 		}
 
-		// Handle nil location
+		// Handle location - use original location or empty fallback
 		locationStr := ""
-		if payload.Location != nil {
+		if payload.Location != nil && string(*payload.Location) != "" {
 			locationStr = string(*payload.Location)
 		}
+
+		// Log the location for debugging
+		frm.logger.InfoContext(ctx, "Processing location for finalized round",
+			attr.RoundID("round_id", payload.RoundID),
+			attr.String("location", locationStr),
+			attr.Bool("location_is_nil", payload.Location == nil))
 
 		// Start with base fields - StartTime and Location
 		embedFields := []*discordgo.MessageEmbedField{}
@@ -159,10 +165,11 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 			})
 		}
 
-		// Add Location field
+		// Add Location field - ensure it's always visible
 		embedFields = append(embedFields, &discordgo.MessageEmbedField{
-			Name:  "📍 Location",
-			Value: locationStr,
+			Name:   "📍 Location",
+			Value:  locationStr,
+			Inline: false, // Make location field full width for better visibility
 		})
 
 		// Add participant fields
@@ -176,7 +183,7 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 
 		embed = &discordgo.MessageEmbed{
 			Title:       title,
-			Description: fmt.Sprintf("Round at %s has been finalized. Admin/Editor access required for score updates.", locationStr),
+			Description: fmt.Sprintf("Round at **%s** has been finalized. Admin/Editor access required for score updates.", locationStr),
 			Color:       0x0000FF, // Blue for finalized round
 			Fields:      embedFields,
 			Footer: &discordgo.MessageEmbedFooter{

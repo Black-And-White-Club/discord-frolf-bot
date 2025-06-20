@@ -3,6 +3,7 @@ package roundhandlers
 import (
 	"context"
 	"fmt"
+	"time"
 
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
@@ -22,35 +23,33 @@ func (h *RoundHandlers) HandleRoundReminder(msg *message.Message) ([]*message.Me
 				return nil, fmt.Errorf("invalid payload type for HandleRoundReminder")
 			}
 
-			// Terminal debug logs
-			fmt.Printf("\n=== HANDLER START ===\n")
-			fmt.Printf("Message ID: %s\n", msg.UUID)
-			fmt.Printf("Round ID: %s\n", reminderPayload.RoundID)
-			fmt.Printf("Reminder Type: %s\n", reminderPayload.ReminderType)
-			fmt.Printf("Delivered: %s\n", msg.Metadata.Get("Delivered"))
-			fmt.Printf("ConsumerSeq: %s\n", msg.Metadata.Get("ConsumerSeq"))
-			fmt.Printf("StreamSeq: %s\n", msg.Metadata.Get("StreamSeq"))
-			fmt.Printf("Consumer: %s\n", msg.Metadata.Get("Consumer"))
-			fmt.Printf("Stream: %s\n", msg.Metadata.Get("Stream"))
-			fmt.Printf("Timestamp: %s\n", msg.Metadata.Get("Timestamp"))
-			fmt.Printf("All Metadata: %+v\n", msg.Metadata)
-			fmt.Printf("======================\n")
+			// Log basic info for debugging
+			h.Logger.InfoContext(ctx, "Processing round reminder",
+				attr.RoundID("round_id", reminderPayload.RoundID),
+				attr.String("reminder_type", reminderPayload.ReminderType),
+				attr.String("message_id", msg.UUID))
 
-			// Early validation
+			// Early validation - fail fast for invalid payloads
 			if reminderPayload.RoundID == sharedtypes.RoundID(uuid.Nil) {
-				fmt.Printf("❌ VALIDATION FAILED: Round ID is required\n")
-				return nil, fmt.Errorf("round ID is required")
+				h.Logger.ErrorContext(ctx, "Round ID is required for reminder",
+					attr.String("message_id", msg.UUID))
+				// Don't return error - this payload is invalid and shouldn't be retried
+				return []*message.Message{}, nil
 			}
 
 			// Use default channel from config if payload doesn't have one
 			if reminderPayload.DiscordChannelID == "" {
 				defaultChannelID := h.Config.Discord.EventChannelID
 				if defaultChannelID == "" {
-					fmt.Printf("❌ VALIDATION FAILED: No channel ID configured\n")
-					return nil, fmt.Errorf("no channel_id in payload and no default event_channel_id in config")
+					h.Logger.ErrorContext(ctx, "No channel ID configured for reminder",
+						attr.String("message_id", msg.UUID))
+					// Don't return error - configuration issue, no point retrying
+					return []*message.Message{}, nil
 				}
 
-				fmt.Printf("ℹ️  Using default channel: %s\n", defaultChannelID)
+				h.Logger.InfoContext(ctx, "Using default channel for reminder",
+					attr.String("channel_id", defaultChannelID),
+					attr.String("message_id", msg.UUID))
 
 				// Create new payload with default channel
 				reminderPayload = &roundevents.DiscordReminderPayload{
@@ -66,42 +65,53 @@ func (h *RoundHandlers) HandleRoundReminder(msg *message.Message) ([]*message.Me
 				}
 			}
 
-			fmt.Printf("🚀 SENDING DISCORD REMINDER...\n")
+			// Create timeout context for Discord API call (30 seconds max)
+			apiCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			defer cancel()
 
-			// CRITICAL OPERATION: Send the Discord reminder
-			result, err := h.RoundDiscord.GetRoundReminderManager().SendRoundReminder(ctx, reminderPayload)
+			h.Logger.InfoContext(ctx, "Sending Discord reminder",
+				attr.RoundID("round_id", reminderPayload.RoundID),
+				attr.String("message_id", msg.UUID))
+
+			// CRITICAL OPERATION: Send the Discord reminder with timeout protection
+			result, err := h.RoundDiscord.GetRoundReminderManager().SendRoundReminder(apiCtx, reminderPayload)
 			if err != nil {
-				fmt.Printf("❌ DISCORD SEND FAILED: %v\n", err)
+				h.Logger.ErrorContext(ctx, "Failed to send Discord reminder",
+					attr.Error(err),
+					attr.String("message_id", msg.UUID))
+
+				// Check if it's a timeout or context cancellation
+				if apiCtx.Err() == context.DeadlineExceeded {
+					h.Logger.WarnContext(ctx, "Discord reminder timed out after 30 seconds",
+						attr.String("message_id", msg.UUID))
+					// Don't retry timeouts - they'll likely timeout again
+					return []*message.Message{}, nil
+				}
+
+				// For other errors, allow retry by returning error
 				return nil, fmt.Errorf("failed to send round reminder: %w", err)
 			}
 
-			// Validate result
-			success, ok := result.Success.(bool)
-			if !ok {
-				success = false
+			// Validate result with defensive check
+			var success bool
+			if successVal, ok := result.Success.(bool); ok {
+				success = successVal
 			}
 
 			if !success {
-				fmt.Printf("❌ DISCORD OPERATION REPORTED FAILURE\n")
-				return nil, fmt.Errorf("discord reminder operation reported failure")
+				h.Logger.WarnContext(ctx, "Discord reminder operation reported failure",
+					attr.String("message_id", msg.UUID))
+				// Don't retry operational failures - they indicate the reminder was processed but failed
+				return []*message.Message{}, nil
 			}
 
-			fmt.Printf("✅ DISCORD REMINDER SENT SUCCESSFULLY\n")
-
-			// Log successful completion
 			h.Logger.InfoContext(ctx, "Round reminder sent to Discord successfully",
 				attr.RoundID("round_id", reminderPayload.RoundID),
 				attr.String("reminder_type", reminderPayload.ReminderType),
 				attr.Int("user_count", len(reminderPayload.UserIDs)),
 				attr.String("message_id", msg.UUID))
 
-			fmt.Printf("=== HANDLER END SUCCESS ===\n")
-			fmt.Printf("Message ID: %s\n", msg.UUID)
-			fmt.Printf("Round ID: %s\n", reminderPayload.RoundID)
-			fmt.Printf("Returning: []*message.Message{} (empty slice)\n")
-			fmt.Printf("============================\n\n")
-
-			// Return empty message array to acknowledge immediately
+			// Return empty message array to acknowledge successfully
 			return []*message.Message{}, nil
 		},
 	)(msg)
