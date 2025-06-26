@@ -7,67 +7,76 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Config struct to hold the configuration settings
+// Config represents the application configuration
 type Config struct {
-	NATS    NATSConfig    `yaml:"nats"`
-	Discord DiscordConfig `yaml:"discord"`
-	// ... other configuration fields ...
+	NATS          NATSConfig          `yaml:"nats"`
+	Discord       DiscordConfig       `yaml:"discord"`
+	Service       ServiceConfig       `yaml:"service"`
+	Observability ObservabilityConfig `yaml:"observability"`
 }
 
-// NATSConfig holds NATS configuration.
+// NATSConfig holds NATS connection configuration
 type NATSConfig struct {
 	URL string `yaml:"url"`
 }
 
-// DiscordConfig holds Discord configuration.
+// DiscordConfig holds Discord bot configuration
 type DiscordConfig struct {
-	Token            string `yaml:"token"`
-	OptInMessageID   string `yaml:"opt_in_message_id"`
-	OptInChannelID   string `yaml:"opt_in_channel_id"`
-	RegisteredRoleID string `yaml:"registered_role_id"`
-	GuildID          string `yaml:"guild_id"`
+	Token                string            `yaml:"token"`
+	SignupChannelID      string            `yaml:"signup_channel_id"`
+	SignupMessageID      string            `yaml:"signup_message_id"`
+	SignupEmoji          string            `yaml:"signup_emoji"`
+	RegisteredRoleID     string            `yaml:"registered_role_id"`
+	EventChannelID       string            `yaml:"event_channel_id"`
+	LeaderboardChannelID string            `yaml:"leaderboard_channel_id"`
+	GuildID              string            `yaml:"guild_id"`
+	AppID                string            `yaml:"app_id"`
+	URL                  string            `yaml:"url"`
+	RoleMappings         map[string]string `yaml:"role_mappings"`
+	AdminRoleID          string            `yaml:"admin_role_id"`
 }
 
-// LoadConfig loads the configuration from a YAML file.
-func LoadConfig(filename string) (*Config, error) {
-	// Try reading configuration from the file first
-	data, err := os.ReadFile(filename)
+// ServiceConfig holds service metadata
+type ServiceConfig struct {
+	Name    string `yaml:"name"`
+	Version string `yaml:"version"`
+}
+
+// ObservabilityConfig holds observability configuration
+type ObservabilityConfig struct {
+	LokiURL         string  `yaml:"loki_url"`
+	MetricsAddress  string  `yaml:"metrics_address"`
+	TempoEndpoint   string  `yaml:"tempo_endpoint"`
+	TempoInsecure   bool    `yaml:"tempo_insecure"`
+	TempoSampleRate float64 `yaml:"tempo_sample_rate"`
+	Environment     string  `yaml:"environment"`
+}
+
+// LoadConfig loads configuration from the specified file path
+func LoadConfig(configPath string) (*Config, error) {
+	cfg := &Config{}
+
+	// Read config file
+	data, err := os.ReadFile(configPath)
 	if err != nil {
-		// If the file is not found, try loading from environment variables
-		fmt.Printf("Failed to read config file: %v\n", err)
-		fmt.Println("Trying to load configuration from environment variables...")
-
-		return loadConfigFromEnv()
+		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	var cfg Config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	// Parse YAML
+	if err := yaml.Unmarshal(data, cfg); err != nil {
+		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
-	return &cfg, nil
-}
-
-// loadConfigFromEnv loads the configuration from environment variables.
-func loadConfigFromEnv() (*Config, error) {
-	var cfg Config
-
-	// Load NATS URL
-	cfg.NATS.URL = os.Getenv("NATS_URL")
-	if cfg.NATS.URL == "" {
-		return nil, fmt.Errorf("NATS_URL environment variable not set")
+	// Override with environment variables if present
+	if token := os.Getenv("DISCORD_TOKEN"); token != "" {
+		cfg.Discord.Token = token
 	}
-	// Load Discord token
-	cfg.Discord.Token = os.Getenv("DISCORD_TOKEN")
-	if cfg.Discord.Token == "" {
-		return nil, fmt.Errorf("DISCORD_TOKEN environment variable not set")
+	if guildID := os.Getenv("DISCORD_GUILD_ID"); guildID != "" {
+		cfg.Discord.GuildID = guildID
+	}
+	if natsURL := os.Getenv("NATS_URL"); natsURL != "" {
+		cfg.NATS.URL = natsURL
 	}
 
-	// Load other Discord configuration fields
-	cfg.Discord.OptInMessageID = os.Getenv("DISCORD_OPT_IN_MESSAGE_ID")
-	cfg.Discord.OptInChannelID = os.Getenv("DISCORD_OPT_IN_CHANNEL_ID")
-	cfg.Discord.RegisteredRoleID = os.Getenv("DISCORD_REGISTERED_ROLE_ID")
-	cfg.Discord.GuildID = os.Getenv("DISCORD_GUILD_ID")
-
-	return &cfg, nil
+	return cfg, nil
 }
