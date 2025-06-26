@@ -45,7 +45,7 @@ func (urm *updateRoundManager) SendUpdateRoundModal(ctx context.Context, i *disc
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.CommandNameKey, "send_update_round_modal")
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.InteractionType, "command")
 
-	result, _ := urm.operationWrapper(ctx, "send_update_round_modal", func(ctx context.Context) (UpdateRoundOperationResult, error) {
+	result, opErr := urm.operationWrapper(ctx, "send_update_round_modal", func(ctx context.Context) (UpdateRoundOperationResult, error) {
 		if err := ctx.Err(); err != nil {
 			return UpdateRoundOperationResult{Error: err}, err
 		}
