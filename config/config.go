@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"sync"
 
 	"gopkg.in/yaml.v3"
@@ -100,6 +101,29 @@ func LoadConfig(configPath string) (*Config, error) {
 	}
 	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
 		cfg.DatabaseURL = dbURL
+	}
+
+	// Override observability settings with environment variables
+	if lokiURL := os.Getenv("LOKI_URL"); lokiURL != "" {
+		cfg.Observability.LokiURL = lokiURL
+	}
+	if metricsAddr := os.Getenv("METRICS_ADDRESS"); metricsAddr != "" {
+		cfg.Observability.MetricsAddress = metricsAddr
+	}
+	if tempoEndpoint := os.Getenv("TEMPO_ENDPOINT"); tempoEndpoint != "" {
+		cfg.Observability.TempoEndpoint = tempoEndpoint
+	}
+	if environment := os.Getenv("ENVIRONMENT"); environment != "" {
+		cfg.Observability.Environment = environment
+	}
+	// Handle boolean and float environment variables
+	if tempoInsecure := os.Getenv("TEMPO_INSECURE"); tempoInsecure != "" {
+		cfg.Observability.TempoInsecure = (tempoInsecure == "true")
+	}
+	if sampleRate := os.Getenv("TEMPO_SAMPLE_RATE"); sampleRate != "" {
+		if rate, err := strconv.ParseFloat(sampleRate, 64); err == nil {
+			cfg.Observability.TempoSampleRate = rate
+		}
 	}
 
 	cfg.isFromDB = false
