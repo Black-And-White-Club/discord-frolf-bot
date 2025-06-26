@@ -47,10 +47,12 @@ func (m *startRoundManager) UpdateRoundToScorecard(ctx context.Context, channelI
 			return StartRoundOperationResult{Error: fmt.Errorf("transformation failed: %w", transformResult.Error)}, nil
 		}
 
-		transformedData, ok := transformResult.Success.(struct {
+		type TransformRoundSuccessPayload struct {
 			Embed      *discordgo.MessageEmbed
 			Components []discordgo.MessageComponent
-		})
+		}
+
+		transformedData, ok := transformResult.Success.(TransformRoundSuccessPayload)
 		if !ok {
 			err := errors.New("unexpected success type from TransformRoundToScorecard")
 			m.logger.ErrorContext(ctx, "Unexpected type from TransformRoundToScorecard success", attr.Error(err))
