@@ -59,7 +59,7 @@ func (urm *updateRoundManager) SendUpdateRoundModal(ctx context.Context, i *disc
 			messageID = i.Message.ID
 		}
 
-		urm.logger.InfoContext(ctx, "DEBUG: Including message ID in modal CustomID",
+		urm.logger.InfoContext(ctx, "Including message ID in modal CustomID",
 			attr.String("message_id", messageID),
 			attr.RoundID("round_id", roundID))
 
