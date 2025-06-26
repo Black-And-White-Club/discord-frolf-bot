@@ -1,0 +1,31 @@
+# Example configuration for Discord Frolf Bot
+# Copy this to config.yaml and fill in your values
+
+nats:
+  url: "nats://localhost:4222"
+
+discord:
+  token: "${DISCORD_TOKEN}"
+  guild_id: "${DISCORD_GUILD_ID}"
+  signup_channel_id: ""
+  signup_message_id: ""
+  signup_emoji: "✋"
+  registered_role_id: ""
+  event_channel_id: ""
+  leaderboard_channel_id: ""
+  role_mappings: {}
+  admin_role_id: ""
+
+service:
+  name: "discord-frolf-bot"
+  version: "1.0.0"
+
+observability:
+  environment: "production"
+  loki_url: ""
+  metrics_address: ":8080"
+  tempo_endpoint: ""
+  tempo_insecure: true
+  tempo_sample_rate: 1.0
+# Optional: PostgreSQL database for guild setup persistence
+# database_url: "${DATABASE_URL}"

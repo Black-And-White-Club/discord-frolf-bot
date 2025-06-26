@@ -1,0 +1,76 @@
+# Multi-Tenant Discord Frolf Bot Configuration
+# Use this when switching to premium/public bot mode
+
+infrastructure:
+  mode: "multi-tenant"
+  database_url: "${DATABASE_URL}" # Required for multi-tenant mode
+
+nats:
+  url: "${NATS_URL:-nats://cluster:4222}"
+
+discord:
+  # Essential bot credentials (required for all modes)
+  token: "${DISCORD_TOKEN}" # Bot token for public bot
+  app_id: "${DISCORD_APP_ID}" # Application ID for public bot
+  url: "https://discord.com"
+
+  # Auto-setup: discovers or creates required Discord resources on new guilds
+  auto_setup:
+    enabled: true
+    required_channels: ["signup", "events", "leaderboard"]
+    required_roles: ["Rattler", "Editor", "Admin"]
+    registered_role_name: "Rattler"
+    admin_role_name: "Admin"
+    signup_emoji: "🐍"
+
+service:
+  name: "discord-frolf-bot"
+  version: "1.0.0"
+  instance_id: "${INSTANCE_ID:-${HOSTNAME}}" # Unique identifier for this bot instance
+
+observability:
+  environment: "${ENVIRONMENT:-production}"
+  loki_url: "${LOKI_URL}"
+  metrics_address: "${METRICS_ADDRESS:-:9090}"
+  tempo_endpoint: "${TEMPO_ENDPOINT}"
+  tempo_insecure: false
+  tempo_sample_rate: 0.01 # Lower sample rate for production
+
+# Multi-tenant specific settings
+multi_tenant:
+  # Per-guild configuration limits
+  limits:
+    max_concurrent_rounds: 10
+    max_participants_per_round: 100
+    commands_per_minute: 30
+    rounds_per_day: 50
+
+  # Premium features configuration
+  premium:
+    enabled: true
+    subscription_tiers:
+      - name: "basic"
+        max_concurrent_rounds: 5
+        max_participants_per_round: 50
+        advanced_scoring: false
+        tournament_mode: false
+      - name: "premium"
+        max_concurrent_rounds: 20
+        max_participants_per_round: 200
+        advanced_scoring: true
+        tournament_mode: true
+        custom_leaderboards: true
+
+  # Auto-setup for new guilds
+  guild_onboarding:
+    auto_setup_on_join: true
+    welcome_message: "Thanks for adding Discord Frolf Bot! Let's set up your server..."
+    setup_timeout_hours: 24
+    required_permissions:
+      ["MANAGE_CHANNELS", "MANAGE_ROLES", "SEND_MESSAGES", "ADD_REACTIONS"]
+
+  # Observability per-tenant
+  tenant_isolation:
+    enabled: true # Add guild_id to all metrics and logs
+    metrics_per_guild: true
+    separate_log_streams: true

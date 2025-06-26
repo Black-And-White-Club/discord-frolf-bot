@@ -36,10 +36,10 @@ func Test_signupManager_MessageReactionAdd(t *testing.T) {
 
 	mockConfig := &config.Config{
 		Discord: config.DiscordConfig{
+			GuildID:         "guild-id",
+			SignupEmoji:     "emoji",
 			SignupChannelID: "channel-id",
 			SignupMessageID: "message-id",
-			SignupEmoji:     "emoji",
-			GuildID:         "guild-id",
 		},
 	}
 

@@ -47,7 +47,7 @@ func (h *RoundHandlers) HandleRoundDeleted(msg *message.Message) ([]*message.Mes
 				attr.String("discord_message_id", discordMessageID),
 			)
 
-			result, err := h.RoundDiscord.GetDeleteRoundManager().DeleteRoundEventEmbed(ctx, discordMessageID, h.Config.Discord.EventChannelID)
+			result, err := h.RoundDiscord.GetDeleteRoundManager().DeleteRoundEventEmbed(ctx, discordMessageID, h.Config.GetEventChannelID())
 			if err != nil {
 				h.Logger.ErrorContext(ctx, "Error calling DeleteRoundEventEmbed service",
 					attr.CorrelationIDFromMsg(msg),

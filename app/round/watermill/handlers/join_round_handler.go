@@ -89,7 +89,7 @@ func (h *RoundHandlers) HandleRoundParticipantJoined(msg *message.Message) ([]*m
 				// Add logging for other lists if needed, but accepted is the key one here
 			)
 
-			channelID := h.Config.Discord.EventChannelID // Assuming Config is available
+			channelID := h.Config.GetEventChannelID() // Assuming Config is available
 			messageID := msg.Metadata.Get("discord_message_id")
 
 			// Determine if this was a late join
@@ -170,7 +170,7 @@ func (h *RoundHandlers) HandleRoundParticipantRemoved(msg *message.Message) ([]*
 				attr.Int("tentative_count_payload", len(p.TentativeParticipants)),
 			)
 
-			channelID := h.Config.Discord.EventChannelID
+			channelID := h.Config.GetEventChannelID()
 			messageID := msg.Metadata.Get("discord_message_id")
 
 			// Check if this is a scorecard embed (started round) by checking if any participant has a score

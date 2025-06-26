@@ -2,10 +2,12 @@ package bot
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guild"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/interactions"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard"
 	leaderboardrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/watermill"
@@ -25,6 +27,7 @@ import (
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/bwmarrin/discordgo"
+	_ "github.com/lib/pq" // PostgreSQL driver
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -188,6 +191,46 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 	)
 	if err != nil {
 		return fmt.Errorf("leaderboard module initialization failed: %w", err)
+	}
+	// Initialize Guild Module (if database is available)
+	if dbURL := bot.Config.DatabaseURL; dbURL != "" {
+		db, err := sql.Open("postgres", dbURL)
+		if err != nil {
+			return fmt.Errorf("failed to connect to database: %w", err)
+		}
+		defer db.Close()
+
+		if err := db.Ping(); err != nil {
+			return fmt.Errorf("failed to ping database: %w", err)
+		}
+
+		// Initialize Guild Module with database
+		guildRouter, err := message.NewRouter(message.RouterConfig{}, watermill.NopLogger{})
+		if err != nil {
+			return fmt.Errorf("failed to create guild router: %w", err)
+		}
+
+		_, err = guild.InitializeGuildModule(
+			ctx,
+			bot.Session,
+			guildRouter,
+			bot.EventBus,
+			bot.EventBus,
+			registry,
+			bot.Logger,
+			bot.Config,
+			db,
+		)
+		if err != nil {
+			return fmt.Errorf("guild module initialization failed: %w", err)
+		}
+
+		// Start guild router
+		go func() {
+			if err := guildRouter.Run(ctx); err != nil && err != context.Canceled {
+				bot.Logger.Error("Guild router failed", attr.Error(err))
+			}
+		}()
 	}
 
 	if err := discord.RegisterCommands(bot.Session, bot.Logger, bot.Config.Discord.GuildID); err != nil {

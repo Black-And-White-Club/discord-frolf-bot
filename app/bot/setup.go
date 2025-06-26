@@ -333,6 +333,8 @@ func (bot *DiscordBot) createSignupMessage(ctx context.Context, session *discord
 
 func (bot *DiscordBot) updateConfiguration(guildID string, channelIDs, roleIDs map[string]string, signupMessageID string, setupConfig ServerSetupConfig) {
 	// Update the bot's configuration with discovered/created IDs
+	// NOTE: In single-server mode, we directly update the config structure
+	// In future multi-tenant mode, this would save to database instead
 	bot.Config.Discord.GuildID = guildID
 
 	// Update channel IDs with specific mappings
@@ -379,7 +381,7 @@ func (bot *DiscordBot) ValidateSetup(ctx context.Context, guildID string) error 
 	}
 
 	// Validate channels exist
-	channels := []string{bot.Config.Discord.SignupChannelID, bot.Config.Discord.EventChannelID}
+	channels := []string{bot.Config.GetSignupChannelID(), bot.Config.GetEventChannelID()}
 	for _, channelID := range channels {
 		if channelID != "" {
 			_, err := session.Channel(channelID)
@@ -400,8 +402,8 @@ func (bot *DiscordBot) ValidateSetup(ctx context.Context, guildID string) error 
 		roleMap[role.ID] = true
 	}
 
-	rolesToCheck := []string{bot.Config.Discord.RegisteredRoleID, bot.Config.Discord.AdminRoleID}
-	for _, roleID := range bot.Config.Discord.RoleMappings {
+	rolesToCheck := []string{bot.Config.GetRegisteredRoleID(), bot.Config.GetAdminRoleID()}
+	for _, roleID := range bot.Config.GetRoleMappings() {
 		rolesToCheck = append(rolesToCheck, roleID)
 	}
 

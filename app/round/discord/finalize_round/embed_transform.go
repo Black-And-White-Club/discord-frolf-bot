@@ -59,7 +59,7 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 			} else {
 				username = user.Username
 				// Only try to get member info if we successfully got the user
-				if member, err := frm.session.GuildMember(frm.config.Discord.GuildID, string(participant.UserID)); err == nil && member != nil && member.Nick != "" {
+				if member, err := frm.session.GuildMember(frm.config.GetGuildID(), string(participant.UserID)); err == nil && member != nil && member.Nick != "" {
 					username = member.Nick
 				}
 			}

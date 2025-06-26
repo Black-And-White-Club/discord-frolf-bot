@@ -95,7 +95,7 @@ func (sm *signupManager) createEvent(ctx context.Context, topic string, payload 
 	newEvent.Metadata.Set("domain", "discord")
 	newEvent.Metadata.Set("interaction_id", i.Interaction.ID)
 	newEvent.Metadata.Set("interaction_token", i.Interaction.Token)
-	newEvent.Metadata.Set("guild_id", sm.config.Discord.GuildID)
+	newEvent.Metadata.Set("guild_id", sm.config.GetGuildID())
 
 	return newEvent, nil
 }

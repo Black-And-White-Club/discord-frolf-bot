@@ -24,7 +24,7 @@ func BuildWatermillMessageFromInteraction(topic string, payload interface{}, int
 	}
 
 	if config != nil {
-		msg.Metadata.Set("guild_id", config.Discord.GuildID)
+		msg.Metadata.Set("guild_id", config.GetGuildID())
 	}
 
 	return msg, nil

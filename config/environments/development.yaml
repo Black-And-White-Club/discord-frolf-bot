@@ -1,0 +1,19 @@
+# Development (single-server mode)
+infrastructure:
+  mode: "single-server"
+  database_url: "" # No database needed for single-server
+
+discord:
+  primary_guild_id: "${DISCORD_GUILD_ID}"
+  auto_setup:
+    enabled: true
+
+business:
+  premium:
+    enabled: false
+    subscription_required: false
+
+observability:
+  tenant_isolation: false # Not needed for single server
+  global_dashboard: false
+  environment: "development"

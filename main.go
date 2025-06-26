@@ -3,10 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/bot"
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
@@ -35,7 +38,29 @@ func main() {
 	}
 
 	// --- Configuration Loading ---
-	cfg, err := config.LoadConfig("config.yaml")
+	var cfg *config.Config
+	var err error
+
+	// Check if database URL is provided for database-backed config
+	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
+		guildID := os.Getenv("DISCORD_GUILD_ID")
+		if guildID == "" {
+			fmt.Println("DISCORD_GUILD_ID environment variable is required for database-backed config")
+			os.Exit(1)
+		}
+
+		fmt.Printf("Loading configuration from database for guild: %s\n", guildID)
+		cfg, err = config.LoadConfigFromDatabase(ctx, databaseURL, guildID)
+		if err != nil {
+			fmt.Printf("Failed to load config from database: %v\n", err)
+			fmt.Println("Falling back to file-based config...")
+			cfg, err = config.LoadConfig("config.yaml")
+		}
+	} else {
+		fmt.Println("Loading configuration from file...")
+		cfg, err = config.LoadConfig("config.yaml")
+	}
+
 	if err != nil {
 		fmt.Printf("Failed to load config: %v\n", err)
 		os.Exit(1)
@@ -110,6 +135,39 @@ func main() {
 
 	logger.Info("Discord bot initialized successfully")
 
+	// --- Health Check Server ---
+	// Start health check server for container orchestration
+	healthMux := http.NewServeMux()
+	healthMux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, `{"status":"healthy","service":"discord-frolf-bot","version":"%s"}`, cfg.Service.Version)
+	})
+
+	healthMux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+		// Check if Discord session is ready
+		if discordSession == nil || discordSession.State == nil || discordSession.State.User == nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			fmt.Fprintf(w, `{"status":"not_ready","reason":"discord_session_not_ready"}`)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, `{"status":"ready","service":"discord-frolf-bot"}`)
+	})
+
+	healthServer := &http.Server{
+		Addr:    ":8080",
+		Handler: healthMux,
+	}
+
+	go func() {
+		logger.Info("Starting health check server on :8080")
+		if err := healthServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Error("Health server failed", attr.Error(err))
+		}
+	}()
+
 	// --- Graceful Shutdown Setup ---
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
@@ -152,6 +210,13 @@ func main() {
 			logger.Error("Failed to shutdown observability", attr.Error(err))
 		} else {
 			logger.Info("Observability shutdown successfully")
+		}
+
+		// Shutdown health server
+		if err := healthServer.Shutdown(shutdownCtx); err != nil {
+			logger.Error("Failed to shutdown health server", attr.Error(err))
+		} else {
+			logger.Info("Health server shutdown successfully")
 		}
 
 		close(cleanShutdown)
@@ -262,17 +327,95 @@ func runSetup(ctx context.Context, guildID string) {
 
 	fmt.Println("Setup completed successfully!")
 	fmt.Println("Updated configuration:")
-	fmt.Printf("  Guild ID: %s\n", setupBot.Config.Discord.GuildID)
-	fmt.Printf("  Signup Channel ID: %s\n", setupBot.Config.Discord.SignupChannelID)
-	fmt.Printf("  Event Channel ID: %s\n", setupBot.Config.Discord.EventChannelID)
-	fmt.Printf("  Leaderboard Channel ID: %s\n", setupBot.Config.Discord.LeaderboardChannelID)
-	fmt.Printf("  Signup Message ID: %s\n", setupBot.Config.Discord.SignupMessageID)
-	fmt.Printf("  Registered Role ID: %s\n", setupBot.Config.Discord.RegisteredRoleID)
-	fmt.Printf("  Admin Role ID: %s\n", setupBot.Config.Discord.AdminRoleID)
+	fmt.Printf("  Guild ID: %s\n", setupBot.Config.GetGuildID())
+	fmt.Printf("  Signup Channel ID: %s\n", setupBot.Config.GetSignupChannelID())
+	fmt.Printf("  Event Channel ID: %s\n", setupBot.Config.GetEventChannelID())
+	fmt.Printf("  Leaderboard Channel ID: %s\n", setupBot.Config.GetLeaderboardChannelID())
+	fmt.Printf("  Signup Message ID: %s\n", setupBot.Config.GetSignupMessageID())
+	fmt.Printf("  Registered Role ID: %s\n", setupBot.Config.GetRegisteredRoleID())
+	fmt.Printf("  Admin Role ID: %s\n", setupBot.Config.GetAdminRoleID())
 	fmt.Println("  Role Mappings:")
-	for name, id := range setupBot.Config.Discord.RoleMappings {
+	for name, id := range setupBot.Config.GetRoleMappings() {
 		fmt.Printf("    %s: %s\n", name, id)
 	}
-
 	fmt.Println("\nNOTE: You need to manually update your config.yaml with these values.")
+
+	// Save to database if DATABASE_URL is provided
+	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
+		fmt.Println("Saving configuration to database...")
+		if err := config.SaveConfigToDatabase(ctx, databaseURL, setupBot.Config, fmt.Sprintf("Guild-%s", guildID)); err != nil {
+			fmt.Printf("Warning: Failed to save config to database: %v\n", err)
+		} else {
+			fmt.Println("✅ Configuration saved to database!")
+		}
+	}
+
+	// Auto-update config.yaml as backup
+	if err := updateConfigFile("config.yaml", setupBot.Config); err != nil {
+		fmt.Printf("Warning: Failed to auto-update config.yaml: %v\n", err)
+		fmt.Println("Please manually update your config.yaml with the values above.")
+	} else {
+		fmt.Println("\n✅ config.yaml has been automatically updated!")
+	}
+}
+
+// updateConfigFile automatically updates the config.yaml file with new setup values
+func updateConfigFile(configPath string, cfg *config.Config) error {
+	// Read the current config file as raw YAML
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	// Parse as generic YAML to preserve structure and comments
+	var yamlData interface{}
+	if err := yaml.Unmarshal(data, &yamlData); err != nil {
+		return fmt.Errorf("failed to parse YAML: %w", err)
+	}
+
+	// Convert to map for easier manipulation
+	yamlMap, ok := yamlData.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("config file is not a valid YAML map")
+	}
+
+	// Update Discord section
+	if discordSection, exists := yamlMap["discord"]; exists {
+		if discordMap, ok := discordSection.(map[string]interface{}); ok {
+			// Update the Discord configuration values
+			discordMap["guild_id"] = cfg.GetGuildID()
+			discordMap["signup_channel_id"] = cfg.GetSignupChannelID()
+			discordMap["signup_message_id"] = cfg.GetSignupMessageID()
+			discordMap["event_channel_id"] = cfg.GetEventChannelID()
+			discordMap["leaderboard_channel_id"] = cfg.GetLeaderboardChannelID()
+			discordMap["registered_role_id"] = cfg.GetRegisteredRoleID()
+			discordMap["admin_role_id"] = cfg.GetAdminRoleID()
+
+			// Update role mappings
+			if len(cfg.GetRoleMappings()) > 0 {
+				discordMap["role_mappings"] = cfg.GetRoleMappings()
+			}
+		}
+	}
+
+	// Write back to file
+	updatedData, err := yaml.Marshal(yamlMap)
+	if err != nil {
+		return fmt.Errorf("failed to marshal updated YAML: %w", err)
+	}
+
+	if err := os.WriteFile(configPath, updatedData, 0o644); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	return nil
+}
+
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("OK"))
+}
+
+func init() {
+	http.HandleFunc("/health", healthHandler)
 }

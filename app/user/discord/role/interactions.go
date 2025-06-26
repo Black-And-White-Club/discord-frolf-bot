@@ -37,7 +37,7 @@ func (rm *roleManager) RespondToRoleRequest(ctx context.Context, interactionID, 
 
 		var buttons []discordgo.MessageComponent
 		// Iterate over the role mappings from the config
-		for role := range rm.config.Discord.RoleMappings {
+		for role := range rm.config.GetRoleMappings() {
 			buttons = append(buttons, discordgo.Button{
 				Label:    role,
 				Style:    discordgo.PrimaryButton,

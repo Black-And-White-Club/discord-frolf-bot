@@ -66,5 +66,16 @@ func RegisterCommands(s Session, logger *slog.Logger, guildID string) error {
 	}
 	logger.Info("registered command: /claimtag")
 
+	// Frolf setup command
+	_, err = s.ApplicationCommandCreate(appID.ID, guildID, &discordgo.ApplicationCommand{
+		Name:        "frolf-setup",
+		Description: "Set up Frolf Bot for this server (Admin only)",
+	})
+	if err != nil {
+		logger.Error("Failed to create '/frolf-setup' command", attr.Error(err))
+		return fmt.Errorf("failed to create '/frolf-setup' command: %w", err)
+	}
+	logger.Info("registered command: /frolf-setup")
+
 	return nil
 }

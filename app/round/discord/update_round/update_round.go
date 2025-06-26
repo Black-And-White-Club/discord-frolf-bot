@@ -168,7 +168,7 @@ func (crm *updateRoundManager) createEvent(ctx context.Context, topic string, pa
 	newEvent.Metadata.Set("domain", "discord")
 	newEvent.Metadata.Set("interaction_id", i.Interaction.ID)
 	newEvent.Metadata.Set("interaction_token", i.Interaction.Token)
-	newEvent.Metadata.Set("guild_id", crm.config.Discord.GuildID)
+	newEvent.Metadata.Set("guild_id", crm.config.GetGuildID())
 
 	return newEvent, nil
 }

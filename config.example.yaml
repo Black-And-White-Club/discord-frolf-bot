@@ -1,0 +1,52 @@
+# Example configuration for Discord Frolf Bot
+# Copy this to config.yaml and fill in your values
+# Many values can be overridden by environment variables (see README)
+
+# Optional: PostgreSQL database for guild configurations and multi-tenancy
+# If not provided, the bot will work in single-guild mode without persistence
+# database_url: "postgres://user:pass@localhost:5432/frolf_bot"
+
+nats:
+  url: "nats://localhost:4222"
+
+discord:
+  # Required: Bot token (can be overridden by DISCORD_TOKEN env var)
+  token: "YOUR_BOT_TOKEN_HERE"
+
+  # Required: Discord application ID
+  app_id: "YOUR_APP_ID_HERE"
+
+  # Required: Primary guild/server ID (can be overridden by DISCORD_GUILD_ID env var)
+  guild_id: "YOUR_GUILD_ID_HERE"
+
+  # Channel configurations (set via /frolf-setup command or manually)
+  signup_channel_id: ""
+  signup_message_id: ""
+  event_channel_id: ""
+  leaderboard_channel_id: ""
+
+  # Role configurations
+  registered_role_id: ""
+  admin_role_id: ""
+
+  # Bot configuration
+  signup_emoji: "✋"
+  url: "https://discord.com/api/oauth2/authorize?client_id=YOUR_APP_ID_HERE&permissions=8&scope=bot"
+
+  # Role mappings for different score ranges
+  role_mappings:
+    "1000": "ROLE_ID_FOR_1000_PLUS"
+    "950": "ROLE_ID_FOR_950_PLUS"
+    "900": "ROLE_ID_FOR_900_PLUS"
+
+service:
+  name: "discord-frolf-bot"
+  version: "1.0.0"
+
+observability:
+  environment: "development"
+  loki_url: ""
+  metrics_address: ":8080"
+  tempo_endpoint: ""
+  tempo_insecure: true
+  tempo_sample_rate: 1.0

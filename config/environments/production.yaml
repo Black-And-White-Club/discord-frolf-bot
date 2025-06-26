@@ -1,0 +1,25 @@
+# Production (multi-tenant mode)
+infrastructure:
+  mode: "multi-tenant"
+  database_url: "${DATABASE_URL}" # Required for multi-tenant
+
+discord:
+  primary_guild_id: "" # Not used in multi-tenant mode
+  auto_setup:
+    enabled: true # Auto-setup new servers when bot joins
+
+business:
+  premium:
+    enabled: true
+    subscription_required: true
+    features:
+      max_concurrent_rounds: 10
+      advanced_scoring: true
+      custom_leaderboards: true
+      tournament_mode: true
+
+observability:
+  tenant_isolation: true
+  global_dashboard: true
+  environment: "production"
+  tempo_sample_rate: 0.01 # Lower sampling in prod

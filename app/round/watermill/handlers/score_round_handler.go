@@ -29,8 +29,8 @@ func (h *RoundHandlers) HandleParticipantScoreUpdated(msg *message.Message) ([]*
 			// Use ChannelID from config if payload ChannelID is empty (as a fallback)
 			// Or rely solely on payload if backend guarantees population
 			channelID := updatePayload.ChannelID
-			if channelID == "" && h.Config != nil && h.Config.Discord.EventChannelID != "" {
-				channelID = h.Config.Discord.EventChannelID
+			if channelID == "" && h.Config != nil && h.Config.GetEventChannelID() != "" {
+				channelID = h.Config.GetEventChannelID()
 			}
 
 			h.Logger.InfoContext(ctx, "Received ParticipantScoreUpdated event", // Updated log message
