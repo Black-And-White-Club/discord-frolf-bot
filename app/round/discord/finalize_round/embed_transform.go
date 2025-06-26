@@ -33,12 +33,14 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 
 		// Create a slice to hold participants with their user info for sorting
 		type participantWithUser struct {
-			UserID   string
-			Username string
-			Score    *sharedtypes.Score
+			UserID    string
+			Username  string
+			Score     *sharedtypes.Score
+			TagNumber *sharedtypes.TagNumber
 		}
 
-		participantsWithUsers := make([]participantWithUser, 0, len(payload.Participants))
+		// Create a map to hold participants for efficient lookups
+		participantsMap := make(map[sharedtypes.DiscordID]participantWithUser)
 
 		for i, participant := range payload.Participants {
 			// Check if UserID is valid
@@ -62,18 +64,36 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 				}
 			}
 
-			participantsWithUsers = append(participantsWithUsers, participantWithUser{
-				UserID:   string(participant.UserID),
-				Username: username,
-				Score:    participant.Score,
-			})
+			participantsMap[participant.UserID] = participantWithUser{
+				UserID:    string(participant.UserID),
+				Username:  username,
+				Score:     participant.Score,
+				TagNumber: participant.TagNumber, // Include tag number for sorting
+			}
+		}
+
+		// Convert map to slice for consistent ordering (only when we need to sort)
+		participantsWithUsers := make([]participantWithUser, 0, len(participantsMap))
+		for _, participant := range participantsMap {
+			participantsWithUsers = append(participantsWithUsers, participant)
 		}
 
 		// Sort participants by score (best score first - in frolf, lower is better)
+		// But also use tag number as secondary sort for consistent ordering
 		sort.Slice(participantsWithUsers, func(i, j int) bool {
 			// Handle nil scores - put them at the end
 			if participantsWithUsers[i].Score == nil && participantsWithUsers[j].Score == nil {
-				return false // maintain original order for equal elements
+				// If both scores are nil, sort by tag number then user ID
+				if participantsWithUsers[i].TagNumber != nil && participantsWithUsers[j].TagNumber != nil {
+					return *participantsWithUsers[i].TagNumber < *participantsWithUsers[j].TagNumber
+				}
+				if participantsWithUsers[i].TagNumber != nil && participantsWithUsers[j].TagNumber == nil {
+					return true
+				}
+				if participantsWithUsers[i].TagNumber == nil && participantsWithUsers[j].TagNumber != nil {
+					return false
+				}
+				return participantsWithUsers[i].UserID < participantsWithUsers[j].UserID
 			}
 			if participantsWithUsers[i].Score == nil {
 				return false // nil scores go to the end

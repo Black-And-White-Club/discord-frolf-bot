@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -200,7 +201,30 @@ func (m *startRoundManager) TransformRoundToScorecard(ctx context.Context, paylo
 		tentativeLines := []string{}
 		// leftLines := []string{} // Add slices for other statuses
 
+		// Convert map to slice for consistent ordering
+		participants := make([]*ParticipantData, 0, len(participantsMap))
 		for _, p := range participantsMap {
+			participants = append(participants, p)
+		}
+
+		// Sort participants by tag number (if present), then by user ID for consistent ordering
+		sort.Slice(participants, func(i, j int) bool {
+			// If both have tag numbers, sort by tag number
+			if participants[i].TagNumber != nil && participants[j].TagNumber != nil {
+				return *participants[i].TagNumber < *participants[j].TagNumber
+			}
+			// If only one has a tag number, that one comes first
+			if participants[i].TagNumber != nil && participants[j].TagNumber == nil {
+				return true
+			}
+			if participants[i].TagNumber == nil && participants[j].TagNumber != nil {
+				return false
+			}
+			// If neither has a tag number, sort by user ID
+			return string(participants[i].UserID) < string(participants[j].UserID)
+		})
+
+		for _, p := range participants {
 			// Add debug log here to inspect participant data before formatting
 			m.logger.DebugContext(ctx, "Formatting participant line",
 				attr.String("user_id", string(p.UserID)),
