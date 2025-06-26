@@ -24,9 +24,9 @@ func (sm *signupManager) MessageReactionAdd(s discord.Session, r *discordgo.Mess
 	return sm.operationWrapper(ctx, "message_reaction_add", func(ctx context.Context) (SignupOperationResult, error) {
 		sm.logger.InfoContext(ctx, "signupManager.MessageReactionAdd called")
 
-		signupChannelID := sm.config.Discord.SignupChannelID
-		signupMessageID := sm.config.Discord.SignupMessageID
-		signupEmoji := sm.config.Discord.SignupEmoji
+		signupChannelID := sm.config.GetSignupChannelID()
+		signupMessageID := sm.config.GetSignupMessageID()
+		signupEmoji := sm.config.GetSignupEmoji()
 
 		// Check if the reaction matches the configured signup message and emoji
 		if r.ChannelID != signupChannelID || r.MessageID != signupMessageID || r.Emoji.Name != signupEmoji {
@@ -79,7 +79,7 @@ func (sm *signupManager) HandleSignupReactionAdd(ctx context.Context, r *discord
 	result, err := sm.operationWrapper(ctx, "handle_signup_reaction", func(ctx context.Context) (SignupOperationResult, error) {
 		sm.logger.InfoContext(ctx, "Handling signup reaction")
 
-		if r.GuildID != sm.config.Discord.GuildID {
+		if r.GuildID != sm.config.GetGuildID() {
 			sm.logger.WarnContext(ctx, "Reaction from wrong guild", attr.String("guildID", r.GuildID))
 			return SignupOperationResult{Error: fmt.Errorf("reaction from unauthorized guild")}, nil
 		}

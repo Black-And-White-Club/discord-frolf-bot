@@ -42,7 +42,7 @@ func (h *UserHandlers) HandleUserCreated(msg *message.Message) ([]*message.Messa
 
 			rolePayload := discorduserevents.AddRolePayload{
 				UserID: createdPayload.UserID,
-				RoleID: h.Config.Discord.RegisteredRoleID,
+				RoleID: h.Config.GetRegisteredRoleID(),
 			}
 			roleMsg, err := h.Helper.CreateResultMessage(msg, rolePayload, discorduserevents.SignupAddRole)
 			if err != nil {

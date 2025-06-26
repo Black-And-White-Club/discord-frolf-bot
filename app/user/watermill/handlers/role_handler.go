@@ -103,7 +103,7 @@ func (h *UserHandlers) HandleRoleUpdateResult(msg *message.Message) ([]*message.
 			h.Logger.InfoContext(ctx, "Received role update result", attr.Topic(topic), attr.CorrelationIDFromMsg(msg))
 
 			discordID := string(resultPayload.UserID)
-			discordRoleID, ok := h.Config.Discord.RoleMappings[string(resultPayload.Role)]
+			discordRoleID, ok := h.Config.GetRoleMappings()[string(resultPayload.Role)]
 			if !ok {
 				err := fmt.Errorf("no Discord role mapping found for application role: %s", resultPayload.Role)
 				h.Logger.ErrorContext(ctx, "Role mapping error", attr.Error(err))
@@ -204,7 +204,7 @@ func (h *UserHandlers) HandleAddRole(msg *message.Message) ([]*message.Message, 
 			rolePayload := payload.(*discorduserevents.AddRolePayload)
 
 			// Attempt to add the role
-			result, err := h.UserDiscord.GetRoleManager().AddRoleToUser(ctx, h.Config.Discord.GuildID, rolePayload.UserID, rolePayload.RoleID)
+			result, err := h.UserDiscord.GetRoleManager().AddRoleToUser(ctx, h.Config.GetGuildID(), rolePayload.UserID, rolePayload.RoleID)
 			if err != nil {
 				h.Logger.ErrorContext(ctx, "Failed to add Discord role", attr.Error(err))
 				// Create a failure message

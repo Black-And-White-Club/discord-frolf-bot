@@ -26,7 +26,7 @@ func (tum *tagUpdateManager) UpdateDiscordEmbedsWithTagChanges(ctx context.Conte
 
 			// Extract channel ID from config - this may need to be added to RoundUpdateInfo
 			// For now, we'll use the channel from config or try to determine it
-			channelID := tum.config.Discord.EventChannelID
+			channelID := tum.config.GetEventChannelID()
 
 			result, err := tum.UpdateTagsInEmbed(ctx, channelID, roundInfo.EventMessageID, tagUpdates)
 			if err != nil || result.Error != nil {

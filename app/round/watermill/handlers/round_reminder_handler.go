@@ -39,7 +39,7 @@ func (h *RoundHandlers) HandleRoundReminder(msg *message.Message) ([]*message.Me
 
 			// Use default channel from config if payload doesn't have one
 			if reminderPayload.DiscordChannelID == "" {
-				defaultChannelID := h.Config.Discord.EventChannelID
+				defaultChannelID := h.Config.GetEventChannelID()
 				if defaultChannelID == "" {
 					h.Logger.ErrorContext(ctx, "No channel ID configured for reminder",
 						attr.String("message_id", msg.UUID))

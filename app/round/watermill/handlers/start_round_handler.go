@@ -27,7 +27,7 @@ func (h *RoundHandlers) HandleRoundStarted(msg *message.Message) ([]*message.Mes
 			channelID := startPayload.DiscordChannelID
 			if channelID == "" {
 				// Fallback to config if payload channel ID is empty
-				channelID = h.Config.Discord.EventChannelID
+				channelID = h.Config.GetEventChannelID()
 			}
 
 			// Convert EventMessageID to string

@@ -27,7 +27,7 @@ func (h *LeaderboardHandlers) HandleBatchTagAssigned(msg *message.Message) ([]*m
 				return nil, nil
 			}
 
-			channelID := h.Config.Discord.LeaderboardChannelID
+			channelID := h.Config.GetLeaderboardChannelID()
 			if channelID == "" {
 				err := fmt.Errorf("missing Discord Channel ID in config")
 				h.Logger.ErrorContext(ctx, err.Error(), attr.CorrelationIDFromMsg(msg))

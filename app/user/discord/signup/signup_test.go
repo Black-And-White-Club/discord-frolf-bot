@@ -386,8 +386,8 @@ func Test_signupManager_createEvent(t *testing.T) {
 					t.Errorf("Expected interaction_token = %q, got %q", mockInteraction.Interaction.Token, msg.Metadata.Get("interaction_token"))
 				}
 
-				if msg.Metadata.Get("guild_id") != mockConfig.Discord.GuildID {
-					t.Errorf("Expected guild_id = %q, got %q", mockConfig.Discord.GuildID, msg.Metadata.Get("guild_id"))
+				if msg.Metadata.Get("guild_id") != mockConfig.GetGuildID() {
+					t.Errorf("Expected guild_id = %q, got %q", mockConfig.GetGuildID(), msg.Metadata.Get("guild_id"))
 				}
 			}
 		})

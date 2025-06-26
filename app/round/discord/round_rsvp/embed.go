@@ -122,12 +122,12 @@ func (rrm *roundRsvpManager) formatParticipants(ctx context.Context, participant
 		} else {
 			// Optionally fetch member if user fetch succeeded, primarily for better logging context
 			// in case member fetch fails. Not used in output line format.
-			_, memberErr := rrm.session.GuildMember(rrm.config.Discord.GuildID, string(participant.UserID))
-			if memberErr != nil && rrm.config.Discord.GuildID != "" {
+			_, memberErr := rrm.session.GuildMember(rrm.config.GetGuildID(), string(participant.UserID))
+			if memberErr != nil && rrm.config.GetGuildID() != "" {
 				rrm.logger.WarnContext(ctx, "Failed to get guild member info for participant in formatParticipants",
 					attr.Error(memberErr),
 					attr.String("user_id", string(participant.UserID)),
-					attr.String("guild_id", rrm.config.Discord.GuildID),
+					attr.String("guild_id", rrm.config.GetGuildID()),
 					attr.String("status", string(participant.Response)),
 					attr.Any("tag_number", participant.TagNumber),
 				)

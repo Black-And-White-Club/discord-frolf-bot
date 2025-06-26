@@ -21,7 +21,7 @@ func (crm *createRoundManager) SendRoundEventEmbed(channelID string, title round
 		}
 
 		creatorName := user.Username
-		if member, err := crm.session.GuildMember(crm.config.Discord.GuildID, string(creatorID)); err == nil && member.Nick != "" {
+		if member, err := crm.session.GuildMember(crm.config.GetGuildID(), string(creatorID)); err == nil && member.Nick != "" {
 			creatorName = member.Nick
 		}
 
