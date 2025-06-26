@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
+	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/ThreeDotsLabs/watermill/message"
 )
 
@@ -13,11 +16,26 @@ import (
 func (h *RoundHandlers) HandleRoundParticipantJoinRequest(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleRoundParticipantJoinRequest",
-		&roundevents.ParticipantJoinRequestPayload{},
+		&discordroundevents.DiscordRoundParticipantJoinRequestPayload{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			p := payload.(*roundevents.ParticipantJoinRequestPayload)
+			p := payload.(*discordroundevents.DiscordRoundParticipantJoinRequestPayload)
 
-			response := p.Response
+			// Extract response from message metadata
+			responseStr := msg.Metadata.Get("response")
+
+			// Convert string response to proper type
+			var response roundtypes.Response
+			switch responseStr {
+			case "accepted":
+				response = roundtypes.ResponseAccept
+			case "declined":
+				response = roundtypes.ResponseDecline
+			case "tentative":
+				response = roundtypes.ResponseTentative
+			default:
+				// Default to accept if response is invalid or missing
+				response = roundtypes.ResponseAccept
+			}
 
 			// Check if this is a late join
 			joinedLate := false
@@ -26,11 +44,12 @@ func (h *RoundHandlers) HandleRoundParticipantJoinRequest(msg *message.Message) 
 			}
 
 			// Construct the backend payload
+			tagNumber := sharedtypes.TagNumber(0) // Default tag number, will be assigned by backend
 			backendPayload := roundevents.ParticipantJoinRequestPayload{
 				RoundID:    p.RoundID,
 				UserID:     p.UserID,
 				Response:   response,
-				TagNumber:  p.TagNumber,
+				TagNumber:  &tagNumber,
 				JoinedLate: &joinedLate,
 			}
 

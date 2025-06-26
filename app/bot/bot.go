@@ -22,6 +22,7 @@ import (
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	eventbusmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/eventbus"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
+	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/bwmarrin/discordgo"
 	"go.opentelemetry.io/otel/trace"
@@ -31,12 +32,17 @@ type DiscordBot struct {
 	Session          discord.Session
 	Logger           *slog.Logger
 	Config           *config.Config
-	WatermillRouter  *message.Router
 	EventBus         eventbus.EventBus
 	InteractionStore storage.ISInterface
 	Metrics          discordmetrics.DiscordMetrics
 	Helper           utils.Helpers
 	Tracer           trace.Tracer
+
+	// Individual router instances per domain
+	UserWatermillRouter        *message.Router
+	RoundWatermillRouter       *message.Router
+	ScoreWatermillRouter       *message.Router
+	LeaderboardWatermillRouter *message.Router
 
 	// Module routers
 	UserRouter        *userrouter.UserRouter
@@ -49,7 +55,6 @@ func NewDiscordBot(
 	session discord.Session,
 	cfg *config.Config,
 	logger *slog.Logger,
-	router *message.Router,
 	interactionStore storage.ISInterface,
 	discordMetrics discordmetrics.DiscordMetrics,
 	eventBusMetrics eventbusmetrics.EventBusMetrics,
@@ -70,16 +75,40 @@ func NewDiscordBot(
 		return nil, fmt.Errorf("failed to create event bus: %w", err)
 	}
 
+	// Create separate router instances for each domain
+	userRouter, err := message.NewRouter(message.RouterConfig{}, watermill.NopLogger{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create user router: %w", err)
+	}
+
+	roundRouter, err := message.NewRouter(message.RouterConfig{}, watermill.NopLogger{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create round router: %w", err)
+	}
+
+	scoreRouter, err := message.NewRouter(message.RouterConfig{}, watermill.NopLogger{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create score router: %w", err)
+	}
+
+	leaderboardRouter, err := message.NewRouter(message.RouterConfig{}, watermill.NopLogger{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create leaderboard router: %w", err)
+	}
+
 	return &DiscordBot{
-		Session:          session,
-		Logger:           logger,
-		Config:           cfg,
-		WatermillRouter:  router,
-		EventBus:         eventBus,
-		InteractionStore: interactionStore,
-		Metrics:          discordMetrics,
-		Helper:           helper,
-		Tracer:           tracer,
+		Session:                    session,
+		Logger:                     logger,
+		Config:                     cfg,
+		EventBus:                   eventBus,
+		InteractionStore:           interactionStore,
+		Metrics:                    discordMetrics,
+		Helper:                     helper,
+		Tracer:                     tracer,
+		UserWatermillRouter:        userRouter,
+		RoundWatermillRouter:       roundRouter,
+		ScoreWatermillRouter:       scoreRouter,
+		LeaderboardWatermillRouter: leaderboardRouter,
 	}, nil
 }
 
@@ -97,7 +126,7 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 	bot.UserRouter, err = user.InitializeUserModule(
 		ctx,
 		bot.Session,
-		bot.WatermillRouter,
+		bot.UserWatermillRouter,
 		registry,
 		reactionRegistry,
 		bot.EventBus,
@@ -114,7 +143,7 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 	bot.RoundRouter, err = round.InitializeRoundModule(
 		ctx,
 		bot.Session,
-		bot.WatermillRouter,
+		bot.RoundWatermillRouter,
 		registry,
 		reactionRegistry,
 		bot.EventBus,
@@ -131,7 +160,7 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 	bot.ScoreRouter, err = score.InitializeScoreModule(
 		ctx,
 		bot.Session,
-		bot.WatermillRouter,
+		bot.ScoreWatermillRouter,
 		registry,
 		reactionRegistry,
 		bot.EventBus,
@@ -148,7 +177,7 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 	bot.LeaderboardRouter, err = leaderboard.InitializeLeaderboardModule(
 		ctx,
 		bot.Session,
-		bot.WatermillRouter,
+		bot.LeaderboardWatermillRouter,
 		registry,
 		bot.EventBus,
 		bot.Logger,
@@ -175,11 +204,32 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 		bot.Logger.Info("Bot is ready", attr.Int("guilds", len(r.Guilds)))
 	})
 
-	// Start the Watermill router
+	// Start the Watermill routers
 	go func() {
-		bot.Logger.Info("Starting Watermill router")
-		if err := bot.WatermillRouter.Run(ctx); err != nil {
-			bot.Logger.Error("Watermill router failed", attr.Error(err))
+		bot.Logger.Info("Starting User Watermill router")
+		if err := bot.UserWatermillRouter.Run(ctx); err != nil {
+			bot.Logger.Error("User Watermill router failed", attr.Error(err))
+		}
+	}()
+
+	go func() {
+		bot.Logger.Info("Starting Round Watermill router")
+		if err := bot.RoundWatermillRouter.Run(ctx); err != nil {
+			bot.Logger.Error("Round Watermill router failed", attr.Error(err))
+		}
+	}()
+
+	go func() {
+		bot.Logger.Info("Starting Score Watermill router")
+		if err := bot.ScoreWatermillRouter.Run(ctx); err != nil {
+			bot.Logger.Error("Score Watermill router failed", attr.Error(err))
+		}
+	}()
+
+	go func() {
+		bot.Logger.Info("Starting Leaderboard Watermill router")
+		if err := bot.LeaderboardWatermillRouter.Run(ctx); err != nil {
+			bot.Logger.Error("Leaderboard Watermill router failed", attr.Error(err))
 		}
 	}()
 
@@ -211,8 +261,17 @@ func (bot *DiscordBot) Close() {
 	}
 
 	// Then close infrastructure
-	if bot.WatermillRouter != nil {
-		bot.WatermillRouter.Close()
+	if bot.UserWatermillRouter != nil {
+		bot.UserWatermillRouter.Close()
+	}
+	if bot.RoundWatermillRouter != nil {
+		bot.RoundWatermillRouter.Close()
+	}
+	if bot.ScoreWatermillRouter != nil {
+		bot.ScoreWatermillRouter.Close()
+	}
+	if bot.LeaderboardWatermillRouter != nil {
+		bot.LeaderboardWatermillRouter.Close()
 	}
 	if bot.Session != nil {
 		bot.Session.Close()
@@ -242,8 +301,17 @@ func (bot *DiscordBot) Shutdown(ctx context.Context) error {
 	}
 
 	// Then close infrastructure
-	if bot.WatermillRouter != nil {
-		bot.WatermillRouter.Close()
+	if bot.UserWatermillRouter != nil {
+		bot.UserWatermillRouter.Close()
+	}
+	if bot.RoundWatermillRouter != nil {
+		bot.RoundWatermillRouter.Close()
+	}
+	if bot.ScoreWatermillRouter != nil {
+		bot.ScoreWatermillRouter.Close()
+	}
+	if bot.LeaderboardWatermillRouter != nil {
+		bot.LeaderboardWatermillRouter.Close()
 	}
 	if bot.Session != nil {
 		bot.Session.Close()

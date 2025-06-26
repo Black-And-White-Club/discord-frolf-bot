@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
+
 	discordleaderboardevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/leaderboard"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	sharedevents "github.com/Black-And-White-Club/frolf-bot-shared/events/shared"
@@ -25,6 +27,13 @@ func (h *LeaderboardHandlers) HandleTagAssignRequest(msg *message.Message) ([]*m
 			if discordPayload.TargetUserID == "" || discordPayload.RequestorID == "" ||
 				discordPayload.TagNumber <= 0 || discordPayload.ChannelID == "" || discordPayload.MessageID == "" {
 				err := fmt.Errorf("invalid TagAssignRequest payload: missing required fields")
+				h.Logger.ErrorContext(ctx, err.Error(), attr.CorrelationIDFromMsg(msg))
+				return nil, err
+			}
+
+			// Validate MessageID is a valid UUID format
+			if _, err := uuid.Parse(discordPayload.MessageID); err != nil {
+				err := fmt.Errorf("invalid TagAssignRequest payload: MessageID is not a valid UUID: %w", err)
 				h.Logger.ErrorContext(ctx, err.Error(), attr.CorrelationIDFromMsg(msg))
 				return nil, err
 			}
@@ -86,23 +95,29 @@ func (h *LeaderboardHandlers) HandleTagAssignedResponse(msg *message.Message) ([
 				successMessage := fmt.Sprintf("✅ Successfully claimed tag #%d!", *backendPayload.TagNumber)
 
 				// Get the claim tag manager and update the interaction
-				claimTagManager := h.LeaderboardDiscord.GetClaimTagManager()
-				if claimTagManager != nil {
-					result, err := claimTagManager.UpdateInteractionResponse(ctx, correlationID, successMessage)
-					if err != nil {
-						h.Logger.ErrorContext(ctx, "Failed to update Discord interaction for tag success",
-							attr.CorrelationIDFromMsg(msg),
-							attr.String("correlation_id", correlationID),
-							attr.Error(err))
-						// Don't fail the whole handler - log and continue
+				if h.LeaderboardDiscord != nil {
+					claimTagManager := h.LeaderboardDiscord.GetClaimTagManager()
+					if claimTagManager != nil {
+						result, err := claimTagManager.UpdateInteractionResponse(ctx, correlationID, successMessage)
+						if err != nil {
+							h.Logger.ErrorContext(ctx, "Failed to update Discord interaction for tag success",
+								attr.CorrelationIDFromMsg(msg),
+								attr.String("correlation_id", correlationID),
+								attr.Error(err))
+							// Don't fail the whole handler - log and continue
+						} else {
+							h.Logger.InfoContext(ctx, "Successfully updated Discord interaction for tag claim success",
+								attr.CorrelationIDFromMsg(msg),
+								attr.String("correlation_id", correlationID),
+								attr.String("result", fmt.Sprintf("%v", result.Success)))
+						}
 					} else {
-						h.Logger.InfoContext(ctx, "Successfully updated Discord interaction for tag claim success",
+						h.Logger.WarnContext(ctx, "ClaimTagManager is nil, cannot update Discord interaction",
 							attr.CorrelationIDFromMsg(msg),
-							attr.String("correlation_id", correlationID),
-							attr.String("result", fmt.Sprintf("%v", result.Success)))
+							attr.String("correlation_id", correlationID))
 					}
 				} else {
-					h.Logger.WarnContext(ctx, "ClaimTagManager is nil, cannot update Discord interaction",
+					h.Logger.WarnContext(ctx, "LeaderboardDiscord is nil, cannot update Discord interaction",
 						attr.CorrelationIDFromMsg(msg),
 						attr.String("correlation_id", correlationID))
 				}
@@ -153,23 +168,29 @@ func (h *LeaderboardHandlers) HandleTagAssignFailedResponse(msg *message.Message
 				errorMessage := fmt.Sprintf("❌ Could not claim tag #%d: %s", *backendPayload.TagNumber, backendPayload.Reason)
 
 				// Get the claim tag manager and update the interaction
-				claimTagManager := h.LeaderboardDiscord.GetClaimTagManager()
-				if claimTagManager != nil {
-					result, err := claimTagManager.UpdateInteractionResponse(ctx, correlationID, errorMessage)
-					if err != nil {
-						h.Logger.ErrorContext(ctx, "Failed to update Discord interaction for tag failure",
-							attr.CorrelationIDFromMsg(msg),
-							attr.String("correlation_id", correlationID),
-							attr.Error(err))
-						// Don't fail the whole handler - log and continue
+				if h.LeaderboardDiscord != nil {
+					claimTagManager := h.LeaderboardDiscord.GetClaimTagManager()
+					if claimTagManager != nil {
+						result, err := claimTagManager.UpdateInteractionResponse(ctx, correlationID, errorMessage)
+						if err != nil {
+							h.Logger.ErrorContext(ctx, "Failed to update Discord interaction for tag failure",
+								attr.CorrelationIDFromMsg(msg),
+								attr.String("correlation_id", correlationID),
+								attr.Error(err))
+							// Don't fail the whole handler - log and continue
+						} else {
+							h.Logger.InfoContext(ctx, "Successfully updated Discord interaction for tag claim failure",
+								attr.CorrelationIDFromMsg(msg),
+								attr.String("correlation_id", correlationID),
+								attr.String("result", fmt.Sprintf("%v", result.Success)))
+						}
 					} else {
-						h.Logger.InfoContext(ctx, "Successfully updated Discord interaction for tag claim failure",
+						h.Logger.WarnContext(ctx, "ClaimTagManager is nil, cannot update Discord interaction",
 							attr.CorrelationIDFromMsg(msg),
-							attr.String("correlation_id", correlationID),
-							attr.String("result", fmt.Sprintf("%v", result.Success)))
+							attr.String("correlation_id", correlationID))
 					}
 				} else {
-					h.Logger.WarnContext(ctx, "ClaimTagManager is nil, cannot update Discord interaction",
+					h.Logger.WarnContext(ctx, "LeaderboardDiscord is nil, cannot update Discord interaction",
 						attr.CorrelationIDFromMsg(msg),
 						attr.String("correlation_id", correlationID))
 				}

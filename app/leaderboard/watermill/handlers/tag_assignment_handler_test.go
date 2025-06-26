@@ -9,6 +9,7 @@ import (
 
 	discordleaderboardevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/leaderboard"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
+	sharedevents "github.com/Black-And-White-Club/frolf-bot-shared/events/shared"
 	util_mocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
@@ -52,12 +53,15 @@ func TestLeaderboardHandlers_HandleTagAssignRequest(t *testing.T) {
 						return nil
 					}).Times(1)
 
-				expectedPayload := leaderboardevents.TagAssignmentRequestedPayload{
-					UserID:     sharedtypes.DiscordID("user123"),
-					TagNumber:  &testTagNumber,
-					UpdateID:   sharedtypes.RoundID(testMessageID),
-					Source:     "manual",
-					UpdateType: "new_tag",
+				expectedPayload := sharedevents.BatchTagAssignmentRequestedPayload{
+					RequestingUserID: sharedtypes.DiscordID("user123"),
+					BatchID:          testMessageID.String(),
+					Assignments: []sharedevents.TagAssignmentInfo{
+						{
+							UserID:    sharedtypes.DiscordID("user123"),
+							TagNumber: sharedtypes.TagNumber(testTagNumber),
+						},
+					},
 				}
 
 				mockMsg := message.NewMessage("test", nil)
@@ -68,7 +72,7 @@ func TestLeaderboardHandlers_HandleTagAssignRequest(t *testing.T) {
 					"message_id":   testMessageID.String(),
 				}
 
-				mockHelper.EXPECT().CreateResultMessage(gomock.Any(), expectedPayload, leaderboardevents.LeaderboardTagAssignmentRequested).
+				mockHelper.EXPECT().CreateResultMessage(gomock.Any(), expectedPayload, leaderboardevents.LeaderboardBatchTagAssignmentRequested).
 					Return(mockMsg, nil).Times(1)
 			},
 		},
@@ -167,15 +171,18 @@ func TestLeaderboardHandlers_HandleTagAssignRequest(t *testing.T) {
 						return nil
 					}).Times(1)
 
-				expectedPayload := leaderboardevents.TagAssignmentRequestedPayload{
-					UserID:     sharedtypes.DiscordID("user123"),
-					TagNumber:  &testTagNumber,
-					UpdateID:   sharedtypes.RoundID(testMessageID),
-					Source:     "manual",
-					UpdateType: "new_tag",
+				expectedPayload := sharedevents.BatchTagAssignmentRequestedPayload{
+					RequestingUserID: sharedtypes.DiscordID("user123"),
+					BatchID:          testMessageID.String(),
+					Assignments: []sharedevents.TagAssignmentInfo{
+						{
+							UserID:    sharedtypes.DiscordID("user123"),
+							TagNumber: sharedtypes.TagNumber(testTagNumber),
+						},
+					},
 				}
 
-				mockHelper.EXPECT().CreateResultMessage(gomock.Any(), expectedPayload, leaderboardevents.LeaderboardTagAssignmentRequested).
+				mockHelper.EXPECT().CreateResultMessage(gomock.Any(), expectedPayload, leaderboardevents.LeaderboardBatchTagAssignmentRequested).
 					Return(nil, errors.New("failed to create message")).Times(1)
 			},
 		},

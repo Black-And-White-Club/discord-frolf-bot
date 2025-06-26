@@ -41,6 +41,11 @@ func (h *RoundHandlers) HandleRoundUpdateRequested(msg *message.Message) ([]*mes
 				return nil, err
 			}
 
+			// Initialize metadata if nil
+			if backendMsg.Metadata == nil {
+				backendMsg.Metadata = message.Metadata{}
+			}
+
 			// Preserve Discord metadata in the outgoing message
 			backendMsg.Metadata.Set("channel_id", channelID)
 			backendMsg.Metadata.Set("message_id", messageID)

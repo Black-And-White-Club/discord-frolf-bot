@@ -251,6 +251,16 @@ func Test_roundRsvpManager_InteractionJoinRoundLate(t *testing.T) {
 			name: "interaction respond error",
 			setup: func() {
 				mockSession.EXPECT().
+					ChannelMessage(gomock.Any(), gomock.Any()).
+					Return(&discordgo.Message{
+						ID: "message-123",
+						Embeds: []*discordgo.MessageEmbed{
+							{Title: "Test Round", Description: "Test Description"},
+						},
+					}, nil).
+					Times(1)
+
+				mockSession.EXPECT().
 					InteractionRespond(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(errors.New("failed to respond")).
 					Times(1)
@@ -267,6 +277,16 @@ func Test_roundRsvpManager_InteractionJoinRoundLate(t *testing.T) {
 		{
 			name: "publish error",
 			setup: func() {
+				mockSession.EXPECT().
+					ChannelMessage(gomock.Any(), gomock.Any()).
+					Return(&discordgo.Message{
+						ID: "message-123",
+						Embeds: []*discordgo.MessageEmbed{
+							{Title: "Test Round", Description: "Test Description"},
+						},
+					}, nil).
+					Times(1)
+
 				mockSession.EXPECT().
 					InteractionRespond(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil).

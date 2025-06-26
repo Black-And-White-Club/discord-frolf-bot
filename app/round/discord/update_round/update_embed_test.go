@@ -45,6 +45,7 @@ func createMockEmbed(title, description, location string, timestamp time.Time, p
 
 func Test_updateRoundManager_UpdateRoundEventEmbed(t *testing.T) {
 	testRoundID := sharedtypes.RoundID(uuid.New())
+	testRoundIDString := uuid.UUID(testRoundID).String()
 	channelID := "test-channel"
 
 	strPtr := func(s string) *string {
@@ -229,7 +230,7 @@ func Test_updateRoundManager_UpdateRoundEventEmbed(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			got, err := urm.UpdateRoundEventEmbed(ctx, channelID, testRoundID, tt.title, tt.description, tt.startTime, tt.location)
+			got, err := urm.UpdateRoundEventEmbed(ctx, channelID, testRoundIDString, tt.title, tt.description, tt.startTime, tt.location)
 
 			if (err != nil) != tt.expectErr {
 				t.Errorf("UpdateRoundEventEmbed() error = %v, wantErr %v", err, tt.expectErr)

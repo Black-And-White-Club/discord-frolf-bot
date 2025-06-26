@@ -29,7 +29,7 @@ func TestRoundHandlers_HandleRoundReminder(t *testing.T) {
 		msg     *message.Message
 		want    []*message.Message
 		wantErr bool
-		setup   func(*gomock.Controller, *util_mocks.MockHelpers, *mocks.MockRoundDiscordInterface, *mocks.MockRoundReminderManager)
+		setup   func(*gomock.Controller, *mocks.MockRoundDiscordInterface, *mocks.MockRoundReminderManager, *util_mocks.MockHelpers)
 	}{
 		{
 			name: "successful_reminder_sent",
@@ -41,35 +41,36 @@ func TestRoundHandlers_HandleRoundReminder(t *testing.T) {
 			}`),
 				Metadata: message.Metadata{"correlation_id": "test-correlation"},
 			},
-			want:    []*message.Message{{UUID: "trace-msg"}},
+			want:    []*message.Message{},
 			wantErr: false,
-			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockReminderManager *mocks.MockRoundReminderManager) {
-				mockHelper.EXPECT().UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.DiscordReminderPayload{})).
-					DoAndReturn(func(_ *message.Message, v any) error {
-						payload := v.(*roundevents.DiscordReminderPayload)
-						payload.RoundID = testRoundID
-						payload.ReminderType = testReminderType
+			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockReminderManager *mocks.MockRoundReminderManager, mockHelper *util_mocks.MockHelpers) {
+				expectedPayload := roundevents.DiscordReminderPayload{
+					RoundID:      testRoundID,
+					ReminderType: testReminderType,
+				}
+
+				// Expected payload that will be passed to SendRoundReminder (with channel ID added)
+				expectedSendPayload := roundevents.DiscordReminderPayload{
+					RoundID:          testRoundID,
+					ReminderType:     testReminderType,
+					DiscordChannelID: "test-channel-id", // Added by handler
+				}
+
+				mockHelper.EXPECT().
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.DiscordReminderPayload{})).
+					DoAndReturn(func(msg *message.Message, v any) error {
+						*v.(*roundevents.DiscordReminderPayload) = expectedPayload
 						return nil
-					}).Times(1)
+					}).
+					Times(1)
+
 				mockRoundDiscord.EXPECT().GetRoundReminderManager().Return(mockReminderManager).Times(1)
 				mockReminderManager.EXPECT().SendRoundReminder(
 					gomock.Any(),
-					&roundevents.DiscordReminderPayload{
-						RoundID:      testRoundID,
-						ReminderType: testReminderType,
-					},
+					&expectedSendPayload,
 				).Return(roundreminder.RoundReminderOperationResult{
 					Success: true,
 				}, nil).Times(1)
-				mockHelper.EXPECT().CreateResultMessage(
-					gomock.Any(),
-					map[string]interface{}{
-						"round_id":      testRoundID,
-						"reminder_type": testReminderType,
-						"status":        "reminder_sent",
-					},
-					roundevents.RoundTraceEvent,
-				).Return(&message.Message{UUID: "trace-msg"}, nil).Times(1)
 			},
 		},
 		{
@@ -84,18 +85,31 @@ func TestRoundHandlers_HandleRoundReminder(t *testing.T) {
 			},
 			want:    nil,
 			wantErr: true,
-			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockReminderManager *mocks.MockRoundReminderManager) {
-				mockHelper.EXPECT().UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.DiscordReminderPayload{})).
-					DoAndReturn(func(_ *message.Message, v any) error {
-						payload := v.(*roundevents.DiscordReminderPayload)
-						payload.RoundID = testRoundID
-						payload.ReminderType = testReminderType
+			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockReminderManager *mocks.MockRoundReminderManager, mockHelper *util_mocks.MockHelpers) {
+				expectedPayload := roundevents.DiscordReminderPayload{
+					RoundID:      testRoundID,
+					ReminderType: testReminderType,
+				}
+
+				// Expected payload that will be passed to SendRoundReminder (with channel ID added)
+				expectedSendPayload := roundevents.DiscordReminderPayload{
+					RoundID:          testRoundID,
+					ReminderType:     testReminderType,
+					DiscordChannelID: "test-channel-id", // Added by handler
+				}
+
+				mockHelper.EXPECT().
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.DiscordReminderPayload{})).
+					DoAndReturn(func(msg *message.Message, v any) error {
+						*v.(*roundevents.DiscordReminderPayload) = expectedPayload
 						return nil
-					}).Times(1)
+					}).
+					Times(1)
+
 				mockRoundDiscord.EXPECT().GetRoundReminderManager().Return(mockReminderManager).Times(1)
 				mockReminderManager.EXPECT().SendRoundReminder(
 					gomock.Any(),
-					gomock.Any(),
+					&expectedSendPayload,
 				).Return(
 					roundreminder.RoundReminderOperationResult{},
 					errors.New("send error"),
@@ -112,35 +126,39 @@ func TestRoundHandlers_HandleRoundReminder(t *testing.T) {
 			}`),
 				Metadata: message.Metadata{"correlation_id": "test-correlation"},
 			},
-			want:    []*message.Message{{UUID: "trace-msg"}},
+			want:    []*message.Message{},
 			wantErr: false,
-			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockReminderManager *mocks.MockRoundReminderManager) {
-				mockHelper.EXPECT().UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.DiscordReminderPayload{})).
-					DoAndReturn(func(_ *message.Message, v any) error {
-						payload := v.(*roundevents.DiscordReminderPayload)
-						payload.RoundID = testRoundID
-						payload.ReminderType = testReminderType
+			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockReminderManager *mocks.MockRoundReminderManager, mockHelper *util_mocks.MockHelpers) {
+				expectedPayload := roundevents.DiscordReminderPayload{
+					RoundID:      testRoundID,
+					ReminderType: testReminderType,
+				}
+
+				// Expected payload that will be passed to SendRoundReminder (with channel ID added)
+				expectedSendPayload := roundevents.DiscordReminderPayload{
+					RoundID:          testRoundID,
+					ReminderType:     testReminderType,
+					DiscordChannelID: "test-channel-id", // Added by handler
+				}
+
+				mockHelper.EXPECT().
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.DiscordReminderPayload{})).
+					DoAndReturn(func(msg *message.Message, v any) error {
+						*v.(*roundevents.DiscordReminderPayload) = expectedPayload
 						return nil
-					}).Times(1)
+					}).
+					Times(1)
+
 				mockRoundDiscord.EXPECT().GetRoundReminderManager().Return(mockReminderManager).Times(1)
 				mockReminderManager.EXPECT().SendRoundReminder(
 					gomock.Any(),
-					gomock.Any(),
+					&expectedSendPayload,
 				).Return(
 					roundreminder.RoundReminderOperationResult{
-						Success: "true", // Non-boolean type
+						Success: true,
 					},
 					nil,
 				).Times(1)
-				mockHelper.EXPECT().CreateResultMessage(
-					gomock.Any(),
-					map[string]interface{}{
-						"round_id":      testRoundID,
-						"reminder_type": testReminderType,
-						"status":        "reminder_failed",
-					},
-					roundevents.RoundTraceEvent,
-				).Return(&message.Message{UUID: "trace-msg"}, nil).Times(1)
 			},
 		},
 		{
@@ -152,15 +170,15 @@ func TestRoundHandlers_HandleRoundReminder(t *testing.T) {
 			},
 			want:    nil,
 			wantErr: true,
-			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockReminderManager *mocks.MockRoundReminderManager) {
-				mockHelper.EXPECT().UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.DiscordReminderPayload{})).
-					DoAndReturn(func(_ *message.Message, v any) error {
-						return errors.New("invalid payload type")
-					}).Times(1)
+			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockReminderManager *mocks.MockRoundReminderManager, mockHelper *util_mocks.MockHelpers) {
+				mockHelper.EXPECT().
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.DiscordReminderPayload{})).
+					Return(errors.New("unmarshal failed")).
+					Times(1)
 			},
 		},
 		{
-			name: "create_trace_message_error",
+			name: "operation_failure",
 			msg: &message.Message{
 				UUID: "5",
 				Payload: []byte(`{
@@ -169,31 +187,39 @@ func TestRoundHandlers_HandleRoundReminder(t *testing.T) {
 			}`),
 				Metadata: message.Metadata{"correlation_id": "test-correlation"},
 			},
-			want:    nil,
-			wantErr: true,
-			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockReminderManager *mocks.MockRoundReminderManager) {
-				mockHelper.EXPECT().UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.DiscordReminderPayload{})).
-					DoAndReturn(func(_ *message.Message, v any) error {
-						payload := v.(*roundevents.DiscordReminderPayload)
-						payload.RoundID = testRoundID
-						payload.ReminderType = testReminderType
+			want:    []*message.Message{},
+			wantErr: false,
+			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockReminderManager *mocks.MockRoundReminderManager, mockHelper *util_mocks.MockHelpers) {
+				expectedPayload := roundevents.DiscordReminderPayload{
+					RoundID:      testRoundID,
+					ReminderType: testReminderType,
+				}
+
+				// Expected payload that will be passed to SendRoundReminder (with channel ID added)
+				expectedSendPayload := roundevents.DiscordReminderPayload{
+					RoundID:          testRoundID,
+					ReminderType:     testReminderType,
+					DiscordChannelID: "test-channel-id", // Added by handler
+				}
+
+				mockHelper.EXPECT().
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.DiscordReminderPayload{})).
+					DoAndReturn(func(msg *message.Message, v any) error {
+						*v.(*roundevents.DiscordReminderPayload) = expectedPayload
 						return nil
-					}).Times(1)
+					}).
+					Times(1)
+
 				mockRoundDiscord.EXPECT().GetRoundReminderManager().Return(mockReminderManager).Times(1)
 				mockReminderManager.EXPECT().SendRoundReminder(
 					gomock.Any(),
-					gomock.Any(),
+					&expectedSendPayload,
 				).Return(
 					roundreminder.RoundReminderOperationResult{
-						Success: true,
+						Success: false,
 					},
 					nil,
 				).Times(1)
-				mockHelper.EXPECT().CreateResultMessage(
-					gomock.Any(),
-					gomock.Any(),
-					roundevents.RoundTraceEvent,
-				).Return(nil, errors.New("create error")).Times(1)
 			},
 		},
 	}
@@ -207,10 +233,14 @@ func TestRoundHandlers_HandleRoundReminder(t *testing.T) {
 			mockLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
 			mockMetrics := &discordmetrics.NoOpMetrics{}
 			mockTracer := noop.NewTracerProvider().Tracer("test")
-			tt.setup(ctrl, mockHelper, mockRoundDiscord, mockReminderManager)
+			tt.setup(ctrl, mockRoundDiscord, mockReminderManager, mockHelper)
 			h := &RoundHandlers{
-				Logger:       mockLogger,
-				Config:       &config.Config{},
+				Logger: mockLogger,
+				Config: &config.Config{
+					Discord: config.DiscordConfig{
+						EventChannelID: "test-channel-id",
+					},
+				},
 				Helpers:      mockHelper,
 				RoundDiscord: mockRoundDiscord,
 				Tracer:       mockTracer,

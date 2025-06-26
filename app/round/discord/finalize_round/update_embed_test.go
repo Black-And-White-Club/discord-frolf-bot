@@ -55,6 +55,23 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 					Return(&discordgo.Member{Nick: ""}, nil).
 					AnyTimes()
 
+				// Mock the ChannelMessage call to fetch existing message
+				mockSession.EXPECT().
+					ChannelMessage("test-channel", testRoundID.String()).
+					Return(&discordgo.Message{
+						ID: testRoundID.String(),
+						Embeds: []*discordgo.MessageEmbed{
+							{
+								Title:       "Test Round",
+								Description: "Test round description",
+								Fields: []*discordgo.MessageEmbedField{
+									{Name: "📍 Location", Value: "Test Course", Inline: true},
+								},
+							},
+						},
+					}, nil).
+					Times(1)
+
 				mockSession.EXPECT().
 					ChannelMessageEditComplex(gomock.Any()).
 					DoAndReturn(func(edit *discordgo.MessageEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
@@ -101,6 +118,23 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 					Return(&discordgo.Member{Nick: ""}, nil).
 					AnyTimes()
 
+				// Mock the ChannelMessage call to fetch existing message
+				mockSession.EXPECT().
+					ChannelMessage("test-channel", testRoundID.String()).
+					Return(&discordgo.Message{
+						ID: testRoundID.String(),
+						Embeds: []*discordgo.MessageEmbed{
+							{
+								Title:       "Test Round",
+								Description: "Test round description",
+								Fields: []*discordgo.MessageEmbedField{
+									{Name: "📍 Location", Value: "Test Course", Inline: true},
+								},
+							},
+						},
+					}, nil).
+					Times(1)
+
 				mockSession.EXPECT().
 					ChannelMessageEditComplex(gomock.Any()).
 					Return(nil, fmt.Errorf("discord API error")).
@@ -125,6 +159,23 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 					User(gomock.Any()).
 					Return(nil, fmt.Errorf("user not found")).
 					AnyTimes()
+
+				// Mock the ChannelMessage call to fetch existing message
+				mockSession.EXPECT().
+					ChannelMessage("test-channel", testRoundID.String()).
+					Return(&discordgo.Message{
+						ID: testRoundID.String(),
+						Embeds: []*discordgo.MessageEmbed{
+							{
+								Title:       "Test Round",
+								Description: "Test round description",
+								Fields: []*discordgo.MessageEmbedField{
+									{Name: "📍 Location", Value: "Test Course", Inline: true},
+								},
+							},
+						},
+					}, nil).
+					Times(1)
 
 				mockSession.EXPECT().
 					ChannelMessageEditComplex(gomock.Any()).

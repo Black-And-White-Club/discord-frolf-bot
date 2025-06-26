@@ -88,17 +88,18 @@ func Test_leaderboardUpdateManager_SendLeaderboardEmbed(t *testing.T) {
 							t.Errorf("Unexpected description: got %s, want %s", embed.Description, "Page 1/1")
 						}
 
-						if len(embed.Fields) != 5 {
-							t.Errorf("Expected 5 fields, got %d", len(embed.Fields))
+						if len(embed.Fields) != 1 {
+							t.Errorf("Expected 1 field, got %d", len(embed.Fields))
 						}
 
-						// Check first entry
-						if embed.Fields[0].Name != "#1" {
-							t.Errorf("Unexpected field name: got %s, want %s", embed.Fields[0].Name, "#1")
+						// Check the single Tags field
+						if embed.Fields[0].Name != "Tags" {
+							t.Errorf("Unexpected field name: got %s, want %s", embed.Fields[0].Name, "Tags")
 						}
 
-						if embed.Fields[0].Value != "<@user1>" {
-							t.Errorf("Unexpected field value: got %s, want %s", embed.Fields[0].Value, "<@user1>")
+						expectedValue := "🥇 **Tag #1  ** <@user1>\n🥈 **Tag #2  ** <@user2>\n🥉 **Tag #3  ** <@user3>\n🏷️ **Tag #4  ** <@user4>\n🗑️ **Tag #5  ** <@user5>\n"
+						if embed.Fields[0].Value != expectedValue {
+							t.Errorf("Unexpected field value: got %s, want %s", embed.Fields[0].Value, expectedValue)
 						}
 
 						// No pagination buttons for single page
@@ -142,9 +143,20 @@ func Test_leaderboardUpdateManager_SendLeaderboardEmbed(t *testing.T) {
 							t.Errorf("Unexpected description: got %s, want %s", embed.Description, "Page 1/2")
 						}
 
-						// Should show exactly 10 entries on first page
-						if len(embed.Fields) != 10 {
-							t.Errorf("Expected 10 fields, got %d", len(embed.Fields))
+						// Should show exactly 1 field with 10 entries on first page
+						if len(embed.Fields) != 1 {
+							t.Errorf("Expected 1 field, got %d", len(embed.Fields))
+						}
+
+						// Check the Tags field contains all 10 entries
+						if embed.Fields[0].Name != "Tags" {
+							t.Errorf("Unexpected field name: got %s, want %s", embed.Fields[0].Name, "Tags")
+						}
+
+						// Should contain entries 1-10 with proper emojis
+						expectedValue := "🥇 **Tag #1  ** <@user1>\n🥈 **Tag #2  ** <@user2>\n🥉 **Tag #3  ** <@user3>\n🏷️ **Tag #4  ** <@user4>\n🏷️ **Tag #5  ** <@user5>\n🏷️ **Tag #6  ** <@user6>\n🏷️ **Tag #7  ** <@user7>\n🏷️ **Tag #8  ** <@user8>\n🏷️ **Tag #9  ** <@user9>\n🏷️ **Tag #10 ** <@user10>\n"
+						if embed.Fields[0].Value != expectedValue {
+							t.Errorf("Unexpected field value: got %s, want %s", embed.Fields[0].Value, expectedValue)
 						}
 
 						// Check pagination buttons
@@ -204,14 +216,20 @@ func Test_leaderboardUpdateManager_SendLeaderboardEmbed(t *testing.T) {
 							t.Errorf("Unexpected description: got %s, want %s", embed.Description, "Page 2/2")
 						}
 
-						// Should show exactly 5 entries on second page
-						if len(embed.Fields) != 5 {
-							t.Errorf("Expected 5 fields, got %d", len(embed.Fields))
+						// Should show exactly 1 field with 5 entries on second page
+						if len(embed.Fields) != 1 {
+							t.Errorf("Expected 1 field, got %d", len(embed.Fields))
 						}
 
-						// Check first entry on page 2
-						if embed.Fields[0].Name != "#11" {
-							t.Errorf("Unexpected field name: got %s, want %s", embed.Fields[0].Name, "#11")
+						// Check the Tags field contains entries 11-15
+						if embed.Fields[0].Name != "Tags" {
+							t.Errorf("Unexpected field name: got %s, want %s", embed.Fields[0].Name, "Tags")
+						}
+
+						// Should contain entries 11-15 with last place emoji for #15
+						expectedValue := "🏷️ **Tag #11 ** <@user11>\n🏷️ **Tag #12 ** <@user12>\n🏷️ **Tag #13 ** <@user13>\n🏷️ **Tag #14 ** <@user14>\n🗑️ **Tag #15 ** <@user15>\n"
+						if embed.Fields[0].Value != expectedValue {
+							t.Errorf("Unexpected field value: got %s, want %s", embed.Fields[0].Value, expectedValue)
 						}
 
 						// Previous button should be enabled, Next disabled

@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
 	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
 	storagemocks "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage/mocks"
@@ -40,11 +42,13 @@ func Test_updateRoundManager_SendupdateRoundModal(t *testing.T) {
 						if r.Type != discordgo.InteractionResponseModal {
 							t.Errorf("Expected InteractionResponseModal, got %v", r.Type)
 						}
-						if r.Data.Title != "update Round" {
-							t.Errorf("Expected title 'update Round', got %v", r.Data.Title)
+						if r.Data.Title != "Update Round" {
+							t.Errorf("Expected title 'Update Round', got %v", r.Data.Title)
 						}
-						if r.Data.CustomID != "update_round_modal" {
-							t.Errorf("Expected CustomID 'update_round_modal', got %v", r.Data.CustomID)
+						// CustomID should include the round ID and message ID: "update_round_modal|{roundID}|{messageID}"
+						expectedCustomIDPrefix := "update_round_modal|"
+						if !strings.HasPrefix(r.Data.CustomID, expectedCustomIDPrefix) {
+							t.Errorf("Expected CustomID to start with '%s', got %v", expectedCustomIDPrefix, r.Data.CustomID)
 						}
 						if len(r.Data.Components) != 5 {
 							t.Errorf("Expected 5 components, got %d", len(r.Data.Components))
@@ -188,7 +192,8 @@ func Test_updateRoundManager_SendupdateRoundModal(t *testing.T) {
 				operationWrapper: testOperationWrapper,
 			}
 
-			testRoundID := sharedtypes.RoundID("test-round-id")
+			testUUID := uuid.MustParse("550e8400-e29b-41d4-a716-446655440000")
+			testRoundID := sharedtypes.RoundID(testUUID)
 			result, err := urm.SendUpdateRoundModal(tt.ctx, tt.args, testRoundID)
 
 			// Check for error
@@ -235,7 +240,7 @@ func createTestUpdateInteraction(title, description, startTime, timezone, locati
 			},
 			Type: discordgo.InteractionModalSubmit,
 			Data: discordgo.ModalSubmitInteractionData{
-				CustomID: "update_round_modal",
+				CustomID: "update_round_modal|550e8400-e29b-41d4-a716-446655440000|message-123",
 				Components: []discordgo.MessageComponent{
 					&discordgo.ActionsRow{
 						Components: []discordgo.MessageComponent{
@@ -315,7 +320,7 @@ func Test_updateRoundManager_HandleUpdateRoundModalSubmit(t *testing.T) {
 					}).
 					Times(1)
 				mockPublisher.EXPECT().
-					Publish(gomock.Eq(discordroundevents.RoundUpdateModalSubmit), gomock.Any()).
+					Publish(gomock.Eq(discordroundevents.RoundUpdateRequestTopic), gomock.Any()).
 					Return(nil).
 					Times(1)
 			},
@@ -410,7 +415,7 @@ func Test_updateRoundManager_HandleUpdateRoundModalSubmit(t *testing.T) {
 					Return(nil).
 					Times(1)
 				mockPublisher.EXPECT().
-					Publish(gomock.Eq(discordroundevents.RoundUpdateModalSubmit), gomock.Any()).
+					Publish(gomock.Eq(discordroundevents.RoundUpdateRequestTopic), gomock.Any()).
 					Return(errors.New("failed to create event")).
 					Times(1)
 			},
@@ -432,7 +437,7 @@ func Test_updateRoundManager_HandleUpdateRoundModalSubmit(t *testing.T) {
 					Return(nil).
 					Times(1)
 				mockPublisher.EXPECT().
-					Publish(gomock.Eq(discordroundevents.RoundUpdateModalSubmit), gomock.Any()).
+					Publish(gomock.Eq(discordroundevents.RoundUpdateRequestTopic), gomock.Any()).
 					Return(errors.New("failed to publish")).
 					Times(1)
 			},

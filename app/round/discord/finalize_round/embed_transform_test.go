@@ -149,13 +149,13 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 						Value: "Test Course",
 					},
 					{
-						Name:   "🏌️ TestUser1",
-						Value:  "Score: +2",
+						Name:   "🥇 TestUser2",
+						Value:  "Score: -1",
 						Inline: true,
 					},
 					{
-						Name:   "🏌️ TestUser2",
-						Value:  "Score: -1",
+						Name:   "🗑️ TestUser1",
+						Value:  "Score: +2",
 						Inline: true,
 					},
 				},
@@ -235,12 +235,12 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 						Value: "Test Course",
 					},
 					{
-						Name:   "🏌️ NickUser1",
-						Value:  "Score: +0",
+						Name:   "🥇 NickUser1",
+						Value:  "Score: Even",
 						Inline: true,
 					},
 					{
-						Name:   "🏌️ NickUser2",
+						Name:   "🗑️ NickUser2",
 						Value:  "Score: --",
 						Inline: true,
 					},
@@ -361,7 +361,7 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 						Value: "Test Course",
 					},
 					{
-						Name:   "🏌️ TestUser1",
+						Name:   "😢 TestUser1",
 						Value:  "Score: -5",
 						Inline: true,
 					},
@@ -495,8 +495,23 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 				if !reflect.DeepEqual(gotEmbed.Color, tt.expectedEmbed.Color) {
 					t.Errorf("Color mismatch: got %v, want %v", gotEmbed.Color, tt.expectedEmbed.Color)
 				}
-				if !reflect.DeepEqual(gotEmbed.Fields, tt.expectedEmbed.Fields) {
-					t.Errorf("Fields mismatch: got %v, want %v", gotEmbed.Fields, tt.expectedEmbed.Fields)
+
+				// Compare fields individually since reflect.DeepEqual compares pointers
+				if len(gotEmbed.Fields) != len(tt.expectedEmbed.Fields) {
+					t.Errorf("Fields length mismatch: got %d, want %d", len(gotEmbed.Fields), len(tt.expectedEmbed.Fields))
+				} else {
+					for i, gotField := range gotEmbed.Fields {
+						expectedField := tt.expectedEmbed.Fields[i]
+						if gotField.Name != expectedField.Name {
+							t.Errorf("Field %d name mismatch: got %v, want %v", i, gotField.Name, expectedField.Name)
+						}
+						if gotField.Value != expectedField.Value {
+							t.Errorf("Field %d value mismatch: got %v, want %v", i, gotField.Value, expectedField.Value)
+						}
+						if gotField.Inline != expectedField.Inline {
+							t.Errorf("Field %d inline mismatch: got %v, want %v", i, gotField.Inline, expectedField.Inline)
+						}
+					}
 				}
 				if !reflect.DeepEqual(gotEmbed.Footer, tt.expectedEmbed.Footer) {
 					t.Errorf("Footer mismatch: got %v, want %v", gotEmbed.Footer, tt.expectedEmbed.Footer)

@@ -58,6 +58,8 @@ func Test_roundReminderManager_SendRoundReminder(t *testing.T) {
 			name: "successful reminder",
 			setup: func() {
 				mockSession.EXPECT().GetChannel(gomock.Eq("channel-123")).Return(&discordgo.Channel{}, nil)
+				mockSession.EXPECT().ChannelMessage(gomock.Eq("channel-123"), gomock.Eq("12345")).Return(&discordgo.Message{ID: "12345"}, nil)
+				mockSession.EXPECT().ThreadsActive(gomock.Eq("guild-id")).Return(&discordgo.ThreadsList{}, nil)
 				mockSession.EXPECT().MessageThreadStartComplex(
 					gomock.Eq("channel-123"),
 					gomock.Any(),
@@ -85,6 +87,8 @@ func Test_roundReminderManager_SendRoundReminder(t *testing.T) {
 			name: "failed to create thread",
 			setup: func() {
 				mockSession.EXPECT().GetChannel(gomock.Eq("channel-123")).Return(&discordgo.Channel{}, nil)
+				mockSession.EXPECT().ChannelMessage(gomock.Eq("channel-123"), gomock.Eq("12345")).Return(&discordgo.Message{ID: "12345"}, nil)
+				mockSession.EXPECT().ThreadsActive(gomock.Eq("guild-id")).Return(&discordgo.ThreadsList{}, nil)
 				mockSession.EXPECT().MessageThreadStartComplex(
 					gomock.Eq("channel-123"),
 					gomock.Any(),
@@ -99,6 +103,8 @@ func Test_roundReminderManager_SendRoundReminder(t *testing.T) {
 			name: "failed to send message",
 			setup: func() {
 				mockSession.EXPECT().GetChannel(gomock.Eq("channel-123")).Return(&discordgo.Channel{}, nil)
+				mockSession.EXPECT().ChannelMessage(gomock.Eq("channel-123"), gomock.Eq("12345")).Return(&discordgo.Message{ID: "12345"}, nil)
+				mockSession.EXPECT().ThreadsActive(gomock.Eq("guild-id")).Return(&discordgo.ThreadsList{}, nil)
 				mockSession.EXPECT().MessageThreadStartComplex(
 					gomock.Eq("channel-123"),
 					gomock.Any(),
@@ -110,24 +116,25 @@ func Test_roundReminderManager_SendRoundReminder(t *testing.T) {
 				).Return(nil, errors.New("failed to send message"))
 			},
 			payload: samplePayload,
-			want:    RoundReminderOperationResult{Error: errors.New("failed to send message to thread: failed to send message")},
+			want:    RoundReminderOperationResult{Error: errors.New("failed to send reminder message to thread: failed to send message")},
 			wantErr: true,
 		},
 		{
 			name: "thread already exists",
 			setup: func() {
 				mockSession.EXPECT().GetChannel(gomock.Eq("channel-123")).Return(&discordgo.Channel{}, nil)
+				mockSession.EXPECT().ChannelMessage(gomock.Eq("channel-123"), gomock.Eq("12345")).Return(&discordgo.Message{ID: "12345"}, nil)
+				mockSession.EXPECT().ThreadsActive(gomock.Eq("guild-id")).Return(&discordgo.ThreadsList{}, nil)
 				mockSession.EXPECT().MessageThreadStartComplex(
 					gomock.Eq("channel-123"),
 					gomock.Any(),
 					gomock.Any(),
 				).Return(nil, errors.New("Thread already exists"))
-				mockSession.EXPECT().ThreadsActive(gomock.Eq("guild-id")).Return(
-					&discordgo.ThreadsList{
-						Threads: []*discordgo.Channel{
-							{ID: "thread-123", ParentID: "channel-123", Name: "⏰ 1 Hour Reminder: Test Round"},
-						},
-					}, nil)
+				// Additional ChannelMessage call in error handling path
+				mockSession.EXPECT().ChannelMessage(gomock.Eq("channel-123"), gomock.Eq("12345")).Return(&discordgo.Message{
+					ID:     "12345",
+					Thread: &discordgo.Channel{ID: "thread-123", ParentID: "channel-123", Name: "⏰ 1 Hour Reminder: Test Round"},
+				}, nil)
 				mockSession.EXPECT().ChannelMessageSend(
 					gomock.Eq("thread-123"),
 					gomock.Any(),
@@ -141,35 +148,47 @@ func Test_roundReminderManager_SendRoundReminder(t *testing.T) {
 			name: "thread already exists, but cannot find it",
 			setup: func() {
 				mockSession.EXPECT().GetChannel(gomock.Eq("channel-123")).Return(&discordgo.Channel{}, nil)
+				mockSession.EXPECT().ChannelMessage(gomock.Eq("channel-123"), gomock.Eq("12345")).Return(&discordgo.Message{ID: "12345"}, nil)
+				mockSession.EXPECT().ThreadsActive(gomock.Eq("guild-id")).Return(&discordgo.ThreadsList{}, nil)
 				mockSession.EXPECT().MessageThreadStartComplex(
 					gomock.Eq("channel-123"),
 					gomock.Any(),
 					gomock.Any(),
 				).Return(nil, errors.New("Thread already exists"))
+				mockSession.EXPECT().ChannelMessage(gomock.Eq("channel-123"), gomock.Eq("12345")).Return(&discordgo.Message{ID: "12345"}, nil)
 				mockSession.EXPECT().ThreadsActive(gomock.Eq("guild-id")).Return(
 					&discordgo.ThreadsList{
 						Threads: []*discordgo.Channel{},
 					}, nil)
+				// Expect fallback to main channel when thread cannot be found
+				mockSession.EXPECT().ChannelMessageSend(
+					gomock.Eq("channel-123"), // Main channel, not thread
+					gomock.Any(),
+				).Return(&discordgo.Message{}, nil)
 			},
 			payload: samplePayload,
-			want:    RoundReminderOperationResult{Error: errors.New("could not find existing thread")},
-			wantErr: true,
+			want:    RoundReminderOperationResult{Success: true}, // Updated to expect success
+			wantErr: false,                                       // Updated to expect no error
 		},
 		{
 			name: "thread active fetch fails",
 			setup: func() {
 				mockSession.EXPECT().GetChannel(gomock.Eq("channel-123")).Return(&discordgo.Channel{}, nil)
+				mockSession.EXPECT().ChannelMessage(gomock.Eq("channel-123"), gomock.Eq("12345")).Return(&discordgo.Message{ID: "12345"}, nil)
+				// When ThreadsActive fails, it continues and tries to create a new thread
 				mockSession.EXPECT().MessageThreadStartComplex(
 					gomock.Eq("channel-123"),
 					gomock.Any(),
 					gomock.Any(),
-				).Return(nil, errors.New("Thread already exists"))
-				mockSession.EXPECT().ThreadsActive(gomock.Eq("guild-id")).Return(
-					nil, errors.New("failed to fetch active threads"))
+				).Return(&discordgo.Channel{ID: "thread-123"}, nil)
+				mockSession.EXPECT().ChannelMessageSend(
+					gomock.Eq("thread-123"),
+					gomock.Any(),
+				).Return(&discordgo.Message{}, nil)
 			},
 			payload: samplePayload,
-			want:    RoundReminderOperationResult{Error: errors.New("failed to get active threads: failed to fetch active threads")},
-			wantErr: true,
+			want:    RoundReminderOperationResult{Success: true}, // Should succeed by creating new thread
+			wantErr: false,
 		},
 		{
 			name: "no message ID provided",

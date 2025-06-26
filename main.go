@@ -15,8 +15,6 @@ import (
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
-	"github.com/ThreeDotsLabs/watermill"
-	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -73,14 +71,6 @@ func main() {
 
 	// --- Discord Components Initialization ---
 
-	// Initialize Watermill router
-	watermillRouter, err := message.NewRouter(message.RouterConfig{}, watermill.NopLogger{})
-	if err != nil {
-		logger.Error("Failed to create Watermill router", attr.Error(err))
-		os.Exit(1)
-	}
-	defer watermillRouter.Close()
-
 	// Create Discord session
 	discordSession, err := discordgo.New("Bot " + cfg.Discord.Token)
 	if err != nil {
@@ -107,7 +97,6 @@ func main() {
 		discordSessionWrapper,
 		cfg,
 		logger,
-		watermillRouter,
 		interactionStore,
 		obs.Registry.DiscordMetrics,
 		obs.Registry.EventBusMetrics,
@@ -215,14 +204,12 @@ func runSetup(ctx context.Context, guildID string) {
 	discordSessionWrapper := discord.NewDiscordSession(discordSession, logger)
 
 	// Create minimal bot for setup
-	watermillRouter, _ := message.NewRouter(message.RouterConfig{}, watermill.NopLogger{})
 	interactionStore := storage.NewInteractionStore()
 
 	setupBot, err := bot.NewDiscordBot(
 		discordSessionWrapper,
 		cfg,
 		logger,
-		watermillRouter,
 		interactionStore,
 		obs.Registry.DiscordMetrics,
 		obs.Registry.EventBusMetrics,

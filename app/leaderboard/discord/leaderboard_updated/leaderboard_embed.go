@@ -41,39 +41,42 @@ func (lum *leaderboardUpdateManager) SendLeaderboardEmbed(ctx context.Context, c
 		fields := []*discordgo.MessageEmbedField{}
 		totalEntries := len(leaderboard)
 
-		// Build leaderboard as a single formatted table instead of multiple fields
-		var leaderboardText string
+		// Only create fields if there are entries to show
+		if totalEntries > 0 {
+			// Build leaderboard as a single formatted table instead of multiple fields
+			var leaderboardText string
 
-		for i, entry := range leaderboard[start:end] {
-			// Calculate the actual position in the full leaderboard
-			actualPosition := int(start) + i + 1
+			for i, entry := range leaderboard[start:end] {
+				// Calculate the actual position in the full leaderboard
+				actualPosition := int(start) + i + 1
 
-			// Determine emoji based on position and total entries
-			var emoji string
-			switch {
-			case actualPosition == 1:
-				emoji = "🥇" // Gold medal for 1st place
-			case actualPosition == 2:
-				emoji = "🥈" // Silver medal for 2nd place
-			case actualPosition == 3:
-				emoji = "🥉" // Bronze medal for 3rd place
-			case actualPosition == totalEntries && totalEntries > 1:
-				emoji = "🗑️" // Trash can for last place
-			default:
-				emoji = "🏷️" // Tag emoji for everyone else
+				// Determine emoji based on position and total entries
+				var emoji string
+				switch {
+				case actualPosition == 1:
+					emoji = "🥇" // Gold medal for 1st place
+				case actualPosition == 2:
+					emoji = "🥈" // Silver medal for 2nd place
+				case actualPosition == 3:
+					emoji = "🥉" // Bronze medal for 3rd place
+				case actualPosition == totalEntries && totalEntries > 1:
+					emoji = "🗑️" // Trash can for last place
+				default:
+					emoji = "🏷️" // Tag emoji for everyone else
+				}
+
+				// Format each row with proper spacing
+				leaderboardText += fmt.Sprintf("%s **Tag #%-3d** <@%s>\n", emoji, entry.Rank, entry.UserID)
 			}
 
-			// Format each row with proper spacing
-			leaderboardText += fmt.Sprintf("%s **Tag #%-3d** <@%s>\n", emoji, entry.Rank, entry.UserID)
-		}
-
-		// Create a single field with the formatted table
-		fields = []*discordgo.MessageEmbedField{
-			{
-				Name:   "Tags",
-				Value:  leaderboardText,
-				Inline: false,
-			},
+			// Create a single field with the formatted table
+			fields = []*discordgo.MessageEmbedField{
+				{
+					Name:   "Tags",
+					Value:  leaderboardText,
+					Inline: false,
+				},
+			}
 		}
 
 		embed := &discordgo.MessageEmbed{

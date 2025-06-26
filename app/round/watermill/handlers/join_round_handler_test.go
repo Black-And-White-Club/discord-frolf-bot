@@ -10,6 +10,7 @@ import (
 
 	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
 	roundrsvp "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/round_rsvp"
+	scoreround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/score_round"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/round/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
@@ -454,13 +455,13 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 							RoundID:        testRoundID,
 							EventMessageID: testMessageID,
 							AcceptedParticipants: []roundtypes.Participant{
-								{UserID: "user1", TagNumber: &tag1},
+								{UserID: "user1", TagNumber: &tag1, Response: roundtypes.ResponseAccept},
 							},
 							DeclinedParticipants: []roundtypes.Participant{
-								{UserID: "user2"},
+								{UserID: "user2", Response: roundtypes.ResponseDecline},
 							},
 							TentativeParticipants: []roundtypes.Participant{
-								{UserID: "user3"},
+								{UserID: "user3", Response: roundtypes.ResponseTentative},
 							},
 							JoinedLate: &joinedLate,
 						}
@@ -469,21 +470,16 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 					Times(1)
 
 				mockConfig.Discord.EventChannelID = testChannelID
-				mockRoundDiscord.EXPECT().GetRoundRsvpManager().Return(mockRoundRsvpManager).Times(1)
-				mockRoundRsvpManager.EXPECT().UpdateRoundEventEmbed(
+				mockScoreRoundManager := mocks.NewMockScoreRoundManager(ctrl)
+				mockRoundDiscord.EXPECT().GetScoreRoundManager().Return(mockScoreRoundManager).Times(1)
+				mockScoreRoundManager.EXPECT().AddLateParticipantToScorecard(
 					gomock.Any(),
 					testChannelID,
-					testMessageID, // This should now match the metadata value
+					testMessageID,
 					[]roundtypes.Participant{
-						{UserID: "user1", TagNumber: &tag1},
+						{UserID: "user1", TagNumber: &tag1, Response: roundtypes.ResponseAccept},
 					},
-					[]roundtypes.Participant{
-						{UserID: "user2"},
-					},
-					[]roundtypes.Participant{
-						{UserID: "user3"},
-					},
-				).Return(roundrsvp.RoundRsvpOperationResult{}, nil).Times(1)
+				).Return(scoreround.ScoreRoundOperationResult{}, nil).Times(1)
 			},
 		},
 		{
