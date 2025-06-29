@@ -52,6 +52,9 @@ type DiscordBot struct {
 	RoundRouter       *roundrouter.RoundRouter
 	ScoreRouter       *scorerouter.ScoreRouter
 	LeaderboardRouter *leaderboardrouter.LeaderboardRouter
+
+	// Guild module reference for DB/config access
+	GuildModule *guild.GuildModule
 }
 
 func NewDiscordBot(
@@ -192,50 +195,56 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("leaderboard module initialization failed: %w", err)
 	}
-	// Initialize Guild Module (if database is available)
+	// Initialize Guild Module
+	// Try with database if available, fall back to no-database mode
+	var db *sql.DB
 	if dbURL := bot.Config.DatabaseURL; dbURL != "" {
-		db, err := sql.Open("postgres", dbURL)
-		if err != nil {
-			return fmt.Errorf("failed to connect to database: %w", err)
+		var err error
+		db, err = sql.Open("postgres", dbURL)
+		if err == nil && db.Ping() == nil {
+			bot.Logger.Info("Guild module initializing with database support")
+		} else {
+			bot.Logger.Warn("Database connection failed, guild module will run without persistence", attr.Error(err))
+			db = nil
 		}
+	} else {
+		bot.Logger.Info("No database URL provided, guild module will run without persistence")
+	}
+
+	// Initialize Guild Module (with or without database)
+	guildRouter, err := message.NewRouter(message.RouterConfig{}, watermill.NopLogger{})
+	if err != nil {
+		return fmt.Errorf("failed to create guild router: %w", err)
+	}
+
+	guildModule, err := guild.InitializeGuildModule(
+		ctx,
+		bot.Session,
+		guildRouter,
+		bot.EventBus,
+		bot.EventBus,
+		registry,
+		bot.Logger,
+		bot.Config,
+		db, // Can be nil for no-database mode
+	)
+	if err != nil {
+		return fmt.Errorf("guild module initialization failed: %w", err)
+	}
+	bot.GuildModule = guildModule
+
+	// Start guild router
+	go func() {
+		if err := guildRouter.Run(ctx); err != nil && err != context.Canceled {
+			bot.Logger.Error("Guild router failed", attr.Error(err))
+		}
+	}()
+
+	if db != nil {
 		defer db.Close()
-
-		if err := db.Ping(); err != nil {
-			return fmt.Errorf("failed to ping database: %w", err)
-		}
-
-		// Initialize Guild Module with database
-		guildRouter, err := message.NewRouter(message.RouterConfig{}, watermill.NopLogger{})
-		if err != nil {
-			return fmt.Errorf("failed to create guild router: %w", err)
-		}
-
-		_, err = guild.InitializeGuildModule(
-			ctx,
-			bot.Session,
-			guildRouter,
-			bot.EventBus,
-			bot.EventBus,
-			registry,
-			bot.Logger,
-			bot.Config,
-			db,
-		)
-		if err != nil {
-			return fmt.Errorf("guild module initialization failed: %w", err)
-		}
-
-		// Start guild router
-		go func() {
-			if err := guildRouter.Run(ctx); err != nil && err != context.Canceled {
-				bot.Logger.Error("Guild router failed", attr.Error(err))
-			}
-		}()
 	}
 
-	if err := discord.RegisterCommands(bot.Session, bot.Logger, bot.Config.Discord.GuildID); err != nil {
-		return fmt.Errorf("failed to register commands with Discord: %w", err)
-	}
+	// Only register commands per-guild in the GuildCreate handler. Do not register globally or on startup.
 
 	// Register Discord handlers
 	discordgoSession.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -245,6 +254,24 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 
 	discordgoSession.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
 		bot.Logger.Info("Bot is ready", attr.Int("guilds", len(r.Guilds)))
+	})
+
+	// Register commands for every guild on join (instant per-guild registration)
+	discordgoSession.AddHandler(func(s *discordgo.Session, g *discordgo.GuildCreate) {
+		bot.Logger.Info("Registering commands for guild", attr.String("guild_id", g.ID), attr.String("guild_name", g.Name))
+		if err := discord.RegisterCommands(bot.Session, bot.Logger, g.ID); err != nil {
+			bot.Logger.Error("Failed to register commands for guild", attr.Error(err), attr.String("guild_id", g.ID))
+		}
+		// Store guild in DB if not present
+		go func() {
+			ctx := context.Background()
+			if bot.GuildModule != nil && bot.GuildModule.GetConfigHandler() != nil {
+				err := bot.GuildModule.GetConfigHandler().EnsureGuildConfig(ctx, g.ID, g.Name)
+				if err != nil {
+					bot.Logger.Error("Failed to ensure guild config in DB", attr.Error(err), attr.String("guild_id", g.ID))
+				}
+			}
+		}()
 	})
 
 	// Start the Watermill routers

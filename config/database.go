@@ -5,18 +5,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"os"
 
 	_ "github.com/lib/pq" // PostgreSQL driver
 )
-
-// getEnvOrDefault returns environment variable value or default
-func getEnvOrDefault(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
 
 // DatabaseConfig represents the configuration stored in the database
 type DatabaseConfig struct {

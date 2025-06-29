@@ -17,7 +17,18 @@ func RegisterCommands(s Session, logger *slog.Logger, guildID string) error {
 	if err != nil {
 		return fmt.Errorf("failed to retrieve bot user: %w", err)
 	}
-	_, err = s.ApplicationCommandCreate(appID.ID, guildID, &discordgo.ApplicationCommand{
+
+	// Register commands globally (empty guildID) if no specific guild is provided
+	// This allows the bot to work in any server it's invited to
+	targetGuildID := guildID
+	if targetGuildID == "" {
+		logger.Info("Registering commands globally (will work in all servers)")
+		targetGuildID = ""
+	} else {
+		logger.Info("Registering commands for specific guild", attr.String("guild_id", targetGuildID))
+	}
+
+	_, err = s.ApplicationCommandCreate(appID.ID, targetGuildID, &discordgo.ApplicationCommand{
 		Name:        "updaterole",
 		Description: "Request a role for a user",
 		Options: []*discordgo.ApplicationCommandOption{
@@ -35,7 +46,7 @@ func RegisterCommands(s Session, logger *slog.Logger, guildID string) error {
 	}
 	logger.Info("registered command: /updaterole")
 
-	_, err = s.ApplicationCommandCreate(appID.ID, guildID, &discordgo.ApplicationCommand{
+	_, err = s.ApplicationCommandCreate(appID.ID, targetGuildID, &discordgo.ApplicationCommand{
 		Name:        "createround",
 		Description: "Create A Round",
 	})
@@ -46,7 +57,7 @@ func RegisterCommands(s Session, logger *slog.Logger, guildID string) error {
 	logger.Info("registered command: /createround")
 
 	// Claim tag command
-	_, err = s.ApplicationCommandCreate(appID.ID, guildID, &discordgo.ApplicationCommand{
+	_, err = s.ApplicationCommandCreate(appID.ID, targetGuildID, &discordgo.ApplicationCommand{
 		Name:        "claimtag",
 		Description: "Claim a specific tag number on the leaderboard",
 		Options: []*discordgo.ApplicationCommandOption{
@@ -66,10 +77,42 @@ func RegisterCommands(s Session, logger *slog.Logger, guildID string) error {
 	}
 	logger.Info("registered command: /claimtag")
 
-	// Frolf setup command
-	_, err = s.ApplicationCommandCreate(appID.ID, guildID, &discordgo.ApplicationCommand{
+	// Frolf setup command (with options for customization)
+	_, err = s.ApplicationCommandCreate(appID.ID, targetGuildID, &discordgo.ApplicationCommand{
 		Name:        "frolf-setup",
 		Description: "Set up Frolf Bot for this server (Admin only)",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "signup_channel",
+				Description: "Name for the signup channel (default: signup)",
+				Required:    false,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "event_channel",
+				Description: "Name for the event channel (default: events)",
+				Required:    false,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "leaderboard_channel",
+				Description: "Name for the leaderboard channel (default: leaderboard)",
+				Required:    false,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "signup_emoji",
+				Description: "Emoji for signup (default: 🐍)",
+				Required:    false,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "signup_message",
+				Description: "Signup message content (default provided)",
+				Required:    false,
+			},
+		},
 	})
 	if err != nil {
 		logger.Error("Failed to create '/frolf-setup' command", attr.Error(err))

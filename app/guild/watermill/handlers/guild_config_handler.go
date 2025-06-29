@@ -23,11 +23,28 @@ type GuildConfigHandler struct {
 	db     DatabaseService
 }
 
+// NewGuildConfigHandler constructs a new GuildConfigHandler
 func NewGuildConfigHandler(logger *slog.Logger, db DatabaseService) *GuildConfigHandler {
 	return &GuildConfigHandler{
 		logger: logger,
 		db:     db,
 	}
+}
+
+// EnsureGuildConfig checks if a guild config exists, and inserts a default if not.
+func (h *GuildConfigHandler) EnsureGuildConfig(ctx context.Context, guildID, guildName string) error {
+	// Try to get the config
+	config, err := h.db.GetGuildConfig(ctx, guildID)
+	if err == nil && config != nil {
+		// Already exists
+		return nil
+	}
+	// Insert default config
+	newConfig := &guildstorage.GuildConfig{
+		GuildID:   guildID,
+		GuildName: guildName,
+	}
+	return h.db.SaveGuildConfig(ctx, newConfig)
 }
 
 // HandleGuildSetup processes guild setup events from Discord

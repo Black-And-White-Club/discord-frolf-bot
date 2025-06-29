@@ -45,16 +45,17 @@ func main() {
 	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
 		guildID := os.Getenv("DISCORD_GUILD_ID")
 		if guildID == "" {
-			fmt.Println("DISCORD_GUILD_ID environment variable is required for database-backed config")
-			os.Exit(1)
-		}
-
-		fmt.Printf("Loading configuration from database for guild: %s\n", guildID)
-		cfg, err = config.LoadConfigFromDatabase(ctx, databaseURL, guildID)
-		if err != nil {
-			fmt.Printf("Failed to load config from database: %v\n", err)
-			fmt.Println("Falling back to file-based config...")
+			fmt.Println("Warning: DISCORD_GUILD_ID not provided. Bot will register commands globally and work in any server.")
+			fmt.Println("Loading configuration from file as fallback...")
 			cfg, err = config.LoadConfig("config.yaml")
+		} else {
+			fmt.Printf("Loading configuration from database for guild: %s\n", guildID)
+			cfg, err = config.LoadConfigFromDatabase(ctx, databaseURL, guildID)
+			if err != nil {
+				fmt.Printf("Failed to load config from database: %v\n", err)
+				fmt.Println("Falling back to file-based config...")
+				cfg, err = config.LoadConfig("config.yaml")
+			}
 		}
 	} else {
 		fmt.Println("Loading configuration from file...")

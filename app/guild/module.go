@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	guilddiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/guild/discord"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/guild/discord/setup"
 	guildstorage "github.com/Black-And-White-Club/discord-frolf-bot/app/guild/storage"
 	guildrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/guild/watermill"
@@ -20,7 +21,7 @@ import (
 
 // GuildModule handles guild setup and configuration
 type GuildModule struct {
-	setupManager  *setup.SetupManager
+	GuildDiscord  guilddiscord.GuildDiscordInterface
 	configHandler *guildhandlers.GuildConfigHandler
 	router        *guildrouter.GuildRouter
 	logger        *slog.Logger
@@ -38,18 +39,24 @@ func InitializeGuildModule(
 	cfg *config.Config,
 	db *sql.DB,
 ) (*GuildModule, error) {
-	// Create database service
-	dbService := guildstorage.NewGuildDatabaseService(db, logger)
+	// Create database service (or no-op if db is nil)
+	var dbService guildhandlers.DatabaseService
+	if db != nil {
+		dbService = guildstorage.NewGuildDatabaseService(db, logger)
+		logger.InfoContext(ctx, "Guild module using database persistence")
+	} else {
+		dbService = &NoOpDatabaseService{logger: logger}
+		logger.InfoContext(ctx, "Guild module using no-op database service (no persistence)")
+	}
 
-	// Create setup manager
-	discordSession := session.(*discord.DiscordSession).GetUnderlyingSession()
-	setupManager := setup.NewSetupManager(discordSession, publisher, logger)
+	// Create GuildDiscord (Discord-specific managers)
+	guildDiscord := guilddiscord.NewGuildDiscord(session, publisher, logger)
 
 	// Create config handler for backend events
 	configHandler := guildhandlers.NewGuildConfigHandler(logger, dbService)
 
 	// Register setup command handler using the proper pattern
-	setup.RegisterHandlers(interactionRegistry, setupManager)
+	setup.RegisterHandlers(interactionRegistry, guildDiscord.GetSetupManager())
 
 	// Create guild router for watermill handlers
 	guildRouter := guildrouter.NewGuildRouter(logger, router, subscriber, publisher)
@@ -61,7 +68,7 @@ func InitializeGuildModule(
 	}
 
 	module := &GuildModule{
-		setupManager:  setupManager,
+		GuildDiscord:  guildDiscord,
 		configHandler: configHandler,
 		router:        guildRouter,
 		logger:        logger,
@@ -70,6 +77,27 @@ func InitializeGuildModule(
 	logger.InfoContext(ctx, "Guild module initialized successfully")
 
 	return module, nil
+}
+
+// NoOpDatabaseService is a no-op implementation for when no database is available
+type NoOpDatabaseService struct {
+	logger *slog.Logger
+}
+
+func (n *NoOpDatabaseService) SaveGuildConfig(ctx context.Context, config *guildstorage.GuildConfig) error {
+	n.logger.InfoContext(ctx, "Guild config saved (no-op)",
+		attr.String("guild_id", config.GuildID),
+		attr.String("guild_name", config.GuildName))
+	return nil
+}
+
+func (n *NoOpDatabaseService) GetGuildConfig(ctx context.Context, guildID string) (*guildstorage.GuildConfig, error) {
+	return nil, fmt.Errorf("guild config not found (no database)")
+}
+
+func (n *NoOpDatabaseService) UpdateGuildConfig(ctx context.Context, guildID string, updates map[string]interface{}) error {
+	n.logger.InfoContext(ctx, "Guild config updated (no-op)", attr.String("guild_id", guildID))
+	return nil
 }
 
 // RegisterSetupCommand registers the /frolf-setup command with Discord
@@ -92,9 +120,9 @@ func RegisterSetupCommand(session discord.Session, logger *slog.Logger, guildID 
 	return nil
 }
 
-// GetSetupManager returns the setup manager for external use
-func (m *GuildModule) GetSetupManager() *setup.SetupManager {
-	return m.setupManager
+// GetGuildDiscord returns the GuildDiscord interface for external use
+func (m *GuildModule) GetGuildDiscord() guilddiscord.GuildDiscordInterface {
+	return m.GuildDiscord
 }
 
 // GetConfigHandler returns the config handler for external use
