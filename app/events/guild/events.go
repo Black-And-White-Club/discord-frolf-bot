@@ -9,6 +9,11 @@ const (
 	GuildSetupEventTopic        = "guild.setup"
 	GuildConfigUpdateEventTopic = "guild.config.update"
 	GuildRemovedEventTopic      = "guild.removed"
+
+	// Additional topic constants for multi-tenant guild lifecycle events
+	GuildJoinedTopic         = "guild.joined"
+	GuildRoleDeletedTopic    = "guild.role.deleted"
+	GuildChannelDeletedTopic = "guild.channel.deleted"
 )
 
 // GuildSetupEvent is published when a guild completes initial setup
@@ -43,4 +48,23 @@ type GuildRemovedEvent struct {
 	GuildID   string    `json:"guild_id"`
 	GuildName string    `json:"guild_name"`
 	RemovedAt time.Time `json:"removed_at"`
+}
+
+// GuildJoinedEvent is published when the bot is added to a new guild
+type GuildJoinedEvent struct {
+	GuildID   string    `json:"guild_id"`
+	GuildName string    `json:"guild_name"`
+	JoinedAt  time.Time `json:"joined_at"`
+}
+
+// GuildRoleDeletedEvent is published when a role is deleted from a guild
+type GuildRoleDeletedEvent struct {
+	GuildID string `json:"guild_id"`
+	RoleID  string `json:"role_id"`
+}
+
+// GuildChannelDeletedEvent is published when a channel is deleted from a guild
+type GuildChannelDeletedEvent struct {
+	GuildID   string `json:"guild_id"`
+	ChannelID string `json:"channel_id"`
 }

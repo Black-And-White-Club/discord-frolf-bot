@@ -50,7 +50,7 @@ func main() {
 		fmt.Println("The following setup would be performed:")
 		fmt.Printf("- Guild ID: %s\n", *guildID)
 		fmt.Println("- Required channels: signup, events, leaderboard")
-		fmt.Println("- Required roles: Rattler, Editor, Admin")
+		fmt.Println("- Required roles: User, Editor, Admin")
 		fmt.Println("- Channel permissions would be configured")
 		fmt.Println("- Signup message would be created")
 		fmt.Println("Run without -dry-run to execute the setup")
@@ -115,11 +115,11 @@ func main() {
 	setupConfig := bot.ServerSetupConfig{
 		GuildID:              *guildID,
 		RequiredChannels:     []string{"signup", "events", "leaderboard"},
-		RequiredRoles:        []string{"Rattler", "Editor", "Admin"},
+		RequiredRoles:        []string{"User", "Editor", "Admin"},
 		SignupEmojiName:      "🐍",
 		CreateSignupMessage:  true,
 		SignupMessageContent: "React with 🐍 to sign up for frolf events!",
-		RegisteredRoleName:   "Rattler",
+		RegisteredRoleName:   "User",
 		AdminRoleName:        "Admin",
 		ChannelPermissions: map[string]bot.ChannelPermissions{
 			"signup": {

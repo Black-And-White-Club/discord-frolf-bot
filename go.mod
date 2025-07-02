@@ -8,7 +8,6 @@ require (
 	github.com/bwmarrin/discordgo v0.29.0
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
-	github.com/lib/pq v1.10.9
 	github.com/prometheus/client_golang v1.22.0
 	go.opentelemetry.io/otel v1.37.0
 	go.opentelemetry.io/otel/trace v1.37.0
@@ -63,3 +62,5 @@ require (
 )
 
 replace google.golang.org/genproto => google.golang.org/genproto/googleapis/rpc v0.0.0-20250603155806-513f23925822
+
+replace github.com/Black-And-White-Club/frolf-bot-shared => ../frolf-bot-shared

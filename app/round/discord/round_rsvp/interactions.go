@@ -94,13 +94,14 @@ func (rrm *roundRsvpManager) HandleRoundResponse(ctx context.Context, i *discord
 			return RoundRsvpOperationResult{Error: fmt.Errorf("failed to parse round UUID: %w", err)}, nil
 		}
 
-		var tagNumberPtr *sharedtypes.TagNumber = nil
+		// var tagNumberPtr *sharedtypes.TagNumber = nil
 
-		payload := roundevents.ParticipantJoinRequestPayload{
-			RoundID:   sharedtypes.RoundID(roundUUID),
-			UserID:    sharedtypes.DiscordID(user.ID),
-			Response:  response,
-			TagNumber: tagNumberPtr,
+		payload := discordroundevents.DiscordRoundParticipantJoinRequestPayload{
+			RoundID:    sharedtypes.RoundID(roundUUID),
+			UserID:     sharedtypes.DiscordID(user.ID),
+			ChannelID:  i.ChannelID,
+			JoinedLate: nil, // Normal join, not late
+			GuildID:    i.GuildID,
 		}
 
 		msg := &wmmessage.Message{

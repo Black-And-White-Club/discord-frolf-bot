@@ -2,7 +2,6 @@ package bot
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log/slog"
 
@@ -27,7 +26,6 @@ import (
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/bwmarrin/discordgo"
-	_ "github.com/lib/pq" // PostgreSQL driver
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -52,9 +50,6 @@ type DiscordBot struct {
 	RoundRouter       *roundrouter.RoundRouter
 	ScoreRouter       *scorerouter.ScoreRouter
 	LeaderboardRouter *leaderboardrouter.LeaderboardRouter
-
-	// Guild module reference for DB/config access
-	GuildModule *guild.GuildModule
 }
 
 func NewDiscordBot(
@@ -196,42 +191,28 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 		return fmt.Errorf("leaderboard module initialization failed: %w", err)
 	}
 	// Initialize Guild Module
-	// Try with database if available, fall back to no-database mode
-	var db *sql.DB
-	if dbURL := bot.Config.DatabaseURL; dbURL != "" {
-		var err error
-		db, err = sql.Open("postgres", dbURL)
-		if err == nil && db.Ping() == nil {
-			bot.Logger.Info("Guild module initializing with database support")
-		} else {
-			bot.Logger.Warn("Database connection failed, guild module will run without persistence", attr.Error(err))
-			db = nil
-		}
-	} else {
-		bot.Logger.Info("No database URL provided, guild module will run without persistence")
-	}
-
-	// Initialize Guild Module (with or without database)
 	guildRouter, err := message.NewRouter(message.RouterConfig{}, watermill.NopLogger{})
 	if err != nil {
 		return fmt.Errorf("failed to create guild router: %w", err)
 	}
 
-	guildModule, err := guild.InitializeGuildModule(
+	_, err = guild.InitializeGuildModule(
 		ctx,
 		bot.Session,
-		guildRouter,
-		bot.EventBus,
-		bot.EventBus,
-		registry,
-		bot.Logger,
-		bot.Config,
-		db, // Can be nil for no-database mode
+		bot.EventBus,         // publisher
+		bot.EventBus,         // subscriber
+		guildRouter,          // messageRouter
+		registry,             // interactionRegistry
+		bot.Logger,           // logger
+		bot.Helper,           // helper
+		bot.Config,           // cfg
+		bot.InteractionStore, // interactionStore
+		bot.Tracer,           // tracer
+		bot.Metrics,          // metrics
 	)
 	if err != nil {
 		return fmt.Errorf("guild module initialization failed: %w", err)
 	}
-	bot.GuildModule = guildModule
 
 	// Start guild router
 	go func() {
@@ -240,11 +221,11 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 		}
 	}()
 
-	if db != nil {
-		defer db.Close()
+	// Multi-tenant deployment: register commands globally for all guilds
+	bot.Logger.Info("Registering commands globally for multi-tenant deployment")
+	if err := discord.RegisterCommands(bot.Session, bot.Logger, ""); err != nil {
+		return fmt.Errorf("failed to register global commands with Discord: %w", err)
 	}
-
-	// Only register commands per-guild in the GuildCreate handler. Do not register globally or on startup.
 
 	// Register Discord handlers
 	discordgoSession.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -256,22 +237,44 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 		bot.Logger.Info("Bot is ready", attr.Int("guilds", len(r.Guilds)))
 	})
 
-	// Register commands for every guild on join (instant per-guild registration)
-	discordgoSession.AddHandler(func(s *discordgo.Session, g *discordgo.GuildCreate) {
-		bot.Logger.Info("Registering commands for guild", attr.String("guild_id", g.ID), attr.String("guild_name", g.Name))
-		if err := discord.RegisterCommands(bot.Session, bot.Logger, g.ID); err != nil {
-			bot.Logger.Error("Failed to register commands for guild", attr.Error(err), attr.String("guild_id", g.ID))
+	// Handle guild lifecycle events for multi-tenant support
+	discordgoSession.AddHandler(func(s *discordgo.Session, event *discordgo.GuildCreate) {
+		ctx := context.Background()
+
+		bot.Logger.InfoContext(ctx, "Bot connected to guild",
+			attr.String("guild_id", event.Guild.ID),
+			attr.String("guild_name", event.Guild.Name),
+			attr.Int("member_count", event.Guild.MemberCount))
+
+		// Request guild configuration from backend
+		// This will either return existing config or indicate that setup is needed
+		if err := bot.requestGuildConfiguration(ctx, event.Guild.ID, event.Guild.Name); err != nil {
+			bot.Logger.ErrorContext(ctx, "Failed to request guild configuration",
+				attr.String("guild_id", event.Guild.ID),
+				attr.Error(err))
 		}
-		// Store guild in DB if not present
-		go func() {
-			ctx := context.Background()
-			if bot.GuildModule != nil && bot.GuildModule.GetConfigHandler() != nil {
-				err := bot.GuildModule.GetConfigHandler().EnsureGuildConfig(ctx, g.ID, g.Name)
-				if err != nil {
-					bot.Logger.Error("Failed to ensure guild config in DB", attr.Error(err), attr.String("guild_id", g.ID))
-				}
-			}
-		}()
+	})
+
+	discordgoSession.AddHandler(func(s *discordgo.Session, event *discordgo.GuildDelete) {
+		ctx := context.Background()
+
+		bot.Logger.InfoContext(ctx, "Bot removed from guild",
+			attr.String("guild_id", event.Guild.ID),
+			attr.Bool("unavailable", event.Guild.Unavailable))
+
+		// Only process actual removals, not temporary unavailability
+		if event.Guild.Unavailable {
+			bot.Logger.InfoContext(ctx, "Guild temporarily unavailable, not processing removal",
+				attr.String("guild_id", event.Guild.ID))
+			return
+		}
+
+		// Publish guild removal event to backend for cleanup
+		if err := bot.publishGuildRemovedEvent(ctx, event.Guild.ID); err != nil {
+			bot.Logger.ErrorContext(ctx, "Failed to publish guild removal event",
+				attr.String("guild_id", event.Guild.ID),
+				attr.Error(err))
+		}
 	})
 
 	// Start the Watermill routers
@@ -391,5 +394,29 @@ func (bot *DiscordBot) Shutdown(ctx context.Context) error {
 	}
 
 	bot.Logger.Info("Discord bot shutdown complete")
+	return nil
+}
+
+// requestGuildConfiguration requests configuration for a guild from the backend
+func (bot *DiscordBot) requestGuildConfiguration(ctx context.Context, guildID, guildName string) error {
+	// TODO: Publish guild configuration request event to backend
+	// The backend will respond with existing configuration or indicate setup is needed
+	bot.Logger.InfoContext(ctx, "Requesting guild configuration from backend",
+		attr.String("guild_id", guildID),
+		attr.String("guild_name", guildName))
+
+	// For now, just log that we would request configuration
+	// In a real implementation, this would publish an event to the backend
+	return nil
+}
+
+// publishGuildRemovedEvent publishes a guild removal event to the backend
+func (bot *DiscordBot) publishGuildRemovedEvent(ctx context.Context, guildID string) error {
+	// TODO: Publish guild removal event to backend for cleanup
+	bot.Logger.InfoContext(ctx, "Publishing guild removal event to backend",
+		attr.String("guild_id", guildID))
+
+	// For now, just log that we would publish the event
+	// In a real implementation, this would publish an event to the backend
 	return nil
 }

@@ -1,53 +1,92 @@
 package setup
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"log/slog"
 	"time"
 
 	guildevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/guild"
-	"github.com/ThreeDotsLabs/watermill"
-	"github.com/ThreeDotsLabs/watermill/message"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
+	"github.com/Black-And-White-Club/discord-frolf-bot/config"
+	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
+	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
+	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"github.com/bwmarrin/discordgo"
+	"go.opentelemetry.io/otel/trace"
 )
 
-type SetupManager struct {
-	session   *discordgo.Session
-	publisher message.Publisher
-	logger    *slog.Logger
+// SetupManager interface defines the contract for guild setup management
+type SetupManager interface {
+	HandleSetupCommand(ctx context.Context, i *discordgo.InteractionCreate) error
 }
 
-func NewSetupManager(session *discordgo.Session, publisher message.Publisher, logger *slog.Logger) *SetupManager {
-	return &SetupManager{
-		session:   session,
-		publisher: publisher,
-		logger:    logger,
+type setupManager struct {
+	session          *discordgo.Session
+	publisher        eventbus.EventBus
+	logger           *slog.Logger
+	helper           utils.Helpers
+	config           *config.Config
+	interactionStore storage.ISInterface
+	tracer           trace.Tracer
+	metrics          discordmetrics.DiscordMetrics
+	operationWrapper func(ctx context.Context, opName string, fn func(ctx context.Context) error) error
+}
+
+// NewSetupManager creates a new SetupManager instance
+func NewSetupManager(
+	session *discordgo.Session,
+	publisher eventbus.EventBus,
+	logger *slog.Logger,
+	helper utils.Helpers,
+	config *config.Config,
+	interactionStore storage.ISInterface,
+	tracer trace.Tracer,
+	metrics discordmetrics.DiscordMetrics,
+) (SetupManager, error) {
+	if logger != nil {
+		logger.InfoContext(context.Background(), "Creating Guild SetupManager")
 	}
+
+	return &setupManager{
+		session:          session,
+		publisher:        publisher,
+		logger:           logger,
+		helper:           helper,
+		config:           config,
+		interactionStore: interactionStore,
+		tracer:           tracer,
+		metrics:          metrics,
+		operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) error) error {
+			return wrapSetupOperation(ctx, opName, fn, logger, tracer, metrics)
+		},
+	}, nil
 }
 
 // HandleSetupCommand handles the /frolf-setup slash command
-func (s *SetupManager) HandleSetupCommand(i *discordgo.InteractionCreate) error {
-	// Check admin permissions
-	if !s.hasAdminPermissions(i) {
-		return s.respondError(i, "You need Administrator permissions to set up Frolf Bot")
-	}
+func (s *setupManager) HandleSetupCommand(ctx context.Context, i *discordgo.InteractionCreate) error {
+	return s.operationWrapper(ctx, "handle_setup_command", func(ctx context.Context) error {
+		// Check admin permissions
+		if !s.hasAdminPermissions(i) {
+			return s.respondError(i, "You need Administrator permissions to set up Frolf Bot")
+		}
 
-	// Try auto-setup first
-	result, err := s.performAutoSetup(i.GuildID)
-	if err != nil {
-		s.logger.Error("Auto-setup failed", "guild_id", i.GuildID, "error", err)
-		return s.respondError(i, fmt.Sprintf("Setup failed: %v", err))
-	}
+		// Try auto-setup first
+		result, err := s.performAutoSetup(i.GuildID)
+		if err != nil {
+			s.logger.ErrorContext(ctx, "Auto-setup failed", "guild_id", i.GuildID, "error", err)
+			return s.respondError(i, fmt.Sprintf("Setup failed: %v", err))
+		}
 
-	// Publish setup event to backend
-	if err := s.publishSetupEvent(i, result); err != nil {
-		s.logger.Error("Failed to publish setup event", "guild_id", i.GuildID, "error", err)
-		return s.respondError(i, "Setup completed but failed to save configuration")
-	}
+		// Publish setup event to backend
+		if err := s.publishSetupEvent(ctx, i, result); err != nil {
+			s.logger.ErrorContext(ctx, "Failed to publish setup event", "guild_id", i.GuildID, "error", err)
+			return s.respondError(i, "Setup completed but failed to save configuration")
+		}
 
-	// Respond with success
-	return s.respondSuccess(i, result)
+		// Respond with success
+		return s.respondSuccess(i, result)
+	})
 }
 
 type SetupResult struct {
@@ -62,7 +101,7 @@ type SetupResult struct {
 	RoleMappings           map[string]string
 }
 
-func (s *SetupManager) performAutoSetup(guildID string) (*SetupResult, error) {
+func (s *setupManager) performAutoSetup(guildID string) (*SetupResult, error) {
 	result := &SetupResult{
 		RoleMappings: make(map[string]string),
 	}
@@ -116,7 +155,7 @@ func (s *SetupManager) performAutoSetup(guildID string) (*SetupResult, error) {
 	return result, nil
 }
 
-func (s *SetupManager) publishSetupEvent(i *discordgo.InteractionCreate, result *SetupResult) error {
+func (s *setupManager) publishSetupEvent(ctx context.Context, i *discordgo.InteractionCreate, result *SetupResult) error {
 	guild, err := s.session.Guild(i.GuildID)
 	if err != nil {
 		return fmt.Errorf("failed to get guild info: %w", err)
@@ -138,23 +177,23 @@ func (s *SetupManager) publishSetupEvent(i *discordgo.InteractionCreate, result 
 		SetupCompletedAt:       time.Now(),
 	}
 
-	payload, err := json.Marshal(event)
+	// Create and publish the message using the helper
+	msg, err := s.helper.CreateNewMessage(event, guildevents.GuildSetupEventTopic)
 	if err != nil {
-		return fmt.Errorf("failed to marshal setup event: %w", err)
+		return fmt.Errorf("failed to create setup event message: %w", err)
 	}
 
-	msg := message.NewMessage(watermill.NewUUID(), payload)
 	msg.Metadata.Set("guild_id", i.GuildID)
 
-	return s.publisher.Publish("guild.setup", msg)
+	return s.publisher.Publish(guildevents.GuildSetupEventTopic, msg)
 }
 
 // Helper methods
-func (s *SetupManager) hasAdminPermissions(i *discordgo.InteractionCreate) bool {
+func (s *setupManager) hasAdminPermissions(i *discordgo.InteractionCreate) bool {
 	return i.Member.Permissions&discordgo.PermissionAdministrator != 0
 }
 
-func (s *SetupManager) createOrFindChannel(guildID, channelName, topic string) (string, error) {
+func (s *setupManager) createOrFindChannel(guildID, channelName, topic string) (string, error) {
 	// Try to find existing channel first
 	channels, err := s.session.GuildChannels(guildID)
 	if err != nil {
@@ -181,7 +220,7 @@ func (s *SetupManager) createOrFindChannel(guildID, channelName, topic string) (
 	return channel.ID, nil
 }
 
-func (s *SetupManager) createOrFindRole(guild *discordgo.Guild, roleName string, color int) (string, error) {
+func (s *setupManager) createOrFindRole(guild *discordgo.Guild, roleName string, color int) (string, error) {
 	// Try to find existing role
 	for _, role := range guild.Roles {
 		if role.Name == roleName {
@@ -201,7 +240,7 @@ func (s *SetupManager) createOrFindRole(guild *discordgo.Guild, roleName string,
 	return role.ID, nil
 }
 
-func (s *SetupManager) respondSuccess(i *discordgo.InteractionCreate, result *SetupResult) error {
+func (s *setupManager) respondSuccess(i *discordgo.InteractionCreate, result *SetupResult) error {
 	embed := &discordgo.MessageEmbed{
 		Title:       "🥏 Frolf Bot Setup Complete!",
 		Description: "Your server is ready for disc golf! Here's what I've set up:",
@@ -227,7 +266,7 @@ func (s *SetupManager) respondSuccess(i *discordgo.InteractionCreate, result *Se
 	})
 }
 
-func (s *SetupManager) respondError(i *discordgo.InteractionCreate, errMsg string) error {
+func (s *setupManager) respondError(i *discordgo.InteractionCreate, errMsg string) error {
 	return s.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
@@ -235,4 +274,43 @@ func (s *SetupManager) respondError(i *discordgo.InteractionCreate, errMsg strin
 			Flags:   discordgo.MessageFlagsEphemeral,
 		},
 	})
+}
+
+// wrapSetupOperation wraps setup operations with observability and error handling
+func wrapSetupOperation(
+	ctx context.Context,
+	opName string,
+	fn func(ctx context.Context) error,
+	logger *slog.Logger,
+	tracer trace.Tracer,
+	metrics discordmetrics.DiscordMetrics,
+) error {
+	// Start span for tracing
+	ctx, span := tracer.Start(ctx, fmt.Sprintf("guild.setup.%s", opName))
+	defer span.End()
+
+	start := time.Now()
+
+	// Execute the operation
+	err := fn(ctx)
+
+	duration := time.Since(start)
+
+	if err != nil {
+		span.RecordError(err)
+		if logger != nil {
+			logger.ErrorContext(ctx, "Guild setup operation failed",
+				"operation", opName,
+				"duration_sec", fmt.Sprintf("%.2f", duration.Seconds()),
+				"error", err)
+		}
+	} else {
+		if logger != nil {
+			logger.InfoContext(ctx, "Guild setup operation completed",
+				"operation", opName,
+				"duration_sec", fmt.Sprintf("%.2f", duration.Seconds()))
+		}
+	}
+
+	return err
 }

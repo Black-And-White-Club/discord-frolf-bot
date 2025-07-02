@@ -20,7 +20,7 @@ type ChannelPermissions struct {
 type ServerSetupConfig struct {
 	GuildID              string
 	RequiredChannels     []string // e.g., ["signup", "events", "leaderboard"]
-	RequiredRoles        []string // e.g., ["Rattler", "Editor", "Admin"]
+	RequiredRoles        []string // e.g., ["User", "Editor", "Admin"]
 	SignupEmojiName      string   // e.g., "🐍"
 	CreateSignupMessage  bool
 	SignupMessageContent string
@@ -199,8 +199,8 @@ func (bot *DiscordBot) setupChannelPermissions(ctx context.Context, session *dis
 					attr.Error(err))
 			}
 
-			// Hide signup channel from Rattler and Editor roles
-			for _, roleName := range []string{"Rattler", "Editor"} {
+			// Hide signup channel from User and Editor roles
+			for _, roleName := range []string{"User", "Editor"} {
 				if roleID, roleExists := roleIDs[roleName]; roleExists {
 					err := session.ChannelPermissionSet(channelID, roleID, discordgo.PermissionOverwriteTypeRole,
 						0, discordgo.PermissionViewChannel)
@@ -255,7 +255,7 @@ func (bot *DiscordBot) setupChannelPermissions(ctx context.Context, session *dis
 			}
 
 			// Allow players to create threads and chat in them, but not post in main channel
-			for _, roleName := range []string{"Rattler", "Editor"} {
+			for _, roleName := range []string{"User", "Editor"} {
 				if roleID, roleExists := roleIDs[roleName]; roleExists {
 					err := session.ChannelPermissionSet(channelID, roleID, discordgo.PermissionOverwriteTypeRole,
 						discordgo.PermissionViewChannel|discordgo.PermissionCreatePublicThreads|discordgo.PermissionSendMessagesInThreads,

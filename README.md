@@ -102,7 +102,7 @@ Run the setup command to automatically configure your Discord server:
    ```
 3. The setup will automatically:
    - Create required channels (signup, events, leaderboard)
-   - Create required roles (Rattler, Editor, Admin)
+   - Create required roles (User, Editor, Admin)
    - Set up channel permissions
    - Create signup reaction message
    - **Update your config.yaml with all the generated IDs**
@@ -139,27 +139,46 @@ GitHub Actions workflow automatically:
 
 ## Architecture
 
-### Current Mode: Single-Server
+The Discord Frolf Bot is built using a modern, multi-tenant event-driven architecture (EDA) designed for production scale and reliability.
 
-- **File-based Configuration**: All settings stored in `config.yaml`
-- **Auto-setup**: Command-line setup automatically configures Discord and updates config
-- **No Database Required**: Everything runs from file-based configuration
-- **Simple Deployment**: Single container with minimal dependencies
+### Multi-Tenant Support
 
-### Future Expansion: Multi-Tenant Ready
+The bot supports two deployment modes:
 
-The codebase is designed to support future multi-tenant deployment:
-- Database schema available for guild configurations
-- Convenience methods abstract config access
-- Ready for horizontal scaling when needed
+**Single-Guild Mode** (Development/Testing):
+```yaml
+discord:
+  guild_id: "123456789"  # Specific guild ID
+```
 
-### Components
+**Multi-Tenant Mode** (Production):
+```yaml
+discord:
+  guild_id: ""  # Empty for global multi-guild support
+```
 
-- **Discord Bot**: Core bot functionality and command handling
-- **Event System**: NATS-based event bus for decoupled components
-- **Storage**: In-memory interaction state management
-- **Observability**: Structured logging, metrics, and tracing
-- **Health**: HTTP endpoints available for container health checks (not integrated)
+In multi-tenant mode, the bot can serve unlimited Discord servers simultaneously with proper isolation and scaling.
+
+### Event-Driven Architecture
+
+- **No Direct Database Access**: All modules communicate via NATS events
+- **Guild Isolation**: All events include `guild_id` for proper multi-tenant isolation
+- **Watermill Integration**: Uses Watermill with NATS/JetStream for reliable message processing
+- **Queue Groups**: Environment-specific queue groups ensure exclusive message processing
+
+### Modules
+
+- **Guild Module**: Multi-tenant guild management, setup, and lifecycle
+- **Round Module**: Event creation, RSVP management, and scheduling
+- **User Module**: User registration, role management, and profiles
+- **Score Module**: Score tracking and leaderboard management
+- **Leaderboard Module**: Tag claiming and ranking systems
+
+Each module follows the same EDA patterns with:
+- Discord interaction handlers
+- Event publishers/subscribers
+- Watermill routers and handlers
+- Multi-tenant context propagation
 
 ## Commands
 

@@ -173,7 +173,14 @@ func (crm *createRoundManager) createEvent(ctx context.Context, topic string, pa
 	newEvent.Metadata.Set("domain", "discord")
 	newEvent.Metadata.Set("interaction_id", i.Interaction.ID)
 	newEvent.Metadata.Set("interaction_token", i.Interaction.Token)
-	newEvent.Metadata.Set("guild_id", crm.config.GetGuildID())
+
+	// Use GuildID from the actual interaction instead of config
+	if i.Interaction.GuildID != "" {
+		newEvent.Metadata.Set("guild_id", i.Interaction.GuildID)
+	} else {
+		// Fallback to config only if interaction doesn't have GuildID
+		newEvent.Metadata.Set("guild_id", crm.config.GetGuildID())
+	}
 
 	return newEvent, correlationID, nil
 }

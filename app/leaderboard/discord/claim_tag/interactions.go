@@ -62,6 +62,7 @@ func (ctm *claimTagManager) HandleClaimTagCommand(ctx context.Context, i *discor
 			TagNumber:    sharedtypes.TagNumber(tagValue),
 			ChannelID:    i.ChannelID,
 			MessageID:    requestID,
+			GuildID:      i.GuildID,
 		}
 
 		// Create and publish the message

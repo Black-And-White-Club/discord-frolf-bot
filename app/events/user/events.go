@@ -65,6 +65,7 @@ type RoleUpdateButtonPressPayload struct {
 type SendUserDMPayload struct {
 	UserID  sharedtypes.DiscordID `json:"user_id"`
 	Message string                `json:"message"`
+	GuildID string                `json:"guild_id"`
 }
 
 // ---  Payloads below this probably aren't needed anymore ---
@@ -73,6 +74,7 @@ type RoleUpdateResponsePayload struct {
 	Response  string                `json:"response"` // The chosen role (or "cancel").
 	UserID    sharedtypes.DiscordID `json:"user_id"`  // The user who responded.
 	MessageID string                `json:"message_id"`
+	GuildID   string                `json:"guild_id"`
 }
 
 // TagNumberResponsePayload for when the user responsds with their tag number.
@@ -80,6 +82,7 @@ type TagNumberResponsePayload struct {
 	TagNumber string                `json:"tag_number"`
 	UserID    sharedtypes.DiscordID `json:"user_id"`
 	MessageID string                `json:"message_id"`
+	GuildID   string                `json:"guild_id"`
 }
 
 // SignupStartedPayload defines the payload for the SignupStarted event.
@@ -87,55 +90,65 @@ type SignupStartedPayload struct {
 	UserID    sharedtypes.DiscordID `json:"user_id"`
 	ChannelID string                `json:"channel_id"`
 	MessageID string                `json:"message_id,omitempty"`
+	GuildID   string                `json:"guild_id"`
 }
 
 // CancelPayload defines the payload for the cancel event.
 type CancelPayload struct {
-	UserID sharedtypes.DiscordID `json:"user_id"`
+	UserID  sharedtypes.DiscordID `json:"user_id"`
+	GuildID string                `json:"guild_id"`
 }
 
 // TracePayload defines the payload for the trace event.
 type TracePayload struct {
 	Message string `json:"message"`
+	GuildID string `json:"guild_id"`
 }
 
 // TagNumberRequestedPayload defines the payload for the TagNumberRequested event.
 type TagNumberRequestedPayload struct {
 	UserID      sharedtypes.DiscordID  `json:"user_id"`
 	Interaction *discordgo.Interaction `json:"interaction"`
+	GuildID     string                 `json:"guild_id"`
 }
 
 // RoleUpdateTimeoutPayload defines the payload for the RoleUpdateTimeout event.
 type RoleUpdateTimeoutPayload struct {
-	UserID string `json:"user_id"`
+	UserID  string `json:"user_id"`
+	GuildID string `json:"guild_id"`
 }
 type TagNumberProvidedPayload struct {
 	UserID      sharedtypes.DiscordID  `json:"user_id"`
 	TagNumber   sharedtypes.TagNumber  `json:"tag_number"`
 	Interaction *discordgo.Interaction `json:"interaction"`
+	GuildID     string                 `json:"guild_id"`
 }
 
 // Success payload
 type SignupSuccessPayload struct {
 	UserID        sharedtypes.DiscordID `json:"user_id"`
 	CorrelationID string                `json:"correlation_id"`
+	GuildID       string                `json:"guild_id"`
 }
 
 // AddRolePayload defines the payload for the AddRole event.
 type AddRolePayload struct {
-	UserID sharedtypes.DiscordID `json:"user_id"`
-	RoleID string                `json:"role_id"`
+	UserID  sharedtypes.DiscordID `json:"user_id"`
+	RoleID  string                `json:"role_id"`
+	GuildID string                `json:"guild_id"`
 }
 
 // RoleAddedPayload defines the payload for the RoleAdded event.
 type RoleAddedPayload struct {
-	UserID sharedtypes.DiscordID `json:"user_id"`
+	UserID  sharedtypes.DiscordID `json:"user_id"`
+	GuildID string                `json:"guild_id"`
 }
 
 // RoleAdditionFailedPayload defines the payload for the RoleAdditionFailed event.
 type RoleAdditionFailedPayload struct {
-	UserID sharedtypes.DiscordID `json:"user_id"`
-	Reason string                `json:"reason"`
+	UserID  sharedtypes.DiscordID `json:"user_id"`
+	Reason  string                `json:"reason"`
+	GuildID string                `json:"guild_id"`
 }
 
 // Failure payload
@@ -145,12 +158,14 @@ type SignupFailedPayload struct {
 	Detail        string                `json:"detail"`
 	UserID        sharedtypes.DiscordID `json:"user_id"`
 	CorrelationID string                `json:"correlation_id"`
+	GuildID       string                `json:"guild_id"`
 }
 type SignupFormSubmittedPayload struct {
 	UserID           sharedtypes.DiscordID  `json:"user_id"`
 	InteractionID    string                 `json:"interaction_id"`
 	InteractionToken string                 `json:"interaction_token"`
 	TagNumber        *sharedtypes.TagNumber `json:"tag_number"`
+	GuildID          string                 `json:"guild_id"`
 }
 
 // SignupModalData represents the structure of the modal submission data.

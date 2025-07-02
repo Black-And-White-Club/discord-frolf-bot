@@ -7,9 +7,9 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-func RegisterHandlers(registry *interactions.Registry, manager *SetupManager) {
+func RegisterHandlers(registry *interactions.Registry, manager SetupManager) {
 	registry.RegisterHandler("frolf-setup", func(ctx context.Context, i *discordgo.InteractionCreate) {
-		if err := manager.HandleSetupCommand(i); err != nil {
+		if err := manager.HandleSetupCommand(ctx, i); err != nil {
 			// Error logging is handled in the manager
 		}
 	})

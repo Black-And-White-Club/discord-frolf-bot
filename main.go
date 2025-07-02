@@ -9,8 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	"gopkg.in/yaml.v3"
-
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/bot"
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
@@ -37,33 +35,31 @@ func main() {
 		return
 	}
 
+	// Check bot mode for multi-pod deployment
+	botMode := os.Getenv("BOT_MODE")
+	switch botMode {
+	case "gateway":
+		runGatewayMode(ctx)
+	case "worker":
+		runWorkerMode(ctx)
+	default:
+		// Default: standalone mode (current behavior)
+		runStandaloneMode(ctx)
+	}
+}
+
+// runStandaloneMode runs the bot in single-pod mode (current behavior)
+func runStandaloneMode(ctx context.Context) {
 	// --- Configuration Loading ---
+	// Load base bot configuration (tokens, URLs, etc.) from environment/file
+	// Discord server-specific configs will be loaded from backend via events
 	var cfg *config.Config
 	var err error
 
-	// Check if database URL is provided for database-backed config
-	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
-		guildID := os.Getenv("DISCORD_GUILD_ID")
-		if guildID == "" {
-			fmt.Println("Warning: DISCORD_GUILD_ID not provided. Bot will register commands globally and work in any server.")
-			fmt.Println("Loading configuration from file as fallback...")
-			cfg, err = config.LoadConfig("config.yaml")
-		} else {
-			fmt.Printf("Loading configuration from database for guild: %s\n", guildID)
-			cfg, err = config.LoadConfigFromDatabase(ctx, databaseURL, guildID)
-			if err != nil {
-				fmt.Printf("Failed to load config from database: %v\n", err)
-				fmt.Println("Falling back to file-based config...")
-				cfg, err = config.LoadConfig("config.yaml")
-			}
-		}
-	} else {
-		fmt.Println("Loading configuration from file...")
-		cfg, err = config.LoadConfig("config.yaml")
-	}
-
+	// Load base configuration (no Discord server-specific settings)
+	cfg, err = config.LoadBaseConfig()
 	if err != nil {
-		fmt.Printf("Failed to load config: %v\n", err)
+		fmt.Printf("Failed to load base config: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -179,7 +175,7 @@ func main() {
 		logger.Info("Starting Discord bot components...")
 		if err := discordBot.Run(ctx); err != nil && err != context.Canceled {
 			logger.Error("Bot run failed", attr.Error(err))
-			cancel()
+			// Note: we can't call cancel() here since it's not available in this scope
 		}
 	}()
 
@@ -195,7 +191,6 @@ func main() {
 		}
 
 		logger.Info("Initiating graceful shutdown...")
-		cancel()
 
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer shutdownCancel()
@@ -232,10 +227,10 @@ func main() {
 func runSetup(ctx context.Context, guildID string) {
 	fmt.Printf("Running setup for guild: %s\n", guildID)
 
-	// Load config
-	cfg, err := config.LoadConfig("config.yaml")
+	// Load base config (no guild-specific settings)
+	cfg, err := config.LoadBaseConfig()
 	if err != nil {
-		fmt.Printf("Failed to load config: %v\n", err)
+		fmt.Printf("Failed to load base config: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -298,11 +293,11 @@ func runSetup(ctx context.Context, guildID string) {
 	setupConfig := bot.ServerSetupConfig{
 		GuildID:              guildID,
 		RequiredChannels:     []string{"signup", "events", "leaderboard"},
-		RequiredRoles:        []string{"Rattler", "Editor", "Admin"},
+		RequiredRoles:        []string{"User", "Editor", "Admin"},
 		SignupEmojiName:      "🐍",
 		CreateSignupMessage:  true,
 		SignupMessageContent: "React with 🐍 to sign up for frolf events!",
-		RegisteredRoleName:   "Rattler",
+		RegisteredRoleName:   "User",
 		AdminRoleName:        "Admin",
 		ChannelPermissions: map[string]bot.ChannelPermissions{
 			"signup": {
@@ -327,7 +322,7 @@ func runSetup(ctx context.Context, guildID string) {
 	}
 
 	fmt.Println("Setup completed successfully!")
-	fmt.Println("Updated configuration:")
+	fmt.Println("Configuration details:")
 	fmt.Printf("  Guild ID: %s\n", setupBot.Config.GetGuildID())
 	fmt.Printf("  Signup Channel ID: %s\n", setupBot.Config.GetSignupChannelID())
 	fmt.Printf("  Event Channel ID: %s\n", setupBot.Config.GetEventChannelID())
@@ -339,77 +334,8 @@ func runSetup(ctx context.Context, guildID string) {
 	for name, id := range setupBot.Config.GetRoleMappings() {
 		fmt.Printf("    %s: %s\n", name, id)
 	}
-	fmt.Println("\nNOTE: You need to manually update your config.yaml with these values.")
-
-	// Save to database if DATABASE_URL is provided
-	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
-		fmt.Println("Saving configuration to database...")
-		if err := config.SaveConfigToDatabase(ctx, databaseURL, setupBot.Config, fmt.Sprintf("Guild-%s", guildID)); err != nil {
-			fmt.Printf("Warning: Failed to save config to database: %v\n", err)
-		} else {
-			fmt.Println("✅ Configuration saved to database!")
-		}
-	}
-
-	// Auto-update config.yaml as backup
-	if err := updateConfigFile("config.yaml", setupBot.Config); err != nil {
-		fmt.Printf("Warning: Failed to auto-update config.yaml: %v\n", err)
-		fmt.Println("Please manually update your config.yaml with the values above.")
-	} else {
-		fmt.Println("\n✅ config.yaml has been automatically updated!")
-	}
-}
-
-// updateConfigFile automatically updates the config.yaml file with new setup values
-func updateConfigFile(configPath string, cfg *config.Config) error {
-	// Read the current config file as raw YAML
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return fmt.Errorf("failed to read config file: %w", err)
-	}
-
-	// Parse as generic YAML to preserve structure and comments
-	var yamlData interface{}
-	if err := yaml.Unmarshal(data, &yamlData); err != nil {
-		return fmt.Errorf("failed to parse YAML: %w", err)
-	}
-
-	// Convert to map for easier manipulation
-	yamlMap, ok := yamlData.(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("config file is not a valid YAML map")
-	}
-
-	// Update Discord section
-	if discordSection, exists := yamlMap["discord"]; exists {
-		if discordMap, ok := discordSection.(map[string]interface{}); ok {
-			// Update the Discord configuration values
-			discordMap["guild_id"] = cfg.GetGuildID()
-			discordMap["signup_channel_id"] = cfg.GetSignupChannelID()
-			discordMap["signup_message_id"] = cfg.GetSignupMessageID()
-			discordMap["event_channel_id"] = cfg.GetEventChannelID()
-			discordMap["leaderboard_channel_id"] = cfg.GetLeaderboardChannelID()
-			discordMap["registered_role_id"] = cfg.GetRegisteredRoleID()
-			discordMap["admin_role_id"] = cfg.GetAdminRoleID()
-
-			// Update role mappings
-			if len(cfg.GetRoleMappings()) > 0 {
-				discordMap["role_mappings"] = cfg.GetRoleMappings()
-			}
-		}
-	}
-
-	// Write back to file
-	updatedData, err := yaml.Marshal(yamlMap)
-	if err != nil {
-		return fmt.Errorf("failed to marshal updated YAML: %w", err)
-	}
-
-	if err := os.WriteFile(configPath, updatedData, 0o644); err != nil {
-		return fmt.Errorf("failed to write config file: %w", err)
-	}
-
-	return nil
+	fmt.Println("\nConfiguration has been sent to the backend via events.")
+	fmt.Println("The bot will automatically use this configuration when running.")
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
@@ -419,4 +345,88 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 
 func init() {
 	http.HandleFunc("/health", healthHandler)
+}
+
+// runGatewayMode runs only the Discord gateway connection (for multi-pod deployment)
+func runGatewayMode(ctx context.Context) {
+	fmt.Println("Starting Discord Gateway Mode - handling Discord connections only")
+
+	// Load base configuration
+	cfg, err := config.LoadBaseConfig()
+	if err != nil {
+		fmt.Printf("Failed to load base config: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Initialize observability
+	obsConfig := observability.Config{
+		ServiceName:     "discord-frolf-bot-gateway",
+		Environment:     cfg.Observability.Environment,
+		Version:         cfg.Service.Version,
+		LokiURL:         cfg.Observability.LokiURL,
+		MetricsAddress:  cfg.Observability.MetricsAddress,
+		TempoEndpoint:   cfg.Observability.TempoEndpoint,
+		TempoInsecure:   cfg.Observability.TempoInsecure,
+		TempoSampleRate: cfg.Observability.TempoSampleRate,
+	}
+
+	obs, err := observability.Init(ctx, obsConfig)
+	if err != nil {
+		fmt.Printf("Failed to initialize observability: %v\n", err)
+		os.Exit(1)
+	}
+	logger := obs.Provider.Logger
+
+	logger.Info("Gateway mode: Discord connection only, business logic handled by workers")
+
+	// TODO: Implement gateway-only logic
+	// - Create Discord session
+	// - Register commands
+	// - Handle Discord events
+	// - Publish events to NATS (no local processing)
+
+	fmt.Println("Gateway mode not yet implemented - falling back to standalone mode")
+	runStandaloneMode(ctx)
+}
+
+// runWorkerMode runs only the business logic processing (for multi-pod deployment)
+func runWorkerMode(ctx context.Context) {
+	fmt.Println("Starting Worker Mode - handling business logic only")
+
+	// Load base configuration
+	cfg, err := config.LoadBaseConfig()
+	if err != nil {
+		fmt.Printf("Failed to load base config: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Initialize observability
+	obsConfig := observability.Config{
+		ServiceName:     "discord-frolf-bot-worker",
+		Environment:     cfg.Observability.Environment,
+		Version:         cfg.Service.Version,
+		LokiURL:         cfg.Observability.LokiURL,
+		MetricsAddress:  cfg.Observability.MetricsAddress,
+		TempoEndpoint:   cfg.Observability.TempoEndpoint,
+		TempoInsecure:   cfg.Observability.TempoInsecure,
+		TempoSampleRate: cfg.Observability.TempoSampleRate,
+	}
+
+	obs, err := observability.Init(ctx, obsConfig)
+	if err != nil {
+		fmt.Printf("Failed to initialize observability: %v\n", err)
+		os.Exit(1)
+	}
+	logger := obs.Provider.Logger
+
+	logger.Info("Worker mode: business logic only, no Discord connection")
+
+	// TODO: Implement worker-only logic
+	// - Subscribe to NATS events
+	// - Process business logic
+	// - Handle backend operations
+	// - NO Discord session
+
+	fmt.Println("Worker mode not yet implemented - falling back to standalone mode")
+	runStandaloneMode(ctx)
 }

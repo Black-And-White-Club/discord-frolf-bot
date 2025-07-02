@@ -37,6 +37,7 @@ type CreateRoundRequestedPayload struct {
 	UserID      sharedtypes.DiscordID  `json:"user_id"`
 	ChannelID   string                 `json:"channel_id"`
 	Timezone    roundtypes.Timezone    `json:"timezone"`
+	GuildID     sharedtypes.GuildID    `json:"guild_id"`
 }
 
 // RoundCreatedPayload: From round handler to discord handler (success).
@@ -47,12 +48,14 @@ type RoundCreatedPayload struct { // Embed the common metadata
 	Location    roundtypes.Location   `json:"location"`
 	RequesterID sharedtypes.DiscordID `json:"requester_id"`
 	ChannelID   string                `json:"channel_id"`
+	GuildID     sharedtypes.GuildID   `json:"guild_id"`
 }
 
 // RoundCreationFailedPayload: From round handler to discord handler (failure).
 type RoundCreationFailedPayload struct {
-	UserID sharedtypes.DiscordID `json:"user_id"`
-	Reason string                `json:"reason"`
+	UserID  sharedtypes.DiscordID `json:"user_id"`
+	Reason  string                `json:"reason"`
+	GuildID string                `json:"guild_id"`
 }
 
 // DiscordRoundReminderPayload: From round handler to discord handler (for sending reminders).
@@ -62,6 +65,7 @@ type DiscordRoundReminderPayload struct {
 	UserIDs      []string            `json:"user_ids"`
 	ReminderType string              `json:"reminder_type"`
 	ChannelID    string              `json:"channel_id"`
+	GuildID      string              `json:"guild_id"`
 }
 type DiscordRoundStartPayload struct {
 	RoundID   sharedtypes.RoundID    `json:"round_id"`
@@ -69,18 +73,21 @@ type DiscordRoundStartPayload struct {
 	Location  *roundtypes.Location   `json:"location"`
 	StartTime *sharedtypes.StartTime `json:"start_time"`
 	ChannelID string                 `json:"channel_id"`
+	GuildID   string                 `json:"guild_id"`
 }
 type DiscordRoundParticipantJoinRequestPayload struct {
 	RoundID    sharedtypes.RoundID   `json:"round_id"`
 	UserID     sharedtypes.DiscordID `json:"user_id"`
 	ChannelID  string                `json:"channel_id"`
 	JoinedLate *bool                 `json:"joined_late,omitempty"`
+	GuildID    string                `json:"guild_id"`
 }
 type DiscordRoundParticipantJoinedPayload struct {
 	RoundID   sharedtypes.RoundID   `json:"round_id"`
 	UserID    sharedtypes.DiscordID `json:"user_id"`
 	TagNumber sharedtypes.TagNumber `json:"tag_number"`
 	ChannelID string                `json:"channel_id"`
+	GuildID   string                `json:"guild_id"`
 }
 
 // --- Update Round ---
@@ -93,6 +100,7 @@ type DiscordRoundUpdateRequestPayload struct {
 	StartTime   *sharedtypes.StartTime  `json:"start_time,omitempty"`
 	Location    *roundtypes.Location    `json:"location,omitempty"`
 	ChannelID   string                  `json:"channel_id"`
+	GuildID     sharedtypes.GuildID     `json:"guild_id"`
 }
 type DiscordRoundUpdatedPayload struct {
 	RoundID     sharedtypes.RoundID     `json:"round_id"`
@@ -102,17 +110,20 @@ type DiscordRoundUpdatedPayload struct {
 	Description *roundtypes.Description `json:"description,omitempty"`
 	StartTime   *sharedtypes.StartTime  `json:"start_time,omitempty"`
 	Location    *roundtypes.Location    `json:"location,omitempty"`
+	GuildID     sharedtypes.GuildID     `json:"guild_id"`
 }
 type DiscordRoundDeleteRequestPayload struct {
 	RoundID   sharedtypes.RoundID   `json:"round_id"`
 	UserID    sharedtypes.DiscordID `json:"user_id"`
 	ChannelID string                `json:"channel_id"`
 	MessageID string                `json:"message_id"`
+	GuildID   string                `json:"guild_id"`
 }
 type DiscordRoundDeletedPayload struct {
 	RoundID   sharedtypes.RoundID `json:"round_id"`
 	ChannelID string              `json:"channel_id"`
 	MessageID string              `json:"message_id"`
+	GuildID   string              `json:"guild_id"`
 }
 type DiscordRoundParticipantScoreUpdatedPayload struct {
 	RoundID   sharedtypes.RoundID   `json:"round_id"`
@@ -120,6 +131,7 @@ type DiscordRoundParticipantScoreUpdatedPayload struct {
 	Score     sharedtypes.Score     `json:"score"`
 	ChannelID string                `json:"channel_id"`
 	MessageID string                `json:"message_id"`
+	GuildID   string                `json:"guild_id"`
 }
 type DiscordRoundScoreUpdateRequestPayload struct {
 	RoundID   sharedtypes.RoundID   `json:"round_id"`
@@ -127,17 +139,20 @@ type DiscordRoundScoreUpdateRequestPayload struct {
 	Score     sharedtypes.Score     `json:"score"`
 	ChannelID string                `json:"channel_id"`
 	MessageID string                `json:"message_id"`
+	GuildID   string                `json:"guild_id"`
 }
 type DiscordRoundFinalizedPayload struct {
 	RoundID   sharedtypes.RoundID `json:"round_id"`
 	ChannelID string              `json:"channel_id"`
 	MessageID string              `json:"message_id"`
+	GuildID   string              `json:"guild_id"`
 }
 
 type DiscordRoundCreatedTracePayload struct {
 	RoundID   sharedtypes.RoundID   `json:"round_id"`
 	Title     roundtypes.Title      `json:"title"`
 	CreatedBy sharedtypes.DiscordID `json:"created_by"`
+	GuildID   string                `json:"guild_id"`
 }
 
 type DiscordRoundUpdateModalSubmitPayload struct {
@@ -150,4 +165,5 @@ type DiscordRoundUpdateModalSubmitPayload struct {
 	Timezone    *roundtypes.Timezone    `json:"timezone,omitempty"`
 	Location    *roundtypes.Location    `json:"location,omitempty"`
 	ChannelID   string                  `json:"channel_id"`
+	GuildID     sharedtypes.GuildID     `json:"guild_id"`
 }

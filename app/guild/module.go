@@ -2,102 +2,106 @@ package guild
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log/slog"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	guilddiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/guild/discord"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/guild/discord/setup"
-	guildstorage "github.com/Black-And-White-Club/discord-frolf-bot/app/guild/storage"
-	guildrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/guild/watermill"
+	guildwatermill "github.com/Black-And-White-Club/discord-frolf-bot/app/guild/watermill"
 	guildhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/guild/watermill/handlers"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/interactions"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
+	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
+	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
+	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/bwmarrin/discordgo"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // GuildModule handles guild setup and configuration
 type GuildModule struct {
-	GuildDiscord  guilddiscord.GuildDiscordInterface
-	configHandler *guildhandlers.GuildConfigHandler
-	router        *guildrouter.GuildRouter
-	logger        *slog.Logger
+	discordModule   guilddiscord.GuildDiscordInterface
+	responseHandler guildhandlers.Handlers
+	router          *guildwatermill.GuildRouter
+	logger          *slog.Logger
 }
 
-// InitializeGuildModule sets up the guild module with setup command and backend handlers
+// InitializeGuildModule sets up the guild module with setup command and backend event handlers
 func InitializeGuildModule(
 	ctx context.Context,
 	session discord.Session,
-	router *message.Router,
-	publisher message.Publisher,
+	publisher eventbus.EventBus,
 	subscriber message.Subscriber,
+	messageRouter *message.Router,
 	interactionRegistry *interactions.Registry,
 	logger *slog.Logger,
+	helper utils.Helpers,
 	cfg *config.Config,
-	db *sql.DB,
+	interactionStore storage.ISInterface,
+	tracer trace.Tracer,
+	metrics discordmetrics.DiscordMetrics,
 ) (*GuildModule, error) {
-	// Create database service (or no-op if db is nil)
-	var dbService guildhandlers.DatabaseService
-	if db != nil {
-		dbService = guildstorage.NewGuildDatabaseService(db, logger)
-		logger.InfoContext(ctx, "Guild module using database persistence")
-	} else {
-		dbService = &NoOpDatabaseService{logger: logger}
-		logger.InfoContext(ctx, "Guild module using no-op database service (no persistence)")
+	// Create Discord module with all managers
+	discordModule, err := guilddiscord.NewGuildDiscord(
+		ctx,
+		session, // Pass the Session interface directly
+		publisher,
+		logger,
+		helper,
+		cfg,
+		interactionStore,
+		tracer,
+		metrics,
+	)
+	if err != nil {
+		logger.ErrorContext(ctx, "Failed to create guild discord module", attr.Error(err))
+		return nil, fmt.Errorf("failed to create guild discord module: %w", err)
 	}
 
-	// Create GuildDiscord (Discord-specific managers)
-	guildDiscord := guilddiscord.NewGuildDiscord(session, publisher, logger)
-
-	// Create config handler for backend events
-	configHandler := guildhandlers.NewGuildConfigHandler(logger, dbService)
-
 	// Register setup command handler using the proper pattern
-	setup.RegisterHandlers(interactionRegistry, guildDiscord.GetSetupManager())
+	setup.RegisterHandlers(interactionRegistry, discordModule.GetSetupManager())
 
-	// Create guild router for watermill handlers
-	guildRouter := guildrouter.NewGuildRouter(logger, router, subscriber, publisher)
+	// Create response handler for backend events
+	responseHandler := guildhandlers.NewGuildHandlers(
+		logger,
+		cfg,
+		helper,
+		discordModule,
+		tracer,
+		metrics,
+	)
 
-	// Configure the router with handlers
-	if err := guildRouter.Configure(ctx, configHandler); err != nil {
+	// Create watermill router for backend event subscriptions
+	guildRouter := guildwatermill.NewGuildRouter(
+		logger,
+		messageRouter,
+		publisher,
+		publisher,
+		cfg,
+		helper,
+		tracer,
+	)
+
+	// Configure the router with response handlers
+	if err := guildRouter.Configure(ctx, responseHandler); err != nil {
 		logger.ErrorContext(ctx, "Failed to configure guild router", attr.Error(err))
 		return nil, fmt.Errorf("failed to configure guild router: %w", err)
 	}
 
 	module := &GuildModule{
-		GuildDiscord:  guildDiscord,
-		configHandler: configHandler,
-		router:        guildRouter,
-		logger:        logger,
+		discordModule:   discordModule,
+		responseHandler: responseHandler,
+		router:          guildRouter,
+		logger:          logger,
 	}
 
 	logger.InfoContext(ctx, "Guild module initialized successfully")
 
 	return module, nil
-}
-
-// NoOpDatabaseService is a no-op implementation for when no database is available
-type NoOpDatabaseService struct {
-	logger *slog.Logger
-}
-
-func (n *NoOpDatabaseService) SaveGuildConfig(ctx context.Context, config *guildstorage.GuildConfig) error {
-	n.logger.InfoContext(ctx, "Guild config saved (no-op)",
-		attr.String("guild_id", config.GuildID),
-		attr.String("guild_name", config.GuildName))
-	return nil
-}
-
-func (n *NoOpDatabaseService) GetGuildConfig(ctx context.Context, guildID string) (*guildstorage.GuildConfig, error) {
-	return nil, fmt.Errorf("guild config not found (no database)")
-}
-
-func (n *NoOpDatabaseService) UpdateGuildConfig(ctx context.Context, guildID string, updates map[string]interface{}) error {
-	n.logger.InfoContext(ctx, "Guild config updated (no-op)", attr.String("guild_id", guildID))
-	return nil
 }
 
 // RegisterSetupCommand registers the /frolf-setup command with Discord
@@ -120,12 +124,25 @@ func RegisterSetupCommand(session discord.Session, logger *slog.Logger, guildID 
 	return nil
 }
 
-// GetGuildDiscord returns the GuildDiscord interface for external use
-func (m *GuildModule) GetGuildDiscord() guilddiscord.GuildDiscordInterface {
-	return m.GuildDiscord
+// GetSetupManager returns the setup manager for external use
+func (m *GuildModule) GetSetupManager() setup.SetupManager {
+	return m.discordModule.GetSetupManager()
 }
 
-// GetConfigHandler returns the config handler for external use
-func (m *GuildModule) GetConfigHandler() *guildhandlers.GuildConfigHandler {
-	return m.configHandler
+// GetResponseHandler returns the response handler for external use
+func (m *GuildModule) GetResponseHandler() guildhandlers.Handlers {
+	return m.responseHandler
+}
+
+// GetRouter returns the watermill router for external use
+func (m *GuildModule) GetRouter() *guildwatermill.GuildRouter {
+	return m.router
+}
+
+// Close gracefully shuts down the guild module
+func (m *GuildModule) Close() error {
+	if m.router != nil {
+		return m.router.Close()
+	}
+	return nil
 }

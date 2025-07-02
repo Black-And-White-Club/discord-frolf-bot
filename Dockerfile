@@ -27,7 +27,7 @@ FROM gcr.io/distroless/static:nonroot
 
 # Add metadata labels for better container management
 LABEL org.opencontainers.image.title="Discord Frolf Bot" \
-      org.opencontainers.image.description="Discord bot for Disc Golf event management" \
+      org.opencontainers.image.description="Discord bot for Disc Golf event management - supports gateway/worker/standalone modes" \
       org.opencontainers.image.source="https://github.com/Black-And-White-Club/discord-frolf-bot" \
       org.opencontainers.image.vendor="Black And White Club" \
       org.opencontainers.image.licenses="MIT"
@@ -50,6 +50,11 @@ USER nonroot:nonroot
 
 # Expose port for health checks and webhooks
 EXPOSE 8080
+
+# Environment variable BOT_MODE controls deployment mode:
+# - "" or "standalone": Full bot with Discord connection (default)
+# - "gateway": Discord gateway only, publishes events to NATS
+# - "worker": Business logic only, subscribes to NATS events
 
 # Use exec form for better signal handling
 ENTRYPOINT ["/discord-frolf-bot"]

@@ -18,8 +18,8 @@ discord:
   auto_setup:
     enabled: true
     required_channels: ["signup", "events", "leaderboard"]
-    required_roles: ["Rattler", "Editor", "Admin"]
-    registered_role_name: "Rattler"
+    required_roles: ["User", "Editor", "Admin"]
+    registered_role_name: "User"
     admin_role_name: "Admin"
     signup_emoji: "🐍"
 
