@@ -177,6 +177,7 @@ USER_DIR := ./app/user
 ROUND_DIR := ./app/round
 LB_DIR := ./app/leaderboard
 SCORE_DIR := ./app/score
+GUILD_DIR := ./app/guild
 
 # Generate mocks for the discordgo interfaces
 generate-mocks:
@@ -189,6 +190,7 @@ mocks-user: mocks-user-discord mocks-user-handlers mocks-user-role-manager mocks
 mocks-round: mocks-create-round-manager mocks-round-rsvp-manager mocks-round-discord mocks-round-reminder-manager mocks-start-round-manager mocks-score-round-manager mocks-finalize-round-manager mocks-delete-round-manager mocks-update-round-manager mocks-tag-update-manager
 mocks-leaderboard: mocks-leaderboard-discord mocks-leaderboard-update-manager mocks-leaderboard-tag-claim
 mocks-score: mocks-score-handlers
+mocks-guild: mocks-guild-discord mocks-guild-handlers mocks-guild-setup-manager
 
 mocks-user-discord:
 	$(MOCKGEN) -source=$(USER_DIR)/discord/discord.go -destination=$(USER_DIR)/mocks/mock_user_discord.go -package=mocks
@@ -233,7 +235,15 @@ mocks-leaderboard-tag-claim:
 mocks-score-handlers:
 	$(MOCKGEN) -source=$(SCORE_DIR)/watermill/handlers/handlers.go -destination=$(SCORE_DIR)/mocks/mock_handlers.go -package=mocks
 
-mocks-all: mocks-user mocks-round mocks-leaderboard mocks-score generate-mocks
+# Mocks for Guild Domain
+mocks-guild-discord:
+	$(MOCKGEN) -source=$(GUILD_DIR)/discord/discord.go -destination=$(GUILD_DIR)/mocks/mock_guild_discord.go -package=mocks
+mocks-guild-handlers:
+	$(MOCKGEN) -source=$(GUILD_DIR)/watermill/handlers/handlers.go -destination=$(GUILD_DIR)/mocks/mock_guild_handlers.go -package=mocks
+mocks-guild-setup-manager:
+	$(MOCKGEN) -source=$(GUILD_DIR)/discord/setup/setup_config_manager.go -destination=$(GUILD_DIR)/mocks/mock_setup_manager.go -package=mocks
+
+mocks-all: mocks-user mocks-round mocks-leaderboard mocks-score mocks-guild generate-mocks
 
 # --- Build Targets ---
 build_version_ldflags := -X 'main.Version=$(shell git describe --tags --always)'
@@ -257,7 +267,7 @@ help:
 	@echo "  test-quick            - Quick tests (fast feedback)"
 	@echo "  test-silent           - Run tests silently (results only)"
 	@echo "  test-json             - Run tests with JSON output"
-	@echo "  test-module MODULE=x  - Test specific module (user|round|score|leaderboard)"
+	@echo "  test-module MODULE=x  - Test specific module (user|round|score|leaderboard|guild)"
 	@echo "  test-count            - Show test count"
 	@echo ""
 	@echo "Coverage:"
@@ -270,6 +280,7 @@ help:
 	@echo "  mocks-round           - Generate round domain mocks"
 	@echo "  mocks-leaderboard     - Generate leaderboard domain mocks"
 	@echo "  mocks-score           - Generate score domain mocks"
+	@echo "  mocks-guild           - Generate guild domain mocks"
 	@echo "  generate-mocks        - Generate core interface mocks"
 	@echo ""
 	@echo "Development:"
