@@ -3,7 +3,9 @@ package roundhandlers
 import (
 	"context"
 	"fmt"
+	"time"
 
+	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
@@ -14,28 +16,49 @@ import (
 func (h *RoundHandlers) HandleRoundUpdateRequested(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleRoundUpdateRequested",
-		&roundevents.UpdateRoundRequestedPayload{},
+		&discordroundevents.DiscordRoundUpdateRequestPayload{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			updatePayload := payload.(*roundevents.UpdateRoundRequestedPayload)
+			discordPayload := payload.(*discordroundevents.DiscordRoundUpdateRequestPayload)
+
+			// Convert to backend payload and set GuildID
+			var startTimeStr *string
+			if discordPayload.StartTime != nil {
+				timeValue := time.Time(*discordPayload.StartTime)
+				timeStr := timeValue.Format("2006-01-02T15:04:05Z07:00")
+				startTimeStr = &timeStr
+			}
+
+			backendPayload := roundevents.UpdateRoundRequestedPayload{
+				GuildID:     sharedtypes.GuildID(discordPayload.GuildID),
+				RoundID:     discordPayload.RoundID,
+				UserID:      discordPayload.UserID,
+				ChannelID:   discordPayload.ChannelID,
+				MessageID:   discordPayload.MessageID,
+				Title:       discordPayload.Title,
+				Description: discordPayload.Description,
+				StartTime:   startTimeStr,
+				Location:    discordPayload.Location,
+				// Note: Timezone field may need to be added if available in Discord payload
+			}
 
 			// Extract Discord metadata from the original payload
-			channelID := updatePayload.ChannelID
-			messageID := updatePayload.MessageID
-			userID := string(updatePayload.UserID)
+			channelID := discordPayload.ChannelID
+			messageID := discordPayload.MessageID
+			userID := string(discordPayload.UserID)
 
 			h.Logger.InfoContext(ctx, "DEBUG: Backend received UpdateRoundRequestedPayload",
-				attr.RoundID("received_round_id", updatePayload.RoundID),
-				attr.String("received_round_id_string", updatePayload.RoundID.String()),
+				attr.RoundID("received_round_id", discordPayload.RoundID),
+				attr.String("received_round_id_string", discordPayload.RoundID.String()),
 				attr.String("channel_id", channelID),
 				attr.String("message_id", messageID),
-				attr.Any("raw_payload", updatePayload))
+				attr.Any("raw_payload", discordPayload))
 
 			// ✅ Add this debug to verify the payload has message_id
 			h.Logger.InfoContext(ctx, "DEBUG: Payload message_id from modal",
-				attr.String("payload_message_id", updatePayload.MessageID),
-				attr.String("payload_channel_id", updatePayload.ChannelID))
+				attr.String("payload_message_id", discordPayload.MessageID),
+				attr.String("payload_channel_id", discordPayload.ChannelID))
 
-			backendMsg, err := h.Helpers.CreateResultMessage(msg, updatePayload, roundevents.RoundUpdateRequest)
+			backendMsg, err := h.Helpers.CreateResultMessage(msg, backendPayload, roundevents.RoundUpdateRequest)
 			if err != nil {
 				h.Logger.ErrorContext(ctx, "Failed to create result message", attr.Error(err))
 				return nil, err

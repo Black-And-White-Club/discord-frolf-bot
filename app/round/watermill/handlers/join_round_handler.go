@@ -46,6 +46,7 @@ func (h *RoundHandlers) HandleRoundParticipantJoinRequest(msg *message.Message) 
 			// Construct the backend payload
 			tagNumber := sharedtypes.TagNumber(0) // Default tag number, will be assigned by backend
 			backendPayload := roundevents.ParticipantJoinRequestPayload{
+				GuildID:    sharedtypes.GuildID(p.GuildID),
 				RoundID:    p.RoundID,
 				UserID:     p.UserID,
 				Response:   response,

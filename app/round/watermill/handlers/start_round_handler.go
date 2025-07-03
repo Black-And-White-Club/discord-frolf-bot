@@ -40,6 +40,7 @@ func (h *RoundHandlers) HandleRoundStarted(msg *message.Message) ([]*message.Mes
 			}
 
 			tracePayload := map[string]interface{}{
+				"guild_id":   startPayload.GuildID,
 				"round_id":   startPayload.RoundID,
 				"event_type": "round_started",
 				"status":     "scorecard_updated",

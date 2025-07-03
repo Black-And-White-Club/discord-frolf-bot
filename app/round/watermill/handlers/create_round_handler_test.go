@@ -37,7 +37,7 @@ func TestRoundHandlers_HandleRoundCreateRequested(t *testing.T) {
 			name: "successful_round_create_request",
 			msg: &message.Message{
 				UUID:    "1",
-				Payload: []byte(`{"title": "Test Round", "description": "Test Description", "location": "Test Location", "start_time": "2024-01-01T12:00:00Z"}`),
+				Payload: []byte(`{"guild_id": "123456789", "title": "Test Round", "description": "Test Description", "location": "Test Location", "start_time": "2024-01-01T12:00:00Z", "user_id": "user123", "channel_id": "channel123"}`),
 				Metadata: message.Metadata{
 					"correlation_id": "correlation_id",
 				},
@@ -45,18 +45,21 @@ func TestRoundHandlers_HandleRoundCreateRequested(t *testing.T) {
 			want:    []*message.Message{{}}, // Assuming a message is returned
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockHelper *util_mocks.MockHelpers) {
-				expectedPayload := roundevents.CreateRoundRequestedPayload{
+				expectedPayload := discordroundevents.CreateRoundRequestedPayload{
+					GuildID:     "123456789",
 					Title:       "Test Round",
 					Description: *roundtypes.DescriptionPtr("Test Description"),
 					Location:    *roundtypes.LocationPtr("Test Location"),
 					StartTime:   "2024-01-01T12:00:00Z",
+					UserID:      "user123",
+					ChannelID:   "channel123",
 				}
 
 				// Make sure this is called by the wrapper
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.CreateRoundRequestedPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discordroundevents.CreateRoundRequestedPayload{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.CreateRoundRequestedPayload) = expectedPayload
+						*v.(*discordroundevents.CreateRoundRequestedPayload) = expectedPayload
 						return nil
 					}).
 					Times(1)
@@ -80,7 +83,7 @@ func TestRoundHandlers_HandleRoundCreateRequested(t *testing.T) {
 			name: "create_result_message_fails",
 			msg: &message.Message{
 				UUID:    "1",
-				Payload: []byte(`{"title": "Test Round", "description": "Test Description", "location": "Test Location", "start_time": "2024-01-01T12:00:00Z"}`),
+				Payload: []byte(`{"guild_id": "123456789", "title": "Test Round", "description": "Test Description", "location": "Test Location", "start_time": "2024-01-01T12:00:00Z", "user_id": "user123", "channel_id": "channel123"}`),
 				Metadata: message.Metadata{
 					"correlation_id": "correlation_id",
 				},
@@ -89,7 +92,7 @@ func TestRoundHandlers_HandleRoundCreateRequested(t *testing.T) {
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockHelper *util_mocks.MockHelpers) {
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.CreateRoundRequestedPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discordroundevents.CreateRoundRequestedPayload{})).
 					Return(nil).
 					Times(1)
 
@@ -111,7 +114,7 @@ func TestRoundHandlers_HandleRoundCreateRequested(t *testing.T) {
 			name: "create_result_message_fails_and_update_interaction_response_fails",
 			msg: &message.Message{
 				UUID:    "1",
-				Payload: []byte(`{"title": "Test Round", "description": "Test Description", "location": "Test Location", "start_time": "2024-01-01T12:00:00Z"}`),
+				Payload: []byte(`{"guild_id": "123456789", "title": "Test Round", "description": "Test Description", "location": "Test Location", "start_time": "2024-01-01T12:00:00Z", "user_id": "user123", "channel_id": "channel123"}`),
 				Metadata: message.Metadata{
 					"correlation_id": "correlation_id",
 				},
@@ -120,7 +123,7 @@ func TestRoundHandlers_HandleRoundCreateRequested(t *testing.T) {
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockHelper *util_mocks.MockHelpers) {
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.CreateRoundRequestedPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discordroundevents.CreateRoundRequestedPayload{})).
 					Return(nil).
 					Times(1)
 

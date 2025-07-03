@@ -19,6 +19,7 @@ func (h *UserHandlers) HandleUserSignupRequest(msg *message.Message) ([]*message
 			reqPayload := payload.(*userevents.UserSignupRequestPayload)
 
 			backendPayload := userevents.UserSignupRequestPayload{
+				GuildID:   reqPayload.GuildID,
 				UserID:    reqPayload.UserID,
 				TagNumber: reqPayload.TagNumber,
 			}
@@ -41,8 +42,9 @@ func (h *UserHandlers) HandleUserCreated(msg *message.Message) ([]*message.Messa
 			createdPayload := payload.(*userevents.UserCreatedPayload)
 
 			rolePayload := discorduserevents.AddRolePayload{
-				UserID: createdPayload.UserID,
-				RoleID: h.Config.GetRegisteredRoleID(),
+				UserID:  createdPayload.UserID,
+				RoleID:  h.Config.GetRegisteredRoleID(),
+				GuildID: string(createdPayload.GuildID),
 			}
 			roleMsg, err := h.Helper.CreateResultMessage(msg, rolePayload, discorduserevents.SignupAddRole)
 			if err != nil {

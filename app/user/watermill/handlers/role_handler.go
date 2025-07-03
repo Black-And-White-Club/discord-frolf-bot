@@ -73,6 +73,7 @@ func (h *UserHandlers) HandleRoleUpdateButtonPress(msg *message.Message) ([]*mes
 
 			// Create and publish a backend event for role update
 			backendPayload := userevents.UserRoleUpdateRequestPayload{
+				GuildID:     sharedtypes.GuildID(buttonPayload.GuildID),
 				RequesterID: sharedtypes.DiscordID(buttonPayload.RequesterID),
 				UserID:      sharedtypes.DiscordID(buttonPayload.TargetUserID),
 				Role:        selectedRole,
@@ -209,8 +210,9 @@ func (h *UserHandlers) HandleAddRole(msg *message.Message) ([]*message.Message, 
 				h.Logger.ErrorContext(ctx, "Failed to add Discord role", attr.Error(err))
 				// Create a failure message
 				failurePayload := discorduserevents.RoleAdditionFailedPayload{
-					UserID: rolePayload.UserID,
-					Reason: err.Error(),
+					UserID:  rolePayload.UserID,
+					Reason:  err.Error(),
+					GuildID: rolePayload.GuildID,
 				}
 				failureMsg, createErr := h.Helper.CreateResultMessage(msg, failurePayload, discorduserevents.SignupRoleAdditionFailed)
 				if createErr != nil {
@@ -227,7 +229,8 @@ func (h *UserHandlers) HandleAddRole(msg *message.Message) ([]*message.Message, 
 
 			// If successful, create a success message
 			successPayload := discorduserevents.RoleAddedPayload{
-				UserID: rolePayload.UserID,
+				UserID:  rolePayload.UserID,
+				GuildID: rolePayload.GuildID,
 			}
 			successMsg, createErr := h.Helper.CreateResultMessage(msg, successPayload, discorduserevents.SignupRoleAdded)
 			if createErr != nil {

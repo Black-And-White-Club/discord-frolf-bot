@@ -17,12 +17,24 @@ import (
 func (h *RoundHandlers) HandleRoundCreateRequested(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleRoundCreateRequested",
-		&roundevents.CreateRoundRequestedPayload{},
+		&discordroundevents.CreateRoundRequestedPayload{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			createPayload := payload.(*roundevents.CreateRoundRequestedPayload)
+			discordPayload := payload.(*discordroundevents.CreateRoundRequestedPayload)
+
+			// Convert to backend payload and set GuildID
+			backendPayload := roundevents.CreateRoundRequestedPayload{
+				GuildID:     sharedtypes.GuildID(discordPayload.GuildID),
+				Title:       discordPayload.Title,
+				Description: discordPayload.Description,
+				StartTime:   discordPayload.StartTime,
+				Location:    discordPayload.Location,
+				UserID:      discordPayload.UserID,
+				ChannelID:   discordPayload.ChannelID,
+				Timezone:    discordPayload.Timezone,
+			}
 
 			// Directly publish to the backend without additional checks
-			backendMsg, err := h.Helpers.CreateResultMessage(msg, createPayload, roundevents.RoundCreateRequest)
+			backendMsg, err := h.Helpers.CreateResultMessage(msg, backendPayload, roundevents.RoundCreateRequest)
 			if err != nil {
 				_, updateErr := h.RoundDiscord.GetCreateRoundManager().UpdateInteractionResponseWithRetryButton(ctx, msg.Metadata.Get("correlation_id"), "Failed to create result message: "+err.Error())
 				if updateErr != nil {
@@ -137,9 +149,11 @@ func (h *RoundHandlers) HandleRoundCreated(msg *message.Message) ([]*message.Mes
 			)
 
 			// Create the payload for the update event
-			updatePayload := struct { // Simple payload, ID goes in metadata
+			updatePayload := struct {
+				GuildID sharedtypes.GuildID `json:"guild_id"`
 				RoundID sharedtypes.RoundID `json:"round_id"`
 			}{
+				GuildID: createdPayload.GuildID,
 				RoundID: roundID,
 			}
 

@@ -40,6 +40,7 @@ func (h *LeaderboardHandlers) HandleTagAssignRequest(msg *message.Message) ([]*m
 
 			// Create batch assignment payload with single assignment
 			batchPayload := sharedevents.BatchTagAssignmentRequestedPayload{
+				ScopedGuildID:    sharedevents.ScopedGuildID{GuildID: discordPayload.GuildID},
 				RequestingUserID: discordPayload.TargetUserID,
 				BatchID:          discordPayload.MessageID, // Use messageID as batchID
 				Assignments: []sharedevents.TagAssignmentInfo{

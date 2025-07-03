@@ -39,6 +39,7 @@ func (h *LeaderboardHandlers) HandleTagSwapRequest(msg *message.Message) ([]*mes
 			}
 
 			backendPayload := leaderboardevents.TagSwapRequestedPayload{
+				GuildID:     sharedtypes.GuildID(discordPayload.GuildID),
 				RequestorID: requestorID,
 				TargetID:    user2ID,
 			}

@@ -25,7 +25,8 @@ func (h *LeaderboardHandlers) HandleGetTagByDiscordID(msg *message.Message) ([]*
 
 			// Correct backend payload
 			backendPayload := leaderboardevents.SoloTagNumberRequestPayload{
-				UserID: sharedtypes.DiscordID(userID),
+				GuildID: sharedtypes.GuildID(discordPayload.GuildID),
+				UserID:  sharedtypes.DiscordID(userID),
 			}
 
 			// Correct event topic for backend to trigger

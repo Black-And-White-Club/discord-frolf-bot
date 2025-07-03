@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
-	"reflect"
 	"testing"
 
 	discordleaderboardevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/leaderboard"
@@ -17,6 +16,44 @@ import (
 	"go.opentelemetry.io/otel/trace/noop"
 	"go.uber.org/mock/gomock"
 )
+
+// compareMessages compares two slices of messages by comparing their content instead of pointers
+func compareMessages(got, want []*message.Message) bool {
+	if len(got) != len(want) {
+		return false
+	}
+
+	for i := range got {
+		if got[i] == nil && want[i] == nil {
+			continue
+		}
+		if got[i] == nil || want[i] == nil {
+			return false
+		}
+
+		// Compare UUID, payload, and metadata
+		if got[i].UUID != want[i].UUID {
+			return false
+		}
+
+		if string(got[i].Payload) != string(want[i].Payload) {
+			return false
+		}
+
+		// Compare metadata
+		if len(got[i].Metadata) != len(want[i].Metadata) {
+			return false
+		}
+
+		for key, value := range got[i].Metadata {
+			if want[i].Metadata[key] != value {
+				return false
+			}
+		}
+	}
+
+	return true
+}
 
 func TestLeaderboardHandlers_HandleTagSwapRequest(t *testing.T) {
 	tests := []struct {
@@ -37,7 +74,7 @@ func TestLeaderboardHandlers_HandleTagSwapRequest(t *testing.T) {
 			},
 			want: []*message.Message{
 				{
-					Payload: []byte(`{"requestor_id":"requestor","target_id":"user2"}`),
+					Payload: []byte(`{"GuildID":"","requestor_id":"requestor","target_id":"user2"}`),
 					Metadata: message.Metadata{
 						"user_id":    "requestor",
 						"channel_id": "channel",
@@ -72,7 +109,14 @@ func TestLeaderboardHandlers_HandleTagSwapRequest(t *testing.T) {
 					TargetID:    sharedtypes.DiscordID("user2"),
 				}
 
-				payloadBytes, _ := json.Marshal(backendPayload)
+				// The real CreateResultMessage helper adds GuildID to the payload
+				expectedPayloadWithGuildID := leaderboardevents.TagSwapRequestedPayload{
+					GuildID:     sharedtypes.GuildID(""), // Empty string as no guild_id in metadata
+					RequestorID: sharedtypes.DiscordID("requestor"),
+					TargetID:    sharedtypes.DiscordID("user2"),
+				}
+
+				payloadBytes, _ := json.Marshal(expectedPayloadWithGuildID)
 
 				mockHelper.EXPECT().
 					CreateResultMessage(
@@ -134,8 +178,30 @@ func TestLeaderboardHandlers_HandleTagSwapRequest(t *testing.T) {
 				t.Errorf("HandleTagSwapRequest() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("HandleTagSwapRequest() = %v, want %v", got, tt.want)
+
+			// Compare message content instead of pointers
+			if !compareMessages(got, tt.want) {
+				// Create better error message with actual content
+				gotStr := make([]string, len(got))
+				wantStr := make([]string, len(tt.want))
+
+				for i, msg := range got {
+					if msg != nil {
+						gotStr[i] = string(msg.Payload)
+					} else {
+						gotStr[i] = "<nil>"
+					}
+				}
+
+				for i, msg := range tt.want {
+					if msg != nil {
+						wantStr[i] = string(msg.Payload)
+					} else {
+						wantStr[i] = "<nil>"
+					}
+				}
+
+				t.Errorf("HandleTagSwapRequest() messages don't match.\nGot payloads: %v\nWant payloads: %v", gotStr, wantStr)
 			}
 		})
 	}
@@ -240,8 +306,30 @@ func TestLeaderboardHandlers_HandleTagSwappedResponse(t *testing.T) {
 				t.Errorf("HandleTagSwappedResponse() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("HandleTagSwappedResponse() = %v, want %v", got, tt.want)
+
+			// Compare message content instead of pointers
+			if !compareMessages(got, tt.want) {
+				// Create better error message with actual content
+				gotStr := make([]string, len(got))
+				wantStr := make([]string, len(tt.want))
+
+				for i, msg := range got {
+					if msg != nil {
+						gotStr[i] = string(msg.Payload)
+					} else {
+						gotStr[i] = "<nil>"
+					}
+				}
+
+				for i, msg := range tt.want {
+					if msg != nil {
+						wantStr[i] = string(msg.Payload)
+					} else {
+						wantStr[i] = "<nil>"
+					}
+				}
+
+				t.Errorf("HandleTagSwappedResponse() messages don't match.\nGot payloads: %v\nWant payloads: %v", gotStr, wantStr)
 			}
 		})
 	}
@@ -348,8 +436,30 @@ func TestLeaderboardHandlers_HandleTagSwapFailedResponse(t *testing.T) {
 				t.Errorf("HandleTagSwapFailedResponse() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("HandleTagSwapFailedResponse() = %v, want %v", got, tt.want)
+
+			// Compare message content instead of pointers
+			if !compareMessages(got, tt.want) {
+				// Create better error message with actual content
+				gotStr := make([]string, len(got))
+				wantStr := make([]string, len(tt.want))
+
+				for i, msg := range got {
+					if msg != nil {
+						gotStr[i] = string(msg.Payload)
+					} else {
+						gotStr[i] = "<nil>"
+					}
+				}
+
+				for i, msg := range tt.want {
+					if msg != nil {
+						wantStr[i] = string(msg.Payload)
+					} else {
+						wantStr[i] = "<nil>"
+					}
+				}
+
+				t.Errorf("HandleTagSwapFailedResponse() messages don't match.\nGot payloads: %v\nWant payloads: %v", gotStr, wantStr)
 			}
 		})
 	}

@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
+	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
-	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	helpersmocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
@@ -55,10 +55,13 @@ func Test_deleteRoundManager_HandleDeleteRoundButton(t *testing.T) {
 	}
 
 	// Helper function to create an expected round delete request payload
-	createExpectedPayload := func(roundID sharedtypes.RoundID) roundevents.RoundDeleteRequestPayload {
-		return roundevents.RoundDeleteRequestPayload{
-			RoundID:              roundID,
-			RequestingUserUserID: sharedtypes.DiscordID("user-456"),
+	createExpectedPayload := func(roundID sharedtypes.RoundID) discordroundevents.DiscordRoundDeleteRequestPayload {
+		return discordroundevents.DiscordRoundDeleteRequestPayload{
+			RoundID:   roundID,
+			UserID:    sharedtypes.DiscordID("user-456"),
+			ChannelID: "",
+			MessageID: "message-123",
+			GuildID:   "",
 		}
 	}
 
@@ -86,12 +89,12 @@ func Test_deleteRoundManager_HandleDeleteRoundButton(t *testing.T) {
 				expectedPayload := createExpectedPayload(sharedtypes.RoundID(roundUUID))
 
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Eq(expectedPayload), gomock.Eq(roundevents.RoundDeleteRequest)).
+					CreateResultMessage(gomock.Any(), gomock.Eq(expectedPayload), gomock.Eq(discordroundevents.RoundDeleteRequestTopic)).
 					Return(&message.Message{UUID: "msg-456"}, nil).
 					Times(1)
 
 				mockPublisher.EXPECT().
-					Publish(gomock.Eq(roundevents.RoundDeleteRequest), gomock.Any()).
+					Publish(gomock.Eq(discordroundevents.RoundDeleteRequestTopic), gomock.Any()).
 					Return(nil).
 					Times(1)
 
@@ -171,7 +174,7 @@ func Test_deleteRoundManager_HandleDeleteRoundButton(t *testing.T) {
 					Times(1)
 
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(roundevents.RoundDeleteRequest)).
+					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(discordroundevents.RoundDeleteRequestTopic)).
 					Return(nil, errors.New("failed to create result message")).
 					Times(1)
 
@@ -199,12 +202,12 @@ func Test_deleteRoundManager_HandleDeleteRoundButton(t *testing.T) {
 					Times(1)
 
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(roundevents.RoundDeleteRequest)).
+					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(discordroundevents.RoundDeleteRequestTopic)).
 					Return(&message.Message{UUID: "msg-456"}, nil).
 					Times(1)
 
 				mockPublisher.EXPECT().
-					Publish(gomock.Eq(roundevents.RoundDeleteRequest), gomock.Any()).
+					Publish(gomock.Eq(discordroundevents.RoundDeleteRequestTopic), gomock.Any()).
 					Return(errors.New("failed to publish message")).
 					Times(1)
 
@@ -232,12 +235,12 @@ func Test_deleteRoundManager_HandleDeleteRoundButton(t *testing.T) {
 					Times(1)
 
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(roundevents.RoundDeleteRequest)).
+					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(discordroundevents.RoundDeleteRequestTopic)).
 					Return(&message.Message{UUID: "msg-456"}, nil).
 					Times(1)
 
 				mockPublisher.EXPECT().
-					Publish(gomock.Eq(roundevents.RoundDeleteRequest), gomock.Any()).
+					Publish(gomock.Eq(discordroundevents.RoundDeleteRequestTopic), gomock.Any()).
 					Return(nil).
 					Times(1)
 
