@@ -237,6 +237,20 @@ func (crm *createRoundManager) HandleCreateRoundModalSubmit(ctx context.Context,
 			return CreateRoundOperationResult{Error: acknowledgeErr}, acknowledgeErr
 		}
 
+		// Lookup the event channel ID from guildconfig
+		var eventChannelID string
+		if crm.guildConfigResolver != nil {
+			guildConfig, err := crm.guildConfigResolver.GetGuildConfigWithContext(ctx, i.GuildID)
+			if err == nil && guildConfig != nil && guildConfig.EventChannelID != "" {
+				eventChannelID = guildConfig.EventChannelID
+			} else {
+				crm.logger.WarnContext(ctx, "Failed to resolve event channel ID, falling back to interaction channel", attr.Error(err))
+				eventChannelID = i.ChannelID
+			}
+		} else {
+			eventChannelID = i.ChannelID
+		}
+
 		// Publish event for backend validation
 		payload := discordroundevents.CreateRoundRequestedPayload{
 			UserID:      sharedtypes.DiscordID(userID),
@@ -245,7 +259,7 @@ func (crm *createRoundManager) HandleCreateRoundModalSubmit(ctx context.Context,
 			StartTime:   startTimeStr,
 			Location:    location,
 			Timezone:    roundtypes.Timezone(timezone),
-			ChannelID:   i.ChannelID,
+			ChannelID:   eventChannelID,
 			GuildID:     sharedtypes.GuildID(i.GuildID),
 		}
 

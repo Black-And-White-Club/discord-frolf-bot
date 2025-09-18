@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/guild/mocks"
+	guildconfigmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	guildevents "github.com/Black-And-White-Club/frolf-bot-shared/events/guild"
 	util_mocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
@@ -26,24 +27,16 @@ func TestGuildHandlers_HandleGuildConfigCreated(t *testing.T) {
 		msg     *message.Message
 		want    []*message.Message
 		wantErr bool
-		setup   func(*gomock.Controller, *mocks.MockGuildDiscordInterface, *util_mocks.MockHelpers)
+		setup   func(*gomock.Controller, *mocks.MockGuildDiscordInterface, *guildconfigmocks.MockGuildConfigResolver, *util_mocks.MockHelpers)
 	}{
 		{
 			name: "successful guild config created",
 			msg: func() *message.Message {
-				return message.NewMessage("1", []byte(`{
-					"guild_id": "123456789",
-					"config_id": "config_123",
-					"created_at": "2024-01-01T12:00:00Z"
-				}`))
+				return message.NewMessage("1", []byte(`{"guild_id":"123456789","config_id":"config_123","created_at":"2024-01-01T12:00:00Z"}`))
 			}(),
-			want:    nil, // Handler returns nil on success
-			wantErr: false,
-			setup: func(ctrl *gomock.Controller, mockGuildDiscord *mocks.MockGuildDiscordInterface, _ *util_mocks.MockHelpers) {
-				mockGuildDiscord.EXPECT().
-					RegisterAllCommands("123456789").
-					Return(nil).
-					Times(1)
+			want: nil, wantErr: false,
+			setup: func(ctrl *gomock.Controller, mockGuildDiscord *mocks.MockGuildDiscordInterface, _ *guildconfigmocks.MockGuildConfigResolver, _ *util_mocks.MockHelpers) {
+				mockGuildDiscord.EXPECT().RegisterAllCommands("123456789").Return(nil).Times(1)
 			},
 		},
 		{
@@ -57,11 +50,8 @@ func TestGuildHandlers_HandleGuildConfigCreated(t *testing.T) {
 			}(),
 			want:    nil,
 			wantErr: true,
-			setup: func(ctrl *gomock.Controller, mockGuildDiscord *mocks.MockGuildDiscordInterface, _ *util_mocks.MockHelpers) {
-				mockGuildDiscord.EXPECT().
-					RegisterAllCommands("123456789").
-					Return(errors.New("failed to register commands")).
-					Times(1)
+			setup: func(ctrl *gomock.Controller, mockGuildDiscord *mocks.MockGuildDiscordInterface, _ *guildconfigmocks.MockGuildConfigResolver, _ *util_mocks.MockHelpers) {
+				mockGuildDiscord.EXPECT().RegisterAllCommands("123456789").Return(errors.New("failed to register commands")).Times(1)
 			},
 		},
 	}
@@ -72,6 +62,7 @@ func TestGuildHandlers_HandleGuildConfigCreated(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockGuildDiscord := mocks.NewMockGuildDiscordInterface(ctrl)
+			mockGuildConfigResolver := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
 			mockHelpers := util_mocks.NewMockHelpers(ctrl)
 
 			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -80,16 +71,17 @@ func TestGuildHandlers_HandleGuildConfigCreated(t *testing.T) {
 			metrics := &discordmetrics.NoOpMetrics{}
 
 			if tt.setup != nil {
-				tt.setup(ctrl, mockGuildDiscord, mockHelpers)
+				tt.setup(ctrl, mockGuildDiscord, mockGuildConfigResolver, mockHelpers)
 			}
 
 			h := &GuildHandlers{
-				Logger:       logger,
-				Config:       cfg,
-				Helpers:      mockHelpers,
-				GuildDiscord: mockGuildDiscord,
-				Tracer:       tracer,
-				Metrics:      metrics,
+				Logger:              logger,
+				Config:              cfg,
+				Helpers:             mockHelpers,
+				GuildDiscord:        mockGuildDiscord,
+				GuildConfigResolver: mockGuildConfigResolver,
+				Tracer:              tracer,
+				Metrics:             metrics,
 				handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
 					return func(msg *message.Message) ([]*message.Message, error) {
 						payload := &guildevents.GuildConfigCreatedPayload{

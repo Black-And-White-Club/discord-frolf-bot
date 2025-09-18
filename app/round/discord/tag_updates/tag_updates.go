@@ -8,6 +8,7 @@ import (
 	"time"
 
 	discordgo "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
@@ -34,14 +35,15 @@ type TagUpdateOperationResult struct {
 }
 
 type tagUpdateManager struct {
-	session          discordgo.Session
-	publisher        eventbus.EventBus
-	logger           *slog.Logger
-	helper           utils.Helpers
-	config           *config.Config
-	tracer           trace.Tracer
-	metrics          discordmetrics.DiscordMetrics
-	operationWrapper func(ctx context.Context, opName string, fn func(ctx context.Context) (TagUpdateOperationResult, error)) (TagUpdateOperationResult, error)
+	session             discordgo.Session
+	publisher           eventbus.EventBus
+	logger              *slog.Logger
+	helper              utils.Helpers
+	config              *config.Config
+	tracer              trace.Tracer
+	metrics             discordmetrics.DiscordMetrics
+	operationWrapper    func(ctx context.Context, opName string, fn func(ctx context.Context) (TagUpdateOperationResult, error)) (TagUpdateOperationResult, error)
+	guildConfigResolver guildconfig.GuildConfigResolver
 }
 
 // NewTagUpdateManager creates a new TagUpdateManager.
@@ -53,6 +55,7 @@ func NewTagUpdateManager(
 	config *config.Config,
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
+	guildConfigResolver guildconfig.GuildConfigResolver,
 ) TagUpdateManager {
 	if logger != nil {
 		logger.InfoContext(context.Background(), "Creating TagUpdateManager")
@@ -68,6 +71,7 @@ func NewTagUpdateManager(
 		operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (TagUpdateOperationResult, error)) (TagUpdateOperationResult, error) {
 			return wrapTagUpdateOperation(ctx, opName, fn, logger, tracer, metrics)
 		},
+		guildConfigResolver: guildConfigResolver,
 	}
 }
 

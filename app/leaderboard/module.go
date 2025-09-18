@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/interactions"
 	leaderboarddiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord"
 	claimtag "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/claim_tag" // Add this import
@@ -22,7 +23,6 @@ import (
 	"go.opentelemetry.io/otel"
 )
 
-// InitializeLeaderboardModule initializes the leaderboard domain module.
 func InitializeLeaderboardModule(
 	ctx context.Context,
 	session discord.Session,
@@ -32,13 +32,12 @@ func InitializeLeaderboardModule(
 	logger *slog.Logger,
 	cfg *config.Config,
 	helper utils.Helpers,
+	guildConfigResolver guildconfig.GuildConfigResolver,
 	interactionStore storage.ISInterface,
 	discordMetricsService discordmetrics.DiscordMetrics,
 ) (*leaderboardrouter.LeaderboardRouter, error) {
 	// Initialize Tracer
 	tracer := otel.Tracer("leaderboard-module")
-
-	// Initialize Discord services
 	leaderboardDiscord, err := leaderboarddiscord.NewLeaderboardDiscord(
 		ctx,
 		session,
@@ -46,6 +45,7 @@ func InitializeLeaderboardModule(
 		logger,
 		helper,
 		cfg,
+		guildConfigResolver,
 		interactionStore,
 		tracer,
 		discordMetricsService,
@@ -65,6 +65,7 @@ func InitializeLeaderboardModule(
 		cfg,
 		helper,
 		leaderboardDiscord,
+		guildConfigResolver,
 		tracer,
 		discordMetricsService,
 	)

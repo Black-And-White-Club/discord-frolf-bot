@@ -27,9 +27,13 @@ type GuildSetupEvent struct {
 	LeaderboardChannelName string            `json:"leaderboard_channel_name"`
 	SignupChannelID        string            `json:"signup_channel_id"`
 	SignupChannelName      string            `json:"signup_channel_name"`
-	RoleMappings           map[string]string `json:"role_mappings"` // role_name -> role_id
-	RegisteredRoleID       string            `json:"registered_role_id"`
+	RoleMappings           map[string]string `json:"role_mappings"`      // role_name -> role_id
+	RegisteredRoleID       string            `json:"registered_role_id"` // Legacy field, mapped to UserRoleID
+	UserRoleID             string            `json:"user_role_id"`
+	EditorRoleID           string            `json:"editor_role_id"`
 	AdminRoleID            string            `json:"admin_role_id"`
+	SignupEmoji            string            `json:"signup_emoji"`
+	SignupMessageID        string            `json:"signup_message_id"`
 	SetupCompletedAt       time.Time         `json:"setup_completed_at"`
 }
 

@@ -16,6 +16,7 @@ const (
 	LeaderboardTagSwapRequestTopic          = "discord.leaderboard.tag.swap.request"
 	LeaderboardTagSwappedTopic              = "discord.leaderboard.tag.swapped"
 	LeaderboardTagSwapFailedTopic           = "discord.leaderboard.tag.swap.failed"
+	LeaderboardBatchTagAssigned             = "discord.leaderboard.batch.tag.assigned"
 )
 
 type LeaderboardRetrieveRequestPayload struct {
@@ -82,6 +83,17 @@ type LeaderboardTagSwappedPayload struct {
 	ChannelID string                `json:"channel_id"`
 	MessageID string                `json:"message_id"`
 	GuildID   string                `json:"guild_id"`
+}
+type BatchTagAssignedPayload struct {
+	RequestingUserID sharedtypes.DiscordID `json:"requesting_user_id"`
+	BatchID          string                `json:"batch_id"`
+	AssignmentCount  int                   `json:"assignment_count"`
+	Assignments      []TagAssignmentInfo   `json:"assignments"`
+	GuildID          string                `json:"guild_id"`
+}
+type TagAssignmentInfo struct {
+	UserID    sharedtypes.DiscordID `json:"user_id"`
+	TagNumber sharedtypes.TagNumber `json:"tag_number"`
 }
 type LeaderboardTagSwapFailedPayload struct {
 	User1ID   sharedtypes.DiscordID `json:"user1_id"`

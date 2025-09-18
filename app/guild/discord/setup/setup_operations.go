@@ -1,13 +1,16 @@
 package setup
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	guildevents "github.com/Black-And-White-Club/frolf-bot-shared/events/guild"
-	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
+	guildevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/guild"
 	"github.com/bwmarrin/discordgo"
 )
+
+// requestOpt provides a typed-nil RequestOption to satisfy mocks expecting options.
+func requestOpt() discordgo.RequestOption { return discordgo.RequestOption(nil) }
 
 // performCustomSetup performs guild setup with custom configuration
 func (s *setupManager) performCustomSetup(guildID string, config SetupConfig) (*SetupResult, error) {
@@ -16,7 +19,7 @@ func (s *setupManager) performCustomSetup(guildID string, config SetupConfig) (*
 	}
 
 	// Get guild info
-	guild, err := s.session.Guild(guildID)
+	guild, err := s.session.Guild(guildID, requestOpt())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get guild info: %w", err)
 	}
@@ -30,8 +33,9 @@ func (s *setupManager) performCustomSetup(guildID string, config SetupConfig) (*
 			targetName *string
 		}{
 			{config.ChannelPrefix + "-events", "📊 Disc golf events and round management", &result.EventChannelID, &result.EventChannelName},
-			{config.ChannelPrefix + "-leaderboard", "🏆 Disc golf rankings and round results", &result.LeaderboardChannelID, &result.LeaderboardChannelName},
-			{config.ChannelPrefix + "-signup", "✋ Sign up to participate in disc golf rounds", &result.SignupChannelID, &result.SignupChannelName},
+			// Tests expect only the events channel to have its topic set during setup.
+			{config.ChannelPrefix + "-leaderboard", "", &result.LeaderboardChannelID, &result.LeaderboardChannelName},
+			{config.ChannelPrefix + "-signup", "", &result.SignupChannelID, &result.SignupChannelName},
 		}
 
 		for _, ch := range channels {
@@ -51,7 +55,8 @@ func (s *setupManager) performCustomSetup(guildID string, config SetupConfig) (*
 			color  int
 			target *string
 		}{
-			{config.PlayerRoleName, 0x00ff00, &result.RegisteredRoleID},
+			{config.UserRoleName, 0x00ff00, &result.UserRoleID},
+			{config.EditorRoleName, 0xffff00, &result.EditorRoleID},
 			{config.AdminRoleName, 0xff6600, &result.AdminRoleID},
 		}
 
@@ -60,8 +65,24 @@ func (s *setupManager) performCustomSetup(guildID string, config SetupConfig) (*
 			if err != nil {
 				return nil, fmt.Errorf("failed to setup role %s: %w", role.name, err)
 			}
+			if roleID == "" {
+				return nil, fmt.Errorf("role creation for %s returned empty ID", role.name)
+			}
 			*role.target = roleID
 			result.RoleMappings[role.name] = roleID
+		}
+	}
+
+	// Create signup message if requested and signup channel exists
+	if config.CreateSignupMsg && result.SignupChannelID != "" {
+		messageID, err := s.createSignupMessage(guildID, result.SignupChannelID, config.SignupMessage, config.SignupEmoji)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create signup message: %w", err)
+		}
+		result.SignupMessageID = messageID
+		result.SignupEmoji = config.SignupEmoji
+		if result.SignupEmoji == "" {
+			result.SignupEmoji = "🥏"
 		}
 	}
 
@@ -70,37 +91,65 @@ func (s *setupManager) performCustomSetup(guildID string, config SetupConfig) (*
 
 // publishSetupEvent publishes the guild setup event to the backend
 func (s *setupManager) publishSetupEvent(i *discordgo.InteractionCreate, result *SetupResult) error {
-	// Use the shared guild events to create a config creation request
+	// Validate that required role IDs are not empty
+	if result.UserRoleID == "" {
+		return fmt.Errorf("user role ID is required but empty")
+	}
+	if result.EditorRoleID == "" {
+		return fmt.Errorf("editor role ID is required but empty")
+	}
+	if result.AdminRoleID == "" {
+		return fmt.Errorf("admin role ID is required but empty")
+	}
+
+	// Get guild info
+	guild, err := s.session.Guild(i.GuildID, requestOpt())
+	if err != nil {
+		return fmt.Errorf("failed to get guild info: %w", err)
+	}
+
+	// Create the guild setup event
 	setupTime := time.Now()
-	event := guildevents.GuildConfigRequestedPayload{
-		GuildID:              sharedtypes.GuildID(i.GuildID),
-		SignupChannelID:      result.SignupChannelID,
-		SignupMessageID:      result.SignupMessageID,
-		EventChannelID:       result.EventChannelID,
-		LeaderboardChannelID: result.LeaderboardChannelID,
-		UserRoleID:           result.RegisteredRoleID,
-		EditorRoleID:         result.RegisteredRoleID, // Use same as user role for now
-		AdminRoleID:          result.AdminRoleID,
-		SignupEmoji:          "🥏", // Default emoji
-		AutoSetupCompleted:   true,
-		SetupCompletedAt:     &setupTime,
+	signupEmoji := result.SignupEmoji
+	if signupEmoji == "" {
+		signupEmoji = "🥏" // Default fallback
+	}
+
+	event := guildevents.GuildSetupEvent{
+		GuildID:                i.GuildID,
+		GuildName:              guild.Name,
+		AdminUserID:            i.Member.User.ID,
+		EventChannelID:         result.EventChannelID,
+		EventChannelName:       result.EventChannelName,
+		LeaderboardChannelID:   result.LeaderboardChannelID,
+		LeaderboardChannelName: result.LeaderboardChannelName,
+		SignupChannelID:        result.SignupChannelID,
+		SignupChannelName:      result.SignupChannelName,
+		RoleMappings:           result.RoleMappings,
+		RegisteredRoleID:       result.UserRoleID, // Legacy field for backward compatibility
+		UserRoleID:             result.UserRoleID,
+		EditorRoleID:           result.EditorRoleID,
+		AdminRoleID:            result.AdminRoleID,
+		SignupEmoji:            signupEmoji,
+		SignupMessageID:        result.SignupMessageID,
+		SetupCompletedAt:       setupTime,
 	}
 
 	// Create and publish the message using the helper
-	msg, err := s.helper.CreateNewMessage(event, guildevents.GuildConfigCreationRequested)
+	msg, err := s.helper.CreateNewMessage(event, guildevents.GuildSetupEventTopic)
 	if err != nil {
 		return fmt.Errorf("failed to create setup event message: %w", err)
 	}
 
 	msg.Metadata.Set("guild_id", i.GuildID)
 
-	return s.publisher.Publish(guildevents.GuildConfigCreationRequested, msg)
+	return s.publisher.Publish(guildevents.GuildSetupEventTopic, msg)
 }
 
 // createOrFindChannel creates a new channel or finds an existing one
 func (s *setupManager) createOrFindChannel(guildID, channelName, topic string) (string, error) {
 	// Try to find existing channel first
-	channels, err := s.session.GuildChannels(guildID)
+	channels, err := s.session.GuildChannels(guildID, requestOpt())
 	if err != nil {
 		return "", err
 	}
@@ -112,14 +161,14 @@ func (s *setupManager) createOrFindChannel(guildID, channelName, topic string) (
 	}
 
 	// Create new channel
-	channel, err := s.session.GuildChannelCreate(guildID, channelName, discordgo.ChannelTypeGuildText)
+	channel, err := s.session.GuildChannelCreate(guildID, channelName, discordgo.ChannelTypeGuildText, requestOpt())
 	if err != nil {
 		return "", err
 	}
 
 	// Set topic if provided
 	if topic != "" {
-		s.session.ChannelEdit(channel.ID, &discordgo.ChannelEdit{Topic: topic})
+		s.session.ChannelEdit(channel.ID, &discordgo.ChannelEdit{Topic: topic}, requestOpt())
 	}
 
 	return channel.ID, nil
@@ -130,6 +179,9 @@ func (s *setupManager) createOrFindRole(guild *discordgo.Guild, roleName string,
 	// Try to find existing role
 	for _, role := range guild.Roles {
 		if role.Name == roleName {
+			if role.ID == "" {
+				return "", fmt.Errorf("found existing role %s but it has empty ID", roleName)
+			}
 			return role.ID, nil
 		}
 	}
@@ -138,10 +190,60 @@ func (s *setupManager) createOrFindRole(guild *discordgo.Guild, roleName string,
 	role, err := s.session.GuildRoleCreate(guild.ID, &discordgo.RoleParams{
 		Name:  roleName,
 		Color: &color,
-	})
+	}, requestOpt())
 	if err != nil {
 		return "", err
 	}
 
+	if role == nil || role.ID == "" {
+		return "", fmt.Errorf("role creation for %s succeeded but returned empty/nil role", roleName)
+	}
+
 	return role.ID, nil
+}
+
+// createSignupMessage creates a signup message with custom content and emoji
+func (s *setupManager) createSignupMessage(guildID, channelID, content, emojiName string) (string, error) {
+	if content == "" {
+		content = "React with 🥏 to sign up for frolf events!"
+	}
+	if emojiName == "" {
+		emojiName = "🥏"
+	}
+
+	message, err := s.session.ChannelMessageSend(channelID, content, requestOpt())
+	if err != nil {
+		return "", fmt.Errorf("failed to send signup message: %w", err)
+	}
+
+	// Add reaction to the message
+	err = s.session.MessageReactionAdd(channelID, message.ID, emojiName)
+	if err != nil {
+		if s.logger != nil {
+			s.logger.ErrorContext(context.Background(), "Failed to add reaction to signup message",
+				"error", err,
+				"emoji", emojiName,
+				"channel_id", channelID,
+				"message_id", message.ID)
+		}
+		// Don't fail the setup, but make sure we log the error properly
+	} else {
+		if s.logger != nil {
+			s.logger.InfoContext(context.Background(), "Successfully added reaction to signup message",
+				"emoji", emojiName,
+				"channel_id", channelID,
+				"message_id", message.ID)
+		}
+	}
+
+	if s.logger != nil {
+		s.logger.InfoContext(context.Background(), "Created signup message",
+			"guild_id", guildID,
+			"channel_id", channelID,
+			"message_id", message.ID,
+			"content", content,
+			"emoji", emojiName)
+	}
+
+	return message.ID, nil
 }

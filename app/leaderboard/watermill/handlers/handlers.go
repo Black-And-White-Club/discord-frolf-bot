@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	leaderboarddiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
@@ -41,13 +42,14 @@ type Handlers interface {
 
 // LeaderboardHandlers handles leaderboard-related events.
 type LeaderboardHandlers struct {
-	Logger             *slog.Logger
-	Config             *config.Config
-	Helpers            utils.Helpers
-	LeaderboardDiscord leaderboarddiscord.LeaderboardDiscordInterface
-	Tracer             trace.Tracer
-	Metrics            discordmetrics.DiscordMetrics
-	handlerWrapper     func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc
+	Logger              *slog.Logger
+	Config              *config.Config
+	Helpers             utils.Helpers
+	LeaderboardDiscord  leaderboarddiscord.LeaderboardDiscordInterface
+	GuildConfigResolver guildconfig.GuildConfigResolver
+	Tracer              trace.Tracer
+	Metrics             discordmetrics.DiscordMetrics
+	handlerWrapper      func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc
 }
 
 // NewLeaderboardHandlers creates a new LeaderboardHandlers instance.
@@ -56,16 +58,18 @@ func NewLeaderboardHandlers(
 	config *config.Config,
 	helpers utils.Helpers,
 	leaderboardDiscord leaderboarddiscord.LeaderboardDiscordInterface,
+	guildConfigResolver guildconfig.GuildConfigResolver,
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
 ) Handlers {
 	return &LeaderboardHandlers{
-		Logger:             logger,
-		Config:             config,
-		Helpers:            helpers,
-		LeaderboardDiscord: leaderboardDiscord,
-		Tracer:             tracer,
-		Metrics:            metrics,
+		Logger:              logger,
+		Config:              config,
+		Helpers:             helpers,
+		LeaderboardDiscord:  leaderboardDiscord,
+		GuildConfigResolver: guildConfigResolver,
+		Tracer:              tracer,
+		Metrics:             metrics,
 		handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
 			return wrapHandler(handlerName, unmarshalTo, handlerFunc, logger, metrics, tracer, helpers)
 		},

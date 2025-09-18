@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -20,8 +21,8 @@ import (
 )
 
 func main() {
-	// Create initial context
-	ctx, cancel := context.WithCancel(context.Background())
+	// Create context that will be cancelled on interrupt signals
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
 
 	// Check for setup command line argument
@@ -86,10 +87,16 @@ func runStandaloneMode(ctx context.Context) {
 		fmt.Printf("Failed to initialize observability: %v\n", err)
 		os.Exit(1)
 	}
-	logger := obs.Provider.Logger
 
+	// Set up slog logger to output all logs to terminal in JSON format
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+	obs.Provider.Logger = logger // Ensure all modules/services use the overridden logger
+
+	fmt.Println("DEBUG: Observability initialized successfully")
 	logger.Info("Observability initialized successfully")
-	logger.Info("TEST LOG: Discord bot starting up")
+	logger.Info("Discord bot starting up")
 
 	// --- Discord Components Initialization ---
 
@@ -166,64 +173,47 @@ func runStandaloneMode(ctx context.Context) {
 	}()
 
 	// --- Graceful Shutdown Setup ---
-	interrupt := make(chan os.Signal, 1)
-	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
-	cleanShutdown := make(chan struct{})
-
 	// Start bot components
 	go func() {
 		logger.Info("Starting Discord bot components...")
 		if err := discordBot.Run(ctx); err != nil && err != context.Canceled {
 			logger.Error("Bot run failed", attr.Error(err))
-			// Note: we can't call cancel() here since it's not available in this scope
 		}
 	}()
 
 	logger.Info("Discord bot is running. Press Ctrl+C to gracefully shut down.")
 
-	// Shutdown handler
-	go func() {
-		select {
-		case sig := <-interrupt:
-			logger.Info("Received signal", attr.String("signal", sig.String()))
-		case <-ctx.Done():
-			logger.Info("Context cancelled")
-		}
+	// Wait for context cancellation (signal)
+	<-ctx.Done()
+	logger.Info("Received shutdown signal, initiating graceful shutdown...")
 
-		logger.Info("Initiating graceful shutdown...")
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
 
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer shutdownCancel()
+	if err := discordBot.Shutdown(shutdownCtx); err != nil {
+		logger.Error("Failed to shutdown Discord bot", attr.Error(err))
+	} else {
+		logger.Info("Discord bot shutdown successfully")
+	}
 
-		if err := discordBot.Shutdown(shutdownCtx); err != nil {
-			logger.Error("Failed to shutdown Discord bot", attr.Error(err))
-		} else {
-			logger.Info("Discord bot shutdown successfully")
-		}
+	// Shutdown observability
+	if err := obs.Provider.Shutdown(shutdownCtx); err != nil {
+		logger.Error("Failed to shutdown observability", attr.Error(err))
+	} else {
+		logger.Info("Observability shutdown successfully")
+	}
 
-		// Shutdown observability
-		if err := obs.Provider.Shutdown(shutdownCtx); err != nil {
-			logger.Error("Failed to shutdown observability", attr.Error(err))
-		} else {
-			logger.Info("Observability shutdown successfully")
-		}
+	// Shutdown health server
+	if err := healthServer.Shutdown(shutdownCtx); err != nil {
+		logger.Error("Failed to shutdown health server", attr.Error(err))
+	} else {
+		logger.Info("Health server shutdown successfully")
+	}
 
-		// Shutdown health server
-		if err := healthServer.Shutdown(shutdownCtx); err != nil {
-			logger.Error("Failed to shutdown health server", attr.Error(err))
-		} else {
-			logger.Info("Health server shutdown successfully")
-		}
-
-		close(cleanShutdown)
-	}()
-
-	// Wait for shutdown to complete
-	<-cleanShutdown
 	logger.Info("Shutdown complete")
 }
 
-// runSetup handles the automated Discord server setup
+// runSetup handles the automated Discord server setup using the modern multi-tenant system
 func runSetup(ctx context.Context, guildID string) {
 	fmt.Printf("Running setup for guild: %s\n", guildID)
 
@@ -264,7 +254,7 @@ func runSetup(ctx context.Context, guildID string) {
 
 	discordSessionWrapper := discord.NewDiscordSession(discordSession, logger)
 
-	// Create minimal bot for setup
+	// Create minimal bot for setup - this will initialize the guild module and modern setup system
 	interactionStore := storage.NewInteractionStore()
 
 	setupBot, err := bot.NewDiscordBot(
@@ -282,60 +272,16 @@ func runSetup(ctx context.Context, guildID string) {
 		os.Exit(1)
 	}
 
-	// Open Discord session
-	if err := setupBot.Session.Open(); err != nil {
-		logger.Error("Failed to open Discord session", attr.Error(err))
-		os.Exit(1)
-	}
-	defer setupBot.Session.Close()
-
-	// Configure setup with better channel names and permissions
-	setupConfig := bot.ServerSetupConfig{
-		GuildID:              guildID,
-		RequiredChannels:     []string{"signup", "events", "leaderboard"},
-		RequiredRoles:        []string{"User", "Editor", "Admin"},
-		SignupEmojiName:      "🐍",
-		CreateSignupMessage:  true,
-		SignupMessageContent: "React with 🐍 to sign up for frolf events!",
-		RegisteredRoleName:   "User",
-		AdminRoleName:        "Admin",
-		ChannelPermissions: map[string]bot.ChannelPermissions{
-			"signup": {
-				RestrictPosting: false, // Handled specially - new users can see, players cannot
-				AllowedRoles:    []string{},
-			},
-			"events": {
-				RestrictPosting: true, // Only admins can post event embeds
-				AllowedRoles:    []string{"Admin"},
-			},
-			"leaderboard": {
-				RestrictPosting: true,
-				AllowedRoles:    []string{"Admin"}, // Only admins can post leaderboard updates
-			},
-		},
-	}
-
-	// Run setup
-	if err := setupBot.AutoSetupServer(ctx, setupConfig); err != nil {
-		logger.Error("Setup failed", attr.Error(err))
+	// Start the bot to initialize the modern guild module system
+	if err := setupBot.Run(ctx); err != nil {
+		logger.Error("Failed to start setup bot", attr.Error(err))
 		os.Exit(1)
 	}
 
 	fmt.Println("Setup completed successfully!")
-	fmt.Println("Configuration details:")
-	fmt.Printf("  Guild ID: %s\n", setupBot.Config.GetGuildID())
-	fmt.Printf("  Signup Channel ID: %s\n", setupBot.Config.GetSignupChannelID())
-	fmt.Printf("  Event Channel ID: %s\n", setupBot.Config.GetEventChannelID())
-	fmt.Printf("  Leaderboard Channel ID: %s\n", setupBot.Config.GetLeaderboardChannelID())
-	fmt.Printf("  Signup Message ID: %s\n", setupBot.Config.GetSignupMessageID())
-	fmt.Printf("  Registered Role ID: %s\n", setupBot.Config.GetRegisteredRoleID())
-	fmt.Printf("  Admin Role ID: %s\n", setupBot.Config.GetAdminRoleID())
-	fmt.Println("  Role Mappings:")
-	for name, id := range setupBot.Config.GetRoleMappings() {
-		fmt.Printf("    %s: %s\n", name, id)
-	}
-	fmt.Println("\nConfiguration has been sent to the backend via events.")
-	fmt.Println("The bot will automatically use this configuration when running.")
+	fmt.Println("The setup process now uses the modern multi-tenant event-driven system.")
+	fmt.Println("Use the /frolf-setup command in Discord to configure your server.")
+	fmt.Println("The bot will automatically register guild-specific commands after setup completion.")
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {

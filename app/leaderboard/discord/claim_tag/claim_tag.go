@@ -8,6 +8,7 @@ import (
 	"time"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
@@ -26,15 +27,16 @@ type ClaimTagManager interface {
 }
 
 type claimTagManager struct {
-	session          discord.Session
-	eventBus         eventbus.EventBus
-	logger           *slog.Logger
-	helper           utils.Helpers
-	config           *config.Config
-	interactionStore storage.ISInterface
-	tracer           trace.Tracer
-	metrics          discordmetrics.DiscordMetrics
-	operationWrapper func(ctx context.Context, opName string, fn func(ctx context.Context) (ClaimTagOperationResult, error)) (ClaimTagOperationResult, error)
+	session             discord.Session
+	eventBus            eventbus.EventBus
+	logger              *slog.Logger
+	helper              utils.Helpers
+	config              *config.Config
+	guildConfigResolver guildconfig.GuildConfigResolver
+	interactionStore    storage.ISInterface
+	tracer              trace.Tracer
+	metrics             discordmetrics.DiscordMetrics
+	operationWrapper    func(ctx context.Context, opName string, fn func(ctx context.Context) (ClaimTagOperationResult, error)) (ClaimTagOperationResult, error)
 }
 
 type ClaimTagOperationResult struct {
@@ -49,6 +51,7 @@ func NewClaimTagManager(
 	logger *slog.Logger,
 	helper utils.Helpers,
 	config *config.Config,
+	guildConfigResolver guildconfig.GuildConfigResolver,
 	interactionStore storage.ISInterface,
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
@@ -57,14 +60,15 @@ func NewClaimTagManager(
 		logger.InfoContext(context.Background(), "Creating ClaimTagManager")
 	}
 	return &claimTagManager{
-		session:          session,
-		eventBus:         eventBus,
-		logger:           logger,
-		helper:           helper,
-		config:           config,
-		interactionStore: interactionStore,
-		tracer:           tracer,
-		metrics:          metrics,
+		session:             session,
+		eventBus:            eventBus,
+		logger:              logger,
+		helper:              helper,
+		config:              config,
+		guildConfigResolver: guildConfigResolver,
+		interactionStore:    interactionStore,
+		tracer:              tracer,
+		metrics:             metrics,
 		operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (ClaimTagOperationResult, error)) (ClaimTagOperationResult, error) {
 			return wrapClaimTagOperation(ctx, opName, fn, logger, tracer, metrics)
 		},

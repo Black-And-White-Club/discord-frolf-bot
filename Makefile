@@ -141,16 +141,23 @@ build-coverage:
 
 # Enhanced coverage using test coverage
 coverage-all: build-coverage
-	@echo "Running all tests with coverage across entire project..."
-	-mkdir -p $(REPORTS_DIR)
-	go test -cover -coverprofile=$(REPORTS_DIR)/coverage.out ./app/...
-	@echo ""
-	@echo "=========================================="
-	@echo "OVERALL PROJECT COVERAGE SUMMARY:"
-	@echo "=========================================="
-	go tool cover -func $(REPORTS_DIR)/coverage.out
-	@echo ""
-	@echo "Total project coverage report generated: $(REPORTS_DIR)/coverage.out"
+	@echo "Generating package list excluding mocks directories..."
+	@PKGS=$$(go list ./app/... | grep -v '/mocks'); \
+	if [ -z "$$PKGS" ]; then \
+		echo "No packages found (after excluding mocks). Aborting."; \
+		exit 1; \
+	fi; \
+	echo "Running coverage for packages:"; \
+	echo "$$PKGS" | tr ' ' '\n'; \
+	mkdir -p $(REPORTS_DIR); \
+	go test -cover -coverprofile=$(REPORTS_DIR)/coverage.out $$PKGS;
+	@echo ""; \
+	echo "=========================================="; \
+	echo "OVERALL PROJECT COVERAGE SUMMARY:"; \
+	echo "=========================================="; \
+	go tool cover -func $(REPORTS_DIR)/coverage.out; \
+	echo ""; \
+	echo "Total project coverage report generated: $(REPORTS_DIR)/coverage.out"
 
 # Generate HTML coverage report for entire project
 coverage-html: coverage-all
@@ -190,7 +197,7 @@ mocks-user: mocks-user-discord mocks-user-handlers mocks-user-role-manager mocks
 mocks-round: mocks-create-round-manager mocks-round-rsvp-manager mocks-round-discord mocks-round-reminder-manager mocks-start-round-manager mocks-score-round-manager mocks-finalize-round-manager mocks-delete-round-manager mocks-update-round-manager mocks-tag-update-manager
 mocks-leaderboard: mocks-leaderboard-discord mocks-leaderboard-update-manager mocks-leaderboard-tag-claim
 mocks-score: mocks-score-handlers
-mocks-guild: mocks-guild-discord mocks-guild-handlers mocks-guild-setup-manager
+mocks-guild: mocks-guild-discord mocks-guild-handlers mocks-guild-setup-manager mocks-guildconfig
 
 mocks-user-discord:
 	$(MOCKGEN) -source=$(USER_DIR)/discord/discord.go -destination=$(USER_DIR)/mocks/mock_user_discord.go -package=mocks
@@ -235,13 +242,19 @@ mocks-leaderboard-tag-claim:
 mocks-score-handlers:
 	$(MOCKGEN) -source=$(SCORE_DIR)/watermill/handlers/handlers.go -destination=$(SCORE_DIR)/mocks/mock_handlers.go -package=mocks
 
-# Mocks for Guild Domain
+# Mocks for GuildConfig Resolver (caching interface)
+mocks-guildconfig:
+	$(MOCKGEN) -source=./app/guildconfig/interface.go -destination=./app/guildconfig/mocks/mock_guildconfig_resolver.go -package=mocks
+
+# Mocks for Guild Domain (aggregate)
+mocks-guild: mocks-guild-discord mocks-guild-handlers mocks-guild-setup-manager mocks-guildconfig
 mocks-guild-discord:
 	$(MOCKGEN) -source=$(GUILD_DIR)/discord/discord.go -destination=$(GUILD_DIR)/mocks/mock_guild_discord.go -package=mocks
 mocks-guild-handlers:
 	$(MOCKGEN) -source=$(GUILD_DIR)/watermill/handlers/handlers.go -destination=$(GUILD_DIR)/mocks/mock_guild_handlers.go -package=mocks
 mocks-guild-setup-manager:
 	$(MOCKGEN) -source=$(GUILD_DIR)/discord/setup/setup_config_manager.go -destination=$(GUILD_DIR)/mocks/mock_setup_manager.go -package=mocks
+
 
 mocks-all: mocks-user mocks-round mocks-leaderboard mocks-score mocks-guild generate-mocks
 

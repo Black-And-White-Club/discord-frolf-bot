@@ -3,9 +3,13 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	guildevents "github.com/Black-And-White-Club/frolf-bot-shared/events/guild"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
+	guildtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/guild"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/ThreeDotsLabs/watermill/message"
 )
 
@@ -77,7 +81,59 @@ func (h *GuildHandlers) HandleGuildConfigRetrieved(msg *message.Message) ([]*mes
 			h.Logger.InfoContext(ctx, "Guild config retrieved successfully",
 				attr.String("guild_id", guildID))
 
-			// No Discord action needed for config retrieval responses - they're informational
+			// Convert the config and notify the resolver that we received the response
+			var convertedConfig *storage.GuildConfig
+			if p.Config.GuildID != "" || p.Config.SignupChannelID != "" || p.Config.LeaderboardChannelID != "" {
+				convertedConfig = convertGuildConfigFromShared(&p.Config)
+			} else {
+				// Provide a minimal placeholder to avoid nil dereference in consumers/tests
+				convertedConfig = &storage.GuildConfig{GuildID: guildID}
+			}
+
+			// Persist into in-memory runtime config (single-tenant / legacy handlers rely on this)
+			if h.Config != nil && convertedConfig != nil {
+				roleMappings := map[string]string{}
+				for k, v := range convertedConfig.RoleMappings {
+					roleMappings[k] = v
+				}
+				h.Config.UpdateGuildConfig(
+					convertedConfig.GuildID,
+					convertedConfig.SignupChannelID,
+					convertedConfig.EventChannelID,
+					convertedConfig.LeaderboardChannelID,
+					convertedConfig.SignupMessageID,
+					convertedConfig.RegisteredRoleID,
+					convertedConfig.AdminRoleID,
+					roleMappings,
+				)
+				h.Logger.InfoContext(ctx, "In-memory guild config updated",
+					attr.String("guild_id", guildID),
+					attr.String("event_channel_id", convertedConfig.EventChannelID),
+					attr.String("signup_channel_id", convertedConfig.SignupChannelID),
+				)
+			}
+
+			// Persist into in-memory config so other handlers (e.g., round joins) can resolve channel IDs
+			if h.Config != nil && convertedConfig != nil {
+				h.Config.UpdateGuildConfig(
+					convertedConfig.GuildID,
+					convertedConfig.SignupChannelID,
+					convertedConfig.EventChannelID,
+					convertedConfig.LeaderboardChannelID,
+					convertedConfig.SignupMessageID,
+					convertedConfig.RegisteredRoleID,
+					convertedConfig.AdminRoleID,
+					convertedConfig.RoleMappings,
+				)
+			}
+			if h.GuildConfigResolver != nil {
+				h.GuildConfigResolver.HandleGuildConfigReceived(ctx, guildID, convertedConfig)
+			}
+
+			h.Logger.InfoContext(ctx, "Guild config retrieved and available from backend",
+				attr.String("guild_id", guildID),
+				attr.String("signup_channel_id", p.Config.SignupChannelID))
+
 			return nil, nil
 		},
 	)(msg)
@@ -96,8 +152,38 @@ func (h *GuildHandlers) HandleGuildConfigRetrievalFailed(msg *message.Message) (
 				attr.String("guild_id", guildID),
 				attr.String("reason", p.Reason))
 
-			// No Discord action needed for retrieval failures - they're informational
+			// The resolver will handle timeouts and retries automatically
+			// This is just an informational event
+
 			return nil, nil
 		},
 	)(msg)
+}
+
+// convertGuildConfigFromShared converts a guildtypes.GuildConfig to a storage.GuildConfig
+func convertGuildConfigFromShared(src *guildtypes.GuildConfig) *storage.GuildConfig {
+	if src == nil {
+		return nil
+	}
+	// Always use sharedtypes.UserRoleEnum constants for mapping keys
+	roleMappings := map[string]string{
+		string(sharedtypes.UserRoleUser):   src.UserRoleID,
+		string(sharedtypes.UserRoleEditor): src.EditorRoleID,
+		string(sharedtypes.UserRoleAdmin):  src.AdminRoleID,
+	}
+	return &storage.GuildConfig{
+		GuildID:              string(src.GuildID),
+		SignupChannelID:      src.SignupChannelID,
+		SignupMessageID:      src.SignupMessageID,
+		EventChannelID:       src.EventChannelID,
+		LeaderboardChannelID: src.LeaderboardChannelID,
+		RegisteredRoleID:     src.UserRoleID, // Map UserRoleID to RegisteredRoleID
+		AdminRoleID:          src.AdminRoleID,
+		RoleMappings:         roleMappings,
+		SignupEmoji:          src.SignupEmoji,
+		CachedAt:             time.Now(),
+		RefreshedAt:          time.Now(),
+		IsPlaceholder:        false,
+		IsRequestPending:     false,
+	}
 }

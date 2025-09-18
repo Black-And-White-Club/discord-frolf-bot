@@ -32,10 +32,7 @@ func (lum *leaderboardUpdateManager) SendLeaderboardEmbed(ctx context.Context, c
 
 		// Calculate slice range
 		start := (page - 1) * entriesPerPage
-		end := start + entriesPerPage
-		if end > int32(len(leaderboard)) {
-			end = int32(len(leaderboard))
-		}
+		end := min(start+entriesPerPage, int32(len(leaderboard)))
 
 		// Build leaderboard fields with ranking emojis
 		fields := []*discordgo.MessageEmbedField{}

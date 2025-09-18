@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
+	guildconfigmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
 	storagemocks "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
@@ -31,8 +32,9 @@ func TestNewDeleteRoundManager(t *testing.T) {
 	mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
 	mockMetrics := discordmetricsmocks.NewMockDiscordMetrics(ctrl)
 	tracer := noop.NewTracerProvider().Tracer("test")
+	mockGuildConfigResolver := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
 
-	manager := NewDeleteRoundManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockInteractionStore, tracer, mockMetrics)
+	manager := NewDeleteRoundManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockInteractionStore, tracer, mockMetrics, mockGuildConfigResolver)
 	impl, ok := manager.(*deleteRoundManager)
 	if !ok {
 		t.Fatalf("Expected *deleteRoundManager, got %T", manager)

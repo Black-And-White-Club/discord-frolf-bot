@@ -9,6 +9,7 @@ import (
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
+	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/bwmarrin/discordgo"
 	"github.com/google/uuid"
 )
@@ -20,6 +21,13 @@ func (ctm *claimTagManager) HandleClaimTagCommand(ctx context.Context, i *discor
 
 	ctm.logger.InfoContext(ctx, "Handling claim tag command",
 		attr.UserID(sharedtypes.DiscordID(i.Member.User.ID)))
+
+	// Fetch per-guild config using guildConfigResolver
+	_, err := ctm.guildConfigResolver.GetGuildConfigWithContext(ctx, i.GuildID)
+	if err != nil {
+		ctm.logger.ErrorContext(ctx, "Failed to resolve guild config", attr.Error(err), attr.String("guild_id", i.GuildID))
+		return ClaimTagOperationResult{Error: fmt.Errorf("failed to resolve guild config: %w", err)}, err
+	}
 
 	return ctm.operationWrapper(ctx, "handle_claim_tag_command", func(ctx context.Context) (ClaimTagOperationResult, error) {
 		// Get tag number from command options
@@ -63,6 +71,7 @@ func (ctm *claimTagManager) HandleClaimTagCommand(ctx context.Context, i *discor
 			ChannelID:    i.ChannelID,
 			MessageID:    requestID,
 			GuildID:      i.GuildID,
+			// You can now use guildConfig for any per-guild logic here
 		}
 
 		// Create and publish the message
@@ -72,7 +81,10 @@ func (ctm *claimTagManager) HandleClaimTagCommand(ctx context.Context, i *discor
 			return ClaimTagOperationResult{Error: err}, err
 		}
 
-		// Add correlation ID to metadata
+		// Add correlation ID to metadata, ensuring map is initialized
+		if msg.Metadata == nil {
+			msg.Metadata = message.Metadata{}
+		}
 		msg.Metadata.Set("correlation_id", requestID)
 
 		// Publish the request

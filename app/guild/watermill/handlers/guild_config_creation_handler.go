@@ -18,7 +18,7 @@ func (h *GuildHandlers) HandleGuildConfigCreated(msg *message.Message) ([]*messa
 			p := payload.(*guildevents.GuildConfigCreatedPayload)
 			guildID := string(p.GuildID)
 
-			h.Logger.InfoContext(ctx, "Guild config created successfully - registering all commands",
+			h.Logger.InfoContext(ctx, "Guild config created successfully - registering all commands for this guild",
 				attr.String("guild_id", guildID))
 
 			// Register all bot commands for the successfully configured guild
@@ -29,7 +29,7 @@ func (h *GuildHandlers) HandleGuildConfigCreated(msg *message.Message) ([]*messa
 				return nil, fmt.Errorf("failed to register commands for guild %s: %w", guildID, err)
 			}
 
-			h.Logger.InfoContext(ctx, "Successfully registered all commands for guild after config creation",
+			h.Logger.InfoContext(ctx, "Successfully registered all commands - guild config available from backend",
 				attr.String("guild_id", guildID))
 
 			return nil, nil

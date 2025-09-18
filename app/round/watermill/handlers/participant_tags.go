@@ -28,6 +28,14 @@ func (h *RoundHandlers) HandleTagsUpdatedForScheduledRounds(msg *message.Message
 				return nil, nil
 			}
 
+			// Attach guild_id of first round (all rounds share guild) to context for downstream resolution
+			if len(tagsUpdatedPayload.UpdatedRounds) > 0 {
+				ctx = context.WithValue(ctx, "guild_id", string(tagsUpdatedPayload.UpdatedRounds[0].GuildID))
+				h.Logger.DebugContext(ctx, "Attached guild_id to context for tag update operation",
+					attr.String("guild_id", string(tagsUpdatedPayload.UpdatedRounds[0].GuildID)),
+				)
+			}
+
 			// Extract tag changes from the updated participants
 			tagUpdates := make(map[sharedtypes.DiscordID]*sharedtypes.TagNumber)
 			for _, roundInfo := range tagsUpdatedPayload.UpdatedRounds {

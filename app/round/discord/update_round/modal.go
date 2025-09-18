@@ -7,7 +7,6 @@ import (
 	"time"
 
 	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
-	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
@@ -41,9 +40,19 @@ func (urm *updateRoundManager) SendUpdateRoundModal(ctx context.Context, i *disc
 		return UpdateRoundOperationResult{Error: opErr}, opErr
 	}
 
+	// Multi-tenant: Extract guildID from interaction
+	guildID := i.Interaction.GuildID
+	if guildID == "" {
+		// Try to extract from custom ID if present (for edge cases)
+		if i.Message != nil && i.Message.ID != "" {
+			// Optionally parse from customID if you encode it in the button
+		}
+	}
+
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.UserIDKey, userID)
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.CommandNameKey, "send_update_round_modal")
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.InteractionType, "command")
+	ctx = discordmetrics.WithValue(ctx, discordmetrics.GuildIDKey, guildID)
 
 	result, _ := urm.operationWrapper(ctx, "send_update_round_modal", func(ctx context.Context) (UpdateRoundOperationResult, error) {
 		if err := ctx.Err(); err != nil {
@@ -63,7 +72,8 @@ func (urm *updateRoundManager) SendUpdateRoundModal(ctx context.Context, i *disc
 			attr.String("message_id", messageID),
 			attr.RoundID("round_id", roundID))
 
-		// ✅ Include both roundID and messageID in CustomID
+		// ✅ Include only roundID and messageID in CustomID (keep under 100 chars)
+		// Format: update_round_modal|<roundID>|<messageID>
 		customID := fmt.Sprintf("update_round_modal|%s|%s", roundID, messageID)
 
 		// Send the modal as the initial response
@@ -71,7 +81,7 @@ func (urm *updateRoundManager) SendUpdateRoundModal(ctx context.Context, i *disc
 			Type: discordgo.InteractionResponseModal,
 			Data: &discordgo.InteractionResponseData{
 				Title:    "Update Round",
-				CustomID: customID, // ✅ Now includes message ID
+				CustomID: customID, // Now includes message ID and guild ID
 				Components: []discordgo.MessageComponent{
 					discordgo.ActionsRow{
 						Components: []discordgo.MessageComponent{
@@ -184,7 +194,7 @@ func (urm *updateRoundManager) HandleUpdateRoundModalSubmit(ctx context.Context,
 		urm.logger.InfoContext(ctx, "Processing modal submission", attr.String("custom_id", customID))
 
 		parts := strings.Split(customID, "|")
-		if len(parts) < 3 { // ✅ Now expecting 3 parts: modal_name|roundID|messageID
+		if len(parts) < 3 { // Expecting 3 parts: modal_name|roundID|messageID
 			err := fmt.Errorf("invalid modal custom_id format: %s (expected 3 parts)", customID)
 			urm.logger.ErrorContext(ctx, err.Error())
 
@@ -202,7 +212,7 @@ func (urm *updateRoundManager) HandleUpdateRoundModalSubmit(ctx context.Context,
 			return UpdateRoundOperationResult{Error: err}, err
 		}
 
-		// ✅ Extract both roundID and messageID
+		// Extract roundID and messageID
 		urm.logger.InfoContext(ctx, "DEBUG: Extracted parts from CustomID",
 			attr.String("full_custom_id", customID),
 			attr.String("round_id_part", parts[1]),
@@ -227,9 +237,9 @@ func (urm *updateRoundManager) HandleUpdateRoundModalSubmit(ctx context.Context,
 			return UpdateRoundOperationResult{Error: err}, err
 		}
 		roundID := sharedtypes.RoundID(roundUUID)
-		messageID := parts[2] // ✅ Extract message ID from CustomID
+		messageID := parts[2]
 
-		// ✅ Add debugging here too
+		// Add debugging here too
 		urm.logger.InfoContext(ctx, "DEBUG: Parsed roundID and messageID",
 			attr.RoundID("round_id", roundID),
 			attr.String("round_id_string", roundID.String()),
@@ -291,7 +301,18 @@ func (urm *updateRoundManager) HandleUpdateRoundModalSubmit(ctx context.Context,
 			return UpdateRoundOperationResult{Error: validationErr}, validationErr
 		}
 
-		// Acknowledge receipt of the modal submission
+		// Defer all parsing of relative/absolute time expressions to backend. Only lightweight guard here.
+		if len(startTimeStr) > 120 {
+			errMsg := "❌ Start Time input too long. Please shorten it."
+			_ = urm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{Content: errMsg, Flags: discordgo.MessageFlagsEphemeral},
+			})
+			return UpdateRoundOperationResult{Error: fmt.Errorf("start time too long")}, fmt.Errorf("start time too long")
+		}
+		// No local parsing; backend will interpret using submitted_at + user_timezone + raw_start_time.
+
+		// Acknowledge receipt of the modal submission after successful validation
 		err = urm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
@@ -305,17 +326,17 @@ func (urm *updateRoundManager) HandleUpdateRoundModalSubmit(ctx context.Context,
 			return UpdateRoundOperationResult{Error: acknowledgeErr}, acknowledgeErr
 		}
 
-		// ✅ Publish event for backend validation with correct messageID
-		payload := roundevents.UpdateRoundRequestedPayload{
+		// Build Discord payload for internal bus; backend handler will convert to backend payload
+		payload := discordroundevents.DiscordRoundUpdateRequestPayload{
+			GuildID:     sharedtypes.GuildID(i.GuildID),
 			RoundID:     roundID,
 			UserID:      sharedtypes.DiscordID(userID),
 			ChannelID:   i.ChannelID,
-			MessageID:   messageID, // ✅ Use the correct message ID from CustomID
+			MessageID:   messageID,
 			Title:       &title,
 			Description: &description,
-			StartTime:   &startTimeStr,
 			Location:    &location,
-			Timezone:    &timezone,
+			// StartTime omitted; backend derives timing from metadata (submitted_at, user_timezone, raw_start_time)
 		}
 
 		// ✅ Add debugging for payload
@@ -340,6 +361,9 @@ func (urm *updateRoundManager) HandleUpdateRoundModalSubmit(ctx context.Context,
 		// Set the correlation ID in the message metadata before publishing
 		msg.Metadata.Set("correlation_id", correlationID)
 		msg.Metadata.Set("user_id", userID)
+		msg.Metadata.Set("submitted_at", time.Now().UTC().Format(time.RFC3339))
+		msg.Metadata.Set("user_timezone", string(timezone))
+		msg.Metadata.Set("raw_start_time", startTimeStr)
 
 		if err := urm.publisher.Publish(discordroundevents.RoundUpdateRequestTopic, msg); err != nil {
 			publishErr := fmt.Errorf("failed to publish event: %w", err)

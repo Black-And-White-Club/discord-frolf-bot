@@ -10,13 +10,12 @@ import (
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
+	scoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/score"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	tracingfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/tracing"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
-	"github.com/ThreeDotsLabs/watermill/components/metrics"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/message/router/middleware"
-	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -56,10 +55,7 @@ func NewRoundRouter(
 
 // Configure sets up the router.
 func (r *RoundRouter) Configure(ctx context.Context, handlers roundhandlers.Handlers) error {
-	// Add Prometheus metrics
-	metricsBuilder := metrics.NewPrometheusMetricsBuilder(prometheus.NewRegistry(), "", "")
-	metricsBuilder.AddPrometheusRouterMetrics(r.Router)
-
+	r.logger.InfoContext(ctx, "RoundRouter.Configure called")
 	r.Router.AddMiddleware(
 		middleware.CorrelationID,
 		r.middlewareHelper.CommonMetadataMiddleware("discord-round"),
@@ -69,15 +65,18 @@ func (r *RoundRouter) Configure(ctx context.Context, handlers roundhandlers.Hand
 		tracingfrolfbot.TraceHandler(r.tracer),
 	)
 
-	if err := r.RegisterHandlers(ctx, handlers); err != nil {
+	err := r.RegisterHandlers(ctx, handlers)
+	if err != nil {
+		r.logger.ErrorContext(ctx, "RoundRouter.RegisterHandlers failed", attr.Error(err))
 		return fmt.Errorf("failed to register round handlers: %w", err)
 	}
+	r.logger.InfoContext(ctx, "RoundRouter.Configure completed successfully")
 	return nil
 }
 
 // RegisterHandlers registers event handlers.
 func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandlers.Handlers) error {
-	r.logger.InfoContext(ctx, "Registering Round Handlers")
+	r.logger.InfoContext(ctx, "RoundRouter.RegisterHandlers called")
 
 	eventsToHandlers := map[string]message.HandlerFunc{
 		// Creation flow
@@ -99,6 +98,13 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 		roundevents.DiscordParticipantScoreUpdated: handlers.HandleParticipantScoreUpdated,
 		roundevents.RoundScoreUpdateError:          handlers.HandleScoreUpdateError,
 
+		// Score override bridging (CorrectScore service)
+		scoreevents.ScoreUpdateSuccess: handlers.HandleScoreOverrideSuccess,
+		// NOTE: We intentionally do NOT map ScoreBulkUpdateSuccess to per-user handler.
+		// The per-user success events (score.update.success) are expected to be emitted individually
+		// for each updated participant. The aggregate bulk success event lacks a specific user/score
+		// and was causing empty participant payloads & failed embed updates when bridged.
+
 		// Lifecycle
 		discordroundevents.RoundDeletedTopic: handlers.HandleRoundDeleted,
 		roundevents.DiscordRoundFinalized:    handlers.HandleRoundFinalized,
@@ -115,6 +121,7 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 
 	for topic, handlerFunc := range eventsToHandlers {
 		handlerName := fmt.Sprintf("discord-round.%s", topic)
+		r.logger.InfoContext(ctx, "Registering handler for topic", attr.String("topic", topic), attr.String("handler", handlerName))
 		r.Router.AddHandler(
 			handlerName,
 			topic,
@@ -151,6 +158,7 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 			},
 		)
 	}
+	r.logger.InfoContext(ctx, "RoundRouter.RegisterHandlers completed successfully")
 	return nil
 }
 

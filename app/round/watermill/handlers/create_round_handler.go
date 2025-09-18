@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
@@ -15,11 +16,18 @@ import (
 )
 
 func (h *RoundHandlers) HandleRoundCreateRequested(msg *message.Message) ([]*message.Message, error) {
+	if h.Logger != nil {
+		h.Logger.Info("HandleRoundCreateRequested invoked", attr.String("message_id", msg.UUID))
+	}
 	return h.handlerWrapper(
 		"HandleRoundCreateRequested",
 		&discordroundevents.CreateRoundRequestedPayload{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
 			discordPayload := payload.(*discordroundevents.CreateRoundRequestedPayload)
+
+			if h.Logger != nil {
+				h.Logger.InfoContext(ctx, "HandleRoundCreateRequested processing payload", attr.Any("payload", discordPayload))
+			}
 
 			// Convert to backend payload and set GuildID
 			backendPayload := roundevents.CreateRoundRequestedPayload{
@@ -33,6 +41,10 @@ func (h *RoundHandlers) HandleRoundCreateRequested(msg *message.Message) ([]*mes
 				Timezone:    discordPayload.Timezone,
 			}
 
+			if h.Logger != nil {
+				h.Logger.InfoContext(ctx, "HandleRoundCreateRequested publishing backendPayload", attr.Any("backendPayload", backendPayload))
+			}
+
 			// Directly publish to the backend without additional checks
 			backendMsg, err := h.Helpers.CreateResultMessage(msg, backendPayload, roundevents.RoundCreateRequest)
 			if err != nil {
@@ -42,6 +54,15 @@ func (h *RoundHandlers) HandleRoundCreateRequested(msg *message.Message) ([]*mes
 				}
 				return nil, nil
 			}
+
+			// Anchor metadata for deterministic relative time parsing downstream
+			// Ensure metadata map initialized to prevent assignment to nil map panics in tests
+			if backendMsg.Metadata == nil {
+				backendMsg.Metadata = make(message.Metadata)
+			}
+			backendMsg.Metadata.Set("submitted_at", time.Now().UTC().Format(time.RFC3339))
+			backendMsg.Metadata.Set("user_timezone", string(discordPayload.Timezone))
+			backendMsg.Metadata.Set("raw_start_time", discordPayload.StartTime)
 
 			return []*message.Message{backendMsg}, nil
 		},
@@ -63,25 +84,20 @@ func (h *RoundHandlers) HandleRoundCreated(msg *message.Message) ([]*message.Mes
 				attr.String("user_id", string(createdPayload.UserID)),
 			)
 
-			// Extract required data
 			roundID := createdPayload.RoundID
-			// **Revert channelID back to the hardcoded value as requested**
-			channelID := h.Config.GetEventChannelID() // Hardcoded value
+			guildID := string(createdPayload.GuildID)
+			channelID := string(createdPayload.ChannelID)
+			h.Logger.InfoContext(ctx, "Using channel ID for embed send", attr.String("channel_id", channelID))
 
-			// Find the correlation ID from the original interaction response if available
-			// Use standard map lookup with ok check
 			interactionCorrelationID, ok := msg.Metadata["interaction_correlation_id"]
-			if ok && interactionCorrelationID != "" { // Check if key exists and value is not empty
-				// 1️⃣ Update the original interaction response
+			if ok && interactionCorrelationID != "" {
 				successMessage := fmt.Sprintf("✅ Round created successfully! Round ID: %s", roundID)
-				// Pass the extracted interactionCorrelationID (string)
 				_, err := h.RoundDiscord.GetCreateRoundManager().UpdateInteractionResponse(ctx, interactionCorrelationID, successMessage)
 				if err != nil {
 					h.Logger.ErrorContext(ctx, "Failed to update original interaction response",
 						attr.CorrelationIDFromMsg(msg),
 						attr.String("interaction_correlation_id", interactionCorrelationID),
 						attr.Error(err))
-					// Decide whether to return nil, err here or just log and continue
 				}
 			} else {
 				h.Logger.WarnContext(ctx, "Interaction correlation ID not found or empty in metadata, skipping response update",
@@ -89,7 +105,6 @@ func (h *RoundHandlers) HandleRoundCreated(msg *message.Message) ([]*message.Mes
 				)
 			}
 
-			// 2️⃣ Send the embedded RSVP message with buttons
 			description := ""
 			if createdPayload.Description != nil {
 				description = string(*createdPayload.Description)
@@ -99,15 +114,15 @@ func (h *RoundHandlers) HandleRoundCreated(msg *message.Message) ([]*message.Mes
 				location = string(*createdPayload.Location)
 			}
 
-			// Call SendRoundEventEmbed
 			sendResult, err := h.RoundDiscord.GetCreateRoundManager().SendRoundEventEmbed(
-				channelID, // Use the hardcoded channel ID
+				guildID,
+				channelID,
 				roundtypes.Title(createdPayload.Title),
 				roundtypes.Description(description),
 				sharedtypes.StartTime(*createdPayload.StartTime),
 				roundtypes.Location(location),
-				sharedtypes.DiscordID(createdPayload.UserID), // Creator's Discord ID
-				roundID, // Pass the RoundID
+				sharedtypes.DiscordID(createdPayload.UserID),
+				roundID,
 			)
 			if err != nil {
 				h.Logger.ErrorContext(ctx, "Failed during SendRoundEventEmbed service call",
@@ -118,8 +133,6 @@ func (h *RoundHandlers) HandleRoundCreated(msg *message.Message) ([]*message.Mes
 				return nil, fmt.Errorf("failed to send round event embed: %w", err)
 			}
 
-			// Check if the operation was successful according to its result
-			// Assuming CreateRoundOperationResult.Success holds *discordgo.Message on success
 			discordMsg, ok := sendResult.Success.(*discordgo.Message)
 			if !ok || discordMsg == nil {
 				if sendResult.Error != nil {
@@ -139,42 +152,50 @@ func (h *RoundHandlers) HandleRoundCreated(msg *message.Message) ([]*message.Mes
 				return nil, fmt.Errorf("SendRoundEventEmbed did not return a Discord message on success for round %s", roundID.String())
 			}
 
-			// **Extract the Discord message ID from the sent message result**
 			discordMessageID := discordMsg.ID
 			h.Logger.InfoContext(ctx, "Successfully sent Discord embed message and captured ID",
 				attr.CorrelationIDFromMsg(msg),
 				attr.RoundID("round_id", roundID),
-				attr.String("discord_message_id", discordMessageID), // Log the captured ID
-				attr.String("channel_id", discordMsg.ChannelID),     // Log the channel ID from the message
+				attr.String("discord_message_id", discordMessageID),
+				attr.String("channel_id", discordMsg.ChannelID),
 			)
 
-			// Create the payload for the update event
-			updatePayload := struct {
-				GuildID sharedtypes.GuildID `json:"guild_id"`
-				RoundID sharedtypes.RoundID `json:"round_id"`
-			}{
-				GuildID: createdPayload.GuildID,
+			// --- PATCH: Ensure GuildID is always set in the payload ---
+			finalGuildID := createdPayload.GuildID
+			if finalGuildID == "" {
+				if metaGuildID, ok := msg.Metadata["guild_id"]; ok && metaGuildID != "" {
+					finalGuildID = sharedtypes.GuildID(metaGuildID)
+					h.Logger.WarnContext(ctx, "GuildID was empty in payload, using metadata fallback",
+						attr.CorrelationIDFromMsg(msg),
+						attr.String("guild_id", string(finalGuildID)),
+					)
+				} else {
+					h.Logger.ErrorContext(ctx, "GuildID missing in both payload and metadata",
+						attr.CorrelationIDFromMsg(msg),
+						attr.RoundID("round_id", roundID),
+					)
+				}
+			}
+
+			updatePayload := roundevents.RoundMessageIDUpdatePayload{
+				GuildID: finalGuildID,
 				RoundID: roundID,
 			}
 
 			tempMsgWithMetadata := &message.Message{
-				Metadata: make(message.Metadata), // Create a new Metadata map
+				Metadata: make(message.Metadata),
 			}
-			// Copy existing metadata from the original incoming message
 			for key, val := range msg.Metadata {
-				tempMsgWithMetadata.Metadata[key] = val // Standard map assignment
+				tempMsgWithMetadata.Metadata[key] = val
 			}
+			tempMsgWithMetadata.Metadata["discord_message_id"] = discordMessageID
 
-			// **Set the captured Discord message ID in the temporary message's metadata**
-			tempMsgWithMetadata.Metadata["discord_message_id"] = discordMessageID // **Standard map assignment**
-
-			// Now use CreateResultMessage, passing the temporary message for metadata copying
 			resultMsg, err := h.Helpers.CreateResultMessage(tempMsgWithMetadata, updatePayload, roundevents.RoundEventMessageIDUpdate)
 			if err != nil {
 				h.Logger.ErrorContext(ctx, "Failed to create RoundEventMessageIDUpdate message",
 					attr.CorrelationIDFromMsg(msg),
 					attr.RoundID("round_id", roundID),
-					attr.String("discord_message_id", discordMessageID), // Use captured ID in log
+					attr.String("discord_message_id", discordMessageID),
 					attr.Error(err),
 				)
 				return nil, fmt.Errorf("failed to create result message: %w", err)
@@ -183,13 +204,12 @@ func (h *RoundHandlers) HandleRoundCreated(msg *message.Message) ([]*message.Mes
 			h.Logger.InfoContext(ctx, "Publishing RoundEventMessageIDUpdate event with Discord message ID in metadata",
 				attr.CorrelationIDFromMsg(msg),
 				attr.RoundID("round_id", roundID),
-				attr.String("discord_message_id", discordMessageID), // Log the ID from the message being published
+				attr.String("discord_message_id", discordMessageID),
 			)
 
-			// Return the message that publishes the Discord message ID update event
 			return []*message.Message{resultMsg}, nil
 		},
-	)(msg) // Execute the wrapped handler
+	)(msg)
 }
 
 func (h *RoundHandlers) HandleRoundCreationFailed(msg *message.Message) ([]*message.Message, error) {

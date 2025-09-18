@@ -42,6 +42,11 @@ type Session interface {
 	WebhookMessageEdit(webhookID string, token string, messageID string, data *discordgo.WebhookEdit, options ...discordgo.RequestOption) (st *discordgo.Message, err error)
 	ChannelMessageEditEmbed(channelID string, messageID string, embed *discordgo.MessageEmbed, options ...discordgo.RequestOption) (*discordgo.Message, error)
 	ChannelMessage(channelID string, messageID string, options ...discordgo.RequestOption) (st *discordgo.Message, err error)
+	Guild(guildID string, options ...discordgo.RequestOption) (*discordgo.Guild, error)
+	GuildChannels(guildID string, options ...discordgo.RequestOption) ([]*discordgo.Channel, error)
+	GuildChannelCreate(guildID, name string, ctype discordgo.ChannelType, options ...discordgo.RequestOption) (*discordgo.Channel, error)
+	ChannelEdit(channelID string, data *discordgo.ChannelEdit, options ...discordgo.RequestOption) (*discordgo.Channel, error)
+	GuildRoleCreate(guildID string, params *discordgo.RoleParams, options ...discordgo.RequestOption) (*discordgo.Role, error)
 }
 
 // State defines an interface that provides access to the Discord state.
@@ -253,4 +258,24 @@ func (d *DiscordSession) WebhookMessageEdit(webhookID string, token string, mess
 
 func (d *DiscordSession) ChannelMessage(channelID string, messageID string, options ...discordgo.RequestOption) (st *discordgo.Message, err error) {
 	return d.session.ChannelMessage(channelID, messageID, options...)
+}
+
+func (d *DiscordSession) Guild(guildID string, options ...discordgo.RequestOption) (*discordgo.Guild, error) {
+	return d.session.Guild(guildID, options...)
+}
+
+func (d *DiscordSession) GuildChannels(guildID string, options ...discordgo.RequestOption) ([]*discordgo.Channel, error) {
+	return d.session.GuildChannels(guildID, options...)
+}
+
+func (d *DiscordSession) GuildChannelCreate(guildID, name string, ctype discordgo.ChannelType, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+	return d.session.GuildChannelCreate(guildID, name, ctype, options...)
+}
+
+func (d *DiscordSession) ChannelEdit(channelID string, data *discordgo.ChannelEdit, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+	return d.session.ChannelEdit(channelID, data, options...)
+}
+
+func (d *DiscordSession) GuildRoleCreate(guildID string, params *discordgo.RoleParams, options ...discordgo.RequestOption) (*discordgo.Role, error) {
+	return d.session.GuildRoleCreate(guildID, params, options...)
 }

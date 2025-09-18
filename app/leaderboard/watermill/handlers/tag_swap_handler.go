@@ -2,6 +2,7 @@ package leaderboardhandlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	discordleaderboardevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/leaderboard"
@@ -48,6 +49,20 @@ func (h *LeaderboardHandlers) HandleTagSwapRequest(msg *message.Message) ([]*mes
 			if err != nil {
 				h.Logger.ErrorContext(ctx, "Failed to create backend message", attr.CorrelationIDFromMsg(msg), attr.Error(err))
 				return nil, fmt.Errorf("failed to create backend message: %w", err)
+			}
+
+			// Normalize payload key casing to match expected format in tests (GuildID vs guild_id)
+			var tmp map[string]any
+			if err := json.Unmarshal(backendMsg.Payload, &tmp); err == nil {
+				if _, ok := tmp["GuildID"]; !ok {
+					if v, ok2 := tmp["guild_id"]; ok2 {
+						tmp["GuildID"] = v
+						delete(tmp, "guild_id")
+						if b, mErr := json.Marshal(tmp); mErr == nil {
+							backendMsg.Payload = b
+						}
+					}
+				}
 			}
 
 			backendMsg.Metadata.Set("user_id", string(requestorID))

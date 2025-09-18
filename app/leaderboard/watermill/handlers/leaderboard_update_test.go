@@ -88,6 +88,7 @@ func TestLeaderboardHandlers_HandleBatchTagAssigned(t *testing.T) {
 					"channel_id":  "test-channel-id",
 					"entry_count": 3,
 					"batch_id":    "batch456",
+					"guild_id":    "", // handler includes guild_id (may be empty)
 				}
 
 				mockHelper.EXPECT().
@@ -127,6 +128,71 @@ func TestLeaderboardHandlers_HandleBatchTagAssigned(t *testing.T) {
 				// We should not call any other methods since the assignments are empty
 				mockLeaderboardDiscord.EXPECT().GetLeaderboardUpdateManager().Times(0)
 				mockHelper.EXPECT().CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+			},
+		},
+		{
+			name: "discord_claim_source_ignores_metadata_channel",
+			msg: &message.Message{
+				UUID:    "3",
+				Payload: []byte(`{"requesting_user_id": "user999", "batch_id": "batch999", "assignment_count": 1, "assignments": [{"user_id": "user999", "tag_number": 10}]}`),
+				Metadata: message.Metadata{
+					"correlation_id": "corr-claim",
+					"channel_id":     "wrong-channel-from-metadata",
+					"source":         "discord_claim",
+				},
+			},
+			want:    []*message.Message{{}},
+			wantErr: false,
+			setup: func(ctrl *gomock.Controller, mockLeaderboardDiscord *mocks.MockLeaderboardDiscordInterface, mockHelper *util_mocks.MockHelpers, cfg *config.Config) {
+				expectedPayload := leaderboardevents.BatchTagAssignedPayload{
+					RequestingUserID: "user999",
+					BatchID:          "batch999",
+					AssignmentCount:  1,
+					Assignments: []leaderboardevents.TagAssignmentInfo{
+						{UserID: "user999", TagNumber: 10},
+					},
+				}
+
+				// Configure Discord channel ID expected to be used instead of metadata
+				cfg.Discord.LeaderboardChannelID = "configured-leaderboard-channel"
+
+				mockHelper.EXPECT().
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&leaderboardevents.BatchTagAssignedPayload{})).
+					DoAndReturn(func(_ *message.Message, v any) error {
+						*v.(*leaderboardevents.BatchTagAssignedPayload) = expectedPayload
+						return nil
+					}).
+					Times(1)
+
+				mockLeaderboardUpdateManager := mocks.NewMockLeaderboardUpdateManager(ctrl)
+				mockLeaderboardDiscord.EXPECT().GetLeaderboardUpdateManager().Return(mockLeaderboardUpdateManager).Times(1)
+
+				expectedEntries := []leaderboardupdated.LeaderboardEntry{{Rank: 10, UserID: "user999"}}
+
+				// Expect the configured channel, not the metadata channel
+				mockLeaderboardUpdateManager.EXPECT().
+					SendLeaderboardEmbed(
+						gomock.Any(),
+						"configured-leaderboard-channel",
+						matchLeaderboardEntries(expectedEntries),
+						int32(1),
+					).
+					Return(leaderboardupdated.LeaderboardUpdateOperationResult{}, nil).
+					Times(1)
+
+				expectedTracePayload := map[string]interface{}{
+					"event_type":  "batch_assignment_completed",
+					"status":      "embed_sent",
+					"channel_id":  "configured-leaderboard-channel",
+					"entry_count": 1,
+					"batch_id":    "batch999",
+					"guild_id":    "", // included as empty
+				}
+
+				mockHelper.EXPECT().
+					CreateResultMessage(gomock.Any(), expectedTracePayload, leaderboardevents.LeaderboardTraceEvent).
+					Return(&message.Message{}, nil).
+					Times(1)
 			},
 		},
 		// ... update other test cases similarly

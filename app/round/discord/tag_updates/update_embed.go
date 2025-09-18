@@ -29,22 +29,38 @@ func (tum *tagUpdateManager) UpdateTagsInEmbed(ctx context.Context, channelID, m
 			return TagUpdateOperationResult{Error: fmt.Errorf("session is nil")}, nil
 		}
 
+		// Multi-tenant: resolve channel ID from guild config if not provided
+		resolvedChannelID := channelID
+		if resolvedChannelID == "" {
+			guildID, _ := ctx.Value("guild_id").(string)
+			if guildID != "" {
+				cfg, err := tum.guildConfigResolver.GetGuildConfigWithContext(ctx, guildID)
+				if err == nil && cfg != nil && cfg.EventChannelID != "" {
+					resolvedChannelID = cfg.EventChannelID
+				}
+			}
+		}
+
 		// 1. Fetch the existing message and embed
-		message, err := tum.session.ChannelMessage(channelID, messageID)
+		message, err := tum.session.ChannelMessage(resolvedChannelID, messageID)
 		if err != nil {
-			tum.logger.ErrorContext(ctx, "Failed to fetch message for tag update",
-				attr.Error(err),
-				attr.String("channel_id", channelID),
-				attr.String("message_id", messageID),
-			)
+			if tum.logger != nil {
+				tum.logger.ErrorContext(ctx, "Failed to fetch message for tag update",
+					attr.Error(err),
+					attr.String("channel_id", resolvedChannelID),
+					attr.String("message_id", messageID),
+				)
+			}
 			return TagUpdateOperationResult{Error: err}, fmt.Errorf("failed to fetch message for tag update: %w", err)
 		}
 
 		if len(message.Embeds) == 0 {
-			tum.logger.WarnContext(ctx, "No embeds found in message for tag update",
-				attr.String("channel_id", channelID),
-				attr.String("message_id", messageID),
-			)
+			if tum.logger != nil {
+				tum.logger.WarnContext(ctx, "No embeds found in message for tag update",
+					attr.String("channel_id", resolvedChannelID),
+					attr.String("message_id", messageID),
+				)
+			}
 			return TagUpdateOperationResult{Success: "No embeds found to update"}, nil
 		}
 
@@ -71,7 +87,7 @@ func (tum *tagUpdateManager) UpdateTagsInEmbed(ctx context.Context, channelID, m
 
 		if len(participantFields) == 0 {
 			tum.logger.WarnContext(ctx, "No participant fields found in embed for tag update",
-				attr.String("channel_id", channelID),
+				attr.String("channel_id", resolvedChannelID),
 				attr.String("message_id", messageID),
 			)
 			return TagUpdateOperationResult{Success: "No participant fields found"}, nil
@@ -81,10 +97,12 @@ func (tum *tagUpdateManager) UpdateTagsInEmbed(ctx context.Context, channelID, m
 		updatedFieldValues := map[string]string{}
 
 		for _, field := range participantFields {
-			tum.logger.DebugContext(ctx, "Processing field for tag update",
-				attr.String("field_name", field.Name),
-				attr.String("field_value", field.Value),
-			)
+			if tum.logger != nil {
+				tum.logger.DebugContext(ctx, "Processing field for tag update",
+					attr.String("field_name", field.Name),
+					attr.String("field_value", field.Value),
+				)
+			}
 
 			originalLines := strings.Split(field.Value, "\n")
 			newLines := []string{}
@@ -92,65 +110,77 @@ func (tum *tagUpdateManager) UpdateTagsInEmbed(ctx context.Context, channelID, m
 			if strings.TrimSpace(field.Value) == "" || field.Value == placeholderNoParticipants {
 				// If the field is empty or placeholder, no participants to update
 				updatedFieldValues[field.Name] = field.Value
-				tum.logger.DebugContext(ctx, "Field is empty or placeholder, skipping",
-					attr.String("field_name", field.Name),
-				)
+				if tum.logger != nil {
+					tum.logger.DebugContext(ctx, "Field is empty or placeholder, skipping",
+						attr.String("field_name", field.Name),
+					)
+				}
 				continue
 			}
 
 			// Process each line once and check if the user needs a tag update
 			for lineIdx, line := range originalLines {
-				tum.logger.DebugContext(ctx, "Processing line in field",
-					attr.String("field_name", field.Name),
-					attr.Int("line_index", lineIdx),
-					attr.String("line", line),
-				)
+				if tum.logger != nil {
+					tum.logger.DebugContext(ctx, "Processing line in field",
+						attr.String("field_name", field.Name),
+						attr.Int("line_index", lineIdx),
+						attr.String("line", line),
+					)
+				}
 
 				parsedUserID, parsedTagNumber, ok := tum.parseParticipantLine(ctx, line)
 
 				if !ok {
 					// If a line can't be parsed, keep the original line
-					tum.logger.WarnContext(ctx, "Failed to parse participant line in UpdateTagsInEmbed",
-						attr.String("line", line),
-						attr.String("field_name", field.Name),
-						attr.String("message_id", messageID),
-					)
+					if tum.logger != nil {
+						tum.logger.WarnContext(ctx, "Failed to parse participant line in UpdateTagsInEmbed",
+							attr.String("line", line),
+							attr.String("field_name", field.Name),
+							attr.String("message_id", messageID),
+						)
+					}
 					newLines = append(newLines, line)
 					continue
 				}
 
-				tum.logger.DebugContext(ctx, "Successfully parsed line",
-					attr.String("parsed_user_id", string(parsedUserID)),
-					attr.Bool("has_existing_tag", parsedTagNumber != nil),
-				)
+				if tum.logger != nil {
+					tum.logger.DebugContext(ctx, "Successfully parsed line",
+						attr.String("parsed_user_id", string(parsedUserID)),
+						attr.Bool("has_existing_tag", parsedTagNumber != nil),
+					)
+				}
 
 				// Check if this user needs a tag update (SINGLE CHECK)
 				if newTagNumber, shouldUpdate := tagUpdates[parsedUserID]; shouldUpdate {
 					// Mark this user as found and updated
 					usersFoundAndUpdated[parsedUserID] = true
 
-					tum.logger.DebugContext(ctx, "Found target user, updating tag",
-						attr.String("user_id", string(parsedUserID)),
-						attr.Int("old_tag", func() int {
-							if parsedTagNumber != nil {
-								return int(*parsedTagNumber)
-							}
-							return 0
-						}()),
-						attr.Int("new_tag", int(*newTagNumber)),
-					)
+					if tum.logger != nil {
+						tum.logger.DebugContext(ctx, "Found target user, updating tag",
+							attr.String("user_id", string(parsedUserID)),
+							attr.Int("old_tag", func() int {
+								if parsedTagNumber != nil {
+									return int(*parsedTagNumber)
+								}
+								return 0
+							}()),
+							attr.Int("new_tag", int(*newTagNumber)),
+						)
+					}
 
 					// Use the NEW tag number
 					updatedLine := tum.formatParticipantLine(parsedUserID, newTagNumber)
 					newLines = append(newLines, updatedLine)
 
-					tum.logger.DebugContext(ctx, "Updated participant tag in embed field",
-						attr.String("user_id", string(parsedUserID)),
-						attr.String("field_name", field.Name),
-						attr.String("original_line", line),
-						attr.String("updated_line", updatedLine),
-						attr.Int("new_tag", int(*newTagNumber)),
-					)
+					if tum.logger != nil {
+						tum.logger.DebugContext(ctx, "Updated participant tag in embed field",
+							attr.String("user_id", string(parsedUserID)),
+							attr.String("field_name", field.Name),
+							attr.String("original_line", line),
+							attr.String("updated_line", updatedLine),
+							attr.Int("new_tag", int(*newTagNumber)),
+						)
+					}
 
 				} else {
 					// User doesn't need updating - keep their current info
@@ -169,10 +199,12 @@ func (tum *tagUpdateManager) UpdateTagsInEmbed(ctx context.Context, channelID, m
 
 		// Check if any of the target users were found and updated
 		if len(usersFoundAndUpdated) == 0 {
-			tum.logger.WarnContext(ctx, "None of the target users were found in embed fields for tag update",
-				attr.String("channel_id", channelID),
-				attr.String("message_id", messageID),
-			)
+			if tum.logger != nil {
+				tum.logger.WarnContext(ctx, "None of the target users were found in embed fields for tag update",
+					attr.String("channel_id", resolvedChannelID),
+					attr.String("message_id", messageID),
+				)
+			}
 			return TagUpdateOperationResult{Success: "No target users found in embed fields"}, nil
 		}
 
@@ -185,26 +217,30 @@ func (tum *tagUpdateManager) UpdateTagsInEmbed(ctx context.Context, channelID, m
 
 		// 5. Edit the Discord message with the modified embed
 		edit := &discordgo.MessageEdit{
-			Channel: channelID,
+			Channel: resolvedChannelID,
 			ID:      messageID,
 		}
 		edit.SetEmbeds([]*discordgo.MessageEmbed{embed})
 
 		updatedMsg, err := tum.session.ChannelMessageEditComplex(edit)
 		if err != nil {
-			tum.logger.ErrorContext(ctx, "Failed to update message with new tags",
-				attr.Error(err),
-				attr.String("channel_id", channelID),
-				attr.String("message_id", messageID),
-			)
+			if tum.logger != nil {
+				tum.logger.ErrorContext(ctx, "Failed to update message with new tags",
+					attr.Error(err),
+					attr.String("channel_id", resolvedChannelID),
+					attr.String("message_id", messageID),
+				)
+			}
 			return TagUpdateOperationResult{Error: err}, fmt.Errorf("failed to edit message for tag update: %w", err)
 		}
 
-		tum.logger.InfoContext(ctx, "Successfully updated user tags in embed",
-			attr.String("channel_id", channelID),
-			attr.String("message_id", messageID),
-			attr.Int("users_updated", len(usersFoundAndUpdated)),
-		)
+		if tum.logger != nil {
+			tum.logger.InfoContext(ctx, "Successfully updated user tags in embed",
+				attr.String("channel_id", resolvedChannelID),
+				attr.String("message_id", messageID),
+				attr.Int("users_updated", len(usersFoundAndUpdated)),
+			)
+		}
 
 		return TagUpdateOperationResult{Success: updatedMsg}, nil
 	})

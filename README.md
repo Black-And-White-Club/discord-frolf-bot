@@ -112,21 +112,43 @@ observability:
 
 ## Guild Setup
 
-Run the setup command to automatically configure your Discord server:
+The bot uses a modern event-driven setup system with multiple options:
 
+### Option 1: Discord Command (Recommended)
 1. Invite the bot to your server with admin permissions
-2. Run setup from command line:
-   ```bash
-   go run main.go setup YOUR_GUILD_ID
-   ```
-3. The setup will automatically:
-   - Create required channels (signup, events, leaderboard)
-   - Create required roles (User, Editor, Admin)
-   - Set up channel permissions
+2. Run `/frolf-setup` in any Discord channel
+3. Fill out the setup modal with your preferences:
+   - Channel prefix (e.g., "frolf", "bottle")
+   - Role names (e.g., "Player, Editor, Admin")
+   - Signup message and emoji
+4. The bot will automatically:
+   - Create required channels with your prefix
+   - Create roles with your custom names
+   - Set up proper Discord permissions
    - Create signup reaction message
-   - **Update your config.yaml with all the generated IDs**
+   - Register all bot commands for your guild
+   - Cache config for fast access
 
-No manual config editing required! ✅
+### Option 2: Setup Trigger Tool
+```bash
+# Start the setup tool
+go run cmd/setup-trigger/main.go -guild YOUR_GUILD_ID
+
+# Then run /frolf-setup in Discord
+```
+
+### Option 3: Manual Setup via Events
+For programmatic setup, publish a `GuildSetupEvent` to the event bus.
+
+**Features:**
+- ✅ **Event-driven architecture** with backend persistence
+- ✅ **Multi-tenant support** for unlimited Discord servers  
+- ✅ **Dynamic command registration** based on setup status
+- ✅ **Configurable names** for channels and roles
+- ✅ **Automatic caching** for fast response times
+- ✅ **No manual config editing** required
+
+**Note:** The old direct setup system has been replaced with this modern approach.
 
 ## Production Deployment
 

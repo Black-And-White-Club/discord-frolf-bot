@@ -8,6 +8,7 @@ import (
 	"time"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
@@ -35,14 +36,15 @@ type StartRoundManager interface {
 
 // startRoundManager implements the StartRoundManager interface.
 type startRoundManager struct {
-	session          discord.Session
-	publisher        eventbus.EventBus
-	logger           *slog.Logger
-	helper           utils.Helpers
-	config           *config.Config
-	tracer           trace.Tracer
-	metrics          discordmetrics.DiscordMetrics
-	operationWrapper func(ctx context.Context, opName string, fn func(ctx context.Context) (StartRoundOperationResult, error)) (StartRoundOperationResult, error)
+	session             discord.Session
+	publisher           eventbus.EventBus
+	logger              *slog.Logger
+	helper              utils.Helpers
+	config              *config.Config
+	tracer              trace.Tracer
+	metrics             discordmetrics.DiscordMetrics
+	operationWrapper    func(ctx context.Context, opName string, fn func(ctx context.Context) (StartRoundOperationResult, error)) (StartRoundOperationResult, error)
+	guildConfigResolver guildconfig.GuildConfigResolver
 }
 
 // NewStartRoundManager creates a new StartRoundManager instance.
@@ -54,6 +56,7 @@ func NewStartRoundManager(
 	config *config.Config,
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
+	guildConfigResolver guildconfig.GuildConfigResolver,
 ) StartRoundManager {
 	if logger != nil {
 		logger.InfoContext(context.Background(), "Creating StartRoundManager")
@@ -69,6 +72,7 @@ func NewStartRoundManager(
 		operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (StartRoundOperationResult, error)) (StartRoundOperationResult, error) {
 			return wrapStartRoundOperation(ctx, opName, fn, logger, tracer, metrics)
 		},
+		guildConfigResolver: guildConfigResolver,
 	}
 }
 

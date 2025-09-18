@@ -22,20 +22,36 @@ func (frm *finalizeRoundManager) FinalizeScorecardEmbed(ctx context.Context, eve
 			return FinalizeRoundOperationResult{Error: err}, err // Return both result and error
 		}
 
+		// If channelID is empty, try to resolve from guild config if possible
+		resolvedChannelID := channelID
+		guildID := ""
+		if embedPayload.GuildID != "" {
+			guildID = string(embedPayload.GuildID)
+		}
+		if resolvedChannelID == "" && frm.guildConfigResolver != nil && guildID != "" {
+			guildConfig, err := frm.guildConfigResolver.GetGuildConfigWithContext(ctx, guildID)
+			if err == nil && guildConfig != nil && guildConfig.EventChannelID != "" {
+				resolvedChannelID = guildConfig.EventChannelID
+				frm.logger.InfoContext(ctx, "Resolved channel ID from guild config", attr.String("channel_id", resolvedChannelID))
+			} else {
+				frm.logger.WarnContext(ctx, "Failed to resolve channel ID from guild config, update may fail", attr.Error(err))
+			}
+		}
+
 		// Check for empty or nil UUID string
-		if eventMessageID == "" || channelID == "" || eventMessageID == uuid.Nil.String() {
+		if eventMessageID == "" || resolvedChannelID == "" || eventMessageID == uuid.Nil.String() {
 			err := fmt.Errorf("missing channel or message ID for finalization update")
 			frm.logger.ErrorContext(ctx, "Missing channel or message ID for finalization update")
 			return FinalizeRoundOperationResult{Error: err}, err // Return both result and error
 		}
 
 		// 🆕 Fetch existing message to preserve original location if payload location is empty
-		existingMsg, err := frm.session.ChannelMessage(channelID, eventMessageID)
+		existingMsg, err := frm.session.ChannelMessage(resolvedChannelID, eventMessageID)
 		if err != nil {
 			frm.logger.ErrorContext(ctx, "Failed to fetch existing message for finalization",
 				attr.Error(err),
 				attr.String("discord_message_id", eventMessageID),
-				attr.String("channel_id", channelID))
+				attr.String("channel_id", resolvedChannelID))
 			return FinalizeRoundOperationResult{Error: fmt.Errorf("failed to fetch existing message: %w", err)}, fmt.Errorf("failed to fetch existing message: %w", err)
 		}
 
@@ -86,7 +102,7 @@ func (frm *finalizeRoundManager) FinalizeScorecardEmbed(ctx context.Context, eve
 
 		// Create the MessageEdit struct to update the Discord message using the provided IDs
 		edit := &discordgo.MessageEdit{
-			Channel:    channelID,                         // Use the provided channel ID
+			Channel:    resolvedChannelID,                 // Use the resolved channel ID
 			ID:         eventMessageID,                    // Use the provided message ID
 			Embeds:     &[]*discordgo.MessageEmbed{embed}, // Use pointer to slice
 			Components: &components,                       // Use pointer to slice

@@ -2,13 +2,16 @@ package discord
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	discordgocommands "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/guild/discord/setup"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
+	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"go.opentelemetry.io/otel/trace"
@@ -39,10 +42,9 @@ func NewGuildDiscord(
 	interactionStore storage.ISInterface,
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
-) (GuildDiscordInterface, error) {
-	// Extract underlying session for setup manager (temporary workaround)
-	underlyingSession := session.(*discordgocommands.DiscordSession).GetUnderlyingSession()
-	setupManager, err := setup.NewSetupManager(underlyingSession, publisher, logger, helper, config, interactionStore, tracer, metrics)
+	guildConfigResolver guildconfig.GuildConfigResolver,
+) (GuildDiscordInterface, error) { // Use wrapped session directly; it implements required interface
+	setupManager, err := setup.NewSetupManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics, guildConfigResolver)
 	if err != nil {
 		return nil, err
 	}
@@ -59,12 +61,50 @@ func (gd *GuildDiscord) GetSetupManager() setup.SetupManager {
 	return gd.SetupManager
 }
 
-// RegisterAllCommands registers all bot commands for a guild after setup completion.
+// RegisterAllCommands registers all guild-specific commands for the given guild.
+// This enables per-guild customization and ensures commands only appear after setup.
 func (gd *GuildDiscord) RegisterAllCommands(guildID string) error {
-	return discordgocommands.RegisterAllCommandsForGuild(gd.session, gd.logger, guildID)
+	gd.logger.Info("Registering guild-specific commands after successful setup",
+		attr.String("guild_id", guildID))
+
+	// Use the discord commands package to register guild-specific commands
+	return discordgocommands.RegisterCommands(gd.session, gd.logger, guildID)
 }
 
-// UnregisterAllCommands unregisters all bot commands from a guild during teardown.
+// UnregisterAllCommands removes all guild-specific commands for the given guild.
+// This is used when a guild is removed or configuration is reset.
 func (gd *GuildDiscord) UnregisterAllCommands(guildID string) error {
-	return discordgocommands.UnregisterAllCommandsForGuild(gd.session, gd.logger, guildID)
+	gd.logger.Info("Unregistering guild-specific commands",
+		attr.String("guild_id", guildID))
+
+	// Get bot user ID
+	appID, err := gd.session.GetBotUser()
+	if err != nil {
+		return fmt.Errorf("failed to get bot user: %w", err)
+	}
+
+	// Get all existing commands for this guild
+	commands, err := gd.session.ApplicationCommands(appID.ID, guildID)
+	if err != nil {
+		return fmt.Errorf("failed to get guild commands: %w", err)
+	}
+
+	// Delete all guild-specific commands (except frolf-setup which is global)
+	for _, cmd := range commands {
+		if cmd.Name != "frolf-setup" {
+			err = gd.session.ApplicationCommandDelete(appID.ID, guildID, cmd.ID)
+			if err != nil {
+				gd.logger.Error("Failed to delete guild command",
+					attr.String("guild_id", guildID),
+					attr.String("command_name", cmd.Name),
+					attr.Error(err))
+			} else {
+				gd.logger.Info("Deleted guild command",
+					attr.String("guild_id", guildID),
+					attr.String("command_name", cmd.Name))
+			}
+		}
+	}
+
+	return nil
 }

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
@@ -32,21 +33,22 @@ type CreateRoundManager interface {
 	UpdateInteractionResponse(ctx context.Context, correlationID, message string, edit ...*discordgo.WebhookEdit) (CreateRoundOperationResult, error)
 	UpdateInteractionResponseWithRetryButton(ctx context.Context, correlationID, message string) (CreateRoundOperationResult, error)
 	HandleCreateRoundModalCancel(ctx context.Context, i *discordgo.InteractionCreate) (CreateRoundOperationResult, error)
-	SendRoundEventEmbed(channelID string, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, creatorID sharedtypes.DiscordID, roundID sharedtypes.RoundID) (CreateRoundOperationResult, error)
+	SendRoundEventEmbed(guildID string, channelID string, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, creatorID sharedtypes.DiscordID, roundID sharedtypes.RoundID) (CreateRoundOperationResult, error)
 	SendCreateRoundModal(ctx context.Context, i *discordgo.InteractionCreate) (CreateRoundOperationResult, error)
 	HandleRetryCreateRound(ctx context.Context, i *discordgo.InteractionCreate) (CreateRoundOperationResult, error)
 }
 
 type createRoundManager struct {
-	session          discord.Session
-	publisher        eventbus.EventBus
-	logger           *slog.Logger
-	helper           utils.Helpers
-	config           *config.Config
-	interactionStore storage.ISInterface
-	tracer           trace.Tracer
-	metrics          discordmetrics.DiscordMetrics
-	operationWrapper func(ctx context.Context, opName string, fn func(ctx context.Context) (CreateRoundOperationResult, error)) (CreateRoundOperationResult, error)
+	session             discord.Session
+	publisher           eventbus.EventBus
+	logger              *slog.Logger
+	helper              utils.Helpers
+	config              *config.Config
+	interactionStore    storage.ISInterface
+	tracer              trace.Tracer
+	metrics             discordmetrics.DiscordMetrics
+	operationWrapper    func(ctx context.Context, opName string, fn func(ctx context.Context) (CreateRoundOperationResult, error)) (CreateRoundOperationResult, error)
+	guildConfigResolver guildconfig.GuildConfigResolver
 }
 
 // NewCreateRoundManager creates a new CreateRoundManager instance.
@@ -59,6 +61,7 @@ func NewCreateRoundManager(
 	interactionStore storage.ISInterface,
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
+	guildConfigResolver guildconfig.GuildConfigResolver, // <-- Add this param
 ) CreateRoundManager {
 	if logger != nil {
 		logger.InfoContext(context.Background(), "Creating CreateRoundManager")
@@ -75,6 +78,7 @@ func NewCreateRoundManager(
 		operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (CreateRoundOperationResult, error)) (CreateRoundOperationResult, error) {
 			return wrapCreateRoundOperation(ctx, opName, fn, logger, tracer, metrics)
 		},
+		guildConfigResolver: guildConfigResolver, // <-- Set field
 	}
 }
 

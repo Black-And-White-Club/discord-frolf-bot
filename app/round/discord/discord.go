@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	discordgo "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	createround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/create_round"
 	deleteround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/delete_round"
 	finalizeround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/finalize_round"
@@ -60,17 +61,18 @@ func NewRoundDiscord(
 	interactionStore storage.ISInterface,
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
+	guildConfigResolver guildconfig.GuildConfigResolver,
 ) (RoundDiscordInterface, error) {
 	// Pass the new dependencies to the manager constructors
-	createRoundManager := createround.NewCreateRoundManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics)
-	roundRsvpManager := roundrsvp.NewRoundRsvpManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics)
-	roundReminderManager := roundreminder.NewRoundReminderManager(session, publisher, logger, helper, config, tracer, metrics)
-	startRoundManager := startround.NewStartRoundManager(session, publisher, logger, helper, config, tracer, metrics)
-	scoreRoundManager := scoreround.NewScoreRoundManager(session, publisher, logger, helper, config, tracer, metrics)
-	finalizeRoundManager := finalizeround.NewFinalizeRoundManager(session, publisher, logger, helper, config, tracer, metrics)
-	deleteRoundManager := deleteround.NewDeleteRoundManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics)
-	updateRoundManager := updateround.NewUpdateRoundManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics)
-	tagUpdateManager := tagupdates.NewTagUpdateManager(session, publisher, logger, helper, config, tracer, metrics)
+	createRoundManager := createround.NewCreateRoundManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics, guildConfigResolver)
+	roundRsvpManager := roundrsvp.NewRoundRsvpManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics, guildConfigResolver)
+	roundReminderManager := roundreminder.NewRoundReminderManager(session, publisher, logger, helper, config, tracer, metrics, guildConfigResolver)
+	startRoundManager := startround.NewStartRoundManager(session, publisher, logger, helper, config, tracer, metrics, guildConfigResolver)
+	scoreRoundManager := scoreround.NewScoreRoundManager(session, publisher, logger, helper, config, tracer, metrics, guildConfigResolver)
+	finalizeRoundManager := finalizeround.NewFinalizeRoundManager(session, publisher, logger, helper, config, tracer, metrics, guildConfigResolver)
+	deleteRoundManager := deleteround.NewDeleteRoundManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics, guildConfigResolver)
+	updateRoundManager := updateround.NewUpdateRoundManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics, guildConfigResolver)
+	tagUpdateManager := tagupdates.NewTagUpdateManager(session, publisher, logger, helper, config, tracer, metrics, guildConfigResolver)
 
 	return &RoundDiscord{
 		CreateRoundManager:   createRoundManager,

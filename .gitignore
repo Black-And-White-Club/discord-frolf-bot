@@ -18,3 +18,8 @@ go.work
 *.env*
 config.yaml
 /tmp
+
+.DS_Store
+bin/
+reports/
+.ko.yaml

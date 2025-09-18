@@ -10,7 +10,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-func (crm *createRoundManager) SendRoundEventEmbed(channelID string, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, creatorID sharedtypes.DiscordID, roundID sharedtypes.RoundID) (CreateRoundOperationResult, error) {
+func (crm *createRoundManager) SendRoundEventEmbed(guildID string, channelID string, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, creatorID sharedtypes.DiscordID, roundID sharedtypes.RoundID) (CreateRoundOperationResult, error) {
 	return crm.operationWrapper(context.Background(), "SendRoundEventEmbed", func(ctx context.Context) (CreateRoundOperationResult, error) {
 		timeValue := time.Time(startTime)
 		unixTimestamp := timeValue.Unix()
@@ -21,7 +21,7 @@ func (crm *createRoundManager) SendRoundEventEmbed(channelID string, title round
 		}
 
 		creatorName := user.Username
-		if member, err := crm.session.GuildMember(crm.config.GetGuildID(), string(creatorID)); err == nil && member.Nick != "" {
+		if member, err := crm.session.GuildMember(guildID, string(creatorID)); err == nil && member.Nick != "" {
 			creatorName = member.Nick
 		}
 

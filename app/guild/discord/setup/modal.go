@@ -16,9 +16,11 @@ type SetupResult struct {
 	LeaderboardChannelName string
 	SignupChannelID        string
 	SignupChannelName      string
-	RegisteredRoleID       string
+	UserRoleID             string
+	EditorRoleID           string
 	AdminRoleID            string
 	SignupMessageID        string
+	SignupEmoji            string
 	RoleMappings           map[string]string
 }
 
@@ -26,8 +28,11 @@ type SetupResult struct {
 type SetupConfig struct {
 	GuildName       string
 	ChannelPrefix   string
-	PlayerRoleName  string
+	UserRoleName    string
+	EditorRoleName  string
 	AdminRoleName   string
+	SignupMessage   string
+	SignupEmoji     string
 	CreateChannels  bool
 	CreateRoles     bool
 	CreateSignupMsg bool
@@ -48,18 +53,6 @@ func (s *setupManager) SendSetupModal(ctx context.Context, i *discordgo.Interact
 					discordgo.ActionsRow{
 						Components: []discordgo.MessageComponent{
 							discordgo.TextInput{
-								CustomID:    "guild_name",
-								Label:       "Guild Display Name",
-								Style:       discordgo.TextInputShort,
-								Placeholder: "My Frolf Community",
-								Required:    false,
-								MaxLength:   100,
-							},
-						},
-					},
-					discordgo.ActionsRow{
-						Components: []discordgo.MessageComponent{
-							discordgo.TextInput{
 								CustomID:    "channel_prefix",
 								Label:       "Channel Name Prefix",
 								Style:       discordgo.TextInputShort,
@@ -73,39 +66,39 @@ func (s *setupManager) SendSetupModal(ctx context.Context, i *discordgo.Interact
 					discordgo.ActionsRow{
 						Components: []discordgo.MessageComponent{
 							discordgo.TextInput{
-								CustomID:    "player_role_name",
-								Label:       "Player Role Name",
+								CustomID:    "role_names",
+								Label:       "Role Names (User, Editor, Admin)",
 								Style:       discordgo.TextInputShort,
-								Placeholder: "Frolf Player",
+								Placeholder: "Frolf Player, Frolf Editor, Frolf Admin",
 								Required:    false,
-								MaxLength:   50,
-								Value:       "Frolf Player",
+								MaxLength:   150,
+								Value:       "Frolf Player, Frolf Editor, Frolf Admin",
 							},
 						},
 					},
 					discordgo.ActionsRow{
 						Components: []discordgo.MessageComponent{
 							discordgo.TextInput{
-								CustomID:    "admin_role_name",
-								Label:       "Admin Role Name",
-								Style:       discordgo.TextInputShort,
-								Placeholder: "Frolf Admin",
-								Required:    false,
-								MaxLength:   50,
-								Value:       "Frolf Admin",
-							},
-						},
-					},
-					discordgo.ActionsRow{
-						Components: []discordgo.MessageComponent{
-							discordgo.TextInput{
-								CustomID:    "setup_options",
-								Label:       "Setup Options (comma-separated)",
+								CustomID:    "signup_message",
+								Label:       "Signup Message",
 								Style:       discordgo.TextInputParagraph,
-								Placeholder: "auto-channels, auto-roles, signup-message (or leave blank for all)",
+								Placeholder: "React with 🥏 to sign up for frolf events!",
 								Required:    false,
-								MaxLength:   200,
-								Value:       "auto-channels, auto-roles, signup-message",
+								MaxLength:   500,
+								Value:       "React with 🥏 to sign up for frolf events!",
+							},
+						},
+					},
+					discordgo.ActionsRow{
+						Components: []discordgo.MessageComponent{
+							discordgo.TextInput{
+								CustomID:    "signup_emoji",
+								Label:       "Signup Emoji",
+								Style:       discordgo.TextInputShort,
+								Placeholder: "🥏",
+								Required:    false,
+								MaxLength:   10,
+								Value:       "🥏",
 							},
 						},
 					},
@@ -129,46 +122,120 @@ func (s *setupManager) HandleSetupModalSubmit(ctx context.Context, i *discordgo.
 
 		// Extract form data
 		data := i.ModalSubmitData()
-		guildName := strings.TrimSpace(data.Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value)
-		channelPrefix := strings.TrimSpace(data.Components[1].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value)
-		playerRoleName := strings.TrimSpace(data.Components[2].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value)
-		adminRoleName := strings.TrimSpace(data.Components[3].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value)
-		setupOptions := strings.TrimSpace(data.Components[4].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value)
+
+		// Safety check for component count
+		if len(data.Components) < 4 {
+			s.logger.ErrorContext(ctx, "Modal data missing components",
+				"guild_id", i.GuildID,
+				"expected", 4,
+				"received", len(data.Components))
+			return s.respondError(i, "Invalid form submission - missing data")
+		}
+
+		// Safely extract text input values from components (support value and pointer variants)
+		getRow := func(mc discordgo.MessageComponent) (row discordgo.ActionsRow, ok bool) {
+			switch v := mc.(type) {
+			case discordgo.ActionsRow:
+				return v, true
+			case *discordgo.ActionsRow:
+				if v != nil {
+					return *v, true
+				}
+			}
+			return discordgo.ActionsRow{}, false
+		}
+		getText := func(mc discordgo.MessageComponent) (string, bool) {
+			switch v := mc.(type) {
+			case discordgo.TextInput:
+				return v.Value, true
+			case *discordgo.TextInput:
+				if v != nil {
+					return v.Value, true
+				}
+			}
+			return "", false
+		}
+
+		// Extract values with validation
+		var channelPrefix, roleNames, signupMessage, signupEmoji string
+		rows := data.Components
+		if r, ok := getRow(rows[0]); ok && len(r.Components) > 0 {
+			if v, ok := getText(r.Components[0]); ok {
+				channelPrefix = strings.TrimSpace(v)
+			}
+		}
+		if r, ok := getRow(rows[1]); ok && len(r.Components) > 0 {
+			if v, ok := getText(r.Components[0]); ok {
+				roleNames = strings.TrimSpace(v)
+			}
+		}
+		if r, ok := getRow(rows[2]); ok && len(r.Components) > 0 {
+			if v, ok := getText(r.Components[0]); ok {
+				signupMessage = strings.TrimSpace(v)
+			}
+		}
+		if r, ok := getRow(rows[3]); ok && len(r.Components) > 0 {
+			if v, ok := getText(r.Components[0]); ok {
+				signupEmoji = strings.TrimSpace(v)
+			}
+		}
+
+		// Parse role names from comma-separated string
+		var userRoleName, editorRoleName, adminRoleName string
+		if roleNames == "" {
+			roleNames = "Frolf Player, Frolf Editor, Frolf Admin"
+		}
+		roleParts := strings.Split(roleNames, ",")
+		if len(roleParts) >= 1 {
+			userRoleName = strings.TrimSpace(roleParts[0])
+		}
+		if len(roleParts) >= 2 {
+			editorRoleName = strings.TrimSpace(roleParts[1])
+		}
+		if len(roleParts) >= 3 {
+			adminRoleName = strings.TrimSpace(roleParts[2])
+		}
 
 		// Apply defaults
 		if channelPrefix == "" {
 			channelPrefix = "frolf"
 		}
-		if playerRoleName == "" {
-			playerRoleName = "Frolf Player"
+		if userRoleName == "" {
+			userRoleName = "Frolf Player"
+		}
+		if editorRoleName == "" {
+			editorRoleName = "Frolf Editor"
 		}
 		if adminRoleName == "" {
 			adminRoleName = "Frolf Admin"
 		}
-		if setupOptions == "" {
-			setupOptions = "auto-channels, auto-roles, signup-message"
+		if signupMessage == "" {
+			signupMessage = "React with 🥏 to sign up for frolf events!"
+		}
+		if signupEmoji == "" {
+			signupEmoji = "🥏"
 		}
 
-		// Get actual guild name if not provided
-		if guildName == "" {
-			guild, err := s.session.Guild(i.GuildID)
-			if err != nil {
-				s.logger.ErrorContext(ctx, "Failed to get guild info", "guild_id", i.GuildID, "error", err)
-				return s.respondError(i, "Failed to get guild information")
-			}
-			guildName = guild.Name
+		// Get guild name automatically
+		guild, err := s.session.Guild(i.GuildID)
+		if err != nil {
+			s.logger.ErrorContext(ctx, "Failed to get guild info", "guild_id", i.GuildID, "error", err)
+			return s.respondError(i, "Failed to get guild information")
 		}
+		guildName := guild.Name
 
 		s.logger.InfoContext(ctx, "Processing guild setup with custom options",
 			"guild_id", i.GuildID,
 			"guild_name", guildName,
 			"channel_prefix", channelPrefix,
-			"player_role", playerRoleName,
+			"user_role", userRoleName,
+			"editor_role", editorRoleName,
 			"admin_role", adminRoleName,
-			"options", setupOptions)
+			"signup_message", signupMessage,
+			"signup_emoji", signupEmoji)
 
 		// Acknowledge the submission immediately
-		err := s.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		err = s.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
 				Content: "🥏 Setting up your guild... This may take a moment.",
@@ -180,23 +247,29 @@ func (s *setupManager) HandleSetupModalSubmit(ctx context.Context, i *discordgo.
 			return fmt.Errorf("failed to acknowledge setup submission: %w", err)
 		}
 
-		// Parse setup options
-		options := parseSetupOptions(setupOptions)
-
-		// Perform the actual setup
+		// Perform the actual setup - always create channels, roles, and signup message
 		result, err := s.performCustomSetup(i.GuildID, SetupConfig{
 			GuildName:       guildName,
 			ChannelPrefix:   channelPrefix,
-			PlayerRoleName:  playerRoleName,
+			UserRoleName:    userRoleName,
+			EditorRoleName:  editorRoleName,
 			AdminRoleName:   adminRoleName,
-			CreateChannels:  options["auto-channels"],
-			CreateRoles:     options["auto-roles"],
-			CreateSignupMsg: options["signup-message"],
+			SignupMessage:   signupMessage,
+			SignupEmoji:     signupEmoji,
+			CreateChannels:  true, // Always create channels
+			CreateRoles:     true, // Always create roles
+			CreateSignupMsg: true, // Always create signup message
 		})
 		if err != nil {
 			s.logger.ErrorContext(ctx, "Custom setup failed", "guild_id", i.GuildID, "error", err)
 			return s.sendFollowupError(i, fmt.Sprintf("Setup failed: %v", err))
 		}
+
+		s.logger.InfoContext(ctx, "Guild setup completed - config will be available from backend",
+			"guild_id", i.GuildID,
+			"signup_channel_id", result.SignupChannelID,
+			"signup_message_id", result.SignupMessageID,
+			"signup_emoji", result.SignupEmoji)
 
 		// Publish setup event to backend
 		if err := s.publishSetupEvent(i, result); err != nil {
@@ -207,33 +280,6 @@ func (s *setupManager) HandleSetupModalSubmit(ctx context.Context, i *discordgo.
 		// Send success followup
 		return s.sendFollowupSuccess(i, result)
 	})
-}
-
-// parseSetupOptions parses the comma-separated setup options
-func parseSetupOptions(optionsStr string) map[string]bool {
-	options := map[string]bool{
-		"auto-channels":  false,
-		"auto-roles":     false,
-		"signup-message": false,
-	}
-
-	if optionsStr == "" {
-		// Default to all options
-		for key := range options {
-			options[key] = true
-		}
-		return options
-	}
-
-	parts := strings.Split(optionsStr, ",")
-	for _, part := range parts {
-		option := strings.TrimSpace(strings.ToLower(part))
-		if _, exists := options[option]; exists {
-			options[option] = true
-		}
-	}
-
-	return options
 }
 
 // sendFollowupError sends an error message as a followup
@@ -279,10 +325,17 @@ func (s *setupManager) sendFollowupSuccess(i *discordgo.InteractionCreate, resul
 			Inline: true,
 		})
 	}
-	if result.RegisteredRoleID != "" {
+	if result.UserRoleID != "" {
 		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-			Name:   "👥 Player Role",
-			Value:  fmt.Sprintf("<@&%s>", result.RegisteredRoleID),
+			Name:   "👥 User Role",
+			Value:  fmt.Sprintf("<@&%s>", result.UserRoleID),
+			Inline: true,
+		})
+	}
+	if result.EditorRoleID != "" {
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name:   "✏️ Editor Role",
+			Value:  fmt.Sprintf("<@&%s>", result.EditorRoleID),
 			Inline: true,
 		})
 	}

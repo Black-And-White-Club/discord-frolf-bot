@@ -7,6 +7,7 @@ import (
 	"time"
 
 	guilddiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/guild/discord"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
@@ -38,13 +39,14 @@ type Handlers interface {
 
 // GuildHandlers handles guild-related events.
 type GuildHandlers struct {
-	Logger         *slog.Logger
-	Config         *config.Config
-	Helpers        utils.Helpers
-	GuildDiscord   guilddiscord.GuildDiscordInterface
-	Tracer         trace.Tracer
-	Metrics        discordmetrics.DiscordMetrics
-	handlerWrapper func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc
+	Logger              *slog.Logger
+	Config              *config.Config
+	Helpers             utils.Helpers
+	GuildDiscord        guilddiscord.GuildDiscordInterface
+	GuildConfigResolver guildconfig.GuildConfigResolver // Use interface for better testability
+	Tracer              trace.Tracer
+	Metrics             discordmetrics.DiscordMetrics
+	handlerWrapper      func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc
 }
 
 // NewGuildHandlers creates a new GuildHandlers.
@@ -53,16 +55,18 @@ func NewGuildHandlers(
 	config *config.Config,
 	helpers utils.Helpers,
 	guildDiscord guilddiscord.GuildDiscordInterface,
+	guildConfigResolver guildconfig.GuildConfigResolver, // Use interface for better testability
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
 ) Handlers {
 	return &GuildHandlers{
-		Logger:       logger,
-		Config:       config,
-		Helpers:      helpers,
-		GuildDiscord: guildDiscord,
-		Tracer:       tracer,
-		Metrics:      metrics,
+		Logger:              logger,
+		Config:              config,
+		Helpers:             helpers,
+		GuildDiscord:        guildDiscord,
+		GuildConfigResolver: guildConfigResolver,
+		Tracer:              tracer,
+		Metrics:             metrics,
 		handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
 			return wrapHandler(handlerName, unmarshalTo, handlerFunc, logger, metrics, tracer, helpers)
 		},

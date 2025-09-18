@@ -81,8 +81,22 @@ func (drm *deleteRoundManager) HandleDeleteRoundButton(ctx context.Context, i *d
 			discordMessageID = i.Message.ID
 		}
 
+		// Lookup the event channel ID from guildconfig
+		var eventChannelID string
+		if drm.guildConfigResolver != nil && i.GuildID != "" {
+			guildConfig, err := drm.guildConfigResolver.GetGuildConfigWithContext(ctx, i.GuildID)
+			if err == nil && guildConfig != nil && guildConfig.EventChannelID != "" {
+				eventChannelID = guildConfig.EventChannelID
+			} else {
+				drm.logger.WarnContext(ctx, "Failed to resolve event channel ID, falling back to interaction channel", attr.Error(err))
+				eventChannelID = i.ChannelID
+			}
+		} else {
+			eventChannelID = i.ChannelID
+		}
+
 		// Send delete request
-		err = drm.sendDeleteRequest(ctx, sharedtypes.RoundID(roundUUID), userID, i.Interaction.ID, discordMessageID, i.GuildID)
+		err = drm.sendDeleteRequest(ctx, sharedtypes.RoundID(roundUUID), userID, i.Interaction.ID, discordMessageID, i.GuildID, eventChannelID)
 		if err != nil {
 			drm.logger.ErrorContext(ctx, "Failed to send delete request", attr.Error(err))
 
@@ -118,12 +132,12 @@ func (drm *deleteRoundManager) HandleDeleteRoundButton(ctx context.Context, i *d
 }
 
 // sendDeleteRequest publishes the delete request to the backend.
-func (drm *deleteRoundManager) sendDeleteRequest(ctx context.Context, roundID sharedtypes.RoundID, userID sharedtypes.DiscordID, interactionID string, discordMessageID string, guildID string) error {
+func (drm *deleteRoundManager) sendDeleteRequest(ctx context.Context, roundID sharedtypes.RoundID, userID sharedtypes.DiscordID, interactionID string, discordMessageID string, guildID string, channelID string) error {
 	// Prepare the payload for the backend
 	payload := discordroundevents.DiscordRoundDeleteRequestPayload{
 		RoundID:   roundID,
 		UserID:    userID,
-		ChannelID: "", // Will be populated by the backend if needed
+		ChannelID: channelID, // Now populated from guild config or interaction
 		MessageID: discordMessageID,
 		GuildID:   guildID,
 	}

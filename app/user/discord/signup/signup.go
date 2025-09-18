@@ -9,6 +9,7 @@ import (
 	"time"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
@@ -34,15 +35,16 @@ type SignupManager interface {
 }
 
 type signupManager struct {
-	session          discord.Session
-	publisher        eventbus.EventBus
-	logger           *slog.Logger
-	helper           utils.Helpers
-	config           *config.Config
-	interactionStore storage.ISInterface
-	tracer           trace.Tracer
-	metrics          discordmetrics.DiscordMetrics
-	operationWrapper func(ctx context.Context, opName string, fn func(ctx context.Context) (SignupOperationResult, error)) (SignupOperationResult, error)
+	session             discord.Session
+	publisher           eventbus.EventBus
+	logger              *slog.Logger
+	helper              utils.Helpers
+	config              *config.Config // Deprecated: use guildConfigResolver for per-guild config
+	guildConfigResolver guildconfig.GuildConfigResolver
+	interactionStore    storage.ISInterface
+	tracer              trace.Tracer
+	metrics             discordmetrics.DiscordMetrics
+	operationWrapper    func(ctx context.Context, opName string, fn func(ctx context.Context) (SignupOperationResult, error)) (SignupOperationResult, error)
 }
 
 // NewSignupManager creates a new SignupManager instance.
@@ -51,7 +53,8 @@ func NewSignupManager(
 	publisher eventbus.EventBus,
 	logger *slog.Logger,
 	helper utils.Helpers,
-	config *config.Config,
+	config *config.Config, // Deprecated: use guildConfigResolver for per-guild config
+	guildConfigResolver guildconfig.GuildConfigResolver,
 	interactionStore storage.ISInterface,
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
@@ -61,14 +64,15 @@ func NewSignupManager(
 	}
 
 	return &signupManager{
-		session:          session,
-		publisher:        publisher,
-		logger:           logger,
-		helper:           helper,
-		config:           config,
-		interactionStore: interactionStore,
-		tracer:           tracer,
-		metrics:          metrics,
+		session:             session,
+		publisher:           publisher,
+		logger:              logger,
+		helper:              helper,
+		config:              config, // Deprecated
+		guildConfigResolver: guildConfigResolver,
+		interactionStore:    interactionStore,
+		tracer:              tracer,
+		metrics:             metrics,
 		operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (SignupOperationResult, error)) (SignupOperationResult, error) {
 			return wrapSignupOperation(ctx, opName, fn, logger, tracer, metrics)
 		},

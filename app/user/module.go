@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/interactions"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	userdiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord"
@@ -37,11 +38,12 @@ func InitializeUserModule(
 	helper utils.Helpers,
 	interactionStore storage.ISInterface,
 	discordMetrics discordmetrics.DiscordMetrics,
+	guildConfigResolver guildconfig.GuildConfigResolver, // <-- Add this parameter
 ) (*userrouter.UserRouter, error) {
 	tracer := otel.Tracer("user-module")
 
 	// Initialize Discord services
-	userDiscord, err := userdiscord.NewUserDiscord(ctx, session, eventBus, logger, helper, cfg, interactionStore, tracer, discordMetrics)
+	userDiscord, err := userdiscord.NewUserDiscord(ctx, session, eventBus, logger, helper, cfg, guildConfigResolver, interactionStore, tracer, discordMetrics)
 	if err != nil {
 		logger.ErrorContext(ctx, "Failed to initialize user Discord services", attr.Error(err))
 		return nil, err
@@ -79,11 +81,20 @@ func InitializeUserModule(
 
 	// Register reaction handlers
 	reactionRegistry.RegisterMessageReactionAddHandler(func(s discord.Session, r *discordgo.MessageReactionAdd) {
+		logger.InfoContext(ctx, "🎯 MessageReactionAdd event received",
+			attr.String("user_id", r.UserID),
+			attr.String("message_id", r.MessageID),
+			attr.String("channel_id", r.ChannelID),
+			attr.String("guild_id", r.GuildID),
+			attr.String("emoji", r.Emoji.Name),
+		)
+
 		if _, err := userDiscord.GetSignupManager().MessageReactionAdd(s, r); err != nil {
 			logger.ErrorContext(ctx, "Error handling reaction add",
 				attr.Error(err),
 				attr.String("user_id", r.UserID),
 				attr.String("message_id", r.MessageID),
+				attr.String("guild_id", r.GuildID),
 			)
 		}
 	})

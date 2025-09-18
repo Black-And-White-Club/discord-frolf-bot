@@ -25,13 +25,21 @@ func (h *GuildHandlers) HandleGuildSetupRequest(msg *message.Message) ([]*messag
 				attr.String("admin_user_id", setupEvent.AdminUserID))
 
 			// Transform Discord event to backend request format
+			// Backward compatibility: map RegisteredRoleID to UserRoleID if the latter is empty
+			userRoleID := setupEvent.UserRoleID
+			if userRoleID == "" && setupEvent.RegisteredRoleID != "" {
+				userRoleID = setupEvent.RegisteredRoleID
+			}
 			backendPayload := sharedevents.GuildConfigRequestedPayload{
 				GuildID:              sharedtypes.GuildID(setupEvent.GuildID),
 				SignupChannelID:      setupEvent.SignupChannelID,
+				SignupMessageID:      setupEvent.SignupMessageID,
 				EventChannelID:       setupEvent.EventChannelID,
 				LeaderboardChannelID: setupEvent.LeaderboardChannelID,
-				UserRoleID:           setupEvent.RegisteredRoleID,
+				UserRoleID:           userRoleID,
+				EditorRoleID:         setupEvent.EditorRoleID,
 				AdminRoleID:          setupEvent.AdminRoleID,
+				SignupEmoji:          setupEvent.SignupEmoji,
 				AutoSetupCompleted:   true,
 				SetupCompletedAt:     &setupEvent.SetupCompletedAt,
 			}

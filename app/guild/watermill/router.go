@@ -1,4 +1,4 @@
-package guildwatermill
+package guildrouter
 
 import (
 	"context"
@@ -13,10 +13,8 @@ import (
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	tracingfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/tracing"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
-	"github.com/ThreeDotsLabs/watermill/components/metrics"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/message/router/middleware"
-	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -56,9 +54,7 @@ func NewGuildRouter(
 
 // Configure sets up the router.
 func (r *GuildRouter) Configure(ctx context.Context, handlers guildhandlers.Handlers) error {
-	// Add Prometheus metrics
-	metricsBuilder := metrics.NewPrometheusMetricsBuilder(prometheus.NewRegistry(), "", "")
-	metricsBuilder.AddPrometheusRouterMetrics(r.Router)
+	// Note: Using Discord metrics instead of separate Prometheus metrics to avoid conflicts
 
 	r.Router.AddMiddleware(
 		middleware.CorrelationID,
@@ -111,62 +107,37 @@ func (r *GuildRouter) RegisterHandlers(ctx context.Context, handlers guildhandle
 			handlerName,
 			topic,
 			r.subscriber,
-			"", // No dead letter topic for now - could add guild-dlq later
+			queueGroup,
 			nil,
 			func(msg *message.Message) ([]*message.Message, error) {
-				// Extract guild-specific context for multi-tenant processing
-				guildID := msg.Metadata.Get("guild_id")
-				if guildID == "" {
-					r.logger.WarnContext(ctx, "Message missing guild_id metadata",
-						attr.String("message_id", msg.UUID),
-						attr.String("topic", topic))
-					// Don't fail processing - some events might not have guild_id
-				}
-
-				r.logger.InfoContext(ctx, "Processing guild event",
-					attr.String("message_id", msg.UUID),
-					attr.String("topic", topic),
-					attr.String("guild_id", guildID),
-					attr.String("queue_group", queueGroup))
-
 				messages, err := handlerFunc(msg)
 				if err != nil {
 					r.logger.ErrorContext(ctx, "Error processing guild message",
 						attr.String("message_id", msg.UUID),
-						attr.String("guild_id", guildID),
-						attr.String("topic", topic),
 						attr.Error(err),
 					)
 					return nil, err
 				}
 
-				// Handle any response messages with proper guild context propagation
 				for _, m := range messages {
 					publishTopic := m.Metadata.Get("topic")
 					if publishTopic != "" {
-						// Ensure guild_id is propagated to response messages for multi-tenant routing
-						if guildID != "" {
-							m.Metadata.Set("guild_id", guildID)
-						}
-
-						r.logger.InfoContext(ctx, "Publishing guild response message",
+						r.logger.InfoContext(ctx, "Publishing message",
 							attr.String("message_id", m.UUID),
 							attr.String("topic", publishTopic),
-							attr.String("guild_id", guildID))
-
+						)
 						if err := r.publisher.Publish(publishTopic, m); err != nil {
-							return nil, fmt.Errorf("failed to publish guild response to %s: %w", publishTopic, err)
+							return nil, fmt.Errorf("failed to publish to %s: %w", publishTopic, err)
 						}
+					} else {
+						r.logger.WarnContext(ctx, "Message missing topic metadata",
+							attr.String("message_id", m.UUID),
+						)
 					}
 				}
 				return nil, nil
 			},
 		)
-
-		r.logger.InfoContext(ctx, "Registered guild handler with multi-tenant queue group",
-			attr.String("topic", topic),
-			attr.String("queue_group", queueGroup),
-			attr.String("handler", handlerName))
 	}
 
 	r.logger.InfoContext(ctx, "Guild router configured successfully",

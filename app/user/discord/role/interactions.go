@@ -36,8 +36,31 @@ func (rm *roleManager) RespondToRoleRequest(ctx context.Context, interactionID, 
 		}
 
 		var buttons []discordgo.MessageComponent
-		// Iterate over the role mappings from the config
-		for role := range rm.config.GetRoleMappings() {
+		// Prefer per-guild role mappings when available; otherwise fall back to static config
+		roleMappings := map[string]string{}
+
+		// Try to read guild id from context (set upstream by handlers)
+		guildID := ""
+		if v := ctx.Value(discordmetrics.GuildIDKey); v != nil {
+			if s, ok := v.(string); ok {
+				guildID = s
+			}
+		}
+
+		// Attempt resolver only if present and we have a guild id; otherwise silently fall back
+		if rm.guildConfigResolver != nil && guildID != "" {
+			if guildConfig, cfgErr := rm.guildConfigResolver.GetGuildConfigWithContext(ctx, guildID); cfgErr == nil && guildConfig != nil && guildConfig.RoleMappings != nil {
+				roleMappings = guildConfig.RoleMappings
+			}
+		}
+		// Fallback to app config if still empty
+		if len(roleMappings) == 0 && rm.config != nil {
+			if rm.config.Discord.RoleMappings != nil {
+				roleMappings = rm.config.Discord.RoleMappings
+			}
+		}
+
+		for role := range roleMappings {
 			buttons = append(buttons, discordgo.Button{
 				Label:    role,
 				Style:    discordgo.PrimaryButton,

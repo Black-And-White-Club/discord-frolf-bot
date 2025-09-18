@@ -18,13 +18,25 @@ const (
 
 // UpdateRoundEventEmbed updates the round event embed with new participant information.
 func (rrm *roundRsvpManager) UpdateRoundEventEmbed(ctx context.Context, channelID string, messageID string, acceptedParticipants, declinedParticipants, tentativeParticipants []roundtypes.Participant) (RoundRsvpOperationResult, error) {
+	// Multi-tenant support: resolve channelID from guild config if not provided
+	resolvedChannelID := channelID
+	if resolvedChannelID == "" {
+		guildID := rrm.config.GetGuildID()
+		if guildID != "" {
+			cfg, err := rrm.guildConfigResolver.GetGuildConfigWithContext(ctx, guildID)
+			if err == nil && cfg != nil && cfg.EventChannelID != "" {
+				resolvedChannelID = cfg.EventChannelID
+			}
+		}
+	}
+
 	return rrm.operationWrapper(ctx, "UpdateRoundEventEmbed", func(ctx context.Context) (RoundRsvpOperationResult, error) {
-		msg, err := rrm.session.ChannelMessage(channelID, messageID)
+		msg, err := rrm.session.ChannelMessage(resolvedChannelID, messageID)
 		if err != nil {
 			wrappedErr := fmt.Errorf("failed to fetch message: %w", err)
 			rrm.logger.ErrorContext(ctx, "Failed to fetch message for embed update",
 				attr.Error(wrappedErr),
-				attr.String("channel_id", channelID),
+				attr.String("channel_id", resolvedChannelID),
 				attr.String("discord_message_id", messageID))
 			return RoundRsvpOperationResult{Error: wrappedErr}, wrappedErr
 		}
@@ -32,7 +44,7 @@ func (rrm *roundRsvpManager) UpdateRoundEventEmbed(ctx context.Context, channelI
 		if len(msg.Embeds) == 0 {
 			err := fmt.Errorf("no embeds found in message")
 			rrm.logger.ErrorContext(ctx, "No embeds found in message",
-				attr.String("channel_id", channelID),
+				attr.String("channel_id", resolvedChannelID),
 				attr.String("discord_message_id", messageID))
 			return RoundRsvpOperationResult{Error: err}, err
 		}
@@ -42,7 +54,7 @@ func (rrm *roundRsvpManager) UpdateRoundEventEmbed(ctx context.Context, channelI
 		if len(embed.Fields) < 5 { // Assuming fields are in a consistent order: 0,1,2=Accepted,3=Declined,4=Tentative
 			err := fmt.Errorf("embed does not have expected fields (expected at least 5, got %d)", len(embed.Fields))
 			rrm.logger.ErrorContext(ctx, "Embed doesn't have expected fields",
-				attr.String("channel_id", channelID),
+				attr.String("channel_id", resolvedChannelID),
 				attr.String("discord_message_id", messageID),
 				attr.Int("field_count", len(embed.Fields)))
 			return RoundRsvpOperationResult{Error: err}, err
@@ -54,18 +66,18 @@ func (rrm *roundRsvpManager) UpdateRoundEventEmbed(ctx context.Context, channelI
 		embed.Fields[4].Value = rrm.formatParticipants(ctx, tentativeParticipants)
 
 		// Update the message in the channel
-		updatedMsg, err := rrm.session.ChannelMessageEditEmbed(channelID, messageID, embed)
+		updatedMsg, err := rrm.session.ChannelMessageEditEmbed(resolvedChannelID, messageID, embed)
 		if err != nil {
 			wrappedErr := fmt.Errorf("failed to update embed: %w", err)
 			rrm.logger.ErrorContext(ctx, "Failed to update round event embed",
 				attr.Error(wrappedErr),
-				attr.String("channel_id", channelID),
+				attr.String("channel_id", resolvedChannelID),
 				attr.String("discord_message_id", messageID))
 			return RoundRsvpOperationResult{Error: wrappedErr}, wrappedErr
 		}
 
 		rrm.logger.InfoContext(ctx, "Successfully updated round event embed",
-			attr.String("channel_id", channelID),
+			attr.String("channel_id", resolvedChannelID),
 			attr.String("discord_message_id", messageID),
 			attr.Int("accepted_count", len(acceptedParticipants)),
 			attr.Int("declined_count", len(declinedParticipants)),

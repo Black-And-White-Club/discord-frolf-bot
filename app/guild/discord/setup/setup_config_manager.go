@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"time"
 
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
@@ -15,6 +17,8 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+// (SetupSession interface is defined in setup_session.go)
+
 // SetupManager interface defines the contract for guild setup management
 type SetupManager interface {
 	HandleSetupCommand(ctx context.Context, i *discordgo.InteractionCreate) error
@@ -23,20 +27,21 @@ type SetupManager interface {
 }
 
 type setupManager struct {
-	session          *discordgo.Session
-	publisher        eventbus.EventBus
-	logger           *slog.Logger
-	helper           utils.Helpers
-	config           *config.Config
-	interactionStore storage.ISInterface
-	tracer           trace.Tracer
-	metrics          discordmetrics.DiscordMetrics
-	operationWrapper func(ctx context.Context, opName string, fn func(ctx context.Context) error) error
+	session             discord.Session
+	publisher           eventbus.EventBus
+	logger              *slog.Logger
+	helper              utils.Helpers
+	config              *config.Config
+	interactionStore    storage.ISInterface
+	tracer              trace.Tracer
+	metrics             discordmetrics.DiscordMetrics
+	operationWrapper    func(ctx context.Context, opName string, fn func(ctx context.Context) error) error
+	guildConfigResolver guildconfig.GuildConfigResolver
 }
 
 // NewSetupManager creates a new SetupManager instance
 func NewSetupManager(
-	session *discordgo.Session,
+	session discord.Session,
 	publisher eventbus.EventBus,
 	logger *slog.Logger,
 	helper utils.Helpers,
@@ -44,6 +49,7 @@ func NewSetupManager(
 	interactionStore storage.ISInterface,
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
+	guildConfigResolver guildconfig.GuildConfigResolver,
 ) (SetupManager, error) {
 	if logger != nil {
 		logger.InfoContext(context.Background(), "Creating Guild SetupManager")
@@ -61,6 +67,7 @@ func NewSetupManager(
 		operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) error) error {
 			return wrapSetupOperation(ctx, opName, fn, logger, tracer, metrics)
 		},
+		guildConfigResolver: guildConfigResolver,
 	}, nil
 }
 

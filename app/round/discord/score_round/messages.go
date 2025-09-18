@@ -15,13 +15,26 @@ func (srm *scoreRoundManager) SendScoreUpdateConfirmation(ctx context.Context, c
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.CommandNameKey, "send_score_update_confirmation")
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.UserIDKey, string(userID))
 
+	// Multi-tenant: resolve channel ID from guild config if not provided
+	resolvedChannelID := channelID
+	if resolvedChannelID == "" {
+		// Try to get guildID from context if available
+		guildID, _ := ctx.Value("guild_id").(string)
+		if guildID != "" {
+			cfg, err := srm.guildConfigResolver.GetGuildConfigWithContext(ctx, guildID)
+			if err == nil && cfg != nil && cfg.EventChannelID != "" {
+				resolvedChannelID = cfg.EventChannelID
+			}
+		}
+	}
+
 	srm.logger.InfoContext(ctx, "Sending score update confirmation",
-		attr.String("channel_id", channelID),
+		attr.String("channel_id", resolvedChannelID),
 		attr.String("user_id", string(userID)),
 		attr.Any("score", *score))
 
 	return srm.operationWrapper(ctx, "send_score_update_confirmation", func(ctx context.Context) (ScoreRoundOperationResult, error) {
-		_, err := srm.session.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
+		_, err := srm.session.ChannelMessageSendComplex(resolvedChannelID, &discordgo.MessageSend{
 			Content: fmt.Sprintf("<@%s> Your score of %d has been recorded!", string(userID), *score),
 			AllowedMentions: &discordgo.MessageAllowedMentions{
 				Users: []string{string(userID)},
@@ -30,7 +43,7 @@ func (srm *scoreRoundManager) SendScoreUpdateConfirmation(ctx context.Context, c
 		if err != nil {
 			srm.logger.ErrorContext(ctx, "Failed to send score update confirmation",
 				attr.Error(err),
-				attr.String("channel_id", channelID),
+				attr.String("channel_id", resolvedChannelID),
 				attr.String("user_id", string(userID)))
 			return ScoreRoundOperationResult{Error: err}, err
 		}

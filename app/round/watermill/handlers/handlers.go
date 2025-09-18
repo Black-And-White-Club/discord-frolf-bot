@@ -22,6 +22,7 @@ type Handlers interface {
 	HandleRoundStarted(msg *message.Message) ([]*message.Message, error)
 	HandleScoreUpdateError(msg *message.Message) ([]*message.Message, error)
 	HandleParticipantScoreUpdated(msg *message.Message) ([]*message.Message, error)
+	HandleScoreOverrideSuccess(msg *message.Message) ([]*message.Message, error)
 	HandleRoundReminder(msg *message.Message) ([]*message.Message, error)
 	HandleRoundParticipantJoinRequest(msg *message.Message) ([]*message.Message, error)
 	HandleRoundParticipantJoined(msg *message.Message) ([]*message.Message, error)

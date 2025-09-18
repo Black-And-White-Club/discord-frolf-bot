@@ -116,7 +116,7 @@ func Test_setupManager_HandleSetupModalSubmit(t *testing.T) {
 }
 
 // validSetupInteraction creates a valid interaction for testing
-func validSetupInteraction(guildName, channelPrefix, playerRoleName, adminRoleName, setupOptions string) *discordgo.InteractionCreate {
+func validSetupInteraction(channelPrefix, playerRoleName, adminRoleName, signupMessage, signupEmoji string) *discordgo.InteractionCreate {
 	return &discordgo.InteractionCreate{
 		Interaction: &discordgo.Interaction{
 			ID:      uuid.New().String(),
@@ -126,14 +126,6 @@ func validSetupInteraction(guildName, channelPrefix, playerRoleName, adminRoleNa
 			Data: discordgo.ModalSubmitInteractionData{
 				CustomID: "guild_setup_modal",
 				Components: []discordgo.MessageComponent{
-					discordgo.ActionsRow{
-						Components: []discordgo.MessageComponent{
-							discordgo.TextInput{
-								CustomID: "guild_name",
-								Value:    guildName,
-							},
-						},
-					},
 					discordgo.ActionsRow{
 						Components: []discordgo.MessageComponent{
 							discordgo.TextInput{
@@ -161,8 +153,16 @@ func validSetupInteraction(guildName, channelPrefix, playerRoleName, adminRoleNa
 					discordgo.ActionsRow{
 						Components: []discordgo.MessageComponent{
 							discordgo.TextInput{
-								CustomID: "setup_options",
-								Value:    setupOptions,
+								CustomID: "signup_message",
+								Value:    signupMessage,
+							},
+						},
+					},
+					discordgo.ActionsRow{
+						Components: []discordgo.MessageComponent{
+							discordgo.TextInput{
+								CustomID: "signup_emoji",
+								Value:    signupEmoji,
 							},
 						},
 					},
