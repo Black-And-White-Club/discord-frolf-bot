@@ -8,6 +8,8 @@ import (
 
 const minPrefixLen = 3
 
+var bulkReplacer = strings.NewReplacer("<@", "", ">", "", "=", " ", "!", "")
+
 type bulkUpdate struct {
 	UserID string
 	Score  int
@@ -79,13 +81,12 @@ func parseBulkOverrides(raw string, originalScores map[string]int, idx nameIndex
 	var diagnostics []bulkDiagnostics
 	var unresolved []string
 	var skipped, unchanged int
-	replacer := strings.NewReplacer("<@", "", ">", "", "=", " ", "!", "")
 	for _, rawLine := range lines {
 		line := strings.TrimSpace(rawLine)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		norm := replacer.Replace(line)
+		norm := bulkReplacer.Replace(line)
 		parts := strings.Fields(norm)
 		if len(parts) < 2 {
 			skipped++

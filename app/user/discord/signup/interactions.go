@@ -81,22 +81,28 @@ func (sm *signupManager) MessageReactionAdd(s discord.Session, r *discordgo.Mess
 			attr.String("signup_emoji", signupEmoji),
 		)
 
-		// Check if the reaction matches the configured signup channel and emoji (simplified approach)
-		// Normalize both emojis to handle Unicode variation selectors
-		normalizedReactionEmoji := normalizeEmoji(r.Emoji.Name)
-		normalizedExpectedEmoji := normalizeEmoji(signupEmoji)
-
-		if r.ChannelID != signupChannelID || normalizedReactionEmoji != normalizedExpectedEmoji {
-			sm.logger.InfoContext(ctx, "Reaction mismatch - ignoring",
+		// Check if the reaction matches the configured signup channel and emoji
+		if r.ChannelID != signupChannelID {
+			sm.logger.InfoContext(ctx, "Reaction channel mismatch - ignoring",
 				attr.String("channel_id", r.ChannelID),
-				attr.Any("emoji", r.Emoji.Name),
-				attr.String("normalized_emoji", normalizedReactionEmoji),
 				attr.String("expected_channel", signupChannelID),
-				attr.String("expected_emoji", signupEmoji),
-				attr.String("normalized_expected_emoji", normalizedExpectedEmoji),
 			)
-			// Return success, indicating the reaction was received but not processed as a signup reaction
 			return SignupOperationResult{Success: "reaction mismatch, ignored"}, nil
+		}
+
+		// Fast path: compare raw emoji first; normalize only on mismatch
+		if r.Emoji.Name != signupEmoji {
+			normalizedReactionEmoji := normalizeEmoji(r.Emoji.Name)
+			normalizedExpectedEmoji := normalizeEmoji(signupEmoji)
+			if normalizedReactionEmoji != normalizedExpectedEmoji {
+				sm.logger.InfoContext(ctx, "Reaction emoji mismatch - ignoring",
+					attr.Any("emoji", r.Emoji.Name),
+					attr.String("normalized_emoji", normalizedReactionEmoji),
+					attr.String("expected_emoji", signupEmoji),
+					attr.String("normalized_expected_emoji", normalizedExpectedEmoji),
+				)
+				return SignupOperationResult{Success: "reaction mismatch, ignored"}, nil
+			}
 		}
 
 		sm.logger.InfoContext(ctx, "Valid signup reaction detected, processing...")

@@ -16,6 +16,11 @@ const (
 	// maxCASRetries controls how many times CAS operations will retry
 	// when marking or clearing pending requests under contention.
 	maxCASRetries = 10
+	// minCleanupInterval ensures the cleanup goroutine does not run too frequently
+	// even if the configured TTL is very small.
+	minCleanupInterval = time.Second
+	// defaultCleanupInterval is used if cacheTTL is not set or invalid (<= 0)
+	defaultCleanupInterval = 5 * time.Minute
 )
 
 // CacheMetrics interface for monitoring cache performance
@@ -293,7 +298,18 @@ func (gc *GuildConfigCache) evictOldestEntry() {
 
 // cleanupExpiredEntries runs periodically to remove expired entries
 func (gc *GuildConfigCache) cleanupExpiredEntries(ctx context.Context) {
-	ticker := time.NewTicker(gc.cacheTTL / 4) // Cleanup 4x more frequently than TTL
+	// Determine a safe ticker interval
+	var interval time.Duration
+	if gc.cacheTTL <= 0 {
+		interval = defaultCleanupInterval
+	} else {
+		interval = gc.cacheTTL / 4 // Cleanup 4x more frequently than TTL
+		if interval < minCleanupInterval {
+			interval = minCleanupInterval
+		}
+	}
+
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for {
