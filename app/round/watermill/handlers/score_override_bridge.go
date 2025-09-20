@@ -10,6 +10,11 @@ import (
 	"github.com/ThreeDotsLabs/watermill/message"
 )
 
+const (
+	metaDiscordMessageID = "discord_message_id"
+	metaChannelID        = "channel_id"
+)
+
 // HandleScoreOverrideSuccess bridges CorrectScore success events into the round Discord update flow
 // by publishing a DiscordParticipantScoreUpdated event so the embed refresh logic is reused.
 func (h *RoundHandlers) HandleScoreOverrideSuccess(msg *message.Message) ([]*message.Message, error) {
@@ -23,8 +28,8 @@ func (h *RoundHandlers) HandleScoreOverrideSuccess(msg *message.Message) ([]*mes
 			}
 
 			// Pull discord message id & channel id (if any) from metadata. Channel may be absent.
-			messageID := msg.Metadata.Get("discord_message_id")
-			channelID := msg.Metadata.Get("channel_id") // optional; Update handler falls back to config if empty
+			messageID := msg.Metadata.Get(metaDiscordMessageID)
+			channelID := msg.Metadata.Get(metaChannelID) // optional; Update handler falls back to config if empty
 
 			if messageID == "" {
 				h.Logger.WarnContext(ctx, "score override success missing discord_message_id metadata; no embed update will occur")

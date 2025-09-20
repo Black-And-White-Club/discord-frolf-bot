@@ -12,6 +12,12 @@ import (
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 )
 
+const (
+	// maxCASRetries controls how many times CAS operations will retry
+	// when marking or clearing pending requests under contention.
+	maxCASRetries = 10
+)
+
 // CacheMetrics interface for monitoring cache performance
 type CacheMetrics interface {
 	RecordHit()
@@ -345,7 +351,7 @@ func (gc *GuildConfig) IsConfigured() bool {
 // Uses atomic CAS operations with retry loop to prevent race conditions
 func (gc *GuildConfigCache) MarkRequestPending(guildID string) bool {
 	// Retry loop for CAS operations to avoid stack overflow under high contention
-	for retries := 0; retries < 10; retries++ {
+	for retries := 0; retries < maxCASRetries; retries++ {
 		if value, found := gc.store.Load(guildID); found {
 			config := value.(*GuildConfig)
 
@@ -395,7 +401,7 @@ func (gc *GuildConfigCache) MarkRequestPending(guildID string) bool {
 // Uses atomic CAS operations with retry loop to prevent race conditions
 func (gc *GuildConfigCache) ClearRequestPending(guildID string) {
 	// Retry loop for CAS operations to avoid stack overflow under high contention
-	for retries := 0; retries < 10; retries++ {
+	for retries := 0; retries < maxCASRetries; retries++ {
 		value, found := gc.store.Load(guildID)
 		if !found {
 			return // Entry doesn't exist

@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+const minPrefixLen = 3
+
 type bulkUpdate struct {
 	UserID string
 	Score  int
@@ -26,7 +28,7 @@ type nameIndex struct {
 func buildNameIndex(nameToID map[string]string) nameIndex {
 	prefixToID := map[string]string{}
 	for ln, uid := range nameToID {
-		for l := 3; l <= len(ln); l++ {
+		for l := minPrefixLen; l <= len(ln); l++ {
 			p := ln[:l]
 			if existing, ok := prefixToID[p]; ok {
 				if existing != uid { // collision
@@ -63,7 +65,7 @@ func resolveToken(tok string, idx nameIndex) (string, bool) {
 	if id, ok := idx.nameToID[lt]; ok {
 		return id, true
 	}
-	if len(lt) >= 3 {
+	if len(lt) >= minPrefixLen {
 		if id, ok := idx.prefixToID[lt]; ok && id != "" {
 			return id, true
 		}
