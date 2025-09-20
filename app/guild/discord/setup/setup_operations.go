@@ -9,9 +9,6 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-// requestOpt provides a typed-nil RequestOption to satisfy mocks expecting options.
-func requestOpt() discordgo.RequestOption { return discordgo.RequestOption(nil) }
-
 // performCustomSetup performs guild setup with custom configuration
 func (s *setupManager) performCustomSetup(guildID string, config SetupConfig) (*SetupResult, error) {
 	result := &SetupResult{
@@ -19,7 +16,7 @@ func (s *setupManager) performCustomSetup(guildID string, config SetupConfig) (*
 	}
 
 	// Get guild info
-	guild, err := s.session.Guild(guildID, requestOpt())
+	guild, err := s.session.Guild(guildID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get guild info: %w", err)
 	}
@@ -103,7 +100,7 @@ func (s *setupManager) publishSetupEvent(i *discordgo.InteractionCreate, result 
 	}
 
 	// Get guild info
-	guild, err := s.session.Guild(i.GuildID, requestOpt())
+	guild, err := s.session.Guild(i.GuildID)
 	if err != nil {
 		return fmt.Errorf("failed to get guild info: %w", err)
 	}
@@ -149,7 +146,7 @@ func (s *setupManager) publishSetupEvent(i *discordgo.InteractionCreate, result 
 // createOrFindChannel creates a new channel or finds an existing one
 func (s *setupManager) createOrFindChannel(guildID, channelName, topic string) (string, error) {
 	// Try to find existing channel first
-	channels, err := s.session.GuildChannels(guildID, requestOpt())
+	channels, err := s.session.GuildChannels(guildID)
 	if err != nil {
 		return "", err
 	}
@@ -161,14 +158,14 @@ func (s *setupManager) createOrFindChannel(guildID, channelName, topic string) (
 	}
 
 	// Create new channel
-	channel, err := s.session.GuildChannelCreate(guildID, channelName, discordgo.ChannelTypeGuildText, requestOpt())
+	channel, err := s.session.GuildChannelCreate(guildID, channelName, discordgo.ChannelTypeGuildText)
 	if err != nil {
 		return "", err
 	}
 
 	// Set topic if provided
 	if topic != "" {
-		s.session.ChannelEdit(channel.ID, &discordgo.ChannelEdit{Topic: topic}, requestOpt())
+		s.session.ChannelEdit(channel.ID, &discordgo.ChannelEdit{Topic: topic})
 	}
 
 	return channel.ID, nil
@@ -190,7 +187,7 @@ func (s *setupManager) createOrFindRole(guild *discordgo.Guild, roleName string,
 	role, err := s.session.GuildRoleCreate(guild.ID, &discordgo.RoleParams{
 		Name:  roleName,
 		Color: &color,
-	}, requestOpt())
+	})
 	if err != nil {
 		return "", err
 	}
@@ -211,7 +208,7 @@ func (s *setupManager) createSignupMessage(guildID, channelID, content, emojiNam
 		emojiName = "🥏"
 	}
 
-	message, err := s.session.ChannelMessageSend(channelID, content, requestOpt())
+	message, err := s.session.ChannelMessageSend(channelID, content)
 	if err != nil {
 		return "", fmt.Errorf("failed to send signup message: %w", err)
 	}

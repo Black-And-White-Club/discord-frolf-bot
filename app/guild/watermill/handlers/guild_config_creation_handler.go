@@ -29,7 +29,30 @@ func (h *GuildHandlers) HandleGuildConfigCreated(msg *message.Message) ([]*messa
 				return nil, fmt.Errorf("failed to register commands for guild %s: %w", guildID, err)
 			}
 
-			h.Logger.InfoContext(ctx, "Successfully registered all commands - guild config available from backend",
+			// Make guild config available to runtime immediately (not just on retrieval events)
+			convertedConfig := convertGuildConfigFromShared(&p.Config)
+			if convertedConfig != nil {
+				// Persist into in-memory runtime config so other handlers (e.g., leaderboard embeds) can resolve channels
+				if h.Config != nil {
+					h.Config.UpdateGuildConfig(
+						convertedConfig.GuildID,
+						convertedConfig.SignupChannelID,
+						convertedConfig.EventChannelID,
+						convertedConfig.LeaderboardChannelID,
+						convertedConfig.SignupMessageID,
+						convertedConfig.RegisteredRoleID,
+						convertedConfig.AdminRoleID,
+						convertedConfig.RoleMappings,
+					)
+				}
+
+				// Notify resolver to unblock any pending config lookups
+				if h.GuildConfigResolver != nil {
+					h.GuildConfigResolver.HandleGuildConfigReceived(ctx, guildID, convertedConfig)
+				}
+			}
+
+			h.Logger.InfoContext(ctx, "Successfully registered all commands and cached guild config",
 				attr.String("guild_id", guildID))
 
 			return nil, nil

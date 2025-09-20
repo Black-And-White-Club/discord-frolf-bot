@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	pprof "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -159,6 +160,26 @@ func runStandaloneMode(ctx context.Context) {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, `{"status":"ready","service":"discord-frolf-bot"}`)
 	})
+
+	// Optionally enable pprof if requested
+	if os.Getenv("PPROF_ENABLED") == "true" {
+		addr := os.Getenv("PPROF_ADDR")
+		if addr == "" {
+			addr = ":6060"
+		}
+		mux := http.NewServeMux()
+		mux.HandleFunc("/debug/pprof/", pprof.Index)
+		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+		go func() {
+			logger.Info("pprof enabled", attr.String("addr", addr))
+			if err := http.ListenAndServe(addr, mux); err != nil && err != http.ErrServerClosed {
+				logger.Error("pprof server failed", attr.Error(err))
+			}
+		}()
+	}
 
 	healthServer := &http.Server{
 		Addr:    ":8080",
