@@ -170,6 +170,10 @@ func (sm *signupManager) HandleSignupModalSubmit(ctx context.Context, i *discord
 			return SignupOperationResult{Error: fmt.Errorf("invalid tag number: %w", err)}, err
 		}
 
+		if guildID == "" {
+			_ = sm.sendFollowupMessage(i.Interaction, "Error: Could not determine guild ID. Please try again or contact support.")
+			return SignupOperationResult{Error: errors.New("guildID is empty")}, errors.New("guildID is empty")
+		}
 		payload := userevents.UserSignupRequestPayload{
 			GuildID:   sharedtypes.GuildID(guildID),
 			UserID:    sharedtypes.DiscordID(userID),
