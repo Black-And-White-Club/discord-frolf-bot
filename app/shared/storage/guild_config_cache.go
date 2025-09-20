@@ -171,9 +171,9 @@ func (gc *GuildConfigCache) Get(guildID string) (*GuildConfig, bool) {
 		return nil, false
 	}
 
-	// Background refresh trigger: if refreshTTL exceeded and not already pending
-	if time.Since(config.RefreshedAt) > gc.refreshTTL && !config.IsRequestPending {
-		slog.Debug("Guild config is stale — triggering background refresh",
+	// Background refresh trigger: if refreshTTL exceeded, atomically mark as pending
+	if time.Since(config.RefreshedAt) > gc.refreshTTL {
+		slog.Debug("Guild config is stale — attempting to trigger background refresh",
 			attr.String("guild_id", guildID))
 
 		go func() {

@@ -16,7 +16,21 @@ import (
 	"github.com/google/uuid"
 )
 
-// normalizeParticipantInput converts an @mention like <@1234> or <@!1234> to 1234, otherwise returns trimmed input
+// normalizeParticipantInput parses a Discord user mention and returns the user ID.
+//
+// It accepts input strings in the following formats:
+//   - "<@1234>"   => "1234"
+//   - "<@!1234>"  => "1234"
+//   - "1234"      => "1234"
+//   - "  <@1234>  " => "1234"
+//   - ""          => ""
+//   - "some text" => "some text"
+//
+// If the input is a Discord mention (e.g., "<@1234>" or "<@!1234>"), it extracts and returns the user ID.
+// Otherwise, it returns the trimmed input string.
+// Edge cases:
+//   - Input with extra whitespace is trimmed.
+//   - Input that does not match the mention format is returned as-is (trimmed).
 func normalizeParticipantInput(in string) string {
 	in = strings.TrimSpace(in)
 	if in == "" {
