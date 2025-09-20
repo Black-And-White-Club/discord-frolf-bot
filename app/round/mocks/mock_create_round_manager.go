@@ -120,18 +120,18 @@ func (mr *MockCreateRoundManagerMockRecorder) SendCreateRoundModal(ctx, i any) *
 }
 
 // SendRoundEventEmbed mocks base method.
-func (m *MockCreateRoundManager) SendRoundEventEmbed(channelID string, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, creatorID sharedtypes.DiscordID, roundID sharedtypes.RoundID) (createround.CreateRoundOperationResult, error) {
+func (m *MockCreateRoundManager) SendRoundEventEmbed(guildID, channelID string, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, creatorID sharedtypes.DiscordID, roundID sharedtypes.RoundID) (createround.CreateRoundOperationResult, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SendRoundEventEmbed", channelID, title, description, startTime, location, creatorID, roundID)
+	ret := m.ctrl.Call(m, "SendRoundEventEmbed", guildID, channelID, title, description, startTime, location, creatorID, roundID)
 	ret0, _ := ret[0].(createround.CreateRoundOperationResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // SendRoundEventEmbed indicates an expected call of SendRoundEventEmbed.
-func (mr *MockCreateRoundManagerMockRecorder) SendRoundEventEmbed(channelID, title, description, startTime, location, creatorID, roundID any) *gomock.Call {
+func (mr *MockCreateRoundManagerMockRecorder) SendRoundEventEmbed(guildID, channelID, title, description, startTime, location, creatorID, roundID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendRoundEventEmbed", reflect.TypeOf((*MockCreateRoundManager)(nil).SendRoundEventEmbed), channelID, title, description, startTime, location, creatorID, roundID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendRoundEventEmbed", reflect.TypeOf((*MockCreateRoundManager)(nil).SendRoundEventEmbed), guildID, channelID, title, description, startTime, location, creatorID, roundID)
 }
 
 // UpdateInteractionResponse mocks base method.

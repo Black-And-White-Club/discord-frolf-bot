@@ -94,19 +94,30 @@ func (rrm *roundRsvpManager) HandleRoundResponse(ctx context.Context, i *discord
 			return RoundRsvpOperationResult{Error: fmt.Errorf("failed to parse round UUID: %w", err)}, nil
 		}
 
-		var tagNumberPtr *sharedtypes.TagNumber = nil
+		// var tagNumberPtr *sharedtypes.TagNumber = nil
 
-		payload := roundevents.ParticipantJoinRequestPayload{
-			RoundID:   sharedtypes.RoundID(roundUUID),
-			UserID:    sharedtypes.DiscordID(user.ID),
-			Response:  response,
-			TagNumber: tagNumberPtr,
+		// Multi-tenant: resolve channel ID from guild config if possible
+		resolvedChannelID := i.ChannelID
+		if rrm.guildConfigResolver != nil && i.GuildID != "" {
+			cfg, err := rrm.guildConfigResolver.GetGuildConfigWithContext(ctx, i.GuildID)
+			if err == nil && cfg != nil && cfg.EventChannelID != "" {
+				resolvedChannelID = cfg.EventChannelID
+			}
+		}
+
+		payload := discordroundevents.DiscordRoundParticipantJoinRequestPayload{
+			RoundID:    sharedtypes.RoundID(roundUUID),
+			UserID:     sharedtypes.DiscordID(user.ID),
+			ChannelID:  resolvedChannelID,
+			JoinedLate: nil, // Normal join, not late
+			GuildID:    i.GuildID,
 		}
 
 		msg := &wmmessage.Message{
 			Metadata: wmmessage.Metadata{
 				"discord_message_id": messageID, // Use the safely extracted messageID
 				"topic":              discordroundevents.RoundParticipantJoinReqTopic,
+				"response":           string(response),
 			},
 		}
 
@@ -174,7 +185,22 @@ func (rrm *roundRsvpManager) InteractionJoinRoundLate(ctx context.Context, i *di
 		}
 
 		// Check if user is already participating by fetching the current embed
-		message, err := rrm.session.ChannelMessage(i.ChannelID, i.Message.ID)
+		// Multi-tenant: resolve channel ID from guild config if possible
+		resolvedChannelID := i.ChannelID
+		if rrm.guildConfigResolver != nil && i.GuildID != "" {
+			cfg, err := rrm.guildConfigResolver.GetGuildConfigWithContext(ctx, i.GuildID)
+			if err == nil && cfg != nil && cfg.EventChannelID != "" {
+				resolvedChannelID = cfg.EventChannelID
+			}
+		}
+
+		if rrm.session == nil {
+			return RoundRsvpOperationResult{Error: fmt.Errorf("session is nil")}, nil
+		}
+		if i.Message == nil {
+			return RoundRsvpOperationResult{Error: fmt.Errorf("interaction message is nil")}, nil
+		}
+		message, err := rrm.session.ChannelMessage(resolvedChannelID, i.Message.ID)
 		if err != nil {
 			return RoundRsvpOperationResult{Error: fmt.Errorf("failed to fetch current message: %w", err)}, nil
 		}
@@ -228,6 +254,7 @@ func (rrm *roundRsvpManager) InteractionJoinRoundLate(ctx context.Context, i *di
 			Response:   roundtypes.ResponseAccept,
 			TagNumber:  &tagNumber,
 			JoinedLate: &joinedLate,
+			GuildID:    sharedtypes.GuildID(i.GuildID),
 		}
 
 		// Add nil check for Message before accessing ID

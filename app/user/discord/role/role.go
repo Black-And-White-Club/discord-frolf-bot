@@ -8,6 +8,7 @@ import (
 	"time"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
@@ -33,15 +34,16 @@ type RoleManager interface {
 }
 
 type roleManager struct {
-	session          discord.Session
-	publisher        eventbus.EventBus
-	logger           *slog.Logger
-	helper           utils.Helpers
-	config           *config.Config
-	interactionStore storage.ISInterface
-	tracer           trace.Tracer
-	metrics          discordmetrics.DiscordMetrics
-	operationWrapper func(ctx context.Context, opName string, fn func(ctx context.Context) (RoleOperationResult, error)) (RoleOperationResult, error)
+	session             discord.Session
+	publisher           eventbus.EventBus
+	logger              *slog.Logger
+	helper              utils.Helpers
+	config              *config.Config // Deprecated: use guildConfigResolver for per-guild config
+	guildConfigResolver guildconfig.GuildConfigResolver
+	interactionStore    storage.ISInterface
+	tracer              trace.Tracer
+	metrics             discordmetrics.DiscordMetrics
+	operationWrapper    func(ctx context.Context, opName string, fn func(ctx context.Context) (RoleOperationResult, error)) (RoleOperationResult, error)
 }
 
 func NewRoleManager(
@@ -49,7 +51,8 @@ func NewRoleManager(
 	publisher eventbus.EventBus,
 	logger *slog.Logger,
 	helper utils.Helpers,
-	config *config.Config,
+	config *config.Config, // Deprecated: use guildConfigResolver for per-guild config
+	guildConfigResolver guildconfig.GuildConfigResolver,
 	interactionStore storage.ISInterface,
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
@@ -59,14 +62,15 @@ func NewRoleManager(
 	}
 
 	rm := &roleManager{
-		session:          session,
-		publisher:        publisher,
-		logger:           logger,
-		helper:           helper,
-		config:           config,
-		interactionStore: interactionStore,
-		tracer:           tracer,
-		metrics:          metrics,
+		session:             session,
+		publisher:           publisher,
+		logger:              logger,
+		helper:              helper,
+		config:              config, // Deprecated
+		guildConfigResolver: guildConfigResolver,
+		interactionStore:    interactionStore,
+		tracer:              tracer,
+		metrics:             metrics,
 		operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (RoleOperationResult, error)) (RoleOperationResult, error) {
 			return wrapRoleOperation(ctx, opName, fn, logger, tracer, metrics)
 		},

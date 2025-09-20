@@ -11,18 +11,20 @@ import (
 )
 
 func RegisterHandlers(registry *interactions.Registry, manager RoleManager) {
-	registry.RegisterHandler("updaterole", func(ctx context.Context, i *discordgo.InteractionCreate) {
+	// updaterole command requires Editor role or higher and guild setup
+	registry.RegisterHandlerWithPermissions("updaterole", func(ctx context.Context, i *discordgo.InteractionCreate) {
 		slog.Info("Handling /updaterole command", attr.String("command_name", i.ApplicationCommandData().Name))
 		manager.HandleRoleRequestCommand(ctx, i)
-	})
+	}, interactions.EditorRequired, true)
 
-	registry.RegisterHandler("role_button_", func(ctx context.Context, i *discordgo.InteractionCreate) {
+	// Role button interactions require Editor role or higher
+	registry.RegisterHandlerWithPermissions("role_button_", func(ctx context.Context, i *discordgo.InteractionCreate) {
 		slog.Info("Handling role button press", attr.String("custom_id", i.MessageComponentData().CustomID))
 		manager.HandleRoleButtonPress(ctx, i)
-	})
+	}, interactions.EditorRequired, true)
 
-	registry.RegisterHandler("role_button_cancel", func(ctx context.Context, i *discordgo.InteractionCreate) {
+	registry.RegisterHandlerWithPermissions("role_button_cancel", func(ctx context.Context, i *discordgo.InteractionCreate) {
 		slog.Info("Handling role cancel button", attr.String("custom_id", i.MessageComponentData().CustomID))
 		manager.HandleRoleCancelButton(ctx, i)
-	})
+	}, interactions.NoPermissionRequired, false) // Cancel can be used by anyone
 }

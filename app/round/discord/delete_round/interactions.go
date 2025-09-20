@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
+	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
@@ -81,8 +81,22 @@ func (drm *deleteRoundManager) HandleDeleteRoundButton(ctx context.Context, i *d
 			discordMessageID = i.Message.ID
 		}
 
+		// Lookup the event channel ID from guildconfig
+		var eventChannelID string
+		if drm.guildConfigResolver != nil && i.GuildID != "" {
+			guildConfig, err := drm.guildConfigResolver.GetGuildConfigWithContext(ctx, i.GuildID)
+			if err == nil && guildConfig != nil && guildConfig.EventChannelID != "" {
+				eventChannelID = guildConfig.EventChannelID
+			} else {
+				drm.logger.WarnContext(ctx, "Failed to resolve event channel ID, falling back to interaction channel", attr.Error(err))
+				eventChannelID = i.ChannelID
+			}
+		} else {
+			eventChannelID = i.ChannelID
+		}
+
 		// Send delete request
-		err = drm.sendDeleteRequest(ctx, sharedtypes.RoundID(roundUUID), userID, i.Interaction.ID, discordMessageID)
+		err = drm.sendDeleteRequest(ctx, sharedtypes.RoundID(roundUUID), userID, i.Interaction.ID, discordMessageID, i.GuildID, eventChannelID)
 		if err != nil {
 			drm.logger.ErrorContext(ctx, "Failed to send delete request", attr.Error(err))
 
@@ -118,15 +132,18 @@ func (drm *deleteRoundManager) HandleDeleteRoundButton(ctx context.Context, i *d
 }
 
 // sendDeleteRequest publishes the delete request to the backend.
-func (drm *deleteRoundManager) sendDeleteRequest(ctx context.Context, roundID sharedtypes.RoundID, userID sharedtypes.DiscordID, interactionID string, discordMessageID string) error {
+func (drm *deleteRoundManager) sendDeleteRequest(ctx context.Context, roundID sharedtypes.RoundID, userID sharedtypes.DiscordID, interactionID string, discordMessageID string, guildID string, channelID string) error {
 	// Prepare the payload for the backend
-	payload := roundevents.RoundDeleteRequestPayload{
-		RoundID:              roundID,
-		RequestingUserUserID: userID,
+	payload := discordroundevents.DiscordRoundDeleteRequestPayload{
+		RoundID:   roundID,
+		UserID:    userID,
+		ChannelID: channelID, // Now populated from guild config or interaction
+		MessageID: discordMessageID,
+		GuildID:   guildID,
 	}
 
 	// Create the message struct with metadata including the discord_message_id - fix parameter order
-	msg, err := drm.helper.CreateResultMessage(nil, payload, roundevents.RoundDeleteRequest)
+	msg, err := drm.helper.CreateResultMessage(nil, payload, discordroundevents.RoundDeleteRequestTopic)
 	if err != nil {
 		return fmt.Errorf("failed to create result message: %w", err)
 	}
@@ -140,7 +157,7 @@ func (drm *deleteRoundManager) sendDeleteRequest(ctx context.Context, roundID sh
 	msg.Metadata.Set("requesting_user_id", string(userID))
 
 	// Publish the delete request message
-	err = drm.publisher.Publish(roundevents.RoundDeleteRequest, msg)
+	err = drm.publisher.Publish(discordroundevents.RoundDeleteRequestTopic, msg)
 	if err != nil {
 		return fmt.Errorf("failed to publish delete request: %w", err)
 	}
@@ -148,7 +165,7 @@ func (drm *deleteRoundManager) sendDeleteRequest(ctx context.Context, roundID sh
 	drm.logger.InfoContext(ctx, "Successfully published delete request",
 		attr.String("round_id", roundID.String()),
 		attr.String("user_id", string(userID)),
-		attr.String("topic", roundevents.RoundDeleteRequest))
+		attr.String("topic", discordroundevents.RoundDeleteRequestTopic))
 
 	return nil
 }

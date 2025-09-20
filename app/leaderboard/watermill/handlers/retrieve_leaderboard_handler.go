@@ -7,6 +7,7 @@ import (
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	leaderboardtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/leaderboard"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/ThreeDotsLabs/watermill/message"
 )
 
@@ -18,8 +19,12 @@ func (h *LeaderboardHandlers) HandleLeaderboardRetrieveRequest(msg *message.Mess
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
 			h.Logger.InfoContext(ctx, "Handling leaderboard retrieve request", attr.CorrelationIDFromMsg(msg))
 
+			discordPayload := payload.(*discordleaderboardevents.LeaderboardRetrieveRequestPayload)
+
 			// Convert to backend payload
-			backendPayload := leaderboardevents.GetLeaderboardRequestPayload{}
+			backendPayload := leaderboardevents.GetLeaderboardRequestPayload{
+				GuildID: sharedtypes.GuildID(discordPayload.GuildID),
+			}
 
 			backendMsg, err := h.Helpers.CreateResultMessage(msg, backendPayload, leaderboardevents.GetLeaderboardRequest)
 			if err != nil {
@@ -45,6 +50,7 @@ func (h *LeaderboardHandlers) HandleLeaderboardData(msg *message.Message) ([]*me
 
 			// Special case: If topic is "LeaderboardUpdated", trigger a re-request
 			if topic == leaderboardevents.LeaderboardUpdated {
+				// For LeaderboardUpdated, we don't need to unmarshal - just send empty request
 				backendPayload := leaderboardevents.GetLeaderboardRequestPayload{}
 
 				backendMsg, err := h.Helpers.CreateResultMessage(msg, backendPayload, leaderboardevents.GetLeaderboardRequest)

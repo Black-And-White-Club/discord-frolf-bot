@@ -9,6 +9,7 @@ import (
 	"time"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
@@ -35,15 +36,16 @@ type UpdateRoundManager interface {
 }
 
 type updateRoundManager struct {
-	session          discord.Session
-	publisher        eventbus.EventBus
-	logger           *slog.Logger
-	helper           utils.Helpers
-	config           *config.Config
-	interactionStore storage.ISInterface
-	tracer           trace.Tracer
-	metrics          discordmetrics.DiscordMetrics
-	operationWrapper func(ctx context.Context, opName string, fn func(ctx context.Context) (UpdateRoundOperationResult, error)) (UpdateRoundOperationResult, error)
+	session             discord.Session
+	publisher           eventbus.EventBus
+	logger              *slog.Logger
+	helper              utils.Helpers
+	config              *config.Config
+	interactionStore    storage.ISInterface
+	tracer              trace.Tracer
+	metrics             discordmetrics.DiscordMetrics
+	operationWrapper    func(ctx context.Context, opName string, fn func(ctx context.Context) (UpdateRoundOperationResult, error)) (UpdateRoundOperationResult, error)
+	guildConfigResolver guildconfig.GuildConfigResolver
 }
 
 // NewUpdateRoundManager creates a new UpdateRoundManager instance.
@@ -56,6 +58,7 @@ func NewUpdateRoundManager(
 	interactionStore storage.ISInterface,
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
+	guildConfigResolver guildconfig.GuildConfigResolver,
 ) UpdateRoundManager {
 	if logger != nil {
 		logger.InfoContext(context.Background(), "Creating UpdateRoundManager")
@@ -72,6 +75,7 @@ func NewUpdateRoundManager(
 		operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (UpdateRoundOperationResult, error)) (UpdateRoundOperationResult, error) {
 			return wrapUpdateRoundOperation(ctx, opName, fn, logger, tracer, metrics)
 		},
+		guildConfigResolver: guildConfigResolver,
 	}
 }
 
@@ -163,12 +167,19 @@ func (crm *updateRoundManager) createEvent(ctx context.Context, topic string, pa
 	}
 
 	newEvent.Payload = payloadBytes
-	newEvent.Metadata.Set("handler_name", "Create Round")
+	newEvent.Metadata.Set("handler_name", "Update Round")
 	newEvent.Metadata.Set("topic", topic)
 	newEvent.Metadata.Set("domain", "discord")
 	newEvent.Metadata.Set("interaction_id", i.Interaction.ID)
 	newEvent.Metadata.Set("interaction_token", i.Interaction.Token)
-	newEvent.Metadata.Set("guild_id", crm.config.GetGuildID())
+
+	// Use GuildID from the actual interaction instead of config
+	if i.Interaction.GuildID != "" {
+		newEvent.Metadata.Set("guild_id", i.Interaction.GuildID)
+	} else {
+		// Fallback to config only if interaction doesn't have GuildID
+		newEvent.Metadata.Set("guild_id", crm.config.GetGuildID())
+	}
 
 	return newEvent, nil
 }

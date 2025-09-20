@@ -24,9 +24,32 @@ func (tum *tagUpdateManager) UpdateDiscordEmbedsWithTagChanges(ctx context.Conte
 				attr.String("event_message_id", roundInfo.EventMessageID),
 				attr.String("title", string(roundInfo.Title)))
 
-			// Extract channel ID from config - this may need to be added to RoundUpdateInfo
-			// For now, we'll use the channel from config or try to determine it
-			channelID := tum.config.GetEventChannelID()
+			// Multi-tenant: Extract guildID from roundInfo, resolve config per guild
+			guildID := string(roundInfo.GuildID) // sharedtypes.GuildID is a string alias
+			if guildID == "" {
+				tum.logger.WarnContext(ctx, "RoundUpdateInfo missing guild_id; attempting fallback from context")
+				if ctxGuildID, ok := ctx.Value("guild_id").(string); ok && ctxGuildID != "" {
+					guildID = ctxGuildID
+					tum.logger.InfoContext(ctx, "Recovered guild_id from context for tag update", attr.String("guild_id", guildID))
+				}
+			}
+			guildConfig, err := tum.guildConfigResolver.GetGuildConfigWithContext(ctx, guildID)
+			if err != nil {
+				tum.logger.ErrorContext(ctx, "Failed to resolve guild config for tag update",
+					attr.String("guild_id", guildID),
+					attr.Error(err))
+				failedUpdates++
+				continue
+			}
+
+			channelID := guildConfig.EventChannelID
+			if channelID == "" {
+				tum.logger.ErrorContext(ctx, "Resolved guild config missing EventChannelID for tag update",
+					attr.String("guild_id", guildID),
+				)
+				failedUpdates++
+				continue
+			}
 
 			result, err := tum.UpdateTagsInEmbed(ctx, channelID, roundInfo.EventMessageID, tagUpdates)
 			if err != nil || result.Error != nil {

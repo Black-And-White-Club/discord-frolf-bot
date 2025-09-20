@@ -38,8 +38,8 @@ func (urm *updateRoundManager) HandleEditRoundButton(ctx context.Context, i *dis
 		urm.logger.InfoContext(ctx, "Parsing custom ID", attr.String("custom_id", customID))
 
 		parts := strings.Split(customID, "|")
-		if len(parts) < 2 {
-			err := fmt.Errorf("invalid custom_id format: %s", customID)
+		if len(parts) != 2 { // Expecting: round_edit|<roundID>
+			err := fmt.Errorf("invalid custom_id format: expected 'round_edit|<uuid>', got '%s'", customID)
 			urm.logger.ErrorContext(ctx, err.Error())
 
 			// Respond with error message to Discord
@@ -56,7 +56,7 @@ func (urm *updateRoundManager) HandleEditRoundButton(ctx context.Context, i *dis
 			return UpdateRoundOperationResult{Error: err}, nil
 		}
 
-		// Parse UUID properly
+		// Parse UUID and extract guildID
 		roundUUID, err := uuid.Parse(parts[1])
 		if err != nil {
 			err := fmt.Errorf("invalid UUID for round ID: %w", err)
@@ -76,10 +76,11 @@ func (urm *updateRoundManager) HandleEditRoundButton(ctx context.Context, i *dis
 			return UpdateRoundOperationResult{Error: err}, nil
 		}
 		roundID := sharedtypes.RoundID(roundUUID)
+		guildID := i.GuildID // Get guild ID from interaction context
 
-		urm.logger.InfoContext(ctx, "Opening modal for round edit", attr.RoundID("round_id", roundID))
+		urm.logger.InfoContext(ctx, "Opening modal for round edit", attr.RoundID("round_id", roundID), attr.String("guild_id", guildID))
 
-		// Send the update round modal with roundID (this responds to Discord automatically)
+		// Send the update round modal with roundID and guildID
 		result, err := urm.SendUpdateRoundModal(ctx, i, roundID)
 		urm.logger.InfoContext(ctx, "Modal send result",
 			attr.Any("result", result),

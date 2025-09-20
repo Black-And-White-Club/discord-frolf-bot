@@ -10,6 +10,7 @@ import (
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	sharedevents "github.com/Black-And-White-Club/frolf-bot-shared/events/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/ThreeDotsLabs/watermill/message"
 )
 
@@ -40,6 +41,7 @@ func (h *LeaderboardHandlers) HandleTagAssignRequest(msg *message.Message) ([]*m
 
 			// Create batch assignment payload with single assignment
 			batchPayload := sharedevents.BatchTagAssignmentRequestedPayload{
+				ScopedGuildID:    sharedevents.ScopedGuildID{GuildID: sharedtypes.GuildID(discordPayload.GuildID)},
 				RequestingUserID: discordPayload.TargetUserID,
 				BatchID:          discordPayload.MessageID, // Use messageID as batchID
 				Assignments: []sharedevents.TagAssignmentInfo{
@@ -67,6 +69,10 @@ func (h *LeaderboardHandlers) HandleTagAssignRequest(msg *message.Message) ([]*m
 			batchMsg.Metadata.Set("requestor_id", string(discordPayload.RequestorID))
 			batchMsg.Metadata.Set("channel_id", discordPayload.ChannelID)
 			batchMsg.Metadata.Set("message_id", discordPayload.MessageID)
+			// Propagate guild_id metadata for multi-tenant routing across services
+			if discordPayload.GuildID != "" {
+				batchMsg.Metadata.Set("guild_id", discordPayload.GuildID)
+			}
 			batchMsg.Metadata.Set("source", "discord_claim")
 			batchMsg.Metadata.Set("single_assignment", "true") // Flag for response handling
 

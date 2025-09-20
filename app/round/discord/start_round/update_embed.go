@@ -12,7 +12,16 @@ import (
 
 func (m *startRoundManager) UpdateRoundToScorecard(ctx context.Context, channelID, messageID string, payload *roundevents.DiscordRoundStartPayload) (StartRoundOperationResult, error) {
 	return m.operationWrapper(ctx, "UpdateRoundToScorecard", func(ctx context.Context) (StartRoundOperationResult, error) {
-		if channelID == "" {
+		// Multi-tenant: resolve channel ID from guild config if not provided
+		resolvedChannelID := channelID
+		if resolvedChannelID == "" && payload != nil && payload.GuildID != "" {
+			cfg, err := m.guildConfigResolver.GetGuildConfigWithContext(ctx, string(payload.GuildID))
+			if err == nil && cfg != nil && cfg.EventChannelID != "" {
+				resolvedChannelID = cfg.EventChannelID
+			}
+		}
+
+		if resolvedChannelID == "" {
 			err := errors.New("missing channel ID")
 			m.logger.ErrorContext(ctx, "Missing channel ID for UpdateRoundToScorecard")
 			return StartRoundOperationResult{Error: err}, nil
@@ -24,7 +33,7 @@ func (m *startRoundManager) UpdateRoundToScorecard(ctx context.Context, channelI
 		}
 
 		// 🆕 Fetch existing message
-		existingMsg, err := m.session.ChannelMessage(channelID, messageID)
+		existingMsg, err := m.session.ChannelMessage(resolvedChannelID, messageID)
 		if err != nil {
 			m.logger.ErrorContext(ctx, "Failed to fetch existing message for UpdateRoundToScorecard",
 				attr.Error(err), attr.String("message_id", messageID))
@@ -58,7 +67,7 @@ func (m *startRoundManager) UpdateRoundToScorecard(ctx context.Context, channelI
 		}
 
 		_, err = m.session.ChannelMessageEditComplex(&discordgo.MessageEdit{
-			Channel:    channelID,
+			Channel:    resolvedChannelID,
 			ID:         messageID,
 			Embeds:     &[]*discordgo.MessageEmbed{transformedData.Embed},
 			Components: &transformedData.Components,
@@ -71,7 +80,7 @@ func (m *startRoundManager) UpdateRoundToScorecard(ctx context.Context, channelI
 
 		m.logger.InfoContext(ctx, "Successfully updated round embed to scorecard",
 			attr.String("message_id", messageID),
-			attr.String("channel_id", channelID))
+			attr.String("channel_id", resolvedChannelID))
 
 		return StartRoundOperationResult{Success: true}, nil
 	})

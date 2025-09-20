@@ -20,6 +20,7 @@ type ScoreUpdateRequestPayload struct {
 	UserID      string `json:"user_id"` // Add these for metadata
 	ChannelID   string `json:"channel_id"`
 	MessageID   string `json:"message_id"`
+	GuildID     string `json:"guild_id"`
 }
 
 // ScoreUpdateResponsePayload is sent back to Discord after a score update.
@@ -32,4 +33,5 @@ type ScoreUpdateResponsePayload struct {
 	UserID      string `json:"user_id"`
 	ChannelID   string `json:"channel_id"`
 	MessageID   string `json:"message_id"`
+	GuildID     string `json:"guild_id"`
 }

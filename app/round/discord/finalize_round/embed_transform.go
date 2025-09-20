@@ -42,6 +42,13 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 		// Create a map to hold participants for efficient lookups
 		participantsMap := make(map[sharedtypes.DiscordID]participantWithUser)
 
+		var guildID string
+		if payload.GuildID != "" {
+			guildID = string(payload.GuildID)
+		} else {
+			guildID = frm.config.GetGuildID()
+		}
+
 		for i, participant := range payload.Participants {
 			// Check if UserID is valid
 			if participant.UserID == "" {
@@ -59,7 +66,11 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 			} else {
 				username = user.Username
 				// Only try to get member info if we successfully got the user
-				if member, err := frm.session.GuildMember(frm.config.GetGuildID(), string(participant.UserID)); err == nil && member != nil && member.Nick != "" {
+				if frm.guildConfigResolver != nil && guildID != "" {
+					if member, err := frm.session.GuildMember(guildID, string(participant.UserID)); err == nil && member != nil && member.Nick != "" {
+						username = member.Nick
+					}
+				} else if member, err := frm.session.GuildMember(frm.config.GetGuildID(), string(participant.UserID)); err == nil && member != nil && member.Nick != "" {
 					username = member.Nick
 				}
 			}
@@ -156,7 +167,7 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 
 			participantFields = append(participantFields, &discordgo.MessageEmbedField{
 				Name:   fmt.Sprintf("%s %s", emoji, participant.Username),
-				Value:  scoreDisplay,
+				Value:  fmt.Sprintf("%s (<@%s>)", scoreDisplay, participant.UserID), // embed mention in value for parsing
 				Inline: true,
 			})
 		}
@@ -204,18 +215,17 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 			Timestamp: time.Now().Format(time.RFC3339), // Current time when finalized
 		}
 
-		// Generate a safe custom ID for the button - use the format expected by tests
-		buttonID := fmt.Sprintf("round_enter_score_finalized|round-%d", payload.RoundID)
+		// (Deprecated) previously generated a separate finalized button ID; now consolidated into a single override button
 
-		// Keep the same button but with modified text to indicate admin requirement
+		// Single consolidated override button (supports single or bulk overrides in one modal)
 		components = []discordgo.MessageComponent{
 			discordgo.ActionsRow{
 				Components: []discordgo.MessageComponent{
 					discordgo.Button{
-						Label:    "Admin/Editor Score Update",
+						Label:    "Score Override",
 						Style:    discordgo.DangerButton,
-						CustomID: buttonID,
-						Emoji:    &discordgo.ComponentEmoji{Name: "🔒"},
+						CustomID: fmt.Sprintf("round_bulk_score_override|%s", payload.RoundID),
+						Emoji:    &discordgo.ComponentEmoji{Name: "🛠️"},
 					},
 				},
 			},

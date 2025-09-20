@@ -8,6 +8,7 @@ import (
 	"time"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
@@ -33,14 +34,15 @@ type ScoreRoundManager interface {
 
 // scoreRoundManager implements the ScoreRoundManager interface.
 type scoreRoundManager struct {
-	session          discord.Session
-	publisher        eventbus.EventBus
-	logger           *slog.Logger
-	helper           utils.Helpers
-	config           *config.Config
-	tracer           trace.Tracer
-	metrics          discordmetrics.DiscordMetrics
-	operationWrapper func(ctx context.Context, opName string, fn func(ctx context.Context) (ScoreRoundOperationResult, error)) (ScoreRoundOperationResult, error)
+	session             discord.Session
+	publisher           eventbus.EventBus
+	logger              *slog.Logger
+	helper              utils.Helpers
+	config              *config.Config
+	tracer              trace.Tracer
+	metrics             discordmetrics.DiscordMetrics
+	operationWrapper    func(ctx context.Context, opName string, fn func(ctx context.Context) (ScoreRoundOperationResult, error)) (ScoreRoundOperationResult, error)
+	guildConfigResolver guildconfig.GuildConfigResolver
 }
 
 // NewScoreRoundManager creates a new ScoreRoundManager instance.
@@ -52,6 +54,7 @@ func NewScoreRoundManager(
 	config *config.Config,
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
+	guildConfigResolver guildconfig.GuildConfigResolver,
 ) ScoreRoundManager {
 	if logger != nil {
 		logger.InfoContext(context.Background(), "Creating ScoreRoundManager",
@@ -71,6 +74,7 @@ func NewScoreRoundManager(
 		operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (ScoreRoundOperationResult, error)) (ScoreRoundOperationResult, error) {
 			return wrapScoreRoundOperation(ctx, opName, fn, logger, tracer, metrics)
 		},
+		guildConfigResolver: guildConfigResolver,
 	}
 }
 

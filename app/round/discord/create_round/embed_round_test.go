@@ -9,6 +9,7 @@ import (
 
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
+	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
 	"github.com/google/uuid"
@@ -120,12 +121,13 @@ func Test_createRoundManager_SendRoundEventEmbed(t *testing.T) {
 			}
 
 			result, err := manager.SendRoundEventEmbed(
+				"guild-id",
 				"channel-123",
-				"Round Title",
-				"This is a description",
+				roundtypes.Title("Round Title"),
+				roundtypes.Description("This is a description"),
 				sharedtypes.StartTime(time.Date(2025, 3, 14, 15, 0, 0, 0, time.UTC)),
-				"Test Park",
-				"user-123",
+				roundtypes.Location("Test Park"),
+				sharedtypes.DiscordID("user-123"),
 				sharedtypes.RoundID(uuid.New()),
 			)
 

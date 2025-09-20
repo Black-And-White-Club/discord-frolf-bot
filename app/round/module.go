@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/interactions"
 	rounddiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord"
 	createround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/create_round"
@@ -38,22 +39,34 @@ func InitializeRoundModule(
 	helper utils.Helpers,
 	interactionStore storage.ISInterface,
 	discordMetrics discordmetrics.DiscordMetrics,
+	guildConfig guildconfig.GuildConfigResolver,
 ) (*roundrouter.RoundRouter, error) {
 	tracer := otel.Tracer("round-module")
 
 	// Initialize Discord services
-	roundDiscord, err := rounddiscord.NewRoundDiscord(ctx, session, eventBus, logger, helper, cfg, interactionStore, tracer, discordMetrics)
+	roundDiscord, err := rounddiscord.NewRoundDiscord(
+		ctx,
+		session,
+		eventBus,
+		logger,
+		helper,
+		cfg,
+		interactionStore,
+		tracer,
+		discordMetrics,
+		guildConfig,
+	)
 	if err != nil {
-		logger.ErrorContext(ctx, "Failed to initialize round Discord services", attr.Error(err))
-		return nil, fmt.Errorf("failed to initialize round Discord services: %w", err)
+		logger.ErrorContext(ctx, "Failed to initialize round discord", attr.Error(err))
+		return nil, err
 	}
 
-	// Register Discord interactions
+	// Register interaction handlers
 	createround.RegisterHandlers(interactionRegistry, roundDiscord.GetCreateRoundManager())
 	roundrsvp.RegisterHandlers(interactionRegistry, roundDiscord.GetRoundRsvpManager())
 	deleteround.RegisterHandlers(interactionRegistry, roundDiscord.GetDeleteRoundManager())
 	scoreround.RegisterHandlers(interactionRegistry, roundDiscord.GetScoreRoundManager())
-	updateround.RegisterHandlers(interactionRegistry, roundDiscord.GetUpdateRoundManager()) // ADD THIS LINE
+	updateround.RegisterHandlers(interactionRegistry, roundDiscord.GetUpdateRoundManager())
 
 	// Build Watermill Handlers
 	roundHandlers := roundhandlers.NewRoundHandlers(
@@ -81,5 +94,6 @@ func InitializeRoundModule(
 		return nil, fmt.Errorf("failed to configure round router: %w", err)
 	}
 
+	logger.InfoContext(ctx, "Round module initialized successfully")
 	return roundRouter, nil
 }

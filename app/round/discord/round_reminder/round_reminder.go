@@ -8,6 +8,7 @@ import (
 	"time"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
@@ -23,16 +24,16 @@ import (
 type RoundReminderManager interface {
 	SendRoundReminder(ctx context.Context, payload *roundevents.DiscordReminderPayload) (RoundReminderOperationResult, error)
 }
-
 type roundReminderManager struct {
-	session          discord.Session
-	publisher        eventbus.EventBus
-	logger           *slog.Logger
-	helper           utils.Helpers
-	config           *config.Config
-	tracer           trace.Tracer
-	metrics          discordmetrics.DiscordMetrics
-	operationWrapper func(ctx context.Context, opName string, fn func(ctx context.Context) (RoundReminderOperationResult, error)) (RoundReminderOperationResult, error)
+	session             discord.Session
+	publisher           eventbus.EventBus
+	logger              *slog.Logger
+	helper              utils.Helpers
+	config              *config.Config
+	tracer              trace.Tracer
+	metrics             discordmetrics.DiscordMetrics
+	operationWrapper    func(ctx context.Context, opName string, fn func(ctx context.Context) (RoundReminderOperationResult, error)) (RoundReminderOperationResult, error)
+	guildConfigResolver guildconfig.GuildConfigResolver
 }
 
 // NewRoundReminderManager creates a new RoundReminderManager instance.
@@ -44,6 +45,7 @@ func NewRoundReminderManager(
 	config *config.Config,
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
+	guildConfigResolver guildconfig.GuildConfigResolver,
 ) RoundReminderManager {
 	if logger != nil {
 		logger.InfoContext(context.Background(), "Creating RoundReminderManager")
@@ -59,6 +61,7 @@ func NewRoundReminderManager(
 		operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (RoundReminderOperationResult, error)) (RoundReminderOperationResult, error) {
 			return wrapRoundReminderOperation(ctx, opName, fn, logger, tracer, metrics)
 		},
+		guildConfigResolver: guildConfigResolver,
 	}
 }
 

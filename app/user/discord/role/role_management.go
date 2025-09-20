@@ -63,6 +63,18 @@ func (rm *roleManager) AddRoleToUser(ctx context.Context, guildID string, userID
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.InteractionType, "api")
 
 	result, err := rm.operationWrapper(ctx, "add_role_to_user", func(ctx context.Context) (RoleOperationResult, error) {
+		// Multi-tenant: Resolve per-guild config if available; tolerate nil in tests
+		if rm.guildConfigResolver != nil {
+			if _, cfgErr := rm.guildConfigResolver.GetGuildConfigWithContext(ctx, guildID); cfgErr != nil {
+				rm.logger.Error("Failed to resolve guild config for role add",
+					attr.String("guild_id", guildID),
+					attr.Error(cfgErr),
+				)
+				return RoleOperationResult{Error: cfgErr}, nil
+			}
+		} // else: no resolver provided (unit tests); proceed without config lookup
+
+		// Use resolved config for any role/channel lookups as needed
 		err := rm.session.GuildMemberRoleAdd(guildID, string(userID), roleID)
 		if err != nil {
 			rm.logger.Error("Failed to add role to user",

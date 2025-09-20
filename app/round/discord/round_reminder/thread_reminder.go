@@ -41,12 +41,25 @@ func (rm *roundReminderManager) SendRoundReminder(ctx context.Context, payload *
 			return RoundReminderOperationResult{Error: err}, err
 		}
 
+		// If channel ID is empty, try to resolve from guild config if possible
+		resolvedChannelID := payload.DiscordChannelID
+		guildID := payload.DiscordGuildID
+		if resolvedChannelID == "" && rm.guildConfigResolver != nil && guildID != "" {
+			guildConfig, err := rm.guildConfigResolver.GetGuildConfigWithContext(ctx, guildID)
+			if err == nil && guildConfig != nil && guildConfig.EventChannelID != "" {
+				resolvedChannelID = guildConfig.EventChannelID
+				rm.logger.InfoContext(ctx, "Resolved channel ID from guild config", attr.String("channel_id", resolvedChannelID))
+			} else {
+				rm.logger.WarnContext(ctx, "Failed to resolve channel ID from guild config, reminder may fail", attr.Error(err))
+			}
+		}
+
 		// Validate channel exists - fail fast
-		_, err := rm.session.GetChannel(payload.DiscordChannelID)
+		_, err := rm.session.GetChannel(resolvedChannelID)
 		if err != nil {
 			err = fmt.Errorf("failed to get channel: %w", err)
 			rm.logger.ErrorContext(ctx, err.Error(),
-				attr.String("channel_id", payload.DiscordChannelID),
+				attr.String("channel_id", resolvedChannelID),
 				attr.Error(err))
 			return RoundReminderOperationResult{Error: err}, err
 		}
@@ -85,16 +98,16 @@ func (rm *roundReminderManager) SendRoundReminder(ctx context.Context, payload *
 		var thread *discordgo.Channel
 
 		// Method 1: Check if the original message already has a thread
-		if message, msgErr := rm.session.ChannelMessage(payload.DiscordChannelID, payload.EventMessageID); msgErr == nil && message.Thread != nil {
+		if message, msgErr := rm.session.ChannelMessage(resolvedChannelID, payload.EventMessageID); msgErr == nil && message.Thread != nil {
 			thread = message.Thread
 			rm.logger.InfoContext(ctx, "Found existing thread via message", attr.String("thread_id", thread.ID))
 		}
 
 		// Method 2: Search active threads if no thread found via message
 		if thread == nil {
-			if threads, threadErr := rm.session.ThreadsActive(payload.DiscordGuildID); threadErr == nil && threads != nil && threads.Threads != nil {
+			if threads, threadErr := rm.session.ThreadsActive(guildID); threadErr == nil && threads != nil && threads.Threads != nil {
 				for _, t := range threads.Threads {
-					if t.ParentID == payload.DiscordChannelID && t.Name == threadName {
+					if t.ParentID == resolvedChannelID && t.Name == threadName {
 						thread = t
 						rm.logger.InfoContext(ctx, "Found existing thread via search", attr.String("thread_id", t.ID))
 						break
@@ -107,7 +120,7 @@ func (rm *roundReminderManager) SendRoundReminder(ctx context.Context, payload *
 		if thread == nil {
 			rm.logger.InfoContext(ctx, "Creating new thread for reminder")
 
-			newThread, createErr := rm.session.MessageThreadStartComplex(payload.DiscordChannelID, payload.EventMessageID, &discordgo.ThreadStart{
+			newThread, createErr := rm.session.MessageThreadStartComplex(resolvedChannelID, payload.EventMessageID, &discordgo.ThreadStart{
 				Name: threadName,
 				Type: discordgo.ChannelTypeGuildPublicThread,
 			})
@@ -118,7 +131,7 @@ func (rm *roundReminderManager) SendRoundReminder(ctx context.Context, payload *
 					rm.logger.InfoContext(ctx, "Thread creation failed due to existing thread, attempting final search")
 
 					// One more attempt to find the thread
-					if message, msgErr := rm.session.ChannelMessage(payload.DiscordChannelID, payload.EventMessageID); msgErr == nil && message.Thread != nil {
+					if message, msgErr := rm.session.ChannelMessage(resolvedChannelID, payload.EventMessageID); msgErr == nil && message.Thread != nil {
 						thread = message.Thread
 						rm.logger.InfoContext(ctx, "Found thread after creation failure", attr.String("thread_id", thread.ID))
 					}
@@ -129,7 +142,7 @@ func (rm *roundReminderManager) SendRoundReminder(ctx context.Context, payload *
 						rm.logger.WarnContext(ctx, "Thread exists but cannot be found, will attempt to send to main channel")
 
 						// Fallback: send to main channel instead of failing
-						_, sendErr := rm.session.ChannelMessageSend(payload.DiscordChannelID, fmt.Sprintf("🧵 Thread creation issue - posting reminder here:\n\n%s", reminderMessage))
+						_, sendErr := rm.session.ChannelMessageSend(resolvedChannelID, fmt.Sprintf("🧵 Thread creation issue - posting reminder here:\n\n%s", reminderMessage))
 						if sendErr != nil {
 							err = fmt.Errorf("failed to send reminder to main channel as fallback: %w", sendErr)
 							rm.logger.ErrorContext(ctx, err.Error())

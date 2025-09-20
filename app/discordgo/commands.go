@@ -9,17 +9,41 @@ import (
 )
 
 // RegisterCommands registers the bot's slash commands with Discord.
-// ...existing code...
-
+// This function supports both single-guild and multi-tenant deployments.
 func RegisterCommands(s Session, logger *slog.Logger, guildID string) error {
-	// --- /updaterole Command ---
+	// For multi-tenant deployments, register commands globally (empty guildID)
+	// For single-guild deployments, register for the specific guild
 	appID, err := s.GetBotUser()
 	if err != nil {
 		return fmt.Errorf("failed to retrieve bot user: %w", err)
 	}
-	_, err = s.ApplicationCommandCreate(appID.ID, guildID, &discordgo.ApplicationCommand{
+
+	targetGuildID := guildID
+	if targetGuildID == "" {
+		logger.Info("Registering commands globally for multi-tenant deployment")
+	} else {
+		logger.Info("Registering commands for specific guild", attr.String("guild_id", targetGuildID))
+	}
+
+	// For multi-tenant mode (empty guildID), only register frolf-setup globally
+	if targetGuildID == "" {
+		_, err = s.ApplicationCommandCreate(appID.ID, "", &discordgo.ApplicationCommand{
+			Name:                     "frolf-setup",
+			Description:              "Set up Frolf Bot for this server (Admin only)",
+			DefaultMemberPermissions: &[]int64{discordgo.PermissionAdministrator}[0],
+		})
+		if err != nil {
+			logger.Error("Failed to create global '/frolf-setup' command", attr.Error(err))
+			return fmt.Errorf("failed to create global '/frolf-setup' command: %w", err)
+		}
+		logger.Info("registered global command: /frolf-setup")
+		return nil
+	}
+
+	// For guild-specific registration, register all commands for that guild
+	_, err = s.ApplicationCommandCreate(appID.ID, targetGuildID, &discordgo.ApplicationCommand{
 		Name:        "updaterole",
-		Description: "Request a role for a user",
+		Description: "Request a role for a user (Requires Editor role or higher)",
 		Options: []*discordgo.ApplicationCommandOption{
 			{
 				Type:        discordgo.ApplicationCommandOptionUser,
@@ -35,9 +59,9 @@ func RegisterCommands(s Session, logger *slog.Logger, guildID string) error {
 	}
 	logger.Info("registered command: /updaterole")
 
-	_, err = s.ApplicationCommandCreate(appID.ID, guildID, &discordgo.ApplicationCommand{
+	_, err = s.ApplicationCommandCreate(appID.ID, targetGuildID, &discordgo.ApplicationCommand{
 		Name:        "createround",
-		Description: "Create A Round",
+		Description: "Create a new frolf round (Available to all players)",
 	})
 	if err != nil {
 		logger.Error("Failed to create '/createround' command", attr.Error(err))
@@ -45,10 +69,9 @@ func RegisterCommands(s Session, logger *slog.Logger, guildID string) error {
 	}
 	logger.Info("registered command: /createround")
 
-	// Claim tag command
-	_, err = s.ApplicationCommandCreate(appID.ID, guildID, &discordgo.ApplicationCommand{
+	_, err = s.ApplicationCommandCreate(appID.ID, targetGuildID, &discordgo.ApplicationCommand{
 		Name:        "claimtag",
-		Description: "Claim a specific tag number on the leaderboard",
+		Description: "Claim a specific tag number on the leaderboard (Available to all players)",
 		Options: []*discordgo.ApplicationCommandOption{
 			{
 				Type:        discordgo.ApplicationCommandOptionInteger,
@@ -65,17 +88,6 @@ func RegisterCommands(s Session, logger *slog.Logger, guildID string) error {
 		return fmt.Errorf("failed to create '/claimtag' command: %w", err)
 	}
 	logger.Info("registered command: /claimtag")
-
-	// Frolf setup command
-	_, err = s.ApplicationCommandCreate(appID.ID, guildID, &discordgo.ApplicationCommand{
-		Name:        "frolf-setup",
-		Description: "Set up Frolf Bot for this server (Admin only)",
-	})
-	if err != nil {
-		logger.Error("Failed to create '/frolf-setup' command", attr.Error(err))
-		return fmt.Errorf("failed to create '/frolf-setup' command: %w", err)
-	}
-	logger.Info("registered command: /frolf-setup")
 
 	return nil
 }

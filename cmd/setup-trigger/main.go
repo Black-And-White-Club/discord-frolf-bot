@@ -6,14 +6,13 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/bot"
-	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
-	"github.com/bwmarrin/discordgo"
 )
 
 func main() {
@@ -49,10 +48,13 @@ func main() {
 		fmt.Println("=== DRY RUN MODE ===")
 		fmt.Println("The following setup would be performed:")
 		fmt.Printf("- Guild ID: %s\n", *guildID)
-		fmt.Println("- Required channels: signup, events, leaderboard")
-		fmt.Println("- Required roles: Rattler, Editor, Admin")
-		fmt.Println("- Channel permissions would be configured")
-		fmt.Println("- Signup message would be created")
+		fmt.Println("- The modern /frolf-setup command flow would be triggered")
+		fmt.Println("- Channels: bottle-events, bottle-leaderboard, bottle-signup")
+		fmt.Println("- Roles: cap, rocket, jack")
+		fmt.Println("- Signup message with reaction")
+		fmt.Println("- Backend event processing and persistence")
+		fmt.Println("- Guild config caching")
+		fmt.Println("- Command registration")
 		fmt.Println("Run without -dry-run to execute the setup")
 		return
 	}
@@ -72,28 +74,17 @@ func main() {
 
 	logger := obs.Provider.Logger
 
-	// Create Discord session
-	discordSession, err := discordgo.New("Bot " + cfg.Discord.Token)
-	if err != nil {
-		log.Fatalf("Failed to create Discord session: %v", err)
-	}
+	fmt.Printf("🚀 Starting modern guild setup for guild: %s\n", *guildID)
+	fmt.Println("⚠️  NOTE: This tool now uses the modern event-driven /frolf-setup system")
+	fmt.Println("📌 The setup will use the same flow as the /frolf-setup Discord command")
+	fmt.Println()
 
-	// Configure Discord intents
-	discordSession.Identify.Intents = discordgo.IntentsGuilds |
-		discordgo.IntentsGuildMessages |
-		discordgo.IntentsGuildMessageReactions |
-		discordgo.IntentGuildMembers
-
-	// Wrap Discord session
-	discordSessionWrapper := discord.NewDiscordSession(discordSession, logger)
-
-	// Create bot instance for setup
-	interactionStore := storage.NewInteractionStore()
+	// Create and start the full bot to trigger setup
 	setupBot, err := bot.NewDiscordBot(
-		discordSessionWrapper,
+		nil, // Session will be created internally
 		cfg,
 		logger,
-		interactionStore,
+		storage.NewInteractionStore(),
 		obs.Registry.DiscordMetrics,
 		obs.Registry.EventBusMetrics,
 		obs.Provider.TracerProvider.Tracer("setup"),
@@ -103,60 +94,39 @@ func main() {
 		log.Fatalf("Failed to create Discord bot: %v", err)
 	}
 
-	// Open Discord session
-	if err := setupBot.Session.Open(); err != nil {
-		log.Fatalf("Failed to open Discord session: %v", err)
-	}
-	defer setupBot.Session.Close()
+	fmt.Println("🔌 Starting bot in setup mode...")
 
-	fmt.Printf("Starting setup for guild: %s\n", *guildID)
+	// Start the bot - this will initialize all the modern systems
+	go func() {
+		if err := setupBot.Run(ctx); err != nil {
+			log.Printf("Bot startup error: %v", err)
+		}
+	}()
 
-	// Configure setup parameters
-	setupConfig := bot.ServerSetupConfig{
-		GuildID:              *guildID,
-		RequiredChannels:     []string{"signup", "events", "leaderboard"},
-		RequiredRoles:        []string{"Rattler", "Editor", "Admin"},
-		SignupEmojiName:      "🐍",
-		CreateSignupMessage:  true,
-		SignupMessageContent: "React with 🐍 to sign up for frolf events!",
-		RegisteredRoleName:   "Rattler",
-		AdminRoleName:        "Admin",
-		ChannelPermissions: map[string]bot.ChannelPermissions{
-			"signup": {
-				RestrictPosting: false, // Handled specially - new users can see, players cannot
-				AllowedRoles:    []string{},
-			},
-			"events": {
-				RestrictPosting: true, // Only admins can post event embeds
-				AllowedRoles:    []string{"Admin"},
-			},
-			"leaderboard": {
-				RestrictPosting: true,
-				AllowedRoles:    []string{"Admin"}, // Only admins can post leaderboard updates
-			},
-		},
-	}
+	// Give the bot time to start up and connect
+	fmt.Println("⏳ Waiting for bot to initialize...")
+	time.Sleep(3 * time.Second)
 
-	// Run setup
-	if err := setupBot.AutoSetupServer(ctx, setupConfig); err != nil {
-		log.Fatalf("Setup failed: %v", err)
-	}
-
-	fmt.Println("✅ Setup completed successfully!")
+	fmt.Println("✅ Setup system is now running!")
 	fmt.Println()
-	fmt.Println("📋 Configuration Summary:")
-	fmt.Printf("  🏰 Guild ID: %s\n", setupBot.Config.Discord.GuildID)
-	fmt.Printf("  📝 Signup Channel ID: %s\n", setupBot.Config.Discord.SignupChannelID)
-	fmt.Printf("  📅 Event Channel ID: %s\n", setupBot.Config.Discord.EventChannelID)
-	fmt.Printf("  🏆 Leaderboard Channel ID: %s\n", setupBot.Config.Discord.LeaderboardChannelID)
-	fmt.Printf("  💬 Signup Message ID: %s\n", setupBot.Config.Discord.SignupMessageID)
-	fmt.Printf("  👤 Registered Role ID: %s\n", setupBot.Config.Discord.RegisteredRoleID)
-	fmt.Printf("  🛡️ Admin Role ID: %s\n", setupBot.Config.Discord.AdminRoleID)
-	fmt.Println("  🎭 Role Mappings:")
-	for name, id := range setupBot.Config.Discord.RoleMappings {
-		fmt.Printf("    %s: %s\n", name, id)
-	}
+	fmt.Println("🎯 Next Steps:")
+	fmt.Printf("1. Go to your Discord server (Guild ID: %s)\n", *guildID)
+	fmt.Println("2. Run the command: /frolf-setup")
+	fmt.Println("3. Fill out the setup modal with your preferences")
+	fmt.Println("4. The modern event-driven system will handle the rest!")
 	fmt.Println()
-	fmt.Println("⚠️  NOTE: You need to manually update your config.yaml with these values.")
-	fmt.Println("💡 TIP: You can also use environment variables instead of updating the config file.")
+	fmt.Println("� Or you can programmatically trigger setup by sending the setup event")
+	fmt.Println("� The setup will create:")
+	fmt.Println("   - Channels (with configurable prefix)")
+	fmt.Println("   - Roles (with configurable names)")
+	fmt.Println("   - Signup message with reactions")
+	fmt.Println("   - Proper Discord permissions")
+	fmt.Println("   - Backend persistence")
+	fmt.Println("   - Guild config caching")
+	fmt.Println("   - Dynamic command registration")
+	fmt.Println()
+	fmt.Println("🔄 Press Ctrl+C to stop the setup tool")
+
+	// Keep running until interrupted
+	select {}
 }

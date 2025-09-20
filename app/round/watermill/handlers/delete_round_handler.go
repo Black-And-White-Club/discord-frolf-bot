@@ -85,6 +85,7 @@ func (h *RoundHandlers) HandleRoundDeleted(msg *message.Message) ([]*message.Mes
 			}
 
 			tracePayload := map[string]interface{}{
+				"guild_id":                  p.GuildID,
 				"round_id":                  p.RoundID,
 				"event_type":                "round_deleted",
 				"status":                    "embed_deletion_attempted",

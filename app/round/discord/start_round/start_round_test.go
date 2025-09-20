@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
+	guildconfigmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
 	"github.com/Black-And-White-Club/frolf-bot-shared/mocks"
@@ -31,8 +32,9 @@ func TestNewStartRoundManager(t *testing.T) {
 	mockConfig := &config.Config{}
 	mockTracer := noop.NewTracerProvider().Tracer("test")
 	mockMetrics := discordmetricsmocks.NewMockDiscordMetrics(ctrl)
+	mockGuildConfig := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
 
-	manager := NewStartRoundManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockTracer, mockMetrics)
+	manager := NewStartRoundManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockTracer, mockMetrics, mockGuildConfig)
 	impl, ok := manager.(*startRoundManager)
 	if !ok {
 		t.Fatalf("Expected *startRoundManager, got %T", manager)

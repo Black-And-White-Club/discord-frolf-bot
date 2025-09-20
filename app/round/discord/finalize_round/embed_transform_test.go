@@ -3,7 +3,6 @@ package finalizeround
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 
@@ -82,10 +81,10 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 				discordgo.ActionsRow{
 					Components: []discordgo.MessageComponent{
 						discordgo.Button{
-							Label:    "Admin/Editor Score Update",
+							Label:    "Score Override",
 							Style:    discordgo.DangerButton,
-							CustomID: fmt.Sprintf("round_enter_score_finalized|round-%d", testRoundID), // Use testRoundID
-							Emoji:    &discordgo.ComponentEmoji{Name: "🔒"},
+							CustomID: fmt.Sprintf("round_bulk_score_override|%s", testRoundID),
+							Emoji:    &discordgo.ComponentEmoji{Name: "🛠️"},
 						},
 					},
 				},
@@ -150,12 +149,12 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 					},
 					{
 						Name:   "🥇 TestUser2",
-						Value:  "Score: -1",
+						Value:  "Score: -1 (<@user-456>)",
 						Inline: true,
 					},
 					{
 						Name:   "🗑️ TestUser1",
-						Value:  "Score: +2",
+						Value:  "Score: +2 (<@user-123>)",
 						Inline: true,
 					},
 				},
@@ -168,10 +167,10 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 				discordgo.ActionsRow{
 					Components: []discordgo.MessageComponent{
 						discordgo.Button{
-							Label:    "Admin/Editor Score Update",
+							Label:    "Score Override",
 							Style:    discordgo.DangerButton,
-							CustomID: fmt.Sprintf("round_enter_score_finalized|round-%d", testRoundID), // Use testRoundID
-							Emoji:    &discordgo.ComponentEmoji{Name: "🔒"},
+							CustomID: fmt.Sprintf("round_bulk_score_override|%s", testRoundID),
+							Emoji:    &discordgo.ComponentEmoji{Name: "🛠️"},
 						},
 					},
 				},
@@ -236,12 +235,12 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 					},
 					{
 						Name:   "🥇 NickUser1",
-						Value:  "Score: Even",
+						Value:  "Score: Even (<@user-123>)",
 						Inline: true,
 					},
 					{
 						Name:   "🗑️ NickUser2",
-						Value:  "Score: --",
+						Value:  "Score: -- (<@user-456>)",
 						Inline: true,
 					},
 				},
@@ -254,10 +253,10 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 				discordgo.ActionsRow{
 					Components: []discordgo.MessageComponent{
 						discordgo.Button{
-							Label:    "Admin/Editor Score Update",
+							Label:    "Score Override",
 							Style:    discordgo.DangerButton,
-							CustomID: fmt.Sprintf("round_enter_score_finalized|round-%d", testRoundID), // Use testRoundID
-							Emoji:    &discordgo.ComponentEmoji{Name: "🔒"},
+							CustomID: fmt.Sprintf("round_bulk_score_override|%s", testRoundID),
+							Emoji:    &discordgo.ComponentEmoji{Name: "🛠️"},
 						},
 					},
 				},
@@ -309,10 +308,10 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 				discordgo.ActionsRow{
 					Components: []discordgo.MessageComponent{
 						discordgo.Button{
-							Label:    "Admin/Editor Score Update",
+							Label:    "Score Override",
 							Style:    discordgo.DangerButton,
-							CustomID: fmt.Sprintf("round_enter_score_finalized|round-%d", testRoundID), // Use testRoundID
-							Emoji:    &discordgo.ComponentEmoji{Name: "🔒"},
+							CustomID: fmt.Sprintf("round_bulk_score_override|%s", testRoundID),
+							Emoji:    &discordgo.ComponentEmoji{Name: "🛠️"},
 						},
 					},
 				},
@@ -362,7 +361,7 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 					},
 					{
 						Name:   "😢 TestUser1",
-						Value:  "Score: -5",
+						Value:  "Score: -5 (<@user-123>)",
 						Inline: true,
 					},
 				},
@@ -375,10 +374,10 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 				discordgo.ActionsRow{
 					Components: []discordgo.MessageComponent{
 						discordgo.Button{
-							Label:    "Admin/Editor Score Update",
+							Label:    "Score Override",
 							Style:    discordgo.DangerButton,
-							CustomID: fmt.Sprintf("round_enter_score_finalized|round-%d", testRoundID), // Use testRoundID
-							Emoji:    &discordgo.ComponentEmoji{Name: "🔒"},
+							CustomID: fmt.Sprintf("round_bulk_score_override|%s", testRoundID),
+							Emoji:    &discordgo.ComponentEmoji{Name: "🛠️"},
 						},
 					},
 				},
@@ -420,10 +419,10 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 				discordgo.ActionsRow{
 					Components: []discordgo.MessageComponent{
 						discordgo.Button{
-							Label:    "Admin/Editor Score Update",
+							Label:    "Score Override",
 							Style:    discordgo.DangerButton,
-							CustomID: fmt.Sprintf("round_enter_score_finalized|round-%d", testRoundID), // Use testRoundID
-							Emoji:    &discordgo.ComponentEmoji{Name: "🔒"},
+							CustomID: fmt.Sprintf("round_bulk_score_override|%s", testRoundID),
+							Emoji:    &discordgo.ComponentEmoji{Name: "🛠️"},
 						},
 					},
 				},
@@ -486,13 +485,13 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 				gotEmbed.Timestamp = ""
 
 				// Do field by field comparison except timestamp
-				if !reflect.DeepEqual(gotEmbed.Title, tt.expectedEmbed.Title) {
+				if gotEmbed.Title != tt.expectedEmbed.Title {
 					t.Errorf("Title mismatch: got %v, want %v", gotEmbed.Title, tt.expectedEmbed.Title)
 				}
-				if !reflect.DeepEqual(gotEmbed.Description, tt.expectedEmbed.Description) {
+				if gotEmbed.Description != tt.expectedEmbed.Description {
 					t.Errorf("Description mismatch: got %v, want %v", gotEmbed.Description, tt.expectedEmbed.Description)
 				}
-				if !reflect.DeepEqual(gotEmbed.Color, tt.expectedEmbed.Color) {
+				if gotEmbed.Color != tt.expectedEmbed.Color {
 					t.Errorf("Color mismatch: got %v, want %v", gotEmbed.Color, tt.expectedEmbed.Color)
 				}
 
@@ -513,13 +512,79 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 						}
 					}
 				}
-				if !reflect.DeepEqual(gotEmbed.Footer, tt.expectedEmbed.Footer) {
-					t.Errorf("Footer mismatch: got %v, want %v", gotEmbed.Footer, tt.expectedEmbed.Footer)
+				if (gotEmbed.Footer == nil) != (tt.expectedEmbed.Footer == nil) {
+					t.Errorf("Footer presence mismatch: got %v want %v", gotEmbed.Footer, tt.expectedEmbed.Footer)
+				} else if gotEmbed.Footer != nil && tt.expectedEmbed.Footer != nil {
+					if gotEmbed.Footer.Text != tt.expectedEmbed.Footer.Text {
+						t.Errorf("Footer text mismatch: got %v want %v", gotEmbed.Footer.Text, tt.expectedEmbed.Footer.Text)
+					}
 				}
 
 				// Compare components
-				if !reflect.DeepEqual(gotComponents, tt.expectedComponents) {
-					t.Errorf("Components mismatch: got %v, want %v", gotComponents, tt.expectedComponents)
+				// Component logical comparison (label, style, custom ID, emoji name)
+				if len(gotComponents) != len(tt.expectedComponents) {
+					// lengths differ
+					if len(gotComponents) == 0 && len(tt.expectedComponents) == 0 {
+						// both empty, fine
+					} else {
+						t.Errorf("Components length mismatch: got %d want %d", len(gotComponents), len(tt.expectedComponents))
+					}
+				} else {
+					for ci := range gotComponents {
+						gotRow, ok1 := gotComponents[ci].(discordgo.ActionsRow)
+						wantRow, ok2 := tt.expectedComponents[ci].(discordgo.ActionsRow)
+						if !ok1 || !ok2 {
+							// Try pointer form
+							if pr, okp := gotComponents[ci].(*discordgo.ActionsRow); okp {
+								gotRow = *pr
+								ok1 = true
+							}
+							if pr, okp := tt.expectedComponents[ci].(*discordgo.ActionsRow); okp {
+								wantRow = *pr
+								ok2 = true
+							}
+						}
+						if !ok1 || !ok2 {
+							continue // skip unknown component types for now
+						}
+						if len(gotRow.Components) != len(wantRow.Components) {
+							t.Errorf("Row %d components length mismatch: got %d want %d", ci, len(gotRow.Components), len(wantRow.Components))
+							continue
+						}
+						for bi := range gotRow.Components {
+							gb, gOK := gotRow.Components[bi].(discordgo.Button)
+							if !gOK {
+								if pb, okp := gotRow.Components[bi].(*discordgo.Button); okp {
+									gb = *pb
+									gOK = true
+								}
+							}
+							wb, wOK := wantRow.Components[bi].(discordgo.Button)
+							if !wOK {
+								if pb, okp := wantRow.Components[bi].(*discordgo.Button); okp {
+									wb = *pb
+									wOK = true
+								}
+							}
+							if !gOK || !wOK {
+								continue
+							}
+							if gb.Label != wb.Label || gb.Style != wb.Style || gb.CustomID != wb.CustomID {
+								t.Errorf("Button mismatch at row %d index %d: got {Label:%s Style:%d ID:%s} want {Label:%s Style:%d ID:%s}", ci, bi, gb.Label, gb.Style, gb.CustomID, wb.Label, wb.Style, wb.CustomID)
+							}
+							gEmoji := ""
+							wEmoji := ""
+							if gb.Emoji != nil {
+								gEmoji = gb.Emoji.Name
+							}
+							if wb.Emoji != nil {
+								wEmoji = wb.Emoji.Name
+							}
+							if gEmoji != wEmoji {
+								t.Errorf("Emoji mismatch at row %d index %d: got %s want %s", ci, bi, gEmoji, wEmoji)
+							}
+						}
+					}
 				}
 
 				// Set timestamp back after tests

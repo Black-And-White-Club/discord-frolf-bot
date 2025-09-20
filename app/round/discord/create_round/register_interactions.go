@@ -10,19 +10,21 @@ import (
 )
 
 func RegisterHandlers(registry *interactions.Registry, manager CreateRoundManager) {
-	registry.RegisterHandler("createround", func(ctx context.Context, i *discordgo.InteractionCreate) {
+	// createround command available to all players
+	registry.RegisterHandlerWithPermissions("createround", func(ctx context.Context, i *discordgo.InteractionCreate) {
 		slog.Info("Handling /createround command", attr.String("command_name", i.ApplicationCommandData().Name))
 		manager.HandleCreateRoundCommand(ctx, i)
-	})
+	}, interactions.PlayerRequired, true)
 
-	registry.RegisterHandler("create_round_modal", func(ctx context.Context, i *discordgo.InteractionCreate) {
+	// Modal submissions require same permission as the command
+	registry.RegisterHandlerWithPermissions("create_round_modal", func(ctx context.Context, i *discordgo.InteractionCreate) {
 		slog.Info("Handling create_round_modal submission", attr.String("custom_id", i.ModalSubmitData().CustomID))
 		manager.HandleCreateRoundModalSubmit(ctx, i)
-	})
+	}, interactions.PlayerRequired, true)
 
-	registry.RegisterHandler("retry_create_round", func(ctx context.Context, i *discordgo.InteractionCreate) {
+	// Retry button requires same permission as the command
+	registry.RegisterHandlerWithPermissions("retry_create_round", func(ctx context.Context, i *discordgo.InteractionCreate) {
 		slog.Info("Handling retry_create_round button press", attr.String("custom_id", i.MessageComponentData().CustomID))
 		manager.HandleRetryCreateRound(ctx, i)
-	})
-
+	}, interactions.PlayerRequired, true)
 }

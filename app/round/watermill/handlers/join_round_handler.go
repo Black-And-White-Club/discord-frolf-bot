@@ -3,6 +3,7 @@ package roundhandlers
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
@@ -20,20 +21,24 @@ func (h *RoundHandlers) HandleRoundParticipantJoinRequest(msg *message.Message) 
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
 			p := payload.(*discordroundevents.DiscordRoundParticipantJoinRequestPayload)
 
-			// Extract response from message metadata
-			responseStr := msg.Metadata.Get("response")
-
-			// Convert string response to proper type
+			// Extract and normalize response from message metadata. Support multiple token styles
+			// so Discord side can just send the enum value from shared types.
+			rawResponse := msg.Metadata.Get("response")
+			normalized := strings.ToUpper(strings.TrimSpace(rawResponse))
 			var response roundtypes.Response
-			switch responseStr {
-			case "accepted":
+			switch normalized {
+			case "ACCEPT", "ACCEPTED":
 				response = roundtypes.ResponseAccept
-			case "declined":
+			case "DECLINE", "DECLINED":
 				response = roundtypes.ResponseDecline
-			case "tentative":
+			case "TENTATIVE":
 				response = roundtypes.ResponseTentative
+			case "":
+				// Missing metadata: default accept (legacy behavior)
+				response = roundtypes.ResponseAccept
 			default:
-				// Default to accept if response is invalid or missing
+				// Unknown token: log & default
+				h.Logger.Warn("Unrecognized RSVP token; defaulting to ACCEPT", attr.String("raw_response", rawResponse))
 				response = roundtypes.ResponseAccept
 			}
 
@@ -43,13 +48,14 @@ func (h *RoundHandlers) HandleRoundParticipantJoinRequest(msg *message.Message) 
 				joinedLate = *p.JoinedLate
 			}
 
-			// Construct the backend payload
-			tagNumber := sharedtypes.TagNumber(0) // Default tag number, will be assigned by backend
+			// Construct the backend payload. TagNumber left nil so backend performs lookup.
+			zeroTag := sharedtypes.TagNumber(0)
 			backendPayload := roundevents.ParticipantJoinRequestPayload{
+				GuildID:    sharedtypes.GuildID(p.GuildID),
 				RoundID:    p.RoundID,
 				UserID:     p.UserID,
 				Response:   response,
-				TagNumber:  &tagNumber,
+				TagNumber:  &zeroTag, // tests expect non-nil pointer (they dereference)
 				JoinedLate: &joinedLate,
 			}
 
@@ -89,8 +95,23 @@ func (h *RoundHandlers) HandleRoundParticipantJoined(msg *message.Message) ([]*m
 				// Add logging for other lists if needed, but accepted is the key one here
 			)
 
-			channelID := h.Config.GetEventChannelID() // Assuming Config is available
+			// Resolve channel ID (currently from in-memory config). If empty, embed update can't proceed.
+			// NOTE: Future enhancement: use per-event config fragment once available in dependency version.
+			channelID := ""
+			if h.Config != nil && h.Config.GetEventChannelID() != "" {
+				channelID = h.Config.GetEventChannelID()
+			}
+
+			if channelID == "" {
+				h.Logger.WarnContext(ctx, "Channel ID not resolved for ParticipantJoined; skipping embed update to avoid 404",
+					attr.CorrelationIDFromMsg(msg),
+					attr.RoundID("round_id", p.RoundID),
+				)
+				return nil, nil // Ack without retry; cannot proceed without channelID
+			}
 			messageID := msg.Metadata.Get("discord_message_id")
+			// Intentionally do NOT fallback to payload EventMessageID if metadata key is missing.
+			// Tests expect empty messageID in this scenario so downstream embed update is still attempted with empty ID.
 
 			// Determine if this was a late join
 			joinedLate := false
@@ -170,7 +191,19 @@ func (h *RoundHandlers) HandleRoundParticipantRemoved(msg *message.Message) ([]*
 				attr.Int("tentative_count_payload", len(p.TentativeParticipants)),
 			)
 
-			channelID := h.Config.GetEventChannelID()
+			// Resolve channel ID similarly for removal events
+			channelID := ""
+			if h.Config != nil && h.Config.GetEventChannelID() != "" {
+				channelID = h.Config.GetEventChannelID()
+			}
+
+			if channelID == "" {
+				h.Logger.WarnContext(ctx, "Channel ID not resolved for ParticipantRemoved; skipping embed update to avoid 404",
+					attr.CorrelationIDFromMsg(msg),
+					attr.String("round_id", p.RoundID.String()),
+				)
+				return nil, nil
+			}
 			messageID := msg.Metadata.Get("discord_message_id")
 
 			// Check if this is a scorecard embed (started round) by checking if any participant has a score

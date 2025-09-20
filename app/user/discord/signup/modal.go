@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	userevents "github.com/Black-And-White-Club/frolf-bot-shared/events/user"
@@ -44,11 +45,30 @@ func (sm *signupManager) SendSignupModal(ctx context.Context, i *discordgo.Inter
 		sm.logger.InfoContext(ctx, "Preparing to send signup modal",
 			attr.String("user_id", userID))
 
+		// Get guild ID from button custom ID if not available directly; only read component data for component type
+		guildID := i.Interaction.GuildID
+		if guildID == "" && i.Interaction.Type == discordgo.InteractionMessageComponent {
+			// Extract from button CustomID: "signup_button|userID|guild_id=GUILD_ID"
+			customID := ""
+			mcd := i.Interaction.MessageComponentData()
+			if mcd.CustomID != "" {
+				customID = mcd.CustomID
+			}
+			if strings.Contains(customID, "guild_id=") {
+				parts := strings.Split(customID, "guild_id=")
+				if len(parts) == 2 {
+					guildID = parts[1]
+				}
+			}
+		}
+
 		// Send the modal with your existing components
+		// Include guild ID in the custom ID so it's available on modal submit
+		customID := fmt.Sprintf("signup_modal|guild_id=%s", guildID)
 		err = sm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseModal,
 			Data: &discordgo.InteractionResponseData{
-				CustomID: "signup_modal",
+				CustomID: customID,
 				Title:    "Frolf Club Signup",
 				Components: []discordgo.MessageComponent{
 					discordgo.ActionsRow{
@@ -108,10 +128,26 @@ func (sm *signupManager) HandleSignupModalSubmit(ctx context.Context, i *discord
 		return SignupOperationResult{Error: fmt.Errorf("user ID is missing")}, fmt.Errorf("user ID is missing")
 	}
 
+	// Try to get guildID from interaction, or from the modal custom_id if missing
+	guildID := i.Interaction.GuildID
+	if guildID == "" {
+		customID := i.ModalSubmitData().CustomID
+		if strings.HasPrefix(customID, "signup_modal|guild_id=") {
+			parts := strings.SplitN(customID, "guild_id=", 2)
+			if len(parts) == 2 {
+				guildID = parts[1]
+			}
+		}
+		// Fallback to configured default guild ID if still empty (tests rely on config.Discord.GuildID)
+		if guildID == "" && sm.config != nil && sm.config.Discord.GuildID != "" {
+			guildID = sm.config.Discord.GuildID
+		}
+	}
+
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.UserIDKey, userID)
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.CommandNameKey, "handle_signup_modal_submit")
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.InteractionType, "modal_submit")
-	ctx = discordmetrics.WithValue(ctx, discordmetrics.GuildIDKey, i.GuildID)
+	ctx = discordmetrics.WithValue(ctx, discordmetrics.GuildIDKey, guildID)
 
 	result, err := sm.operationWrapper(ctx, "handle_signup_modal_submit", func(ctx context.Context) (SignupOperationResult, error) {
 		sm.logger.InfoContext(ctx, "HandlingModalSubmit", attr.String("custom_id", i.ModalSubmitData().CustomID))
@@ -134,23 +170,26 @@ func (sm *signupManager) HandleSignupModalSubmit(ctx context.Context, i *discord
 			return SignupOperationResult{Error: fmt.Errorf("invalid tag number: %w", err)}, err
 		}
 
+		if guildID == "" {
+			_ = sm.sendFollowupMessage(i.Interaction, "Error: Could not determine guild ID. Please try again or contact support.")
+			return SignupOperationResult{Error: errors.New("guildID is empty")}, errors.New("guildID is empty")
+		}
 		payload := userevents.UserSignupRequestPayload{
+			GuildID:   sharedtypes.GuildID(guildID),
 			UserID:    sharedtypes.DiscordID(userID),
 			TagNumber: tagNumberPtr,
 		}
+
 		correlationID := uuid.New().String()
 		sm.interactionStore.Set(i.Interaction.Token, i.Interaction, 10*time.Minute)
 
-		msg, err := sm.createEvent(ctx, userevents.UserSignupRequest, payload, i)
+		msg, err := BuildUserSignupRequestMessage(ctx, payload, i)
 		if err != nil {
 			_ = sm.sendFollowupMessage(i.Interaction, "Error processing signup. Try again later.")
-			return SignupOperationResult{Error: fmt.Errorf("failed to create event: %w", err)}, err
+			return SignupOperationResult{Error: fmt.Errorf("failed to build signup message: %w", err)}, err
 		}
-
+		// Overwrite correlation id with deterministic one for trace continuity if needed
 		msg.Metadata.Set("correlation_id", correlationID)
-		msg.Metadata.Set("user_id", userID)
-		msg.Metadata.Set("interaction_token", i.Interaction.Token)
-
 		if err := sm.publisher.Publish(userevents.UserSignupRequest, msg); err != nil {
 			_ = sm.sendFollowupMessage(i.Interaction, "Failed to publish signup event.")
 			return SignupOperationResult{Error: fmt.Errorf("failed to publish signup event: %w", err)}, err

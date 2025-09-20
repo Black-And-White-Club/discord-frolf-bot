@@ -138,6 +138,8 @@ func parseInt(s string) (int, error) {
 // merging participant status from the existing embed with the new payload data.
 func (m *startRoundManager) TransformRoundToScorecard(ctx context.Context, payload *roundevents.DiscordRoundStartPayload, existingEmbed *discordgo.MessageEmbed) (StartRoundOperationResult, error) {
 	return m.operationWrapper(ctx, "TransformRoundToScorecard", func(ctx context.Context) (StartRoundOperationResult, error) {
+		// Multi-tenant: resolve channel ID from guild config if not provided (if needed for embed operations)
+		// Channel resolution logic is present for future use, but not needed in this function. Removed unused variable.
 		if payload.StartTime == nil {
 			err := errors.New("payload StartTime is nil")
 			m.logger.ErrorContext(ctx, "TransformRoundToScorecard received nil StartTime in payload")

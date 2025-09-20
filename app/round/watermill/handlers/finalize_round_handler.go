@@ -106,6 +106,7 @@ func (h *RoundHandlers) HandleRoundFinalized(msg *message.Message) ([]*message.M
 
 			// Create trace event (optional)
 			tracePayload := map[string]interface{}{
+				"guild_id":           p.GuildID,
 				"round_id":           p.RoundID,
 				"event_type":         "round_finalized",             // Or Discord specific event type
 				"status":             "scorecard_finalized_display", // Clarified status

@@ -3,6 +3,7 @@ package scorehandlers
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	scoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/score"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
@@ -90,6 +91,17 @@ func (h *ScoreHandlers) HandleScoreUpdateFailure(msg *message.Message) ([]*messa
 			userID := msg.Metadata.Get("user_id")
 			channelID := msg.Metadata.Get("channel_id")
 			messageID := msg.Metadata.Get("message_id")
+
+			// Always suppress retries and do NOT post Discord messages for the known business failure
+			// where the aggregate scores row is missing. This prevents spam on redelivery.
+			if strings.Contains(fail.Error, "score record not found") {
+				h.Logger.InfoContext(ctx, "Suppressing retry for known business failure (aggregate scores missing)",
+					attr.RoundID("round_id", fail.RoundID),
+					attr.String("guild_id", string(fail.GuildID)),
+					attr.String("user_id", string(fail.UserID)),
+				)
+				return nil, nil // ACK with no downstream messages
+			}
 
 			if userID == "" || channelID == "" {
 				return nil, fmt.Errorf("missing routing metadata for Discord message")

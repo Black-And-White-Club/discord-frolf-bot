@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
+	guildconfigmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
 	storagemocks "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
@@ -31,8 +32,9 @@ func TestNewLeaderboardUpdateManager(t *testing.T) {
 	mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
 	mockMetrics := discordmetricsmocks.NewMockDiscordMetrics(ctrl)
 	tracer := noop.NewTracerProvider().Tracer("test")
+	mockGuildConfig := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
 
-	manager := NewLeaderboardUpdateManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockInteractionStore, tracer, mockMetrics)
+	manager := NewLeaderboardUpdateManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockGuildConfig, mockInteractionStore, tracer, mockMetrics)
 	impl, ok := manager.(*leaderboardUpdateManager)
 	if !ok {
 		t.Fatalf("Expected *leaderboardUpdateManager, got %T", manager)

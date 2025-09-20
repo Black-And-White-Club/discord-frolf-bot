@@ -57,7 +57,7 @@ go run main.go setup YOUR_GUILD_ID
 This command:
 1. Connects to your Discord server
 2. Creates required channels (signup, events, leaderboard)
-3. Creates required roles (Rattler, Editor, Admin)
+3. Creates required roles (User, Editor, Admin)
 4. Sets up channel permissions
 5. Creates signup reaction message
 6. **Automatically updates your config.yaml** with all generated IDs

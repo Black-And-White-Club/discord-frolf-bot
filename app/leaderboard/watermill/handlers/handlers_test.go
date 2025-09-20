@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"testing"
 
+	guildconfigmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
 	leaderboarddiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	mockHelpers "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
@@ -25,13 +26,14 @@ func TestNewLeaderboardHandlers(t *testing.T) {
 		defer ctrl.Finish()
 
 		mockLeaderboardDiscord := leaderboarddiscord.NewMockLeaderboardDiscordInterface(ctrl)
+		mockGuildConfigResolver := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
 		mockHelpers := mockHelpers.NewMockHelpers(ctrl)
 		mockMetrics := mocks.NewMockDiscordMetrics(ctrl)
 		logger := loggerfrolfbot.NoOpLogger
 		tracer := noop.NewTracerProvider().Tracer("test")
 		cfg := &config.Config{}
 
-		handlers := NewLeaderboardHandlers(logger, cfg, mockHelpers, mockLeaderboardDiscord, tracer, mockMetrics)
+		handlers := NewLeaderboardHandlers(logger, cfg, mockHelpers, mockLeaderboardDiscord, mockGuildConfigResolver, tracer, mockMetrics)
 
 		if handlers == nil {
 			t.Fatalf("Expected non-nil LeaderboardHandlers")
@@ -41,6 +43,9 @@ func TestNewLeaderboardHandlers(t *testing.T) {
 
 		if lh.LeaderboardDiscord != mockLeaderboardDiscord {
 			t.Errorf("LeaderboardDiscord not set correctly")
+		}
+		if lh.GuildConfigResolver != mockGuildConfigResolver {
+			t.Errorf("GuildConfigResolver not set correctly")
 		}
 		if lh.Helpers != mockHelpers {
 			t.Errorf("Helpers not set correctly")

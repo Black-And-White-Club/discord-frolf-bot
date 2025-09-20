@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
+	guildconfigmock "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	storagemocks "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
@@ -43,6 +45,9 @@ func Test_signupManager_MessageReactionAdd(t *testing.T) {
 		},
 	}
 
+	// Add mock GuildConfigResolver
+	mockGuildConfigResolver := guildconfigmock.NewMockGuildConfigResolver(ctrl)
+
 	tests := []struct {
 		name        string
 		setup       func()
@@ -70,7 +75,7 @@ func Test_signupManager_MessageReactionAdd(t *testing.T) {
 			args: &discordgo.MessageReactionAdd{
 				MessageReaction: &discordgo.MessageReaction{
 					ChannelID: "channel-id",
-					MessageID: "message-id",
+					MessageID: "any-message-id", // Message ID no longer matters
 					Emoji: discordgo.Emoji{
 						Name: "emoji",
 					},
@@ -93,7 +98,7 @@ func Test_signupManager_MessageReactionAdd(t *testing.T) {
 			args: &discordgo.MessageReactionAdd{
 				MessageReaction: &discordgo.MessageReaction{
 					ChannelID: "invalid-channel-id",
-					MessageID: "message-id",
+					MessageID: "any-message-id", // Message ID no longer matters
 					Emoji: discordgo.Emoji{
 						Name: "emoji",
 					},
@@ -105,20 +110,33 @@ func Test_signupManager_MessageReactionAdd(t *testing.T) {
 			wantErrIs:   nil,
 		},
 		{
-			name: "invalid message id",
+			name: "different message id in same channel - now processed since we only check channel + emoji",
 			setup: func() {
+				mockSession.EXPECT().
+					GetBotUser().
+					Return(&discordgo.User{ID: "bot-user-id"}, nil).
+					Times(1)
+				mockSession.EXPECT().
+					UserChannelCreate(gomock.Any()).
+					Return(&discordgo.Channel{}, nil).
+					Times(1)
+				mockSession.EXPECT().
+					ChannelMessageSendComplex(gomock.Any(), gomock.Any()).
+					Return(&discordgo.Message{}, nil).
+					Times(1)
 			},
 			args: &discordgo.MessageReactionAdd{
 				MessageReaction: &discordgo.MessageReaction{
 					ChannelID: "channel-id",
-					MessageID: "invalid-message-id",
+					MessageID: "different-message-id", // This is now allowed
 					Emoji: discordgo.Emoji{
 						Name: "emoji",
 					},
-					UserID: "user-id",
+					UserID:  "user-id",
+					GuildID: "guild-id", // Ensure GuildID is set so resolver is called
 				},
 			},
-			wantSuccess: "reaction mismatch, ignored",
+			wantSuccess: "signup button sent", // Would now be processed
 			wantErrMsg:  "",
 			wantErrIs:   nil,
 		},
@@ -129,7 +147,7 @@ func Test_signupManager_MessageReactionAdd(t *testing.T) {
 			args: &discordgo.MessageReactionAdd{
 				MessageReaction: &discordgo.MessageReaction{
 					ChannelID: "channel-id",
-					MessageID: "message-id",
+					MessageID: "any-message-id", // Message ID no longer matters
 					Emoji: discordgo.Emoji{
 						Name: "invalid-emoji",
 					},
@@ -151,7 +169,7 @@ func Test_signupManager_MessageReactionAdd(t *testing.T) {
 			args: &discordgo.MessageReactionAdd{
 				MessageReaction: &discordgo.MessageReaction{
 					ChannelID: "channel-id",
-					MessageID: "message-id",
+					MessageID: "any-message-id", // Message ID no longer matters
 					Emoji: discordgo.Emoji{
 						Name: "emoji",
 					},
@@ -173,7 +191,7 @@ func Test_signupManager_MessageReactionAdd(t *testing.T) {
 			args: &discordgo.MessageReactionAdd{
 				MessageReaction: &discordgo.MessageReaction{
 					ChannelID: "channel-id",
-					MessageID: "message-id",
+					MessageID: "any-message-id", // Message ID no longer matters
 					Emoji: discordgo.Emoji{
 						Name: "emoji",
 					},
@@ -193,14 +211,24 @@ func Test_signupManager_MessageReactionAdd(t *testing.T) {
 			}
 
 			sm := &signupManager{
-				session:          mockSession,
-				publisher:        mockPublisher,
-				logger:           logger,
-				config:           mockConfig,
-				interactionStore: mockInteractionStore,
-				tracer:           tracer,
-				metrics:          metrics,
-				operationWrapper: testOperationWrapper,
+				session:             mockSession,
+				publisher:           mockPublisher,
+				logger:              logger,
+				config:              mockConfig,
+				guildConfigResolver: mockGuildConfigResolver,
+				interactionStore:    mockInteractionStore,
+				tracer:              tracer,
+				metrics:             metrics,
+				operationWrapper:    testOperationWrapper,
+			}
+
+			// Set up GuildConfigResolver expectations for per-guild config fetches
+			if tt.args != nil && tt.args.GuildID != "" {
+				guildConfig := &storage.GuildConfig{
+					SignupChannelID: "channel-id",
+					SignupEmoji:     "emoji",
+				}
+				mockGuildConfigResolver.EXPECT().GetGuildConfigWithContext(gomock.Any(), tt.args.GuildID).Return(guildConfig, nil).AnyTimes()
 			}
 
 			result, err := sm.MessageReactionAdd(mockSession, tt.args)

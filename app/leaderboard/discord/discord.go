@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	discordgo "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	claimtag "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/claim_tag"
 	leaderboardupdated "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/leaderboard_updated"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
@@ -28,6 +29,7 @@ type LeaderboardDiscord struct {
 }
 
 // NewLeaderboardDiscord creates a new LeaderboardDiscord instance.
+
 func NewLeaderboardDiscord(
 	ctx context.Context,
 	session discordgo.Session,
@@ -35,13 +37,14 @@ func NewLeaderboardDiscord(
 	logger *slog.Logger,
 	helper utils.Helpers,
 	config *config.Config,
+	guildConfigResolver guildconfig.GuildConfigResolver,
 	interactionStore storage.ISInterface,
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
 ) (LeaderboardDiscordInterface, error) {
-	leaderboardUpdateManager := leaderboardupdated.NewLeaderboardUpdateManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics)
+	leaderboardUpdateManager := leaderboardupdated.NewLeaderboardUpdateManager(session, publisher, logger, helper, config, guildConfigResolver, interactionStore, tracer, metrics)
 
-	claimTagManager := claimtag.NewClaimTagManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics)
+	claimTagManager := claimtag.NewClaimTagManager(session, publisher, logger, helper, config, guildConfigResolver, interactionStore, tracer, metrics)
 
 	return &LeaderboardDiscord{
 		LeaderboardUpdateManager: leaderboardUpdateManager,

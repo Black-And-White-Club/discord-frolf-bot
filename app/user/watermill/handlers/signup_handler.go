@@ -16,9 +16,18 @@ func (h *UserHandlers) HandleUserSignupRequest(msg *message.Message) ([]*message
 		"HandleUserSignupRequest",
 		&userevents.UserSignupRequestPayload{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
+			h.Logger.DebugContext(ctx, "HandleUserSignupRequest called", attr.String("msg_uuid", msg.UUID))
 			reqPayload := payload.(*userevents.UserSignupRequestPayload)
+			h.Logger.DebugContext(
+				ctx,
+				"Parsed UserSignupRequestPayload",
+				attr.String("guild_id", string(reqPayload.GuildID)),
+				attr.String("user_id", string(reqPayload.UserID)),
+				attr.Any("tag_number", reqPayload.TagNumber),
+			)
 
 			backendPayload := userevents.UserSignupRequestPayload{
+				GuildID:   reqPayload.GuildID,
 				UserID:    reqPayload.UserID,
 				TagNumber: reqPayload.TagNumber,
 			}
@@ -27,6 +36,7 @@ func (h *UserHandlers) HandleUserSignupRequest(msg *message.Message) ([]*message
 				h.Logger.ErrorContext(ctx, "Failed to create backend event", attr.Error(err))
 				return nil, fmt.Errorf("failed to create backend event: %w", err)
 			}
+			h.Logger.InfoContext(ctx, "Created backend event for signup", attr.String("guild_id", string(backendPayload.GuildID)), attr.String("user_id", string(backendPayload.UserID)), attr.Any("tag_number", backendPayload.TagNumber))
 			return []*message.Message{backendEvent}, nil
 		},
 	)(msg)
@@ -41,8 +51,9 @@ func (h *UserHandlers) HandleUserCreated(msg *message.Message) ([]*message.Messa
 			createdPayload := payload.(*userevents.UserCreatedPayload)
 
 			rolePayload := discorduserevents.AddRolePayload{
-				UserID: createdPayload.UserID,
-				RoleID: h.Config.GetRegisteredRoleID(),
+				UserID:  createdPayload.UserID,
+				RoleID:  h.Config.GetRegisteredRoleID(),
+				GuildID: string(createdPayload.GuildID),
 			}
 			roleMsg, err := h.Helper.CreateResultMessage(msg, rolePayload, discorduserevents.SignupAddRole)
 			if err != nil {

@@ -12,10 +12,8 @@ import (
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	tracingfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/tracing"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
-	"github.com/ThreeDotsLabs/watermill/components/metrics"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/message/router/middleware"
-	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -55,9 +53,6 @@ func NewScoreRouter(
 
 // Configure sets up the router.
 func (r *ScoreRouter) Configure(ctx context.Context, handlers scorehandlers.Handler) error {
-	metricsBuilder := metrics.NewPrometheusMetricsBuilder(prometheus.NewRegistry(), "", "")
-	metricsBuilder.AddPrometheusRouterMetrics(r.Router)
-
 	r.Router.AddMiddleware(
 		middleware.CorrelationID,
 		r.middlewareHelper.CommonMetadataMiddleware("discord-score"),

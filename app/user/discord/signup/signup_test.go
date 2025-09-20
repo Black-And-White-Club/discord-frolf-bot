@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
+	guildconfigmock "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
 	storagemocks "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	eventbus "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
@@ -42,8 +43,11 @@ func TestNewSignupManager(t *testing.T) {
 				mockMetrics := discordmetrics.NewMockDiscordMetrics(ctrl)
 				tracer := noop.NewTracerProvider().Tracer("test")
 
+				// Add mock GuildConfigResolver
+				mockGuildConfigResolver := guildconfigmock.NewMockGuildConfigResolver(ctrl)
+
 				// Call the function being tested
-				manager, err := NewSignupManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockInteractionStore, tracer, mockMetrics)
+				manager, err := NewSignupManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockGuildConfigResolver, mockInteractionStore, tracer, mockMetrics)
 				// Ensure manager is correctly created
 				if err != nil {
 					t.Fatalf("NewSignupManager returned error: %v", err)
@@ -94,7 +98,7 @@ func TestNewSignupManager(t *testing.T) {
 			name: "Handles nil dependencies",
 			test: func(t *testing.T) {
 				// Call with nil dependencies
-				manager, err := NewSignupManager(nil, nil, nil, nil, nil, nil, nil, nil)
+				manager, err := NewSignupManager(nil, nil, nil, nil, nil, nil, nil, nil, nil)
 				// Ensure manager is correctly created
 				if err != nil {
 					t.Fatalf("NewSignupManager returned error: %v", err)

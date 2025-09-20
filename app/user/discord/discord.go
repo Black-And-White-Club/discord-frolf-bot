@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	discordgo "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord/role"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord/signup"
@@ -27,7 +28,6 @@ type UserDiscord struct {
 	SignupManager signup.SignupManager
 }
 
-// NewUserDiscord creates a new UserDiscord instance.
 func NewUserDiscord(
 	ctx context.Context,
 	session discordgo.Session,
@@ -35,16 +35,17 @@ func NewUserDiscord(
 	logger *slog.Logger,
 	helper utils.Helpers,
 	config *config.Config,
+	guildConfigResolver guildconfig.GuildConfigResolver,
 	interactionStore storage.ISInterface,
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
 ) (UserDiscordInterface, error) {
-	roleManager, err := role.NewRoleManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics)
+	roleManager, err := role.NewRoleManager(session, publisher, logger, helper, config, guildConfigResolver, interactionStore, tracer, metrics)
 	if err != nil {
 		return nil, err
 	}
 
-	signupManager, err := signup.NewSignupManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics)
+	signupManager, err := signup.NewSignupManager(session, publisher, logger, helper, config, guildConfigResolver, interactionStore, tracer, metrics)
 	if err != nil {
 		return nil, err
 	}

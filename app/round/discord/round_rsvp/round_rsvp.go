@@ -8,6 +8,7 @@ import (
 	"time"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
@@ -29,15 +30,16 @@ type RoundRsvpManager interface {
 }
 
 type roundRsvpManager struct {
-	session          discord.Session
-	publisher        eventbus.EventBus
-	logger           *slog.Logger
-	helper           utils.Helpers
-	config           *config.Config
-	interactionStore storage.ISInterface
-	tracer           trace.Tracer
-	metrics          discordmetrics.DiscordMetrics
-	operationWrapper func(ctx context.Context, opName string, fn func(ctx context.Context) (RoundRsvpOperationResult, error)) (RoundRsvpOperationResult, error)
+	session             discord.Session
+	publisher           eventbus.EventBus
+	logger              *slog.Logger
+	helper              utils.Helpers
+	config              *config.Config
+	interactionStore    storage.ISInterface
+	tracer              trace.Tracer
+	metrics             discordmetrics.DiscordMetrics
+	operationWrapper    func(ctx context.Context, opName string, fn func(ctx context.Context) (RoundRsvpOperationResult, error)) (RoundRsvpOperationResult, error)
+	guildConfigResolver guildconfig.GuildConfigResolver
 }
 
 // NewRoundRsvpManager creates a new RoundRsvpManager instance.
@@ -50,6 +52,7 @@ func NewRoundRsvpManager(
 	interactionStore storage.ISInterface,
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
+	guildConfigResolver guildconfig.GuildConfigResolver,
 ) RoundRsvpManager {
 	if logger != nil {
 		logger.InfoContext(context.Background(), "Creating RoundRsvpManager")
@@ -66,6 +69,7 @@ func NewRoundRsvpManager(
 		operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (RoundRsvpOperationResult, error)) (RoundRsvpOperationResult, error) {
 			return wrapRoundRsvpOperation(ctx, opName, fn, logger, tracer, metrics)
 		},
+		guildConfigResolver: guildConfigResolver,
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
+	guildconfigmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
 	storagemocks "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	eventbus "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
@@ -40,9 +41,10 @@ func TestNewRoleManager(t *testing.T) {
 				mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
 				mockMetrics := discordmetrics.NewMockDiscordMetrics(ctrl)
 				tracer := noop.NewTracerProvider().Tracer("test")
+				mockGuildConfig := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
 
 				// Call the function being tested
-				manager, err := NewRoleManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockInteractionStore, tracer, mockMetrics)
+				manager, err := NewRoleManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockGuildConfig, mockInteractionStore, tracer, mockMetrics)
 				// Ensure manager is correctly created
 				if err != nil {
 					t.Fatalf("NewRoleManager returned error: %v", err)
@@ -93,7 +95,7 @@ func TestNewRoleManager(t *testing.T) {
 			name: "Handles nil dependencies",
 			test: func(t *testing.T) {
 				// Call with nil dependencies
-				manager, err := NewRoleManager(nil, nil, nil, nil, nil, nil, nil, nil)
+				manager, err := NewRoleManager(nil, nil, nil, nil, nil, nil, nil, nil, nil)
 				// Ensure manager is correctly created
 				if err != nil {
 					t.Fatalf("NewRoleManager returned error: %v", err)

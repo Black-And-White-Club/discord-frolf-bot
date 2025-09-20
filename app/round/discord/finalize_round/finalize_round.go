@@ -8,6 +8,7 @@ import (
 	"time"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
@@ -27,14 +28,15 @@ type FinalizeRoundManager interface {
 }
 
 type finalizeRoundManager struct {
-	session          discord.Session
-	publisher        eventbus.EventBus
-	logger           *slog.Logger
-	helper           utils.Helpers
-	config           *config.Config
-	tracer           trace.Tracer
-	metrics          discordmetrics.DiscordMetrics
-	operationWrapper func(ctx context.Context, opName string, fn func(ctx context.Context) (FinalizeRoundOperationResult, error)) (FinalizeRoundOperationResult, error)
+	session             discord.Session
+	publisher           eventbus.EventBus
+	logger              *slog.Logger
+	helper              utils.Helpers
+	config              *config.Config
+	tracer              trace.Tracer
+	metrics             discordmetrics.DiscordMetrics
+	operationWrapper    func(ctx context.Context, opName string, fn func(ctx context.Context) (FinalizeRoundOperationResult, error)) (FinalizeRoundOperationResult, error)
+	guildConfigResolver guildconfig.GuildConfigResolver
 }
 
 // NewFinalizeRoundManager creates a new FinalizeRoundManager instance.
@@ -46,6 +48,7 @@ func NewFinalizeRoundManager(
 	config *config.Config,
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
+	guildConfigResolver guildconfig.GuildConfigResolver,
 ) FinalizeRoundManager {
 	if logger != nil {
 		logger.InfoContext(context.Background(), "Creating FinalizeRoundManager")
@@ -61,6 +64,7 @@ func NewFinalizeRoundManager(
 		operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (FinalizeRoundOperationResult, error)) (FinalizeRoundOperationResult, error) {
 			return wrapFinalizeRoundOperation(ctx, opName, fn, logger, tracer, metrics)
 		},
+		guildConfigResolver: guildConfigResolver,
 	}
 }
 

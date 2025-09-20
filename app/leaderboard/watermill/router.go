@@ -13,10 +13,8 @@ import (
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	tracingfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/tracing"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
-	"github.com/ThreeDotsLabs/watermill/components/metrics"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/message/router/middleware"
-	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -56,9 +54,7 @@ func NewLeaderboardRouter(
 
 // Configure sets up the router.
 func (r *LeaderboardRouter) Configure(ctx context.Context, handlers leaderboardhandlers.Handlers) error {
-	// Add Prometheus metrics
-	metricsBuilder := metrics.NewPrometheusMetricsBuilder(prometheus.NewRegistry(), "", "")
-	metricsBuilder.AddPrometheusRouterMetrics(r.Router)
+	// Note: Using Discord metrics instead of separate Prometheus metrics to avoid conflicts
 
 	// Add middleware
 	r.Router.AddMiddleware(
@@ -90,7 +86,7 @@ func (r *LeaderboardRouter) RegisterHandlers(ctx context.Context, handlers leade
 		leaderboardevents.GetTagNumberResponse:                          handlers.HandleGetTagByDiscordIDResponse,
 
 		// Leaderboard updates
-		leaderboardevents.LeaderboardUpdated:               handlers.HandleBatchTagAssigned,
+		leaderboardevents.LeaderboardBatchTagAssigned:      handlers.HandleBatchTagAssigned,
 		discordleaderboardevents.LeaderboardRetrievedTopic: handlers.HandleLeaderboardData,
 
 		// Tag swaps
@@ -101,11 +97,16 @@ func (r *LeaderboardRouter) RegisterHandlers(ctx context.Context, handlers leade
 
 	for topic, handlerFunc := range eventsToHandlers {
 		handlerName := fmt.Sprintf("discord-leaderboard.%s", topic)
+
+		// Use environment-specific queue groups for multi-tenant scalability
+		// This ensures only one instance processes each message per environment
+		queueGroup := fmt.Sprintf("leaderboard-handlers-%s", r.config.Observability.Environment)
+
 		r.Router.AddHandler(
 			handlerName,
 			topic,
 			r.subscriber,
-			"",
+			queueGroup,
 			nil,
 			func(msg *message.Message) ([]*message.Message, error) {
 				messages, err := handlerFunc(msg)

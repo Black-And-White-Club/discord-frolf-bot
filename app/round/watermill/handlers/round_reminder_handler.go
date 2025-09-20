@@ -3,6 +3,7 @@ package roundhandlers
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
@@ -21,6 +22,18 @@ func (h *RoundHandlers) HandleRoundReminder(msg *message.Message) ([]*message.Me
 			reminderPayload, ok := payload.(*roundevents.DiscordReminderPayload)
 			if !ok {
 				return nil, fmt.Errorf("invalid payload type for HandleRoundReminder")
+			}
+
+			// Detect duplicate delivery (JetStream redelivery) and skip if already processed once
+			if deliveredStr := msg.Metadata.Get("Delivered"); deliveredStr != "" {
+				if deliveredCount, err := strconv.Atoi(deliveredStr); err == nil && deliveredCount > 1 {
+					h.Logger.WarnContext(ctx, "Skipping duplicate reminder delivery",
+						attr.RoundID("round_id", reminderPayload.RoundID),
+						attr.String("message_id", msg.UUID),
+						attr.Int("delivered_count", deliveredCount),
+					)
+					return []*message.Message{}, nil
+				}
 			}
 
 			// Log basic info for debugging

@@ -21,9 +21,15 @@ func BuildWatermillMessageFromInteraction(topic string, payload interface{}, int
 	if interaction != nil && interaction.Interaction != nil {
 		msg.Metadata.Set("interaction_id", interaction.Interaction.ID)
 		msg.Metadata.Set("interaction_token", interaction.Interaction.Token)
+
+		// Use GuildID from the actual interaction instead of config
+		if interaction.Interaction.GuildID != "" {
+			msg.Metadata.Set("guild_id", interaction.Interaction.GuildID)
+		}
 	}
 
-	if config != nil {
+	// Fallback to config only if interaction doesn't have GuildID
+	if msg.Metadata.Get("guild_id") == "" && config != nil {
 		msg.Metadata.Set("guild_id", config.GetGuildID())
 	}
 
