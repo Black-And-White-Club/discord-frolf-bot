@@ -12,17 +12,6 @@ import (
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 )
 
-const (
-	// maxCASRetries controls how many times CAS operations will retry
-	// when marking or clearing pending requests under contention.
-	maxCASRetries = 10
-	// minCleanupInterval ensures the cleanup goroutine does not run too frequently
-	// even if the configured TTL is very small.
-	minCleanupInterval = time.Second
-	// defaultCleanupInterval is used if cacheTTL is not set or invalid (<= 0)
-	defaultCleanupInterval = 5 * time.Minute
-)
-
 // CacheMetrics interface for monitoring cache performance
 type CacheMetrics interface {
 	RecordHit()
@@ -298,18 +287,7 @@ func (gc *GuildConfigCache) evictOldestEntry() {
 
 // cleanupExpiredEntries runs periodically to remove expired entries
 func (gc *GuildConfigCache) cleanupExpiredEntries(ctx context.Context) {
-	// Determine a safe ticker interval
-	var interval time.Duration
-	if gc.cacheTTL <= 0 {
-		interval = defaultCleanupInterval
-	} else {
-		interval = gc.cacheTTL / 4 // Cleanup 4x more frequently than TTL
-		if interval < minCleanupInterval {
-			interval = minCleanupInterval
-		}
-	}
-
-	ticker := time.NewTicker(interval)
+	ticker := time.NewTicker(gc.cacheTTL / 4) // Cleanup 4x more frequently than TTL
 	defer ticker.Stop()
 
 	for {
@@ -367,7 +345,7 @@ func (gc *GuildConfig) IsConfigured() bool {
 // Uses atomic CAS operations with retry loop to prevent race conditions
 func (gc *GuildConfigCache) MarkRequestPending(guildID string) bool {
 	// Retry loop for CAS operations to avoid stack overflow under high contention
-	for retries := 0; retries < maxCASRetries; retries++ {
+	for range 10 {
 		if value, found := gc.store.Load(guildID); found {
 			config := value.(*GuildConfig)
 
@@ -417,7 +395,7 @@ func (gc *GuildConfigCache) MarkRequestPending(guildID string) bool {
 // Uses atomic CAS operations with retry loop to prevent race conditions
 func (gc *GuildConfigCache) ClearRequestPending(guildID string) {
 	// Retry loop for CAS operations to avoid stack overflow under high contention
-	for retries := 0; retries < maxCASRetries; retries++ {
+	for range 10 {
 		value, found := gc.store.Load(guildID)
 		if !found {
 			return // Entry doesn't exist

@@ -107,17 +107,19 @@ func (srm *scoreRoundManager) HandleScoreSubmission(ctx context.Context, i *disc
 			for _, inner := range row.Components {
 				switch ti := inner.(type) {
 				case *discordgo.TextInput:
-					if ti.CustomID == "score_input" {
+					switch ti.CustomID {
+					case "score_input":
 						scoreStr = strings.TrimSpace(ti.Value)
-					} else if ti.CustomID == "participant_input" {
+					case "participant_input":
 						if p := strings.TrimSpace(ti.Value); p != "" {
 							participantID = normalizeParticipantInput(p)
 						}
 					}
 				case discordgo.TextInput:
-					if ti.CustomID == "score_input" {
+					switch ti.CustomID {
+					case "score_input":
 						scoreStr = strings.TrimSpace(ti.Value)
-					} else if ti.CustomID == "participant_input" {
+					case "participant_input":
 						if p := strings.TrimSpace(ti.Value); p != "" {
 							participantID = normalizeParticipantInput(p)
 						}
