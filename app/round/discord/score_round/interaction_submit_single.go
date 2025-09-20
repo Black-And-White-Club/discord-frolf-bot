@@ -32,6 +32,9 @@ import (
 //   - Input with extra whitespace is trimmed.
 //   - Input that does not match the mention format is returned as-is (trimmed).
 func normalizeParticipantInput(in string) string {
+	// Normalize input by trimming whitespace and extracting user ID from Discord mention formats.
+	// Go's string functions are UTF-8 safe, so Unicode and edge cases (e.g., extra spaces, unusual characters)
+	// are handled correctly by TrimSpace and string prefix/suffix checks.
 	in = strings.TrimSpace(in)
 	if in == "" {
 		return in
