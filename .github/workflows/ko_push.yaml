@@ -11,7 +11,7 @@ on:
 permissions:
   id-token: write
   contents: read
-
+#empty
 jobs:
   build-push:
     runs-on: ubuntu-latest
