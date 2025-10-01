@@ -10,6 +10,11 @@ import (
 	"github.com/ThreeDotsLabs/watermill/message"
 )
 
+// contextKey is a custom type for context keys to avoid collisions
+type contextKey string
+
+const guildIDKey contextKey = "guild_id"
+
 func (h *RoundHandlers) HandleTagsUpdatedForScheduledRounds(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleTagsUpdatedForScheduledRounds",
@@ -30,7 +35,7 @@ func (h *RoundHandlers) HandleTagsUpdatedForScheduledRounds(msg *message.Message
 
 			// Attach guild_id of first round (all rounds share guild) to context for downstream resolution
 			if len(tagsUpdatedPayload.UpdatedRounds) > 0 {
-				ctx = context.WithValue(ctx, "guild_id", string(tagsUpdatedPayload.UpdatedRounds[0].GuildID))
+				ctx = context.WithValue(ctx, guildIDKey, string(tagsUpdatedPayload.UpdatedRounds[0].GuildID))
 				h.Logger.DebugContext(ctx, "Attached guild_id to context for tag update operation",
 					attr.String("guild_id", string(tagsUpdatedPayload.UpdatedRounds[0].GuildID)),
 				)
