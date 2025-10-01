@@ -23,6 +23,15 @@ func (h *RoundHandlers) HandleRoundCreateRequested(msg *message.Message) ([]*mes
 		"HandleRoundCreateRequested",
 		&discordroundevents.CreateRoundRequestedPayload{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
+			// Check context health at start of handler logic
+			if err := ctx.Err(); err != nil {
+				h.Logger.ErrorContext(ctx, "Context cancelled at start of HandleRoundCreateRequested",
+					attr.String("message_id", msg.UUID),
+					attr.Error(err),
+				)
+				return nil, fmt.Errorf("context cancelled: %w", err)
+			}
+
 			discordPayload := payload.(*discordroundevents.CreateRoundRequestedPayload)
 
 			if h.Logger != nil {

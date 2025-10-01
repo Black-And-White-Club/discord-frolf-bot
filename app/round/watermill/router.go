@@ -129,9 +129,12 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 			"",
 			nil,
 			func(msg *message.Message) ([]*message.Message, error) {
+				// Use message context, not captured registration context
+				msgCtx := msg.Context()
+
 				messages, err := handlerFunc(msg)
 				if err != nil {
-					r.logger.ErrorContext(ctx, "Error processing message",
+					r.logger.ErrorContext(msgCtx, "Error processing message",
 						attr.String("message_id", msg.UUID),
 						attr.Error(err),
 					)
@@ -141,7 +144,7 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 				for _, m := range messages {
 					publishTopic := m.Metadata.Get("topic")
 					if publishTopic != "" {
-						r.logger.InfoContext(ctx, "Publishing message",
+						r.logger.InfoContext(msgCtx, "Publishing message",
 							attr.String("message_id", m.UUID),
 							attr.String("topic", publishTopic),
 						)
@@ -149,7 +152,7 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 							return nil, fmt.Errorf("failed to publish to %s: %w", publishTopic, err)
 						}
 					} else {
-						r.logger.WarnContext(ctx, "Message missing topic metadata",
+						r.logger.WarnContext(msgCtx, "Message missing topic metadata",
 							attr.String("message_id", m.UUID),
 						)
 					}

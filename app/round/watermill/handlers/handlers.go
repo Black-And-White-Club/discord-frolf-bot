@@ -84,8 +84,22 @@ func wrapHandler(
 	helpers utils.Helpers,
 ) message.HandlerFunc {
 	return func(msg *message.Message) ([]*message.Message, error) {
+		// Get the message context and check if it's already cancelled
+		msgCtx := msg.Context()
+		if err := msgCtx.Err(); err != nil {
+			logger.Error("Message context already cancelled before handler started",
+				attr.String("handler", handlerName),
+				attr.String("message_id", msg.UUID),
+				attr.Error(err),
+			)
+			// Don't return error - this will cause redelivery. Just log and skip.
+			// Returning nil, nil will acknowledge the message.
+			metrics.RecordHandlerFailure(msgCtx, handlerName)
+			return nil, nil
+		}
+
 		ctx, span := tracer.Start(
-			msg.Context(), handlerName,
+			msgCtx, handlerName,
 			trace.WithAttributes(
 				attribute.String("message.id", msg.UUID),
 				attribute.String("message.correlation_id", middleware.MessageCorrelationID(msg)),
