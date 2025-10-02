@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -247,6 +248,25 @@ func (s *setupManager) HandleSetupModalSubmit(ctx context.Context, i *discordgo.
 			return fmt.Errorf("failed to acknowledge setup submission: %w", err)
 		}
 
+		// If the guild is already configured, surface that to the user and skip creating resources
+		if s.guildConfigResolver != nil {
+			existingCfg, cfgErr := s.guildConfigResolver.GetGuildConfigWithContext(ctx, i.GuildID)
+			if cfgErr != nil {
+				if s.logger != nil {
+					s.logger.WarnContext(ctx, "Failed to fetch existing guild config before setup",
+						"guild_id", i.GuildID,
+						"error", cfgErr,
+					)
+				}
+			} else if existingCfg != nil && existingCfg.IsConfigured() {
+				if s.logger != nil {
+					s.logger.InfoContext(ctx, "Guild already configured — skipping setup",
+						"guild_id", i.GuildID)
+				}
+				return s.sendFollowupAlreadyConfigured(i, existingCfg)
+			}
+		}
+
 		// Perform the actual setup - always create channels, roles, and signup message
 		result, err := s.performCustomSetup(i.GuildID, SetupConfig{
 			GuildName:       guildName,
@@ -350,6 +370,81 @@ func (s *setupManager) sendFollowupSuccess(i *discordgo.InteractionCreate, resul
 	_, err := s.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
 		Embeds: []*discordgo.MessageEmbed{embed},
 		Flags:  discordgo.MessageFlagsEphemeral,
+	})
+	return err
+}
+
+// sendFollowupAlreadyConfigured informs the user that setup was skipped because a config already exists.
+func (s *setupManager) sendFollowupAlreadyConfigured(i *discordgo.InteractionCreate, cfg *storage.GuildConfig) error {
+	embed := &discordgo.MessageEmbed{
+		Title:       "🥏 Frolf Bot is already configured",
+		Description: "I detected an existing configuration for this server, so I didn't create new channels or roles. Use /frolf-config update to make changes.",
+		Color:       0xf9a602,
+		Fields:      []*discordgo.MessageEmbedField{},
+		Footer: &discordgo.MessageEmbedFooter{
+			Text: "Use /frolf-config update to adjust settings.",
+		},
+	}
+
+	if cfg.EventChannelID != "" {
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name:   "📊 Events Channel",
+			Value:  fmt.Sprintf("<#%s>", cfg.EventChannelID),
+			Inline: true,
+		})
+	}
+	if cfg.LeaderboardChannelID != "" {
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name:   "🏆 Leaderboard Channel",
+			Value:  fmt.Sprintf("<#%s>", cfg.LeaderboardChannelID),
+			Inline: true,
+		})
+	}
+	if cfg.SignupChannelID != "" {
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name:   "✋ Signup Channel",
+			Value:  fmt.Sprintf("<#%s>", cfg.SignupChannelID),
+			Inline: true,
+		})
+	}
+	if cfg.RegisteredRoleID != "" {
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name:   "👥 User Role",
+			Value:  fmt.Sprintf("<@&%s>", cfg.RegisteredRoleID),
+			Inline: true,
+		})
+	}
+	if cfg.EditorRoleID != "" {
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name:   "✏️ Editor Role",
+			Value:  fmt.Sprintf("<@&%s>", cfg.EditorRoleID),
+			Inline: true,
+		})
+	}
+	if cfg.AdminRoleID != "" {
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name:   "⚡ Admin Role",
+			Value:  fmt.Sprintf("<@&%s>", cfg.AdminRoleID),
+			Inline: true,
+		})
+	}
+	if cfg.SignupMessageID != "" {
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name:  "📝 Signup Message ID",
+			Value: fmt.Sprintf("`%s`", cfg.SignupMessageID),
+		})
+	}
+	if cfg.SignupEmoji != "" {
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name:  "Emoji",
+			Value: cfg.SignupEmoji,
+		})
+	}
+
+	_, err := s.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+		Content: "ℹ️ Setup skipped — this server is already configured.",
+		Embeds:  []*discordgo.MessageEmbed{embed},
+		Flags:   discordgo.MessageFlagsEphemeral,
 	})
 	return err
 }

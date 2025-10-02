@@ -3,10 +3,15 @@ package setup
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
+	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
+	guildconfigmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/bwmarrin/discordgo"
 	"github.com/google/uuid"
+	"go.uber.org/mock/gomock"
 )
 
 func Test_setupManager_SendSetupModal(t *testing.T) {
@@ -112,6 +117,53 @@ func Test_setupManager_HandleSetupModalSubmit(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestHandleSetupModalSubmit_SkipsWhenAlreadyConfigured(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	interaction := validSetupInteraction("frolf", "Frolf Player", "Frolf Admin", "React!", "🥏")
+
+	sessionMock := discordmocks.NewMockSession(ctrl)
+	resolverMock := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
+
+	sessionMock.EXPECT().Guild(interaction.GuildID).Return(&discordgo.Guild{ID: interaction.GuildID, Name: "Test Guild"}, nil)
+	sessionMock.EXPECT().InteractionRespond(interaction.Interaction, gomock.Any()).Return(nil)
+
+	resolverMock.EXPECT().GetGuildConfigWithContext(gomock.Any(), interaction.GuildID).Return(&storage.GuildConfig{
+		GuildID:              interaction.GuildID,
+		SignupChannelID:      "signup",
+		EventChannelID:       "events",
+		LeaderboardChannelID: "leaders",
+		RegisteredRoleID:     "role-player",
+		EditorRoleID:         "role-editor",
+		AdminRoleID:          "role-admin",
+		SignupMessageID:      "msg-123",
+		SignupEmoji:          "🥏",
+	}, nil)
+
+	sessionMock.EXPECT().FollowupMessageCreate(interaction.Interaction, true, gomock.Any()).DoAndReturn(
+		func(_ *discordgo.Interaction, wait bool, params *discordgo.WebhookParams, _ ...discordgo.RequestOption) (*discordgo.Message, error) {
+			if params == nil || !strings.Contains(params.Content, "already configured") {
+				t.Fatalf("expected follow-up content to mention existing configuration, got %v", params)
+			}
+			return &discordgo.Message{ID: "ok"}, nil
+		},
+	)
+
+	sm := &setupManager{
+		session:             sessionMock,
+		logger:              discardLogger(),
+		guildConfigResolver: resolverMock,
+		operationWrapper: func(ctx context.Context, _ string, fn func(ctx context.Context) error) error {
+			return fn(ctx)
+		},
+	}
+
+	if err := sm.HandleSetupModalSubmit(context.Background(), interaction); err != nil {
+		t.Fatalf("HandleSetupModalSubmit returned error: %v", err)
 	}
 }
 
