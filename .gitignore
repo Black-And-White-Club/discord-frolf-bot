@@ -16,7 +16,7 @@
 # Go workspace file
 go.work
 *.env*
-config.yaml
+config*.yaml
 /tmp
 
 .DS_Store
