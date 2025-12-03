@@ -95,8 +95,8 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 		roundevents.RoundParticipantRemoved:             handlers.HandleRoundParticipantRemoved,
 
 		// Scoring
-		roundevents.DiscordParticipantScoreUpdated: handlers.HandleParticipantScoreUpdated,
-		roundevents.RoundScoreUpdateError:          handlers.HandleScoreUpdateError,
+		roundevents.RoundParticipantScoreUpdated: handlers.HandleParticipantScoreUpdated,
+		roundevents.RoundScoreUpdateError:        handlers.HandleScoreUpdateError,
 
 		// Score override bridging (CorrectScore service)
 		scoreevents.ScoreUpdateSuccess: handlers.HandleScoreOverrideSuccess,
@@ -107,14 +107,14 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 
 		// Lifecycle
 		discordroundevents.RoundDeletedTopic: handlers.HandleRoundDeleted,
-		roundevents.DiscordRoundFinalized:    handlers.HandleRoundFinalized,
-		roundevents.DiscordRoundStarted:      handlers.HandleRoundStarted,
+		roundevents.RoundFinalized:           handlers.HandleRoundFinalized,
+		roundevents.RoundStarted:             handlers.HandleRoundStarted,
 
 		// Tag handling
 		roundevents.RoundParticipantJoined: handlers.HandleRoundParticipantJoined,
 
 		// Reminders
-		roundevents.DiscordRoundReminder: handlers.HandleRoundReminder,
+		roundevents.RoundReminder: handlers.HandleRoundReminder,
 
 		roundevents.TagsUpdatedForScheduledRounds: handlers.HandleTagsUpdatedForScheduledRounds,
 	}

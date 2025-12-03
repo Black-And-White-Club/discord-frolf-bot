@@ -16,7 +16,7 @@ const (
 )
 
 // HandleScoreOverrideSuccess bridges CorrectScore success events into the round Discord update flow
-// by publishing a DiscordParticipantScoreUpdated event so the embed refresh logic is reused.
+// by publishing a RoundParticipantScoreUpdated event so the embed refresh logic is reused.
 func (h *RoundHandlers) HandleScoreOverrideSuccess(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleScoreOverrideSuccess",
@@ -45,12 +45,12 @@ func (h *RoundHandlers) HandleScoreOverrideSuccess(msg *message.Message) ([]*mes
 				EventMessageID: messageID,
 			}
 
-			bridgeMsg, err := h.Helpers.CreateResultMessage(msg, participantPayload, roundevents.DiscordParticipantScoreUpdated)
+			bridgeMsg, err := h.Helpers.CreateResultMessage(msg, participantPayload, roundevents.RoundParticipantScoreUpdated)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create bridge message: %w", err)
 			}
 			// Ensure topic metadata set
-			bridgeMsg.Metadata.Set("topic", roundevents.DiscordParticipantScoreUpdated)
+			bridgeMsg.Metadata.Set("topic", roundevents.RoundParticipantScoreUpdated)
 
 			h.Logger.InfoContext(ctx, "Bridged score override success to discord participant score updated",
 				attr.RoundID("round_id", p.RoundID),
