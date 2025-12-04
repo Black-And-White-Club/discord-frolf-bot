@@ -59,6 +59,7 @@ type ObservabilityConfig struct {
 	Environment     string  `yaml:"environment"`
 	OTLPEndpoint    string  `yaml:"otlp_endpoint"`
 	OTLPTransport   string  `yaml:"otlp_transport"`
+	OTLPLogsEnabled bool    `yaml:"otlp_logs_enabled"`
 }
 
 // LoadConfigFromEnvironment loads configuration from environment variables only
@@ -106,6 +107,7 @@ func LoadConfigFromEnvironment() (*Config, error) {
 	cfg.Observability.TempoEndpoint = os.Getenv("TEMPO_ENDPOINT")
 	cfg.Observability.OTLPEndpoint = os.Getenv("OTLP_ENDPOINT")
 	cfg.Observability.OTLPTransport = os.Getenv("OTLP_TRANSPORT")
+	cfg.Observability.OTLPLogsEnabled = os.Getenv("OTLP_LOGS_ENABLED") == "true"
 	cfg.Observability.Environment = getEnvOrDefault("ENVIRONMENT", "development")
 
 	// Handle boolean and float environment variables
@@ -150,6 +152,7 @@ func LoadBaseConfig() (*Config, error) {
 			TempoSampleRate: 1.0,
 			OTLPEndpoint:    getEnvOrDefault("OTLP_ENDPOINT", ""),
 			OTLPTransport:   getEnvOrDefault("OTLP_TRANSPORT", ""),
+			OTLPLogsEnabled: getEnvOrDefault("OTLP_LOGS_ENABLED", "false") == "true",
 		},
 		NATS: NATSConfig{
 			URL: getEnvOrDefault("NATS_URL", "nats://localhost:4222"),
@@ -279,6 +282,9 @@ func applyEnvironmentOverrides(cfg *Config) {
 	}
 	if otlpTransport := os.Getenv("OTLP_TRANSPORT"); otlpTransport != "" {
 		cfg.Observability.OTLPTransport = otlpTransport
+	}
+	if otlpLogsEnabled := os.Getenv("OTLP_LOGS_ENABLED"); otlpLogsEnabled != "" {
+		cfg.Observability.OTLPLogsEnabled = (otlpLogsEnabled == "true")
 	}
 	if environment := os.Getenv("ENVIRONMENT"); environment != "" {
 		cfg.Observability.Environment = environment
