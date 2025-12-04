@@ -106,9 +106,9 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 		// and was causing empty participant payloads & failed embed updates when bridged.
 
 		// Lifecycle
-		discordroundevents.RoundDeletedTopic: handlers.HandleRoundDeleted,
-		roundevents.RoundFinalized:           handlers.HandleRoundFinalized,
-		roundevents.RoundStarted:             handlers.HandleRoundStarted,
+		roundevents.RoundDeleted:   handlers.HandleRoundDeleted,
+		roundevents.RoundFinalized: handlers.HandleRoundFinalized,
+		roundevents.RoundStarted:   handlers.HandleRoundStarted,
 
 		// Tag handling
 		roundevents.RoundParticipantJoined: handlers.HandleRoundParticipantJoined,
