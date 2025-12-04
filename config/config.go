@@ -57,6 +57,8 @@ type ObservabilityConfig struct {
 	TempoInsecure   bool    `yaml:"tempo_insecure"`
 	TempoSampleRate float64 `yaml:"tempo_sample_rate"`
 	Environment     string  `yaml:"environment"`
+	OTLPEndpoint    string  `yaml:"otlp_endpoint"`
+	OTLPTransport   string  `yaml:"otlp_transport"`
 }
 
 // LoadConfigFromEnvironment loads configuration from environment variables only
@@ -102,6 +104,8 @@ func LoadConfigFromEnvironment() (*Config, error) {
 	cfg.Observability.LokiURL = os.Getenv("LOKI_URL")
 	cfg.Observability.MetricsAddress = getEnvOrDefault("METRICS_ADDRESS", ":8080")
 	cfg.Observability.TempoEndpoint = os.Getenv("TEMPO_ENDPOINT")
+	cfg.Observability.OTLPEndpoint = os.Getenv("OTLP_ENDPOINT")
+	cfg.Observability.OTLPTransport = os.Getenv("OTLP_TRANSPORT")
 	cfg.Observability.Environment = getEnvOrDefault("ENVIRONMENT", "development")
 
 	// Handle boolean and float environment variables
@@ -144,6 +148,8 @@ func LoadBaseConfig() (*Config, error) {
 			TempoEndpoint:   getEnvOrDefault("TEMPO_ENDPOINT", ""),
 			TempoInsecure:   getEnvOrDefault("TEMPO_INSECURE", "true") == "true",
 			TempoSampleRate: 1.0,
+			OTLPEndpoint:    getEnvOrDefault("OTLP_ENDPOINT", ""),
+			OTLPTransport:   getEnvOrDefault("OTLP_TRANSPORT", ""),
 		},
 		NATS: NATSConfig{
 			URL: getEnvOrDefault("NATS_URL", "nats://localhost:4222"),
@@ -267,6 +273,12 @@ func applyEnvironmentOverrides(cfg *Config) {
 	}
 	if tempoEndpoint := os.Getenv("TEMPO_ENDPOINT"); tempoEndpoint != "" {
 		cfg.Observability.TempoEndpoint = tempoEndpoint
+	}
+	if otlpEndpoint := os.Getenv("OTLP_ENDPOINT"); otlpEndpoint != "" {
+		cfg.Observability.OTLPEndpoint = otlpEndpoint
+	}
+	if otlpTransport := os.Getenv("OTLP_TRANSPORT"); otlpTransport != "" {
+		cfg.Observability.OTLPTransport = otlpTransport
 	}
 	if environment := os.Getenv("ENVIRONMENT"); environment != "" {
 		cfg.Observability.Environment = environment

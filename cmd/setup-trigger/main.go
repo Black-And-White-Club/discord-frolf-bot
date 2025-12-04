@@ -61,9 +61,16 @@ func main() {
 
 	// Initialize minimal observability for the setup tool
 	obsConfig := observability.Config{
-		ServiceName: "frolf-bot-setup-trigger",
-		Environment: "setup",
-		Version:     cfg.Service.Version,
+		ServiceName:     "frolf-bot-setup-trigger",
+		Environment:     "setup",
+		Version:         cfg.Service.Version,
+		LokiURL:         cfg.Observability.LokiURL,
+		MetricsAddress:  cfg.Observability.MetricsAddress,
+		TempoEndpoint:   cfg.Observability.TempoEndpoint,
+		TempoInsecure:   cfg.Observability.TempoInsecure,
+		TempoSampleRate: cfg.Observability.TempoSampleRate,
+		OTLPEndpoint:    cfg.Observability.OTLPEndpoint,
+		OTLPTransport:   cfg.Observability.OTLPTransport,
 	}
 
 	obs, err := observability.Init(ctx, obsConfig)

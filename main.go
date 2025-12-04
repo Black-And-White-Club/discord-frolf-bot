@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"net/http"
 	pprof "net/http/pprof"
 	"os"
@@ -75,6 +74,8 @@ func runStandaloneMode(ctx context.Context) {
 		TempoEndpoint:   cfg.Observability.TempoEndpoint,
 		TempoInsecure:   cfg.Observability.TempoInsecure,
 		TempoSampleRate: cfg.Observability.TempoSampleRate,
+		OTLPEndpoint:    cfg.Observability.OTLPEndpoint,
+		OTLPTransport:   cfg.Observability.OTLPTransport,
 	}
 
 	// Debug: Print the config to see what's being used
@@ -89,11 +90,7 @@ func runStandaloneMode(ctx context.Context) {
 		os.Exit(1)
 	}
 
-	// Set up slog logger to output all logs to terminal in JSON format
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
-	}))
-	obs.Provider.Logger = logger // Ensure all modules/services use the overridden logger
+	logger := obs.Provider.Logger
 
 	fmt.Println("DEBUG: Observability initialized successfully")
 	logger.Info("Observability initialized successfully")
@@ -247,9 +244,16 @@ func runSetup(ctx context.Context, guildID string) {
 
 	// Initialize basic observability for setup
 	obsConfig := observability.Config{
-		ServiceName: "discord-frolf-bot-setup",
-		Environment: cfg.Observability.Environment,
-		Version:     cfg.Service.Version,
+		ServiceName:     "discord-frolf-bot-setup",
+		Environment:     cfg.Observability.Environment,
+		Version:         cfg.Service.Version,
+		LokiURL:         cfg.Observability.LokiURL,
+		MetricsAddress:  cfg.Observability.MetricsAddress,
+		TempoEndpoint:   cfg.Observability.TempoEndpoint,
+		TempoInsecure:   cfg.Observability.TempoInsecure,
+		TempoSampleRate: cfg.Observability.TempoSampleRate,
+		OTLPEndpoint:    cfg.Observability.OTLPEndpoint,
+		OTLPTransport:   cfg.Observability.OTLPTransport,
 	}
 
 	obs, err := observability.Init(ctx, obsConfig)
@@ -335,6 +339,8 @@ func runGatewayMode(ctx context.Context) {
 		TempoEndpoint:   cfg.Observability.TempoEndpoint,
 		TempoInsecure:   cfg.Observability.TempoInsecure,
 		TempoSampleRate: cfg.Observability.TempoSampleRate,
+		OTLPEndpoint:    cfg.Observability.OTLPEndpoint,
+		OTLPTransport:   cfg.Observability.OTLPTransport,
 	}
 
 	obs, err := observability.Init(ctx, obsConfig)
@@ -377,6 +383,8 @@ func runWorkerMode(ctx context.Context) {
 		TempoEndpoint:   cfg.Observability.TempoEndpoint,
 		TempoInsecure:   cfg.Observability.TempoInsecure,
 		TempoSampleRate: cfg.Observability.TempoSampleRate,
+		OTLPEndpoint:    cfg.Observability.OTLPEndpoint,
+		OTLPTransport:   cfg.Observability.OTLPTransport,
 	}
 
 	obs, err := observability.Init(ctx, obsConfig)

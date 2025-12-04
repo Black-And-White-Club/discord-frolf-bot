@@ -50,3 +50,5 @@ observability:
   tempo_endpoint: ""
   tempo_insecure: true
   tempo_sample_rate: 1.0
+  otlp_endpoint: ""
+  otlp_transport: "grpc"

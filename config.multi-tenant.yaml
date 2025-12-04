@@ -35,6 +35,8 @@ observability:
   tempo_endpoint: "${TEMPO_ENDPOINT}"
   tempo_insecure: false
   tempo_sample_rate: 0.01 # Lower sample rate for production
+  otlp_endpoint: "${OTLP_ENDPOINT}"
+  otlp_transport: "${OTLP_TRANSPORT:-grpc}"
 
 # Multi-tenant specific settings
 multi_tenant:
