@@ -76,6 +76,7 @@ func runStandaloneMode(ctx context.Context) {
 		TempoSampleRate: cfg.Observability.TempoSampleRate,
 		OTLPEndpoint:    cfg.Observability.OTLPEndpoint,
 		OTLPTransport:   cfg.Observability.OTLPTransport,
+		LogsEnabled:     cfg.Observability.OTLPLogsEnabled,
 	}
 
 	// Debug: Print the config to see what's being used
@@ -254,6 +255,7 @@ func runSetup(ctx context.Context, guildID string) {
 		TempoSampleRate: cfg.Observability.TempoSampleRate,
 		OTLPEndpoint:    cfg.Observability.OTLPEndpoint,
 		OTLPTransport:   cfg.Observability.OTLPTransport,
+		LogsEnabled:     cfg.Observability.OTLPLogsEnabled,
 	}
 
 	obs, err := observability.Init(ctx, obsConfig)
@@ -341,6 +343,7 @@ func runGatewayMode(ctx context.Context) {
 		TempoSampleRate: cfg.Observability.TempoSampleRate,
 		OTLPEndpoint:    cfg.Observability.OTLPEndpoint,
 		OTLPTransport:   cfg.Observability.OTLPTransport,
+		LogsEnabled:     cfg.Observability.OTLPLogsEnabled,
 	}
 
 	obs, err := observability.Init(ctx, obsConfig)
@@ -385,6 +388,7 @@ func runWorkerMode(ctx context.Context) {
 		TempoSampleRate: cfg.Observability.TempoSampleRate,
 		OTLPEndpoint:    cfg.Observability.OTLPEndpoint,
 		OTLPTransport:   cfg.Observability.OTLPTransport,
+		LogsEnabled:     cfg.Observability.OTLPLogsEnabled,
 	}
 
 	obs, err := observability.Init(ctx, obsConfig)
