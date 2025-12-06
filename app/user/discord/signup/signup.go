@@ -191,12 +191,12 @@ func wrapSignupOperation(
 
 // TrackChannelForReactions registers a channel to have its reactions processed.
 // This should be called when a guild is set up or when the bot creates a new managed channel.
-func (sm *signupManager) TrackChannelForReactions(channelID string) {
+func (sm *signupManager) TrackChannelForReactions(ctx context.Context, channelID string) {
 	if channelID == "" {
 		return
 	}
 	sm.trackedChannels.Store(channelID, true)
-	sm.logger.DebugContext(context.Background(), "Tracking channel for reactions",
+	sm.logger.DebugContext(ctx, "Tracking channel for reactions",
 		attr.String("channel_id", channelID),
 	)
 }
