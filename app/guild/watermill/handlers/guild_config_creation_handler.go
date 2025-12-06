@@ -53,7 +53,7 @@ func (h *GuildHandlers) HandleGuildConfigCreated(msg *message.Message) ([]*messa
 
 				// Track channels for reaction handling to avoid unnecessary backend requests
 				if h.SignupManager != nil && convertedConfig.SignupChannelID != "" {
-					h.SignupManager.TrackChannelForReactions(convertedConfig.SignupChannelID)
+					h.SignupManager.TrackChannelForReactions(ctx, convertedConfig.SignupChannelID)
 					h.Logger.DebugContext(ctx, "Tracked signup channel for reactions",
 						attr.String("guild_id", guildID),
 						attr.String("channel_id", convertedConfig.SignupChannelID))
