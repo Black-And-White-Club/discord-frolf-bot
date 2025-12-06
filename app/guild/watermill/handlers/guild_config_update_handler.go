@@ -134,9 +134,6 @@ func (h *GuildHandlers) HandleGuildConfigRetrieved(msg *message.Message) ([]*mes
 			if h.SignupManager != nil && convertedConfig != nil {
 				if convertedConfig.SignupChannelID != "" {
 					h.SignupManager.TrackChannelForReactions(convertedConfig.SignupChannelID)
-					h.Logger.DebugContext(ctx, "Tracked signup channel for reactions",
-						attr.String("guild_id", guildID),
-						attr.String("channel_id", convertedConfig.SignupChannelID))
 				}
 			}
 

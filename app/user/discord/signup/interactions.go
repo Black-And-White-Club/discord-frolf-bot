@@ -33,34 +33,26 @@ func normalizeEmoji(emoji string) string {
 // MessageReactionAdd is the top-level Watermill/Discord event hook
 // Updated to use the wrapper and return SignupOperationResult, error
 func (sm *signupManager) MessageReactionAdd(s discord.Session, r *discordgo.MessageReactionAdd) (SignupOperationResult, error) {
-	ctx := context.Background() // Start with a background context for top-level event
+	// Early exit BEFORE any logging/tracing for reactions outside bot's scope
+	if r.GuildID == "" {
+		return SignupOperationResult{Success: "missing guild_id, ignored"}, nil
+	}
+
+	// TIER 1: Channel-level filtering (no backend call, no logging!)
+	_, tracked := sm.trackedChannels.Load(r.ChannelID)
+	if !tracked {
+		return SignupOperationResult{Success: "untracked channel, ignored"}, nil
+	}
+
+	// Only set up context and tracing for reactions we actually care about
+	ctx := context.Background()
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.UserIDKey, r.UserID)
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.CommandNameKey, "reaction_signup")
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.InteractionType, "reaction")
+	ctx = discordmetrics.WithValue(ctx, discordmetrics.GuildIDKey, r.GuildID)
 
-	ctx = discordmetrics.WithValue(ctx, discordmetrics.GuildIDKey, r.GuildID) // Add GuildID if available
-
-	// Wrap the entire logic in the operationWrapper
+	// Wrap only relevant reactions in the operationWrapper
 	return sm.operationWrapper(ctx, "message_reaction_add", func(ctx context.Context) (SignupOperationResult, error) {
-		sm.logger.InfoContext(ctx, "signupManager.MessageReactionAdd called")
-
-		// Early exit if no guild ID (can't be validated)
-		if r.GuildID == "" {
-			sm.logger.InfoContext(ctx, "Reaction missing guild ID - cannot validate, ignoring")
-			return SignupOperationResult{Success: "missing guild_id, ignored"}, nil
-		}
-
-		// TIER 1: Channel-level filtering (no backend call!)
-		// Check if this channel is one we track for reactions
-		_, tracked := sm.trackedChannels.Load(r.ChannelID)
-		if !tracked {
-			sm.logger.InfoContext(ctx, "Reaction in untracked channel - ignoring",
-				attr.String("channel_id", r.ChannelID),
-				attr.String("guild_id", r.GuildID),
-			)
-			return SignupOperationResult{Success: "untracked channel, ignored"}, nil
-		}
-
 		// TIER 2: Now fetch guild config since we know the channel matters
 		var signupChannelID, signupEmoji string
 		if sm.guildConfigResolver != nil {

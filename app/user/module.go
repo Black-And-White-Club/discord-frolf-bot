@@ -83,14 +83,7 @@ func InitializeUserModule(
 
 	// Register reaction handlers
 	reactionRegistry.RegisterMessageReactionAddHandler(func(s discord.Session, r *discordgo.MessageReactionAdd) {
-		logger.InfoContext(ctx, "MessageReactionAdd event received",
-			attr.String("user_id", r.UserID),
-			attr.String("message_id", r.MessageID),
-			attr.String("channel_id", r.ChannelID),
-			attr.String("guild_id", r.GuildID),
-			attr.String("emoji", r.Emoji.Name),
-		)
-
+		// Silently delegate to signup manager - it handles filtering internally
 		if _, err := userDiscord.GetSignupManager().MessageReactionAdd(s, r); err != nil {
 			logger.ErrorContext(ctx, "Error handling reaction add",
 				attr.Error(err),

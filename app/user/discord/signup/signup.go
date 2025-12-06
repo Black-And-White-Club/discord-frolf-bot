@@ -196,9 +196,6 @@ func (sm *signupManager) TrackChannelForReactions(channelID string) {
 		return
 	}
 	sm.trackedChannels.Store(channelID, true)
-	sm.logger.DebugContext(context.Background(), "Tracking channel for reactions",
-		attr.String("channel_id", channelID),
-	)
 }
 
 type SignupOperationResult struct {
