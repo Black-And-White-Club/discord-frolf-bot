@@ -12,6 +12,7 @@ import (
 	guildhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/guild/watermill/handlers"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/interactions"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord/signup"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
@@ -36,6 +37,7 @@ func InitializeGuildModule(
 	interactionStore storage.ISInterface,
 	discordMetrics discordmetrics.DiscordMetrics,
 	guildConfigResolver guildconfig.GuildConfigResolver,
+	signupManager signup.SignupManager, // For tracking signup channels when configs are set up
 ) (*guildwatermill.GuildRouter, error) {
 	tracer := otel.Tracer("guild-module")
 
@@ -69,6 +71,7 @@ func InitializeGuildModule(
 		guildConfigResolver,
 		tracer,
 		discordMetrics,
+		signupManager,
 	)
 
 	// Setup Watermill router

@@ -234,6 +234,7 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 		bot.InteractionStore,
 		bot.Metrics,
 		bot.GuildConfigResolver,
+		bot.UserRouter.GetSignupManager(),
 	)
 	if err != nil {
 		return fmt.Errorf("guild module initialization failed: %w", err)

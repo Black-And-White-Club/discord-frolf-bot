@@ -73,6 +73,8 @@ func InitializeUserModule(
 		helper,
 		tracer,
 	)
+	// Store the userDiscord instance for access to signup manager in other modules
+	userRouter.SetUserDiscord(userDiscord)
 
 	if err := userRouter.Configure(ctx, userHandlers); err != nil {
 		logger.ErrorContext(ctx, "Failed to configure user router", attr.Error(err))
@@ -81,7 +83,7 @@ func InitializeUserModule(
 
 	// Register reaction handlers
 	reactionRegistry.RegisterMessageReactionAddHandler(func(s discord.Session, r *discordgo.MessageReactionAdd) {
-		logger.InfoContext(ctx, "🎯 MessageReactionAdd event received",
+		logger.InfoContext(ctx, "MessageReactionAdd event received",
 			attr.String("user_id", r.UserID),
 			attr.String("message_id", r.MessageID),
 			attr.String("channel_id", r.ChannelID),

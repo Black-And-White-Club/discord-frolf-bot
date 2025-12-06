@@ -44,9 +44,27 @@ func (sm *signupManager) MessageReactionAdd(s discord.Session, r *discordgo.Mess
 	return sm.operationWrapper(ctx, "message_reaction_add", func(ctx context.Context) (SignupOperationResult, error) {
 		sm.logger.InfoContext(ctx, "signupManager.MessageReactionAdd called")
 
-		// Determine expected channel and emoji using resolver if guild id exists; otherwise fall back to static config
+		// Early exit if no guild ID (can't be validated)
+		if r.GuildID == "" {
+			sm.logger.InfoContext(ctx, "Reaction missing guild ID - cannot validate, ignoring")
+			return SignupOperationResult{Success: "missing guild_id, ignored"}, nil
+		}
+
+		// TIER 1: Channel-level filtering (no backend call!)
+		// Check if this channel is one we track for reactions
+		_, tracked := sm.trackedChannels.Load(r.ChannelID)
+		if !tracked {
+			sm.logger.InfoContext(ctx, "Reaction in untracked channel - ignoring",
+				attr.String("channel_id", r.ChannelID),
+				attr.String("guild_id", r.GuildID),
+			)
+			return SignupOperationResult{Success: "untracked channel, ignored"}, nil
+		}
+
+		// TIER 2: Now fetch guild config since we know the channel matters
 		var signupChannelID, signupEmoji string
-		if r.GuildID != "" && sm.guildConfigResolver != nil {
+		if sm.guildConfigResolver != nil {
+			// We have a guild config resolver - use it to get per-guild config
 			cfg, err := sm.guildConfigResolver.GetGuildConfigWithContext(ctx, r.GuildID)
 			if err != nil {
 				sm.logger.WarnContext(ctx, "Failed to get guild config - guild may not be set up",
@@ -64,13 +82,18 @@ func (sm *signupManager) MessageReactionAdd(s discord.Session, r *discordgo.Mess
 			}
 			signupChannelID = cfg.SignupChannelID
 			signupEmoji = cfg.SignupEmoji
+		} else if sm.config != nil && sm.config.Discord.SignupChannelID != "" {
+			// Fall back to static config if no resolver
+			signupChannelID = sm.config.Discord.SignupChannelID
+			signupEmoji = sm.config.Discord.SignupEmoji
 		} else {
-			// Use static config for checks when guildID not present in the event (tests cover this)
-			if sm.config != nil {
-				signupChannelID = sm.config.Discord.SignupChannelID
-				signupEmoji = sm.config.Discord.SignupEmoji
-			}
+			// No config available at all - can't process
+			sm.logger.InfoContext(ctx, "No guild or static config available - ignoring reaction",
+				attr.String("guild_id", r.GuildID),
+			)
+			return SignupOperationResult{Success: "no config available, ignored"}, nil
 		}
+
 		if signupEmoji == "" {
 			signupEmoji = "🥏"
 		}
@@ -81,7 +104,7 @@ func (sm *signupManager) MessageReactionAdd(s discord.Session, r *discordgo.Mess
 			attr.String("signup_emoji", signupEmoji),
 		)
 
-		// Check if the reaction matches the configured signup channel and emoji
+		// TIER 3: Validate channel and emoji
 		if r.ChannelID != signupChannelID {
 			sm.logger.InfoContext(ctx, "Reaction channel mismatch - ignoring",
 				attr.String("channel_id", r.ChannelID),
