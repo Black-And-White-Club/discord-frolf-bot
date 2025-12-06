@@ -6,6 +6,8 @@ import (
 	"log/slog"
 
 	discorduserevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/user"
+	userdiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord/signup"
 	userhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/user/watermill/handlers"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
@@ -27,6 +29,7 @@ type UserRouter struct {
 	helper           utils.Helpers
 	tracer           trace.Tracer
 	middlewareHelper utils.MiddlewareHelpers
+	userDiscord      interface{} // Store userDiscord for access to signup manager
 }
 
 // NewUserRouter creates a new UserRouter.
@@ -136,4 +139,17 @@ func (r *UserRouter) RegisterHandlers(ctx context.Context, handlers userhandlers
 // Close gracefully stops the router.
 func (r *UserRouter) Close() error {
 	return r.Router.Close()
+}
+
+// SetUserDiscord stores the user discord module for access to signup manager.
+func (r *UserRouter) SetUserDiscord(ud userdiscord.UserDiscordInterface) {
+	r.userDiscord = ud
+}
+
+// GetSignupManager returns the signup manager from the user discord module.
+func (r *UserRouter) GetSignupManager() signup.SignupManager {
+	if ud, ok := r.userDiscord.(userdiscord.UserDiscordInterface); ok {
+		return ud.GetSignupManager()
+	}
+	return nil
 }

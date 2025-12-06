@@ -8,6 +8,7 @@ import (
 
 	guilddiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/guild/discord"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord/signup"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
@@ -44,6 +45,7 @@ type GuildHandlers struct {
 	Helpers             utils.Helpers
 	GuildDiscord        guilddiscord.GuildDiscordInterface
 	GuildConfigResolver guildconfig.GuildConfigResolver // Use interface for better testability
+	SignupManager       signup.SignupManager            // Optional: for tracking signup channels
 	Tracer              trace.Tracer
 	Metrics             discordmetrics.DiscordMetrics
 	handlerWrapper      func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc
@@ -58,6 +60,7 @@ func NewGuildHandlers(
 	guildConfigResolver guildconfig.GuildConfigResolver, // Use interface for better testability
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
+	signupManager signup.SignupManager, // Optional: for tracking signup channels when guild config is set up
 ) Handlers {
 	return &GuildHandlers{
 		Logger:              logger,
@@ -65,6 +68,7 @@ func NewGuildHandlers(
 		Helpers:             helpers,
 		GuildDiscord:        guildDiscord,
 		GuildConfigResolver: guildConfigResolver,
+		SignupManager:       signupManager,
 		Tracer:              tracer,
 		Metrics:             metrics,
 		handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
@@ -32,6 +33,8 @@ type SignupManager interface {
 	HandleSignupReactionAdd(ctx context.Context, r *discordgo.MessageReactionAdd) (SignupOperationResult, error)
 	HandleSignupButtonPress(ctx context.Context, i *discordgo.InteractionCreate) (SignupOperationResult, error)
 	SendSignupResult(ctx context.Context, interactionToken string, success bool) (SignupOperationResult, error)
+	// TrackChannelForReactions registers a channel to have its reactions processed
+	TrackChannelForReactions(channelID string)
 }
 
 type signupManager struct {
@@ -45,6 +48,7 @@ type signupManager struct {
 	tracer              trace.Tracer
 	metrics             discordmetrics.DiscordMetrics
 	operationWrapper    func(ctx context.Context, opName string, fn func(ctx context.Context) (SignupOperationResult, error)) (SignupOperationResult, error)
+	trackedChannels     sync.Map // map[channelID]bool - channels we listen for reactions on (no backend call on miss)
 }
 
 // NewSignupManager creates a new SignupManager instance.
@@ -183,6 +187,18 @@ func wrapSignupOperation(
 	}
 
 	return result, nil
+}
+
+// TrackChannelForReactions registers a channel to have its reactions processed.
+// This should be called when a guild is set up or when the bot creates a new managed channel.
+func (sm *signupManager) TrackChannelForReactions(channelID string) {
+	if channelID == "" {
+		return
+	}
+	sm.trackedChannels.Store(channelID, true)
+	sm.logger.DebugContext(context.Background(), "Tracking channel for reactions",
+		attr.String("channel_id", channelID),
+	)
 }
 
 type SignupOperationResult struct {
