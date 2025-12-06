@@ -33,25 +33,38 @@ func normalizeEmoji(emoji string) string {
 // MessageReactionAdd is the top-level Watermill/Discord event hook
 // Updated to use the wrapper and return SignupOperationResult, error
 func (sm *signupManager) MessageReactionAdd(s discord.Session, r *discordgo.MessageReactionAdd) (SignupOperationResult, error) {
-	// Early exit BEFORE any logging/tracing for reactions outside bot's scope
+	// Early exit for reactions without guild context
 	if r.GuildID == "" {
 		return SignupOperationResult{Success: "missing guild_id, ignored"}, nil
 	}
 
-	// TIER 1: Channel-level filtering (no backend call, no logging!)
+	// TIER 1: Fast-path filtering for channels we KNOW we don't care about
+	// If channel is tracked, proceed. If not tracked but we have tracked channels,
+	// this is definitely not our channel. If no channels tracked yet (cold start),
+	// we need to check config to populate the tracking.
 	_, tracked := sm.trackedChannels.Load(r.ChannelID)
-	if !tracked {
+	hasTrackedChannels := false
+	sm.trackedChannels.Range(func(_, _ interface{}) bool {
+		hasTrackedChannels = true
+		return false // stop after first item
+	})
+
+	if !tracked && hasTrackedChannels {
+		// We have tracked channels but this isn't one of them - silently ignore
 		return SignupOperationResult{Success: "untracked channel, ignored"}, nil
 	}
 
-	// Only set up context and tracing for reactions we actually care about
+	// Either this channel is tracked, OR we haven't tracked any channels yet (cold start)
+	// In both cases, we need to proceed and check config
+
+	// Set up context and tracing for reactions we might care about
 	ctx := context.Background()
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.UserIDKey, r.UserID)
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.CommandNameKey, "reaction_signup")
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.InteractionType, "reaction")
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.GuildIDKey, r.GuildID)
 
-	// Wrap only relevant reactions in the operationWrapper
+	// Wrap in the operationWrapper
 	return sm.operationWrapper(ctx, "message_reaction_add", func(ctx context.Context) (SignupOperationResult, error) {
 		// TIER 2: Now fetch guild config since we know the channel matters
 		var signupChannelID, signupEmoji string
@@ -74,15 +87,18 @@ func (sm *signupManager) MessageReactionAdd(s discord.Session, r *discordgo.Mess
 			}
 			signupChannelID = cfg.SignupChannelID
 			signupEmoji = cfg.SignupEmoji
+
+			// Track this channel for future fast-path filtering
+			sm.TrackChannelForReactions(signupChannelID)
 		} else if sm.config != nil && sm.config.Discord.SignupChannelID != "" {
 			// Fall back to static config if no resolver
 			signupChannelID = sm.config.Discord.SignupChannelID
 			signupEmoji = sm.config.Discord.SignupEmoji
+
+			// Track static config channel too
+			sm.TrackChannelForReactions(signupChannelID)
 		} else {
-			// No config available at all - can't process
-			sm.logger.InfoContext(ctx, "No guild or static config available - ignoring reaction",
-				attr.String("guild_id", r.GuildID),
-			)
+			// No config available at all - silently ignore
 			return SignupOperationResult{Success: "no config available, ignored"}, nil
 		}
 
@@ -90,19 +106,9 @@ func (sm *signupManager) MessageReactionAdd(s discord.Session, r *discordgo.Mess
 			signupEmoji = "🥏"
 		}
 
-		sm.logger.InfoContext(ctx, "Signup config resolved from backend",
-			attr.String("guild_id", r.GuildID),
-			attr.String("signup_channel_id", signupChannelID),
-			attr.String("signup_emoji", signupEmoji),
-		)
-
-		// TIER 3: Validate channel and emoji
+		// TIER 3: Validate channel and emoji (silent ignore if mismatch)
 		if r.ChannelID != signupChannelID {
-			sm.logger.InfoContext(ctx, "Reaction channel mismatch - ignoring",
-				attr.String("channel_id", r.ChannelID),
-				attr.String("expected_channel", signupChannelID),
-			)
-			return SignupOperationResult{Success: "reaction mismatch, ignored"}, nil
+			return SignupOperationResult{Success: "channel mismatch, ignored"}, nil
 		}
 
 		// Fast path: compare raw emoji first; normalize only on mismatch
@@ -110,13 +116,7 @@ func (sm *signupManager) MessageReactionAdd(s discord.Session, r *discordgo.Mess
 			normalizedReactionEmoji := normalizeEmoji(r.Emoji.Name)
 			normalizedExpectedEmoji := normalizeEmoji(signupEmoji)
 			if normalizedReactionEmoji != normalizedExpectedEmoji {
-				sm.logger.InfoContext(ctx, "Reaction emoji mismatch - ignoring",
-					attr.Any("emoji", r.Emoji.Name),
-					attr.String("normalized_emoji", normalizedReactionEmoji),
-					attr.String("expected_emoji", signupEmoji),
-					attr.String("normalized_expected_emoji", normalizedExpectedEmoji),
-				)
-				return SignupOperationResult{Success: "reaction mismatch, ignored"}, nil
+				return SignupOperationResult{Success: "emoji mismatch, ignored"}, nil
 			}
 		}
 
