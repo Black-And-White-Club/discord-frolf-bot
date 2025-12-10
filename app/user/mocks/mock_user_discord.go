@@ -14,6 +14,7 @@ import (
 
 	role "github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord/role"
 	signup "github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord/signup"
+	udisc "github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord/udisc"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -67,4 +68,18 @@ func (m *MockUserDiscordInterface) GetSignupManager() signup.SignupManager {
 func (mr *MockUserDiscordInterfaceMockRecorder) GetSignupManager() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSignupManager", reflect.TypeOf((*MockUserDiscordInterface)(nil).GetSignupManager))
+}
+
+// GetUDiscManager mocks base method.
+func (m *MockUserDiscordInterface) GetUDiscManager() udisc.UDiscManager {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUDiscManager")
+	ret0, _ := ret[0].(udisc.UDiscManager)
+	return ret0
+}
+
+// GetUDiscManager indicates an expected call of GetUDiscManager.
+func (mr *MockUserDiscordInterfaceMockRecorder) GetUDiscManager() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUDiscManager", reflect.TypeOf((*MockUserDiscordInterface)(nil).GetUDiscManager))
 }

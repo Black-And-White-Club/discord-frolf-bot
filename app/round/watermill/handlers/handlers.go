@@ -38,6 +38,10 @@ type Handlers interface {
 	HandleRoundUpdateValidationFailed(msg *message.Message) ([]*message.Message, error)
 	HandleRoundParticipantRemoved(msg *message.Message) ([]*message.Message, error)
 	HandleTagsUpdatedForScheduledRounds(msg *message.Message) ([]*message.Message, error)
+	HandleScorecardUploaded(msg *message.Message) ([]*message.Message, error)
+	HandleScorecardParseFailed(msg *message.Message) ([]*message.Message, error)
+	HandleImportFailed(msg *message.Message) ([]*message.Message, error)
+	HandleScorecardURLRequested(msg *message.Message) ([]*message.Message, error)
 }
 
 // RoundHandlers handles round-related events.

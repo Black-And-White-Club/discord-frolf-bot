@@ -50,4 +50,4 @@ require (
 	google.golang.org/protobuf v1.36.10 // indirect
 )
 
-// replace github.com/Black-And-White-Club/frolf-bot-shared => ../frolf-bot-shared
+replace github.com/Black-And-White-Club/frolf-bot-shared => ../frolf-bot-shared

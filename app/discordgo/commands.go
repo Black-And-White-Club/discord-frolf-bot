@@ -89,5 +89,31 @@ func RegisterCommands(s Session, logger *slog.Logger, guildID string) error {
 	}
 	logger.Info("registered command: /claimtag")
 
+	_, err = s.ApplicationCommandCreate(appID.ID, targetGuildID, &discordgo.ApplicationCommand{
+		Name:        "set-udisc-name",
+		Description: "Set your UDisc username and name for scorecard matching (Available to all players)",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "username",
+				Description: "Your UDisc username (e.g., @johndoe)",
+				Required:    false,
+				MaxLength:   100,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "name",
+				Description: "Your name as shown on UDisc rounds",
+				Required:    false,
+				MaxLength:   100,
+			},
+		},
+	})
+	if err != nil {
+		logger.Error("Failed to create '/set-udisc-name' command", attr.Error(err))
+		return fmt.Errorf("failed to create '/set-udisc-name' command: %w", err)
+	}
+	logger.Info("registered command: /set-udisc-name")
+
 	return nil
 }

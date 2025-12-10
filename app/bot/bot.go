@@ -150,6 +150,9 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 	reactionRegistry := interactions.NewReactionRegistry()
 	reactionRegistry.RegisterWithSession(discordgoSession, bot.Session)
 
+	messageRegistry := interactions.NewMessageRegistry()
+	messageRegistry.RegisterWithSession(discordgoSession, bot.Session)
+
 	// Initialize modules
 	var err error
 	bot.UserRouter, err = user.InitializeUserModule(
@@ -176,6 +179,7 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 		bot.RoundWatermillRouter,
 		registry,
 		reactionRegistry,
+		messageRegistry,
 		bot.EventBus,
 		bot.Logger,
 		bot.Config,

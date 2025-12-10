@@ -132,3 +132,15 @@ func (mr *MockSignupManagerMockRecorder) SendSignupResult(ctx, interactionToken,
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendSignupResult", reflect.TypeOf((*MockSignupManager)(nil).SendSignupResult), ctx, interactionToken, success)
 }
+
+// TrackChannelForReactions mocks base method.
+func (m *MockSignupManager) TrackChannelForReactions(channelID string) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "TrackChannelForReactions", channelID)
+}
+
+// TrackChannelForReactions indicates an expected call of TrackChannelForReactions.
+func (mr *MockSignupManagerMockRecorder) TrackChannelForReactions(channelID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TrackChannelForReactions", reflect.TypeOf((*MockSignupManager)(nil).TrackChannelForReactions), channelID)
+}

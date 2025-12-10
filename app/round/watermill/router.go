@@ -105,6 +105,12 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 		// for each updated participant. The aggregate bulk success event lacks a specific user/score
 		// and was causing empty participant payloads & failed embed updates when bridged.
 
+		// Scorecard import flow
+		roundevents.ScorecardUploadedTopic:     handlers.HandleScorecardUploaded,
+		roundevents.ScorecardParseFailedTopic:  handlers.HandleScorecardParseFailed,
+		roundevents.ImportFailedTopic:          handlers.HandleImportFailed,
+		roundevents.ScorecardURLRequestedTopic: handlers.HandleScorecardURLRequested,
+
 		// Lifecycle
 		roundevents.RoundDeleted:   handlers.HandleRoundDeleted,
 		roundevents.RoundFinalized: handlers.HandleRoundFinalized,

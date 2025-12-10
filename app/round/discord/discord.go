@@ -12,6 +12,7 @@ import (
 	roundreminder "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/round_reminder"
 	roundrsvp "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/round_rsvp"
 	scoreround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/score_round"
+	scorecardupload "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/scorecard_upload"
 	startround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/start_round"
 	tagupdates "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/tag_updates"
 	updateround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/update_round"
@@ -34,19 +35,21 @@ type RoundDiscordInterface interface {
 	GetDeleteRoundManager() deleteround.DeleteRoundManager
 	GetUpdateRoundManager() updateround.UpdateRoundManager
 	GetTagUpdateManager() tagupdates.TagUpdateManager
+	GetScorecardUploadManager() scorecardupload.ScorecardUploadManager
 }
 
 // RoundDiscord encapsulates all Round Discord services.
 type RoundDiscord struct {
-	CreateRoundManager   createround.CreateRoundManager
-	RoundRsvpManager     roundrsvp.RoundRsvpManager
-	RoundReminderManager roundreminder.RoundReminderManager
-	StartRoundManager    startround.StartRoundManager
-	ScoreRoundManager    scoreround.ScoreRoundManager
-	FinalizeRoundManager finalizeround.FinalizeRoundManager
-	DeleteRoundManager   deleteround.DeleteRoundManager
-	UpdateRoundManager   updateround.UpdateRoundManager
-	TagUpdateManager     tagupdates.TagUpdateManager
+	CreateRoundManager     createround.CreateRoundManager
+	RoundRsvpManager       roundrsvp.RoundRsvpManager
+	RoundReminderManager   roundreminder.RoundReminderManager
+	StartRoundManager      startround.StartRoundManager
+	ScoreRoundManager      scoreround.ScoreRoundManager
+	FinalizeRoundManager   finalizeround.FinalizeRoundManager
+	DeleteRoundManager     deleteround.DeleteRoundManager
+	UpdateRoundManager     updateround.UpdateRoundManager
+	TagUpdateManager       tagupdates.TagUpdateManager
+	ScorecardUploadManager scorecardupload.ScorecardUploadManager
 }
 
 // NewRoundDiscord creates a new RoundDiscord instance.
@@ -73,17 +76,19 @@ func NewRoundDiscord(
 	deleteRoundManager := deleteround.NewDeleteRoundManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics, guildConfigResolver)
 	updateRoundManager := updateround.NewUpdateRoundManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics, guildConfigResolver)
 	tagUpdateManager := tagupdates.NewTagUpdateManager(session, publisher, logger, helper, config, tracer, metrics, guildConfigResolver)
+	scorecardUploadManager := scorecardupload.NewScorecardUploadManager(session, publisher, logger, config, tracer, metrics)
 
 	return &RoundDiscord{
-		CreateRoundManager:   createRoundManager,
-		RoundRsvpManager:     roundRsvpManager,
-		RoundReminderManager: roundReminderManager,
-		StartRoundManager:    startRoundManager,
-		ScoreRoundManager:    scoreRoundManager,
-		FinalizeRoundManager: finalizeRoundManager,
-		DeleteRoundManager:   deleteRoundManager,
-		UpdateRoundManager:   updateRoundManager,
-		TagUpdateManager:     tagUpdateManager,
+		CreateRoundManager:     createRoundManager,
+		RoundRsvpManager:       roundRsvpManager,
+		RoundReminderManager:   roundReminderManager,
+		StartRoundManager:      startRoundManager,
+		ScoreRoundManager:      scoreRoundManager,
+		FinalizeRoundManager:   finalizeRoundManager,
+		DeleteRoundManager:     deleteRoundManager,
+		UpdateRoundManager:     updateRoundManager,
+		TagUpdateManager:       tagUpdateManager,
+		ScorecardUploadManager: scorecardUploadManager,
 	}, nil
 }
 
@@ -129,4 +134,9 @@ func (rd *RoundDiscord) GetUpdateRoundManager() updateround.UpdateRoundManager {
 
 func (rd *RoundDiscord) GetTagUpdateManager() tagupdates.TagUpdateManager {
 	return rd.TagUpdateManager
+}
+
+// GetScorecardUploadManager returns the ScorecardUploadManager.
+func (rd *RoundDiscord) GetScorecardUploadManager() scorecardupload.ScorecardUploadManager {
+	return rd.ScorecardUploadManager
 }

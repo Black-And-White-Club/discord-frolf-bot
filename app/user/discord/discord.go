@@ -9,6 +9,7 @@ import (
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord/role"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord/signup"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord/udisc"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
@@ -20,12 +21,14 @@ import (
 type UserDiscordInterface interface {
 	GetRoleManager() role.RoleManager
 	GetSignupManager() signup.SignupManager
+	GetUDiscManager() udisc.UDiscManager
 }
 
 // UserDiscord encapsulates all user Discord services.
 type UserDiscord struct {
 	RoleManager   role.RoleManager
 	SignupManager signup.SignupManager
+	UDiscManager  udisc.UDiscManager
 }
 
 func NewUserDiscord(
@@ -50,9 +53,12 @@ func NewUserDiscord(
 		return nil, err
 	}
 
+	udiscManager := udisc.NewUDiscManager(session, publisher, logger, config, tracer, metrics)
+
 	return &UserDiscord{
 		RoleManager:   roleManager,
 		SignupManager: signupManager,
+		UDiscManager:  udiscManager,
 	}, nil
 }
 
@@ -64,4 +70,9 @@ func (ud *UserDiscord) GetRoleManager() role.RoleManager {
 // GetSignupManager returns the SignupManager.
 func (ud *UserDiscord) GetSignupManager() signup.SignupManager {
 	return ud.SignupManager
+}
+
+// GetUDiscManager returns the UDiscManager.
+func (ud *UserDiscord) GetUDiscManager() udisc.UDiscManager {
+	return ud.UDiscManager
 }

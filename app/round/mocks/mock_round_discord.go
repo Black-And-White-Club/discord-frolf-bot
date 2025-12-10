@@ -18,6 +18,7 @@ import (
 	roundreminder "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/round_reminder"
 	roundrsvp "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/round_rsvp"
 	scoreround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/score_round"
+	scorecardupload "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/scorecard_upload"
 	startround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/start_round"
 	tagupdates "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/tag_updates"
 	updateround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/update_round"
@@ -130,6 +131,20 @@ func (m *MockRoundDiscordInterface) GetScoreRoundManager() scoreround.ScoreRound
 func (mr *MockRoundDiscordInterfaceMockRecorder) GetScoreRoundManager() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetScoreRoundManager", reflect.TypeOf((*MockRoundDiscordInterface)(nil).GetScoreRoundManager))
+}
+
+// GetScorecardUploadManager mocks base method.
+func (m *MockRoundDiscordInterface) GetScorecardUploadManager() scorecardupload.ScorecardUploadManager {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetScorecardUploadManager")
+	ret0, _ := ret[0].(scorecardupload.ScorecardUploadManager)
+	return ret0
+}
+
+// GetScorecardUploadManager indicates an expected call of GetScorecardUploadManager.
+func (mr *MockRoundDiscordInterfaceMockRecorder) GetScorecardUploadManager() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetScorecardUploadManager", reflect.TypeOf((*MockRoundDiscordInterface)(nil).GetScorecardUploadManager))
 }
 
 // GetStartRoundManager mocks base method.

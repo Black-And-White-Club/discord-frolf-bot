@@ -88,19 +88,7 @@ func (sm *signupManager) SendSignupModal(ctx context.Context, i *discordgo.Inter
 					discordgo.ActionsRow{
 						Components: []discordgo.MessageComponent{
 							discordgo.TextInput{
-								CustomID:    "udisc_username",
-								Label:       "UDisc Username (Optional)",
-								Style:       discordgo.TextInputShort,
-								Placeholder: "Your @username on UDisc",
-								Required:    false,
-								MaxLength:   100,
-							},
-						},
-					},
-					discordgo.ActionsRow{
-						Components: []discordgo.MessageComponent{
-							discordgo.TextInput{
-								CustomID:    "udisc_name",
+								CustomID:    "udisc_display_name",
 								Label:       "UDisc Display Name (Optional)",
 								Style:       discordgo.TextInputShort,
 								Placeholder: "Your name as shown on UDisc scorecards",
