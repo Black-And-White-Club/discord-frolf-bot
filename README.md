@@ -16,6 +16,7 @@ A production-ready Discord bot for managing frolf (frisbee golf) events, scoring
 ### Local Development
 
 1. **Clone and Setup**:
+
    ```bash
    git clone https://github.com/your-org/discord-frolf-bot.git
    cd discord-frolf-bot
@@ -23,12 +24,14 @@ A production-ready Discord bot for managing frolf (frisbee golf) events, scoring
    ```
 
 2. **Configuration**:
+
    ```bash
    cp config.example.yaml config.yaml
    # Edit config.yaml with your Discord bot token
    ```
 
 3. **Guild Setup** (Auto-configures your Discord server):
+
    ```bash
    go run main.go setup YOUR_GUILD_ID
    # This will automatically update your config.yaml
@@ -42,11 +45,13 @@ A production-ready Discord bot for managing frolf (frisbee golf) events, scoring
 ### Container Deployment
 
 1. **Build Container**:
+
    ```bash
    docker build -t discord-frolf-bot:latest .
    ```
 
 2. **Run Container** (Standalone Mode):
+
    ```bash
    docker run -e DISCORD_TOKEN=your_token \
               -p 8080:8080 \
@@ -54,6 +59,7 @@ A production-ready Discord bot for managing frolf (frisbee golf) events, scoring
    ```
 
 3. **Multi-Pod Production Deployment**:
+
    ```bash
    # Gateway pod (exactly 1 replica)
    docker run -e DISCORD_TOKEN=your_token \
@@ -90,7 +96,7 @@ Copy `config.example.yaml` to `config.yaml` and customize:
 ```yaml
 discord:
   token: "YOUR_BOT_TOKEN"
-  guild_id: ""  # Auto-populated by setup command
+  guild_id: "" # Auto-populated by setup command
   app_id: "YOUR_APP_ID"
   # Channel/role IDs auto-populated by setup
   signup_channel_id: ""
@@ -114,7 +120,16 @@ observability:
 
 The bot uses a modern event-driven setup system with multiple options:
 
+### Slash command registration & updates
+
+- Before setup, the only visible command is the global `/frolf-setup`.
+- After setup succeeds, the bot registers the guild-scoped commands for that server.
+- On deploy/startup, the bot reconciles commands for _setup-complete_ guilds so newly-added commands roll out automatically.
+
+Details: see `docs/COMMAND_REGISTRATION.md`.
+
 ### Option 1: Discord Command (Recommended)
+
 1. Invite the bot to your server with admin permissions
 2. Run `/frolf-setup` in any Discord channel
 3. Fill out the setup modal with your preferences:
@@ -130,6 +145,7 @@ The bot uses a modern event-driven setup system with multiple options:
    - Cache config for fast access
 
 ### Option 2: Setup Trigger Tool
+
 ```bash
 # Start the setup tool
 go run cmd/setup-trigger/main.go -guild YOUR_GUILD_ID
@@ -138,11 +154,13 @@ go run cmd/setup-trigger/main.go -guild YOUR_GUILD_ID
 ```
 
 ### Option 3: Manual Setup via Events
+
 For programmatic setup, publish a `GuildSetupEvent` to the event bus.
 
 **Features:**
+
 - ✅ **Event-driven architecture** with backend persistence
-- ✅ **Multi-tenant support** for unlimited Discord servers  
+- ✅ **Multi-tenant support** for unlimited Discord servers
 - ✅ **Dynamic command registration** based on setup status
 - ✅ **Configurable names** for channels and roles
 - ✅ **Automatic caching** for fast response times
@@ -157,12 +175,14 @@ For programmatic setup, publish a `GuildSetupEvent` to the event bus.
 The bot supports three deployment modes via the `BOT_MODE` environment variable:
 
 1. **Standalone Mode** (Default):
+
    ```bash
    # Single pod handling both Discord interactions and backend processing
    docker run -e DISCORD_TOKEN=your_token discord-frolf-bot:latest
    ```
 
 2. **Gateway Mode** (Production):
+
    ```bash
    # Single pod handling Discord interactions only
    docker run -e DISCORD_TOKEN=your_token \
@@ -181,6 +201,7 @@ The bot supports three deployment modes via the `BOT_MODE` environment variable:
 ### Health Checks
 
 The bot includes health check endpoints (port 8080) for container orchestration:
+
 - `GET /health` - Application health status
 - `GET /ready` - Readiness check for load balancers
 
@@ -195,20 +216,20 @@ kind: Deployment
 metadata:
   name: discord-frolf-bot-gateway
 spec:
-  replicas: 1  # MUST be 1 - Discord allows only one connection per bot
+  replicas: 1 # MUST be 1 - Discord allows only one connection per bot
   template:
     spec:
       containers:
-      - name: gateway
-        image: discord-frolf-bot:latest
-        env:
-        - name: BOT_MODE
-          value: "gateway"
-        - name: DISCORD_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: discord-secrets
-              key: token
+        - name: gateway
+          image: discord-frolf-bot:latest
+          env:
+            - name: BOT_MODE
+              value: "gateway"
+            - name: DISCORD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: discord-secrets
+                  key: token
 ---
 # Worker deployment (scale as needed)
 apiVersion: apps/v1
@@ -216,20 +237,21 @@ kind: Deployment
 metadata:
   name: discord-frolf-bot-worker
 spec:
-  replicas: 3  # Scale based on load
+  replicas: 3 # Scale based on load
   template:
     spec:
       containers:
-      - name: worker
-        image: discord-frolf-bot:latest
-        env:
-        - name: BOT_MODE
-          value: "worker"
+        - name: worker
+          image: discord-frolf-bot:latest
+          env:
+            - name: BOT_MODE
+              value: "worker"
 ```
 
 ### CI/CD
 
 GitHub Actions workflow automatically:
+
 - Builds and tests on every push
 - Creates Docker images tagged with Git SHA
 - Pushes to GitHub Container Registry
@@ -244,17 +266,20 @@ The Discord Frolf Bot is built using a modern, multi-tenant event-driven archite
 The bot supports three deployment modes optimized for different scenarios:
 
 **Standalone Mode** (Development/Small deployments):
+
 - Single process handles both Discord interactions and backend processing
 - Simplest deployment, good for development and testing
 - Set `BOT_MODE=standalone` or leave unset (default)
 
 **Gateway Mode** (Production - Discord Interface):
+
 - Dedicated pod handling only Discord interactions and event publishing
 - **MUST run exactly 1 replica** (Discord allows only one bot connection)
 - Handles slash commands, user interactions, and Discord events
 - Set `BOT_MODE=gateway`
 
 **Worker Mode** (Production - Backend Processing):
+
 - Dedicated pods handling event processing and business logic
 - **Can scale horizontally** (multiple replicas supported)
 - Processes guild setup, scoring, leaderboards, and database operations
@@ -286,6 +311,7 @@ The bot supports unlimited Discord servers (guilds) simultaneously:
 - **Leaderboard Module**: Tag claiming and ranking systems
 
 Each module follows the same EDA patterns with:
+
 - Discord interaction handlers
 - Event publishers/subscribers
 - Watermill routers and handlers
@@ -294,10 +320,12 @@ Each module follows the same EDA patterns with:
 ## Commands
 
 ### Setup Commands
+
 - `go run main.go setup <guild_id>` - Automated server setup and configuration
 - `make setup GUILD_ID=<guild_id>` - Setup using Makefile
 
 ### Bot Commands (Discord)
+
 - `/frolf-setup` - Initial guild setup (auto-registered for new guilds)
 - `/create-round` - Create new frolf event
 - `/score-round` - Submit scores for completed round
@@ -306,6 +334,7 @@ Each module follows the same EDA patterns with:
 - And many more... (commands auto-register after guild setup)
 
 ### Development Commands
+
 - `make test-all` - Run all tests with summary
 - `make build` - Build the application
 - `make run` - Run in development mode
@@ -351,6 +380,7 @@ scripts/              # Build and deployment scripts
 ### Module Architecture
 
 Each module follows the same EDA pattern:
+
 - **Discord handlers**: Handle Discord interactions and publish events
 - **Watermill routers**: Route events to appropriate handlers
 - **Event handlers**: Process events and manage business logic
@@ -364,12 +394,14 @@ The framework for multi-pod deployment exists but needs completion. This section
 ### Current State
 
 ✅ **Framework Complete**:
+
 - `BOT_MODE` environment variable support
 - Health endpoints for each mode
 - Graceful fallback to standalone mode
 - Event-driven architecture with NATS
 
 🚧 **Implementation Needed**:
+
 - Gateway-only logic (currently falls back to standalone)
 - Worker-only logic (currently falls back to standalone)
 
@@ -380,24 +412,25 @@ The framework for multi-pod deployment exists but needs completion. This section
 **Purpose**: Handle Discord WebSocket connection and forward events to workers
 
 **Required Implementation**:
+
 ```go
 func runGatewayMode(ctx context.Context) {
     // ✅ Config and observability already implemented
-    
+
     // 🚧 TODO: Discord session (WebSocket only)
     session, err := discordgo.New("Bot " + cfg.Discord.Token)
-    
+
     // 🚧 TODO: NATS publisher setup
     publisher := setupNATSPublisher(cfg.NATS.URL)
-    
+
     // 🚧 TODO: Discord event handlers → NATS publishers
     session.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
         publishInteractionToNATS(publisher, i) // NO local processing
     })
-    
+
     // 🚧 TODO: NATS subscriber for worker responses
     subscriber.Subscribe("discord.response.*", handleWorkerResponse)
-    
+
     // 🚧 TODO: Open Discord connection
     session.Open()
 }
@@ -408,23 +441,24 @@ func runGatewayMode(ctx context.Context) {
 **Purpose**: Process business logic from NATS events (no Discord connection)
 
 **Required Implementation**:
+
 ```go
 func runWorkerMode(ctx context.Context) {
     // ✅ Config and observability already implemented
-    
+
     // 🚧 TODO: NATS subscriber (NO Discord session)
     subscriber := setupNATSSubscriber(cfg.NATS.URL)
-    
+
     // 🚧 TODO: Initialize business logic modules
     // Extract from existing standalone mode:
     // - User module initialization
-    // - Round module initialization  
+    // - Round module initialization
     // - Guild module initialization
     // - All Watermill routers
-    
+
     // 🚧 TODO: Subscribe to gateway events
     subscriber.Subscribe("discord.interaction.*", processInteraction)
-    
+
     // 🚧 TODO: Start all business logic routers
 }
 ```
@@ -432,6 +466,7 @@ func runWorkerMode(ctx context.Context) {
 #### 3. Event Schema (New File: `app/events/gateway/`)
 
 **Required Events**:
+
 ```go
 // Gateway → Workers
 type DiscordInteractionEvent struct {
@@ -440,7 +475,7 @@ type DiscordInteractionEvent struct {
     Timestamp   time.Time                   `json:"timestamp"`
 }
 
-// Workers → Gateway  
+// Workers → Gateway
 type DiscordResponseEvent struct {
     GuildID       string                         `json:"guild_id"`
     InteractionID string                         `json:"interaction_id"`
@@ -452,6 +487,7 @@ type DiscordResponseEvent struct {
 #### 4. NATS Topics
 
 **Topic Structure**:
+
 - `discord.interaction.{guild_id}` - Gateway publishes interactions
 - `discord.response.{guild_id}` - Workers publish responses
 - `discord.guild.joined.{guild_id}` - Gateway publishes guild events
@@ -460,10 +496,12 @@ type DiscordResponseEvent struct {
 #### 5. Files to Modify/Create
 
 **Existing Files**:
+
 - `main.go` - Complete gateway/worker functions
 - `app/bot/bot.go` - Extract business logic for worker mode
 
 **New Files Needed**:
+
 - `app/gateway/gateway.go` - Gateway-specific Discord handling
 - `app/events/gateway/events.go` - Gateway/worker event schemas
 - `app/gateway/publisher.go` - NATS event publishing
@@ -472,12 +510,14 @@ type DiscordResponseEvent struct {
 #### 6. Implementation Benefits
 
 **When Complete**:
+
 - True zero-downtime deployments (update workers without Discord disconnect)
 - Independent scaling (scale business logic separately from Discord handling)
 - Fault isolation (business logic crashes don't affect Discord connection)
 - Resource optimization (lightweight gateway, heavy-processing workers)
 
 **Scaling Pattern**:
+
 ```yaml
 # Production deployment
 gateway:   replicas: 1    # MUST be exactly 1

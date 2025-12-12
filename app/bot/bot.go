@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/guild"
@@ -142,6 +143,8 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 	bot.Logger.Info("Starting Discord bot initialization")
 	discordgoSession := bot.Session.(*discord.DiscordSession).GetUnderlyingSession()
 
+	var commandSyncOnce sync.Once
+
 	// Setup interaction registries
 	registry := interactions.NewRegistry()
 	registry.SetGuildConfigResolver(bot.GuildConfigResolver)
@@ -267,6 +270,9 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 
 	discordgoSession.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
 		bot.Logger.Info("Bot is ready", attr.Int("guilds", len(r.Guilds)))
+		commandSyncOnce.Do(func() {
+			go bot.syncGuildCommands(r.Guilds)
+		})
 	})
 
 	// Handle guild lifecycle events for multi-tenant support
@@ -346,6 +352,44 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 	bot.Logger.Info("Discord bot is now running")
 	<-ctx.Done()
 	return nil
+}
+
+func (bot *DiscordBot) syncGuildCommands(guilds []*discordgo.Guild) {
+	ctx := context.Background()
+
+	if len(guilds) == 0 {
+		bot.Logger.InfoContext(ctx, "No guilds in Ready payload; skipping command sync")
+		return
+	}
+
+	bot.Logger.InfoContext(ctx, "Syncing guild commands for existing guilds",
+		attr.Int("guilds", len(guilds)))
+
+	for _, g := range guilds {
+		if g == nil || g.ID == "" {
+			continue
+		}
+
+		// Preserve the intended UX: only register guild commands after setup is complete.
+		// This also avoids spamming unconfigured guilds with commands that will just be blocked.
+		if bot.GuildConfigResolver != nil {
+			if !bot.GuildConfigResolver.IsGuildSetupComplete(g.ID) {
+				bot.Logger.InfoContext(ctx, "Skipping command sync: guild setup incomplete",
+					attr.String("guild_id", g.ID))
+				continue
+			}
+		}
+
+		if err := discord.RegisterCommands(bot.Session, bot.Logger, g.ID); err != nil {
+			bot.Logger.ErrorContext(ctx, "Failed to sync guild commands",
+				attr.String("guild_id", g.ID),
+				attr.Error(err))
+			continue
+		}
+
+		// Avoid hitting Discord rate limits when syncing across many guilds.
+		time.Sleep(250 * time.Millisecond)
+	}
 }
 
 func (bot *DiscordBot) Close() {
