@@ -116,6 +116,7 @@ func Test_scorecardUploadManager_publishScorecardUploadEvent_PublishFailure_Retu
 		"c1",
 		"m1",
 		[]byte("data"),
+		"http://example.com/scorecard.csv",
 		"scorecard.csv",
 		"",
 	)

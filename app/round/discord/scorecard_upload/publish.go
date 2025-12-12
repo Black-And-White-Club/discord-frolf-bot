@@ -59,7 +59,7 @@ func (m *scorecardUploadManager) publishScorecardURLEvent(ctx context.Context, g
 
 // publishScorecardUploadEvent publishes a scorecard uploaded event (for file uploads) to the message bus.
 // This will be used when file upload is fully implemented.
-func (m *scorecardUploadManager) publishScorecardUploadEvent(ctx context.Context, guildID sharedtypes.GuildID, roundID sharedtypes.RoundID, userID sharedtypes.DiscordID, channelID, messageID string, fileData []byte, fileName, notes string) (string, error) {
+func (m *scorecardUploadManager) publishScorecardUploadEvent(ctx context.Context, guildID sharedtypes.GuildID, roundID sharedtypes.RoundID, userID sharedtypes.DiscordID, channelID, messageID string, fileData []byte, fileURL, fileName, notes string) (string, error) {
 	importID := uuid.New().String()
 
 	payload := roundevents.ScorecardUploadedPayload{
@@ -70,6 +70,7 @@ func (m *scorecardUploadManager) publishScorecardUploadEvent(ctx context.Context
 		ChannelID: channelID,
 		MessageID: messageID,
 		FileData:  fileData,
+		FileURL:   fileURL,
 		FileName:  fileName,
 		Notes:     notes,
 		Timestamp: time.Now().UTC(),

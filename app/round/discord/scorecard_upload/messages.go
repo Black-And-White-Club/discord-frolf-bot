@@ -100,6 +100,7 @@ func (m *scorecardUploadManager) HandleFileUploadMessage(s discord.Session, msg 
 		msg.ChannelID,
 		msg.ID,
 		fileData,
+		scorecardFile.URL,
 		scorecardFile.Filename,
 		pending.Notes,
 	)
