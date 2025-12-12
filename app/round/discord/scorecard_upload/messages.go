@@ -121,6 +121,19 @@ func (m *scorecardUploadManager) HandleFileUploadMessage(s discord.Session, msg 
 	}
 }
 
+// SendUploadError sends an error message to the specified channel.
+func (m *scorecardUploadManager) SendUploadError(ctx context.Context, channelID, errorMsg string) error {
+	_, err := m.session.ChannelMessageSend(channelID, fmt.Sprintf("❌ Scorecard import failed: %s", errorMsg))
+	if err != nil {
+		m.logger.ErrorContext(ctx, "Failed to send upload error message",
+			attr.Error(err),
+			attr.String("channel_id", channelID),
+		)
+		return err
+	}
+	return nil
+}
+
 // sendFileUploadErrorMessage sends an error message in the channel.
 func (m *scorecardUploadManager) sendFileUploadErrorMessage(ctx context.Context, s discord.Session, channelID, errorMsg string) {
 	_, err := s.ChannelMessageSend(channelID, errorMsg)

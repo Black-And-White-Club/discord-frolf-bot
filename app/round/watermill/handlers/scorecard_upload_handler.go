@@ -155,7 +155,13 @@ func (rh *RoundHandlers) ScorecardParseFailedEvent(msg *message.Message) error {
 		attr.String("error", payload.Error),
 	)
 
-	// TODO: Notify user in Discord about parsing failure
+	// Notify user in Discord about parsing failure
+	if payload.ChannelID != "" {
+		err := rh.RoundDiscord.GetScorecardUploadManager().SendUploadError(ctx, payload.ChannelID, payload.Error)
+		if err != nil {
+			rh.Logger.ErrorContext(ctx, "Failed to notify user of parsing failure", attr.Error(err))
+		}
+	}
 
 	msg.Ack()
 	return nil
@@ -183,7 +189,13 @@ func (rh *RoundHandlers) ImportFailedEvent(msg *message.Message) error {
 		attr.String("error", payload.Error),
 	)
 
-	// TODO: Notify user in Discord about import failure
+	// Notify user in Discord about import failure
+	if payload.ChannelID != "" {
+		err := rh.RoundDiscord.GetScorecardUploadManager().SendUploadError(ctx, payload.ChannelID, payload.Error)
+		if err != nil {
+			rh.Logger.ErrorContext(ctx, "Failed to notify user of import failure", attr.Error(err))
+		}
+	}
 
 	msg.Ack()
 	return nil

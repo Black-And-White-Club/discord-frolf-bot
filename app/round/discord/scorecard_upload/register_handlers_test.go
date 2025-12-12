@@ -36,6 +36,10 @@ func (m *fakeScorecardUploadManager) HandleFileUploadMessage(s discord.Session, 
 	m.lastMsg = msg
 }
 
+func (m *fakeScorecardUploadManager) SendUploadError(ctx context.Context, channelID, errorMsg string) error {
+	return nil
+}
+
 type testDiscordgoAdder struct {
 	handler func(s *discordgo.Session, e *discordgo.MessageCreate)
 }
