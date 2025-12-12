@@ -71,9 +71,17 @@ func Test_scorecardUploadManager_sendFileUploadPrompt_StoresPendingAndResponds(t
 	t.Cleanup(ctrl.Finish)
 
 	sess := discordmocks.NewMockSession(ctrl)
-	inter := &discordgo.Interaction{ID: "i1", ChannelID: "c1", Member: &discordgo.Member{User: &discordgo.User{ID: "u1"}}}
+	inter := &discordgo.Interaction{ID: "i1", ChannelID: "c1", GuildID: "g1", Member: &discordgo.Member{User: &discordgo.User{ID: "u1"}}}
 	rID := sharedtypes.RoundID(uuid.New())
 
+	// Expect DM channel creation
+	dmChannel := &discordgo.Channel{ID: "dm-channel-id"}
+	sess.EXPECT().UserChannelCreate("u1").Return(dmChannel, nil).Times(1)
+
+	// Expect DM message
+	sess.EXPECT().ChannelMessageSend("dm-channel-id", gomock.Any()).Return(&discordgo.Message{}, nil).Times(1)
+
+	// Expect interaction response
 	sess.EXPECT().InteractionRespond(gomock.Eq(inter), gomock.Any()).Return(nil).Times(1)
 
 	m := &scorecardUploadManager{

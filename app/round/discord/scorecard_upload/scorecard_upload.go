@@ -20,6 +20,7 @@ import (
 // pendingUpload tracks a file upload that's expected from a user.
 type pendingUpload struct {
 	RoundID   sharedtypes.RoundID
+	GuildID   sharedtypes.GuildID
 	Notes     string
 	CreatedAt time.Time
 }

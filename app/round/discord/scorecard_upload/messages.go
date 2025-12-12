@@ -93,7 +93,7 @@ func (m *scorecardUploadManager) HandleFileUploadMessage(s discord.Session, msg 
 	// Publish scorecard upload event
 	importID, err := m.publishScorecardUploadEvent(
 		ctx,
-		sharedtypes.GuildID(msg.GuildID),
+		pending.GuildID,
 		pending.RoundID,
 		sharedtypes.DiscordID(msg.Author.ID),
 		msg.ChannelID,

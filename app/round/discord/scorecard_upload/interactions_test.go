@@ -252,6 +252,7 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_PendingExists_Publishes
 		pendingUploads: map[string]*pendingUpload{
 			fmt.Sprintf("%s:%s", userID, channelID): {
 				RoundID: sharedtypes.RoundID(roundUUID),
+				GuildID: sharedtypes.GuildID(guildID),
 				Notes:   notes,
 			},
 		},
@@ -804,12 +805,19 @@ func Test_scorecardUploadManager_HandleScorecardUploadModalSubmit_FileFlow_Promp
 			if resp.Data.Flags != discordgo.MessageFlagsEphemeral {
 				t.Fatalf("expected ephemeral prompt")
 			}
-			if !strings.Contains(resp.Data.Content, "Please upload your scorecard file") {
+			if !strings.Contains(resp.Data.Content, "I've sent you a DM") {
 				t.Fatalf("unexpected prompt content: %q", resp.Data.Content)
 			}
 			return nil
 		}).
 		Times(1)
+
+	// Expect DM channel creation
+	dmChannel := &discordgo.Channel{ID: "dm-channel-id"}
+	mockSession.EXPECT().UserChannelCreate(userID).Return(dmChannel, nil).Times(1)
+
+	// Expect DM message
+	mockSession.EXPECT().ChannelMessageSend("dm-channel-id", gomock.Any()).Return(&discordgo.Message{}, nil).Times(1)
 
 	m := &scorecardUploadManager{
 		session: mockSession,
@@ -831,7 +839,7 @@ func Test_scorecardUploadManager_HandleScorecardUploadModalSubmit_FileFlow_Promp
 		t.Fatalf("expected success %q, got %v", "file_upload_prompted", res.Success)
 	}
 
-	key := fmt.Sprintf("%s:%s", userID, channelID)
+	key := fmt.Sprintf("%s:%s", userID, "dm-channel-id")
 	m.pendingMutex.RLock()
 	pending := m.pendingUploads[key]
 	m.pendingMutex.RUnlock()
@@ -840,6 +848,9 @@ func Test_scorecardUploadManager_HandleScorecardUploadModalSubmit_FileFlow_Promp
 	}
 	if pending.RoundID.String() != roundID.String() {
 		t.Fatalf("pending round id mismatch: got %q want %q", pending.RoundID.String(), roundID.String())
+	}
+	if pending.GuildID != sharedtypes.GuildID(guildID) {
+		t.Fatalf("pending guild id mismatch: got %q want %q", pending.GuildID, guildID)
 	}
 	if pending.Notes != notes {
 		t.Fatalf("pending notes mismatch: got %q want %q", pending.Notes, notes)
