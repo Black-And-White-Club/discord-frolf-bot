@@ -106,10 +106,8 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 		// and was causing empty participant payloads & failed embed updates when bridged.
 
 		// Scorecard import flow
-		roundevents.ScorecardUploadedTopic:     handlers.HandleScorecardUploaded,
-		roundevents.ScorecardParseFailedTopic:  handlers.HandleScorecardParseFailed,
-		roundevents.ImportFailedTopic:          handlers.HandleImportFailed,
-		roundevents.ScorecardURLRequestedTopic: handlers.HandleScorecardURLRequested,
+		roundevents.ScorecardParseFailedTopic: handlers.HandleScorecardParseFailed,
+		roundevents.ImportFailedTopic:         handlers.HandleImportFailed,
 
 		// Lifecycle
 		roundevents.RoundDeleted:   handlers.HandleRoundDeleted,
