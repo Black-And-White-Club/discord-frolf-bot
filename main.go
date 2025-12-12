@@ -112,7 +112,8 @@ func runStandaloneMode(ctx context.Context) {
 		discordgo.IntentsGuildMessageReactions |
 		discordgo.IntentGuildScheduledEvents |
 		discordgo.IntentMessageContent |
-		discordgo.IntentGuildMembers
+		discordgo.IntentGuildMembers |
+		discordgo.IntentDirectMessages
 
 	// Wrap Discord session with observability
 	discordSessionWrapper := discord.NewDiscordSession(discordSession, logger)
