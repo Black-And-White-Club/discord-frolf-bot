@@ -136,7 +136,23 @@ func Test_scorecardUploadManager_HandleScorecardUploadModalSubmit_URLFlow_Publis
 		Return(fmt.Errorf("publish failed")).
 		Times(1)
 
-	// No InteractionRespond expected because publish fails before confirmation.
+	// Publish failures should respond ephemerally with an error message (best-effort)
+	// and still return the publish error to the caller.
+	mockSession.EXPECT().
+		InteractionRespond(gomock.Eq(i.Interaction), gomock.Any()).
+		DoAndReturn(func(_ *discordgo.Interaction, resp *discordgo.InteractionResponse, _ ...discordgo.RequestOption) error {
+			if resp == nil || resp.Data == nil {
+				t.Fatalf("expected non-nil response data")
+			}
+			if resp.Data.Flags&discordgo.MessageFlagsEphemeral == 0 {
+				t.Fatalf("expected ephemeral response")
+			}
+			if !strings.Contains(resp.Data.Content, "Failed to upload scorecard from URL") {
+				t.Fatalf("unexpected error content: %q", resp.Data.Content)
+			}
+			return nil
+		}).
+		Times(1)
 	m := &scorecardUploadManager{
 		session:   mockSession,
 		publisher: mockPublisher,

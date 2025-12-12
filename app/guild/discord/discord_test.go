@@ -25,6 +25,7 @@ func TestRegisterAllCommands_Global(t *testing.T) {
 	logger := testLogger()
 
 	ms.EXPECT().GetBotUser().Return(&discordgo.User{ID: "bot"}, nil)
+	ms.EXPECT().ApplicationCommands("bot", "").Return([]*discordgo.ApplicationCommand{}, nil)
 	ms.EXPECT().ApplicationCommandCreate("bot", "", gomock.Any(), gomock.Any()).Return(&discordgo.ApplicationCommand{ID: "cmd1"}, nil)
 
 	gd := &GuildDiscord{session: ms, logger: logger}
@@ -41,6 +42,7 @@ func TestRegisterAllCommands_Guild(t *testing.T) {
 	logger := testLogger()
 
 	ms.EXPECT().GetBotUser().Return(&discordgo.User{ID: "bot"}, nil)
+	ms.EXPECT().ApplicationCommands("bot", "g1").Return([]*discordgo.ApplicationCommand{}, nil)
 	// Expect all guild commands to be created
 	ms.EXPECT().ApplicationCommandCreate("bot", "g1", gomock.Any(), gomock.Any()).Times(4).Return(&discordgo.ApplicationCommand{ID: "c"}, nil)
 

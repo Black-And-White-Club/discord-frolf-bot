@@ -25,9 +25,53 @@ func RegisterCommands(s Session, logger *slog.Logger, guildID string) error {
 		logger.Info("Registering commands for specific guild", attr.String("guild_id", targetGuildID))
 	}
 
+	// Make command registration idempotent: only create commands that don't already exist.
+	existing := map[string]struct{}{}
+	if cmds, listErr := s.ApplicationCommands(appID.ID, targetGuildID); listErr != nil {
+		logger.Warn("Failed to list existing application commands; will attempt to create commands anyway",
+			attr.String("guild_id", targetGuildID),
+			attr.Error(listErr),
+		)
+	} else {
+		for _, cmd := range cmds {
+			if cmd == nil || cmd.Name == "" {
+				continue
+			}
+			existing[cmd.Name] = struct{}{}
+		}
+	}
+
+	createIfMissing := func(cmd *discordgo.ApplicationCommand) error {
+		if cmd == nil {
+			return fmt.Errorf("nil command provided")
+		}
+		if cmd.Name == "" {
+			return fmt.Errorf("command name is required")
+		}
+		if _, ok := existing[cmd.Name]; ok {
+			logger.Info("command already registered; skipping",
+				attr.String("command_name", cmd.Name),
+				attr.String("guild_id", targetGuildID),
+			)
+			return nil
+		}
+
+		_, err := s.ApplicationCommandCreate(appID.ID, targetGuildID, cmd)
+		if err != nil {
+			return err
+		}
+
+		existing[cmd.Name] = struct{}{}
+		logger.Info("registered command",
+			attr.String("command_name", cmd.Name),
+			attr.String("guild_id", targetGuildID),
+		)
+		return nil
+	}
+
 	// For multi-tenant mode (empty guildID), only register frolf-setup globally
 	if targetGuildID == "" {
-		_, err = s.ApplicationCommandCreate(appID.ID, "", &discordgo.ApplicationCommand{
+		err = createIfMissing(&discordgo.ApplicationCommand{
 			Name:                     "frolf-setup",
 			Description:              "Set up Frolf Bot for this server (Admin only)",
 			DefaultMemberPermissions: &[]int64{discordgo.PermissionAdministrator}[0],
@@ -36,12 +80,11 @@ func RegisterCommands(s Session, logger *slog.Logger, guildID string) error {
 			logger.Error("Failed to create global '/frolf-setup' command", attr.Error(err))
 			return fmt.Errorf("failed to create global '/frolf-setup' command: %w", err)
 		}
-		logger.Info("registered global command: /frolf-setup")
 		return nil
 	}
 
 	// For guild-specific registration, register all commands for that guild
-	_, err = s.ApplicationCommandCreate(appID.ID, targetGuildID, &discordgo.ApplicationCommand{
+	err = createIfMissing(&discordgo.ApplicationCommand{
 		Name:        "updaterole",
 		Description: "Request a role for a user (Requires Editor role or higher)",
 		Options: []*discordgo.ApplicationCommandOption{
@@ -57,9 +100,8 @@ func RegisterCommands(s Session, logger *slog.Logger, guildID string) error {
 		logger.Error("Failed to create '/updaterole' command", attr.Error(err))
 		return fmt.Errorf("failed to create '/updaterole' command: %w", err)
 	}
-	logger.Info("registered command: /updaterole")
 
-	_, err = s.ApplicationCommandCreate(appID.ID, targetGuildID, &discordgo.ApplicationCommand{
+	err = createIfMissing(&discordgo.ApplicationCommand{
 		Name:        "createround",
 		Description: "Create a new frolf round (Available to all players)",
 	})
@@ -67,9 +109,8 @@ func RegisterCommands(s Session, logger *slog.Logger, guildID string) error {
 		logger.Error("Failed to create '/createround' command", attr.Error(err))
 		return fmt.Errorf("failed to create '/createround' command: %w", err)
 	}
-	logger.Info("registered command: /createround")
 
-	_, err = s.ApplicationCommandCreate(appID.ID, targetGuildID, &discordgo.ApplicationCommand{
+	err = createIfMissing(&discordgo.ApplicationCommand{
 		Name:        "claimtag",
 		Description: "Claim a specific tag number on the leaderboard (Available to all players)",
 		Options: []*discordgo.ApplicationCommandOption{
@@ -87,9 +128,8 @@ func RegisterCommands(s Session, logger *slog.Logger, guildID string) error {
 		logger.Error("Failed to create '/claimtag' command", attr.Error(err))
 		return fmt.Errorf("failed to create '/claimtag' command: %w", err)
 	}
-	logger.Info("registered command: /claimtag")
 
-	_, err = s.ApplicationCommandCreate(appID.ID, targetGuildID, &discordgo.ApplicationCommand{
+	err = createIfMissing(&discordgo.ApplicationCommand{
 		Name:        "set-udisc-name",
 		Description: "Set your UDisc username and name for scorecard matching (Available to all players)",
 		Options: []*discordgo.ApplicationCommandOption{
@@ -113,7 +153,6 @@ func RegisterCommands(s Session, logger *slog.Logger, guildID string) error {
 		logger.Error("Failed to create '/set-udisc-name' command", attr.Error(err))
 		return fmt.Errorf("failed to create '/set-udisc-name' command: %w", err)
 	}
-	logger.Info("registered command: /set-udisc-name")
 
 	return nil
 }
