@@ -41,8 +41,8 @@ func TestRegisterAllCommands_Guild(t *testing.T) {
 	logger := testLogger()
 
 	ms.EXPECT().GetBotUser().Return(&discordgo.User{ID: "bot"}, nil)
-	// Expect three guild commands to be created
-	ms.EXPECT().ApplicationCommandCreate("bot", "g1", gomock.Any(), gomock.Any()).Times(3).Return(&discordgo.ApplicationCommand{ID: "c"}, nil)
+	// Expect all guild commands to be created
+	ms.EXPECT().ApplicationCommandCreate("bot", "g1", gomock.Any(), gomock.Any()).Times(4).Return(&discordgo.ApplicationCommand{ID: "c"}, nil)
 
 	gd := &GuildDiscord{session: ms, logger: logger}
 	if err := gd.RegisterAllCommands("g1"); err != nil {

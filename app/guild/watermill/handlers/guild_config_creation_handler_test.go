@@ -35,8 +35,9 @@ func TestGuildHandlers_HandleGuildConfigCreated(t *testing.T) {
 				return message.NewMessage("1", []byte(`{"guild_id":"123456789","config_id":"config_123","created_at":"2024-01-01T12:00:00Z"}`))
 			}(),
 			want: nil, wantErr: false,
-			setup: func(ctrl *gomock.Controller, mockGuildDiscord *mocks.MockGuildDiscordInterface, _ *guildconfigmocks.MockGuildConfigResolver, _ *util_mocks.MockHelpers) {
+			setup: func(ctrl *gomock.Controller, mockGuildDiscord *mocks.MockGuildDiscordInterface, mockGuildConfigResolver *guildconfigmocks.MockGuildConfigResolver, _ *util_mocks.MockHelpers) {
 				mockGuildDiscord.EXPECT().RegisterAllCommands("123456789").Return(nil).Times(1)
+				mockGuildConfigResolver.EXPECT().HandleGuildConfigReceived(gomock.Any(), "123456789", gomock.Any()).Times(1)
 			},
 		},
 		{
@@ -50,8 +51,9 @@ func TestGuildHandlers_HandleGuildConfigCreated(t *testing.T) {
 			}(),
 			want:    nil,
 			wantErr: true,
-			setup: func(ctrl *gomock.Controller, mockGuildDiscord *mocks.MockGuildDiscordInterface, _ *guildconfigmocks.MockGuildConfigResolver, _ *util_mocks.MockHelpers) {
+			setup: func(ctrl *gomock.Controller, mockGuildDiscord *mocks.MockGuildDiscordInterface, mockGuildConfigResolver *guildconfigmocks.MockGuildConfigResolver, _ *util_mocks.MockHelpers) {
 				mockGuildDiscord.EXPECT().RegisterAllCommands("123456789").Return(errors.New("failed to register commands")).Times(1)
+				mockGuildConfigResolver.EXPECT().HandleGuildConfigReceived(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 			},
 		},
 	}
@@ -84,9 +86,11 @@ func TestGuildHandlers_HandleGuildConfigCreated(t *testing.T) {
 				Metrics:             metrics,
 				handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
 					return func(msg *message.Message) ([]*message.Message, error) {
-						payload := &guildevents.GuildConfigCreatedPayload{
-							GuildID: sharedtypes.GuildID("123456789"),
-						}
+						payload := &guildevents.GuildConfigCreatedPayload{GuildID: sharedtypes.GuildID("123456789")}
+						payload.Config.GuildID = sharedtypes.GuildID("123456789")
+						payload.Config.SignupChannelID = "signup-channel"
+						payload.Config.EventChannelID = "event-channel"
+						payload.Config.LeaderboardChannelID = "leaderboard-channel"
 						return handlerFunc(context.Background(), msg, payload)
 					}
 				},

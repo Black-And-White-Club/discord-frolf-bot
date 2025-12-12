@@ -36,12 +36,14 @@ const (
 	tagPrefix   = "Tag:" // Added constant for tag prefix
 
 	// CustomIDs for message components (buttons)
-	customIDEnterScore = "round_enter_score"
-	customIDJoinLate   = "round_join_late"
+	customIDEnterScore      = "round_enter_score"
+	customIDJoinLate        = "round_join_late"
+	customIDUploadScorecard = "round_upload_scorecard"
 
 	// Emojis for buttons
-	emojiEnterScore = "💰"
-	emojiJoinLate   = "🦇"
+	emojiEnterScore      = "💰"
+	emojiJoinLate        = "🦇"
+	emojiUploadScorecard = "📋"
 
 	// Embed Colors
 	colorRoundStarted = 0x00AA00 // Green
@@ -352,6 +354,14 @@ func (m *startRoundManager) TransformRoundToScorecard(ctx context.Context, paylo
 						CustomID: fmt.Sprintf("%s|%s", customIDJoinLate, payload.RoundID),
 						Emoji: &discordgo.ComponentEmoji{
 							Name: emojiJoinLate,
+						},
+					},
+					discordgo.Button{
+						Label:    "Upload Scorecard",
+						Style:    discordgo.SuccessButton,
+						CustomID: fmt.Sprintf("%s|%s", customIDUploadScorecard, payload.RoundID),
+						Emoji: &discordgo.ComponentEmoji{
+							Name: emojiUploadScorecard,
 						},
 					},
 				},

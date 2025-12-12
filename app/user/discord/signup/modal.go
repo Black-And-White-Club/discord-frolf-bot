@@ -85,6 +85,30 @@ func (sm *signupManager) SendSignupModal(ctx context.Context, i *discordgo.Inter
 							},
 						},
 					},
+					discordgo.ActionsRow{
+						Components: []discordgo.MessageComponent{
+							discordgo.TextInput{
+								CustomID:    "udisc_username",
+								Label:       "UDisc Username (Optional)",
+								Style:       discordgo.TextInputShort,
+								Placeholder: "Your @username on UDisc",
+								Required:    false,
+								MaxLength:   100,
+							},
+						},
+					},
+					discordgo.ActionsRow{
+						Components: []discordgo.MessageComponent{
+							discordgo.TextInput{
+								CustomID:    "udisc_name",
+								Label:       "UDisc Display Name (Optional)",
+								Style:       discordgo.TextInputShort,
+								Placeholder: "Your name as shown on UDisc scorecards",
+								Required:    false,
+								MaxLength:   100,
+							},
+						},
+					},
 				},
 			},
 		})
@@ -170,14 +194,19 @@ func (sm *signupManager) HandleSignupModalSubmit(ctx context.Context, i *discord
 			return SignupOperationResult{Error: fmt.Errorf("invalid tag number: %w", err)}, err
 		}
 
+		udiscUsername := sm.extractUDiscUsername(data)
+		udiscName := sm.extractUDiscName(data)
+
 		if guildID == "" {
 			_ = sm.sendFollowupMessage(i.Interaction, "Error: Could not determine guild ID. Please try again or contact support.")
 			return SignupOperationResult{Error: errors.New("guildID is empty")}, errors.New("guildID is empty")
 		}
 		payload := userevents.UserSignupRequestPayload{
-			GuildID:   sharedtypes.GuildID(guildID),
-			UserID:    sharedtypes.DiscordID(userID),
-			TagNumber: tagNumberPtr,
+			GuildID:       sharedtypes.GuildID(guildID),
+			UserID:        sharedtypes.DiscordID(userID),
+			TagNumber:     tagNumberPtr,
+			UDiscUsername: udiscUsername,
+			UDiscName:     udiscName,
 		}
 
 		correlationID := uuid.New().String()
@@ -225,6 +254,54 @@ func (sm *signupManager) extractTagNumber(data discordgo.ModalSubmitInteractionD
 	}
 	// If the tag_number component was not found, treat it as optional and return nil
 	return nil, nil
+}
+
+// extractUDiscUsername extracts the UDisc username from the modal submission data.
+func (sm *signupManager) extractUDiscUsername(data discordgo.ModalSubmitInteractionData) *string {
+	for _, comp := range data.Components {
+		row, ok := comp.(*discordgo.ActionsRow)
+		if !ok {
+			continue
+		}
+		for _, innerComp := range row.Components {
+			textInput, ok := innerComp.(*discordgo.TextInput)
+			if ok && textInput.CustomID == "udisc_username" {
+				if textInput.Value == "" {
+					return nil
+				}
+				trimmed := strings.TrimSpace(textInput.Value)
+				if trimmed == "" {
+					return nil
+				}
+				return &trimmed
+			}
+		}
+	}
+	return nil
+}
+
+// extractUDiscName extracts the UDisc name from the modal submission data.
+func (sm *signupManager) extractUDiscName(data discordgo.ModalSubmitInteractionData) *string {
+	for _, comp := range data.Components {
+		row, ok := comp.(*discordgo.ActionsRow)
+		if !ok {
+			continue
+		}
+		for _, innerComp := range row.Components {
+			textInput, ok := innerComp.(*discordgo.TextInput)
+			if ok && textInput.CustomID == "udisc_name" {
+				if textInput.Value == "" {
+					return nil
+				}
+				trimmed := strings.TrimSpace(textInput.Value)
+				if trimmed == "" {
+					return nil
+				}
+				return &trimmed
+			}
+		}
+	}
+	return nil
 }
 
 // sendFollowupMessage is a helper to send a followup message to an interaction.

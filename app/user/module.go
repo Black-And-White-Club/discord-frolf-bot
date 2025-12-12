@@ -13,6 +13,7 @@ import (
 	userdiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord/role"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord/signup"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord/udisc"
 	userrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/user/watermill"
 	userhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/user/watermill/handlers"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
@@ -52,6 +53,7 @@ func InitializeUserModule(
 	// Register slash command handlers
 	role.RegisterHandlers(interactionRegistry, userDiscord.GetRoleManager())
 	signup.RegisterHandlers(interactionRegistry, userDiscord.GetSignupManager())
+	udisc.RegisterUDiscInteractions(interactionRegistry, userDiscord.GetUDiscManager())
 
 	// Build Watermill Handlers
 	userHandlers := userhandlers.NewUserHandlers(
