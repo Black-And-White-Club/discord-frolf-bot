@@ -22,6 +22,10 @@ const (
 )
 
 var (
+	// guildRateLimiter is a best-effort, per-process rate limiter.
+	//
+	// Note: This bot can run multiple instances (e.g., in Kubernetes). In that case the limit
+	// is enforced per instance only; a true global limit would require a shared store (e.g., Redis).
 	guildRateLimiter     = make(map[string][]time.Time)
 	guildRateLimiterLock sync.Mutex
 )

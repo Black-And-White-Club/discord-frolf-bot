@@ -130,6 +130,7 @@ func (m *scorecardUploadManager) HandleScorecardUploadModalSubmit(ctx context.Co
 			importID, err := m.publishScorecardURLEvent(ctx, guildID, sharedtypes.RoundID(parsedRoundID), userID, channelID, messageID, uDiscURL, notes)
 			if err != nil {
 				m.logger.ErrorContext(ctx, "Failed to publish scorecard URL event", attr.Error(err))
+				_ = m.sendUploadError(ctx, m.session, i.Interaction, "Failed to upload scorecard from URL. Please try again later.")
 				return ScorecardUploadOperationResult{}, err
 			}
 
@@ -148,6 +149,7 @@ func (m *scorecardUploadManager) HandleScorecardUploadModalSubmit(ctx context.Co
 		err = m.sendFileUploadPrompt(ctx, m.session, i.Interaction, sharedtypes.RoundID(parsedRoundID), notes)
 		if err != nil {
 			m.logger.ErrorContext(ctx, "Failed to send file upload prompt", attr.Error(err))
+			_ = m.sendUploadError(ctx, m.session, i.Interaction, "Sorry, there was a problem prompting for file upload. Please try again later.")
 			return ScorecardUploadOperationResult{}, err
 		}
 

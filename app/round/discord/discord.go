@@ -76,7 +76,7 @@ func NewRoundDiscord(
 	deleteRoundManager := deleteround.NewDeleteRoundManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics, guildConfigResolver)
 	updateRoundManager := updateround.NewUpdateRoundManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics, guildConfigResolver)
 	tagUpdateManager := tagupdates.NewTagUpdateManager(session, publisher, logger, helper, config, tracer, metrics, guildConfigResolver)
-	scorecardUploadManager := scorecardupload.NewScorecardUploadManager(session, publisher, logger, config, tracer, metrics)
+	scorecardUploadManager := scorecardupload.NewScorecardUploadManager(ctx, session, publisher, logger, config, tracer, metrics)
 
 	return &RoundDiscord{
 		CreateRoundManager:     createRoundManager,

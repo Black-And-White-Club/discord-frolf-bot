@@ -136,17 +136,6 @@ func (m *udiscManager) HandleSetUDiscNameCommand(ctx context.Context, i *discord
 			return UDiscOperationResult{Error: err}, err
 		}
 
-		// Store interaction for potential follow-up messages
-		m.storeInteraction(i.Interaction.ID, i.Interaction)
-
 		return UDiscOperationResult{Success: "udisc_name_set"}, nil
 	})
-}
-
-// storeInteraction is a helper to store interaction data (implementation can be added if needed)
-func (m *udiscManager) storeInteraction(id string, interaction *discordgo.Interaction) {
-	// Store for 10 minutes in case we need to send follow-up messages
-	// This would need an interaction store injected into the manager if we want persistence
-	_ = id
-	_ = interaction
 }

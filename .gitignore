@@ -23,3 +23,6 @@ config*.yaml
 bin/
 reports/
 .ko.yaml
+
+# Editor/backup files
+*.bak

@@ -46,6 +46,7 @@ type scorecardUploadManager struct {
 
 // NewScorecardUploadManager creates a new ScorecardUploadManager instance.
 func NewScorecardUploadManager(
+	ctx context.Context,
 	session discord.Session,
 	publisher eventbus.EventBus,
 	logger *slog.Logger,
@@ -71,7 +72,7 @@ func NewScorecardUploadManager(
 	}
 
 	// Start background cleanup of old pending uploads
-	go m.cleanupPendingUploads()
+	go m.cleanupPendingUploads(ctx)
 
 	return m
 }
@@ -117,22 +118,28 @@ func operationWrapper(
 }
 
 // cleanupPendingUploads runs in background and removes stale pending uploads.
-func (m *scorecardUploadManager) cleanupPendingUploads() {
+func (m *scorecardUploadManager) cleanupPendingUploads(ctx context.Context) {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		m.pendingMutex.Lock()
-		now := time.Now()
-		for key, pending := range m.pendingUploads {
-			if now.Sub(pending.CreatedAt) > 5*time.Minute {
-				delete(m.pendingUploads, key)
-				m.logger.Info("Cleaned up stale pending upload",
-					attr.String("key", key),
-					attr.String("round_id", pending.RoundID.String()),
-				)
+	for {
+		select {
+		case <-ctx.Done():
+			m.logger.Info("Stopping pending upload cleanup", attr.Error(ctx.Err()))
+			return
+		case <-ticker.C:
+			m.pendingMutex.Lock()
+			now := time.Now()
+			for key, pending := range m.pendingUploads {
+				if now.Sub(pending.CreatedAt) > 5*time.Minute {
+					delete(m.pendingUploads, key)
+					m.logger.Info("Cleaned up stale pending upload",
+						attr.String("key", key),
+						attr.String("round_id", pending.RoundID.String()),
+					)
+				}
 			}
+			m.pendingMutex.Unlock()
 		}
-		m.pendingMutex.Unlock()
 	}
 }
