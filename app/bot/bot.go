@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -63,6 +65,35 @@ type DiscordBot struct {
 
 	// Shutdown synchronization
 	shutdownOnce sync.Once
+
+	// Command reconciliation (startup)
+	commandRegistrar func(discord.Session, *slog.Logger, string) error
+	commandSyncDelay time.Duration
+}
+
+const (
+	defaultCommandSyncDelay   = 250 * time.Millisecond
+	commandSyncDelayEnvVarKey = "DISCORD_COMMAND_SYNC_DELAY_MS"
+)
+
+func commandSyncDelayFromEnv(logger *slog.Logger) time.Duration {
+	val := os.Getenv(commandSyncDelayEnvVarKey)
+	if val == "" {
+		return defaultCommandSyncDelay
+	}
+	ms, err := strconv.Atoi(val)
+	if err != nil || ms < 0 {
+		if logger != nil {
+			logger.Warn("Invalid command sync delay; using default",
+				attr.String("env", commandSyncDelayEnvVarKey),
+				attr.String("value", val),
+				attr.Duration("default", defaultCommandSyncDelay),
+				attr.Error(err),
+			)
+		}
+		return defaultCommandSyncDelay
+	}
+	return time.Duration(ms) * time.Millisecond
 }
 
 func NewDiscordBot(
@@ -136,6 +167,8 @@ func NewDiscordBot(
 		ScoreWatermillRouter:       scoreRouter,
 		LeaderboardWatermillRouter: leaderboardRouter,
 		GuildWatermillRouter:       guildRouter,
+		commandRegistrar:           discord.RegisterCommands,
+		commandSyncDelay:           commandSyncDelayFromEnv(logger),
 	}, nil
 }
 
@@ -271,7 +304,7 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 	discordgoSession.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
 		bot.Logger.Info("Bot is ready", attr.Int("guilds", len(r.Guilds)))
 		commandSyncOnce.Do(func() {
-			go bot.syncGuildCommands(r.Guilds)
+			go bot.syncGuildCommands(ctx, r.Guilds)
 		})
 	})
 
@@ -354,8 +387,10 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 	return nil
 }
 
-func (bot *DiscordBot) syncGuildCommands(guilds []*discordgo.Guild) {
-	ctx := context.Background()
+func (bot *DiscordBot) syncGuildCommands(ctx context.Context, guilds []*discordgo.Guild) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
 	if len(guilds) == 0 {
 		bot.Logger.InfoContext(ctx, "No guilds in Ready payload; skipping command sync")
@@ -366,6 +401,13 @@ func (bot *DiscordBot) syncGuildCommands(guilds []*discordgo.Guild) {
 		attr.Int("guilds", len(guilds)))
 
 	for _, g := range guilds {
+		select {
+		case <-ctx.Done():
+			bot.Logger.InfoContext(ctx, "Command sync canceled", attr.Error(ctx.Err()))
+			return
+		default:
+		}
+
 		if g == nil || g.ID == "" {
 			continue
 		}
@@ -380,7 +422,11 @@ func (bot *DiscordBot) syncGuildCommands(guilds []*discordgo.Guild) {
 			}
 		}
 
-		if err := discord.RegisterCommands(bot.Session, bot.Logger, g.ID); err != nil {
+		registrar := bot.commandRegistrar
+		if registrar == nil {
+			registrar = discord.RegisterCommands
+		}
+		if err := registrar(bot.Session, bot.Logger, g.ID); err != nil {
 			bot.Logger.ErrorContext(ctx, "Failed to sync guild commands",
 				attr.String("guild_id", g.ID),
 				attr.Error(err))
@@ -388,7 +434,19 @@ func (bot *DiscordBot) syncGuildCommands(guilds []*discordgo.Guild) {
 		}
 
 		// Avoid hitting Discord rate limits when syncing across many guilds.
-		time.Sleep(250 * time.Millisecond)
+		if bot.commandSyncDelay <= 0 {
+			continue
+		}
+		t := time.NewTimer(bot.commandSyncDelay)
+		select {
+		case <-ctx.Done():
+			if !t.Stop() {
+				<-t.C
+			}
+			bot.Logger.InfoContext(ctx, "Command sync canceled", attr.Error(ctx.Err()))
+			return
+		case <-t.C:
+		}
 	}
 }
 
