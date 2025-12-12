@@ -86,6 +86,7 @@ func (m *scorecardUploadManager) HandleFileUploadMessage(s discord.Session, msg 
 
 	m.logger.InfoContext(ctx, "Processing file upload with pending context",
 		attr.String("filename", scorecardFile.Filename),
+		attr.Int("file_size", len(fileData)),
 		attr.String("round_id", pending.RoundID.String()),
 		attr.String("user_id", msg.Author.ID),
 	)
