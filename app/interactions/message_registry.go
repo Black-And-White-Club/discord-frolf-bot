@@ -5,6 +5,10 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
+type discordgoAdder interface {
+	AddHandler(handler interface{}) func()
+}
+
 // MessageRegistry manages message event handlers
 type MessageRegistry struct {
 	messageCreateHandlers []func(s discord.Session, m *discordgo.MessageCreate)
@@ -23,7 +27,8 @@ func (r *MessageRegistry) RegisterMessageCreateHandler(handler func(s discord.Se
 }
 
 // RegisterWithSession registers all handlers with the Discord session
-func (r *MessageRegistry) RegisterWithSession(session *discordgo.Session, wrapperSession discord.Session) {
+
+func (r *MessageRegistry) RegisterWithSession(session discordgoAdder, wrapperSession discord.Session) {
 	// Register MessageCreate handler
 	session.AddHandler(func(s *discordgo.Session, e *discordgo.MessageCreate) {
 		for _, handler := range r.messageCreateHandlers {

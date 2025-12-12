@@ -102,10 +102,11 @@ func Test_signupManager_MessageReactionAdd(t *testing.T) {
 					Emoji: discordgo.Emoji{
 						Name: "emoji",
 					},
-					UserID: "user-id",
+					UserID:  "user-id",
+					GuildID: "guild-id",
 				},
 			},
-			wantSuccess: "reaction mismatch, ignored",
+			wantSuccess: "channel mismatch, ignored",
 			wantErrMsg:  "",
 			wantErrIs:   nil,
 		},
@@ -151,10 +152,11 @@ func Test_signupManager_MessageReactionAdd(t *testing.T) {
 					Emoji: discordgo.Emoji{
 						Name: "invalid-emoji",
 					},
-					UserID: "user-id",
+					UserID:  "user-id",
+					GuildID: "guild-id",
 				},
 			},
-			wantSuccess: "reaction mismatch, ignored",
+			wantSuccess: "emoji mismatch, ignored",
 			wantErrMsg:  "",
 			wantErrIs:   nil,
 		},
@@ -173,7 +175,8 @@ func Test_signupManager_MessageReactionAdd(t *testing.T) {
 					Emoji: discordgo.Emoji{
 						Name: "emoji",
 					},
-					UserID: "user-id",
+					UserID:  "user-id",
+					GuildID: "guild-id",
 				},
 			},
 			wantSuccess: "ignored bot reaction",
@@ -195,7 +198,8 @@ func Test_signupManager_MessageReactionAdd(t *testing.T) {
 					Emoji: discordgo.Emoji{
 						Name: "emoji",
 					},
-					UserID: "user-id",
+					UserID:  "user-id",
+					GuildID: "guild-id",
 				},
 			},
 			wantSuccess: "", // or nil, depending on the expected behavior
