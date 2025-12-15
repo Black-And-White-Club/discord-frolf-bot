@@ -33,7 +33,7 @@ func (m *scorecardUploadManager) sendUploadConfirmation(ctx context.Context, s d
 }
 
 // sendFileUploadPrompt sends a DM instructing the user to upload a CSV/XLSX file.
-func (m *scorecardUploadManager) sendFileUploadPrompt(ctx context.Context, s discord.Session, i *discordgo.Interaction, roundID sharedtypes.RoundID, notes string) error {
+func (m *scorecardUploadManager) sendFileUploadPrompt(ctx context.Context, s discord.Session, i *discordgo.Interaction, roundID sharedtypes.RoundID, notes string, eventMessageID string) error {
 	userID := i.Member.User.ID
 	guildID := sharedtypes.GuildID(i.GuildID)
 
@@ -49,10 +49,11 @@ func (m *scorecardUploadManager) sendFileUploadPrompt(ctx context.Context, s dis
 
 	m.pendingMutex.Lock()
 	m.pendingUploads[key] = &pendingUpload{
-		RoundID:   roundID,
-		GuildID:   guildID,
-		Notes:     notes,
-		CreatedAt: time.Now(),
+		RoundID:        roundID,
+		GuildID:        guildID,
+		Notes:          notes,
+		EventMessageID: eventMessageID,
+		CreatedAt:      time.Now(),
 	}
 	m.pendingMutex.Unlock()
 

@@ -251,9 +251,10 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_PendingExists_Publishes
 		},
 		pendingUploads: map[string]*pendingUpload{
 			fmt.Sprintf("%s:%s", userID, channelID): {
-				RoundID: sharedtypes.RoundID(roundUUID),
-				GuildID: sharedtypes.GuildID(guildID),
-				Notes:   notes,
+				RoundID:        sharedtypes.RoundID(roundUUID),
+				GuildID:        sharedtypes.GuildID(guildID),
+				Notes:          notes,
+				EventMessageID: messageID,
 			},
 		},
 	}

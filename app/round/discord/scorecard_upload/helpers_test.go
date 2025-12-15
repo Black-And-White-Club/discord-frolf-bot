@@ -89,7 +89,17 @@ func Test_scorecardUploadManager_sendFileUploadPrompt_StoresPendingAndResponds(t
 		pendingUploads: make(map[string]*pendingUpload),
 	}
 
-	if err := m.sendFileUploadPrompt(context.Background(), sess, inter, rID, "notes"); err != nil {
+	if err := m.sendFileUploadPrompt(context.Background(), sess, inter, rID, "notes", "msg-123"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify pending upload was stored with correct fields
+	key := "u1:dm-channel-id"
+	pending, exists := m.pendingUploads[key]
+	if !exists {
+		t.Fatalf("pending upload not stored")
+	}
+	if pending.EventMessageID != "msg-123" {
+		t.Fatalf("EventMessageID not stored correctly: got %q, want %q", pending.EventMessageID, "msg-123")
 	}
 }

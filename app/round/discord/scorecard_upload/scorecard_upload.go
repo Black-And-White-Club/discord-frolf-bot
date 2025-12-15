@@ -19,10 +19,11 @@ import (
 
 // pendingUpload tracks a file upload that's expected from a user.
 type pendingUpload struct {
-	RoundID   sharedtypes.RoundID
-	GuildID   sharedtypes.GuildID
-	Notes     string
-	CreatedAt time.Time
+	RoundID        sharedtypes.RoundID
+	GuildID        sharedtypes.GuildID
+	Notes          string
+	EventMessageID string // ID of the original round embed message
+	CreatedAt      time.Time
 }
 
 // ScorecardUploadManager defines the interface for scorecard upload operations.

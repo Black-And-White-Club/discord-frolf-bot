@@ -146,7 +146,7 @@ func (m *scorecardUploadManager) HandleScorecardUploadModalSubmit(ctx context.Co
 		}
 
 		// File upload flow - prompt user to upload file
-		err = m.sendFileUploadPrompt(ctx, m.session, i.Interaction, sharedtypes.RoundID(parsedRoundID), notes)
+		err = m.sendFileUploadPrompt(ctx, m.session, i.Interaction, sharedtypes.RoundID(parsedRoundID), notes, messageID)
 		if err != nil {
 			m.logger.ErrorContext(ctx, "Failed to send file upload prompt", attr.Error(err))
 			_ = m.sendUploadError(ctx, m.session, i.Interaction, "Sorry, there was a problem prompting for file upload. Please try again later.")

@@ -98,7 +98,7 @@ func (m *scorecardUploadManager) HandleFileUploadMessage(s discord.Session, msg 
 		pending.RoundID,
 		sharedtypes.DiscordID(msg.Author.ID),
 		msg.ChannelID,
-		msg.ID,
+		pending.EventMessageID,
 		fileData,
 		scorecardFile.URL,
 		scorecardFile.Filename,
