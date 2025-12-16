@@ -1,5 +1,5 @@
-github.com/Black-And-White-Club/frolf-bot-shared v0.0.58 h1:jZAKUZ78l6ZgcxKKAV5hgim4sVX+xT1xj7QH6C3LhTw=
-github.com/Black-And-White-Club/frolf-bot-shared v0.0.58/go.mod h1:0Vc68i4ckxfE2Jf9vFxJCQJE3SYxyp+19G4r65eQgFQ=
+github.com/Black-And-White-Club/frolf-bot-shared v0.0.59 h1:HPPqgnGzL/NI45eQcPTVcvIr46xus0VLE6n3DznBAmg=
+github.com/Black-And-White-Club/frolf-bot-shared v0.0.59/go.mod h1:0Vc68i4ckxfE2Jf9vFxJCQJE3SYxyp+19G4r65eQgFQ=
 github.com/ThreeDotsLabs/watermill v1.5.1 h1:t5xMivyf9tpmU3iozPqyrCZXHvoV1XQDfihas4sV0fY=
 github.com/ThreeDotsLabs/watermill v1.5.1/go.mod h1:Uop10dA3VeJWsSvis9qO3vbVY892LARrKAdki6WtXS4=
 github.com/ThreeDotsLabs/watermill-nats/v2 v2.1.3 h1:/5IfNugBb9H+BvEHHNRnICmF3jaI9P7wVRzA12kDDDs=

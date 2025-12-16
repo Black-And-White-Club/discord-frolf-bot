@@ -13,12 +13,12 @@ import (
 // HandleRoundFinalized handles the DiscordRoundFinalized event and updates the Discord embed
 func (h *RoundHandlers) HandleRoundFinalized(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
-		"HandleRoundFinalized (Discord)",                // Descriptive handler name
-		&roundevents.RoundFinalizedEmbedUpdatePayload{}, // Expecting this payload from backend
+		"HandleRoundFinalized (Discord)",            // Descriptive handler name
+		&roundevents.RoundFinalizedDiscordPayload{}, // Expecting Discord-specific finalized payload
 		// Corrected return type here: []message.Message
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
 			// Assert the payload to the expected type
-			p, ok := payload.(*roundevents.RoundFinalizedEmbedUpdatePayload)
+			p, ok := payload.(*roundevents.RoundFinalizedDiscordPayload)
 			if !ok {
 				h.Logger.ErrorContext(ctx, "Invalid payload type for HandleRoundFinalized (Discord)",
 					attr.Any("payload", payload), // Log the received payload
@@ -43,16 +43,9 @@ func (h *RoundHandlers) HandleRoundFinalized(msg *message.Message) ([]*message.M
 			}
 
 			// The ChannelID is needed by FinalizeScorecardEmbed.
-			// It should ideally also be in the payload (p.DiscordChannelID), or fetched here if necessary.
-			// Let's use the ChannelID from the payload if available, otherwise metadata.
-			// Or better, enforce it in the payload for clarity. Assuming it's in payload.
-			// if p.DiscordChannelID == "" { // Validate ChannelID from payload
-			// 	h.Logger.ErrorContext(ctx, "Missing DiscordChannelID in payload for Discord Finalized",
-			// 		attr.CorrelationIDFromMsg(msg),
-			// 		attr.RoundID("round_id", p.RoundID),
-			// 	)
-			// 	return nil, fmt.Errorf("missing DiscordChannelID in round finalized payload")
-			// }
+			// The ChannelID is needed by FinalizeScorecardEmbed. The handler will
+			// attempt to use the configured event channel as a fallback; prefer the
+			// channel from config or other sources if the payload does not include it.
 
 			h.Logger.InfoContext(ctx, "Received DiscordRoundFinalized event",
 				attr.CorrelationIDFromMsg(msg),
@@ -74,13 +67,26 @@ func (h *RoundHandlers) HandleRoundFinalized(msg *message.Message) ([]*message.M
 			// Get the FinalizeRoundManager on the Discord App
 			finalizeRoundManager := h.RoundDiscord.GetFinalizeRoundManager() // Assuming this method exists
 
+			// Convert the Discord-specific payload into the embed update payload
+			// expected by the FinalizeScorecardEmbed manager.
+			embedPayload := roundevents.RoundFinalizedEmbedUpdatePayload{
+				GuildID:          p.GuildID,
+				RoundID:          p.RoundID,
+				Title:            p.Title,
+				StartTime:        p.StartTime,
+				Location:         p.Location,
+				Participants:     p.Participants,
+				EventMessageID:   p.EventMessageID,
+				DiscordChannelID: p.DiscordChannelID,
+			}
+
 			// Finalize the round embed by calling the manager method
 			// *** PASS THE MESSAGE ID FROM METADATA AND CHANNEL ID FROM PAYLOAD ***
 			finalizeResult, err := finalizeRoundManager.FinalizeScorecardEmbed(
 				ctx,
 				discordMessageID, // Pass message ID obtained from metadata
 				discordChannelID, // Pass channel ID from payload
-				*p,               // Pass the full payload struct value (dereferencing p pointer)
+				embedPayload,
 			)
 			if err != nil {
 				h.Logger.ErrorContext(ctx, "Failed to finalize scorecard embed", attr.Error(err))

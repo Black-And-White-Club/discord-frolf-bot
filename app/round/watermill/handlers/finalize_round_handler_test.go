@@ -46,16 +46,22 @@ func TestRoundHandlers_HandleRoundFinalized(t *testing.T) {
 			want:    []*message.Message{{}},
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockHelper *util_mocks.MockHelpers, mockFinalizeRoundManager *mocks.MockFinalizeRoundManager) {
-				expectedPayload := roundevents.RoundFinalizedEmbedUpdatePayload{
+				expectedDiscordPayload := roundevents.RoundFinalizedDiscordPayload{
+					RoundID:          testRoundID,
+					DiscordChannelID: "1234",
+					EventMessageID:   eventMessageID.String(),
+				}
+
+				expectedEmbedPayload := roundevents.RoundFinalizedEmbedUpdatePayload{
 					RoundID:          testRoundID,
 					DiscordChannelID: "1234",
 					EventMessageID:   eventMessageID.String(),
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundFinalizedEmbedUpdatePayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundFinalizedDiscordPayload{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.RoundFinalizedEmbedUpdatePayload) = expectedPayload
+						*v.(*roundevents.RoundFinalizedDiscordPayload) = expectedDiscordPayload
 						return nil
 					}).
 					Times(1)
@@ -65,9 +71,9 @@ func TestRoundHandlers_HandleRoundFinalized(t *testing.T) {
 					Return(mockFinalizeRoundManager).
 					AnyTimes()
 
-				// Fix the function signature to match what the handler actually calls
+				// Finalize manager should be called with converted embed payload
 				mockFinalizeRoundManager.EXPECT().
-					FinalizeScorecardEmbed(gomock.Any(), discordMessageID, "1234", expectedPayload).
+					FinalizeScorecardEmbed(gomock.Any(), discordMessageID, "1234", expectedEmbedPayload).
 					Return(finalizeround.FinalizeRoundOperationResult{}, nil).
 					Times(1)
 
@@ -90,16 +96,22 @@ func TestRoundHandlers_HandleRoundFinalized(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockHelper *util_mocks.MockHelpers, mockFinalizeRoundManager *mocks.MockFinalizeRoundManager) {
-				expectedPayload := roundevents.RoundFinalizedEmbedUpdatePayload{
+				expectedDiscordPayload := roundevents.RoundFinalizedDiscordPayload{
+					RoundID:          testRoundID,
+					DiscordChannelID: "1234",
+					EventMessageID:   eventMessageID.String(),
+				}
+
+				expectedEmbedPayload := roundevents.RoundFinalizedEmbedUpdatePayload{
 					RoundID:          testRoundID,
 					DiscordChannelID: "1234",
 					EventMessageID:   eventMessageID.String(),
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundFinalizedEmbedUpdatePayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundFinalizedDiscordPayload{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.RoundFinalizedEmbedUpdatePayload) = expectedPayload
+						*v.(*roundevents.RoundFinalizedDiscordPayload) = expectedDiscordPayload
 						return nil
 					}).
 					Times(1)
@@ -111,7 +123,7 @@ func TestRoundHandlers_HandleRoundFinalized(t *testing.T) {
 
 				// Fix the function signature and return an error
 				mockFinalizeRoundManager.EXPECT().
-					FinalizeScorecardEmbed(gomock.Any(), discordMessageID, "1234", expectedPayload).
+					FinalizeScorecardEmbed(gomock.Any(), discordMessageID, "1234", expectedEmbedPayload).
 					Return(finalizeround.FinalizeRoundOperationResult{}, errors.New("failed to finalize embed")).
 					Times(1)
 			},
@@ -129,16 +141,22 @@ func TestRoundHandlers_HandleRoundFinalized(t *testing.T) {
 			want:    []*message.Message{},
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockHelper *util_mocks.MockHelpers, mockFinalizeRoundManager *mocks.MockFinalizeRoundManager) {
-				expectedPayload := roundevents.RoundFinalizedEmbedUpdatePayload{
+				expectedDiscordPayload := roundevents.RoundFinalizedDiscordPayload{
+					RoundID:          testRoundID,
+					DiscordChannelID: "1234",
+					EventMessageID:   eventMessageID.String(),
+				}
+
+				expectedEmbedPayload := roundevents.RoundFinalizedEmbedUpdatePayload{
 					RoundID:          testRoundID,
 					DiscordChannelID: "1234",
 					EventMessageID:   eventMessageID.String(),
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundFinalizedEmbedUpdatePayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundFinalizedDiscordPayload{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.RoundFinalizedEmbedUpdatePayload) = expectedPayload
+						*v.(*roundevents.RoundFinalizedDiscordPayload) = expectedDiscordPayload
 						return nil
 					}).
 					Times(1)
@@ -148,9 +166,9 @@ func TestRoundHandlers_HandleRoundFinalized(t *testing.T) {
 					Return(mockFinalizeRoundManager).
 					AnyTimes()
 
-				// Fix the function signature
+				// Finalize manager should be called with converted embed payload
 				mockFinalizeRoundManager.EXPECT().
-					FinalizeScorecardEmbed(gomock.Any(), discordMessageID, "1234", expectedPayload).
+					FinalizeScorecardEmbed(gomock.Any(), discordMessageID, "1234", expectedEmbedPayload).
 					Return(finalizeround.FinalizeRoundOperationResult{}, nil).
 					Times(1)
 
@@ -173,16 +191,16 @@ func TestRoundHandlers_HandleRoundFinalized(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockHelper *util_mocks.MockHelpers, mockFinalizeRoundManager *mocks.MockFinalizeRoundManager) {
-				expectedPayload := roundevents.RoundFinalizedEmbedUpdatePayload{
+				expectedDiscordPayload := roundevents.RoundFinalizedDiscordPayload{
 					RoundID:          testRoundID,
 					DiscordChannelID: "1234",
 					EventMessageID:   eventMessageID.String(),
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundFinalizedEmbedUpdatePayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundFinalizedDiscordPayload{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.RoundFinalizedEmbedUpdatePayload) = expectedPayload
+						*v.(*roundevents.RoundFinalizedDiscordPayload) = expectedDiscordPayload
 						return nil
 					}).
 					Times(1)
@@ -208,16 +226,22 @@ func TestRoundHandlers_HandleRoundFinalized(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockHelper *util_mocks.MockHelpers, mockFinalizeRoundManager *mocks.MockFinalizeRoundManager) {
-				expectedPayload := roundevents.RoundFinalizedEmbedUpdatePayload{
+				expectedDiscordPayload := roundevents.RoundFinalizedDiscordPayload{
+					RoundID:          testRoundID,
+					DiscordChannelID: "1234",
+					EventMessageID:   eventMessageID.String(),
+				}
+
+				expectedEmbedPayload := roundevents.RoundFinalizedEmbedUpdatePayload{
 					RoundID:          testRoundID,
 					DiscordChannelID: "1234",
 					EventMessageID:   eventMessageID.String(),
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundFinalizedEmbedUpdatePayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundFinalizedDiscordPayload{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.RoundFinalizedEmbedUpdatePayload) = expectedPayload
+						*v.(*roundevents.RoundFinalizedDiscordPayload) = expectedDiscordPayload
 						return nil
 					}).
 					Times(1)
@@ -229,7 +253,7 @@ func TestRoundHandlers_HandleRoundFinalized(t *testing.T) {
 
 				// Return a result with an error in the result object
 				mockFinalizeRoundManager.EXPECT().
-					FinalizeScorecardEmbed(gomock.Any(), discordMessageID, "1234", expectedPayload).
+					FinalizeScorecardEmbed(gomock.Any(), discordMessageID, "1234", expectedEmbedPayload).
 					Return(finalizeround.FinalizeRoundOperationResult{
 						Error: errors.New("operation error in result"),
 					}, nil).
