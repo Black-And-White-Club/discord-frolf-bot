@@ -110,9 +110,9 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 		roundevents.ImportFailedTopic:         handlers.HandleImportFailed,
 
 		// Lifecycle
-		roundevents.RoundDeleted:   handlers.HandleRoundDeleted,
-		roundevents.RoundFinalized: handlers.HandleRoundFinalized,
-		roundevents.RoundStarted:   handlers.HandleRoundStarted,
+		roundevents.RoundDeleted:          handlers.HandleRoundDeleted,
+		roundevents.RoundFinalizedDiscord: handlers.HandleRoundFinalized,
+		roundevents.RoundStarted:          handlers.HandleRoundStarted,
 
 		// Tag handling
 		roundevents.RoundParticipantJoined: handlers.HandleRoundParticipantJoined,
