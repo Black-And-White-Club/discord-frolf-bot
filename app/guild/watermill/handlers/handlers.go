@@ -21,8 +21,6 @@ import (
 
 // Handlers defines the interface for guild handlers.
 type Handlers interface {
-	HandleGuildSetupRequest(msg *message.Message) ([]*message.Message, error)
-
 	// Guild config creation/setup handlers
 	HandleGuildConfigCreated(msg *message.Message) ([]*message.Message, error)
 	HandleGuildConfigCreationFailed(msg *message.Message) ([]*message.Message, error)

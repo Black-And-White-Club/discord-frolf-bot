@@ -17,9 +17,9 @@ import (
 func (h *GuildHandlers) HandleGuildConfigUpdated(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleGuildConfigUpdated",
-		&guildevents.GuildConfigUpdatedPayload{},
+		&guildevents.GuildConfigUpdatedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			p := payload.(*guildevents.GuildConfigUpdatedPayload)
+			p := payload.(*guildevents.GuildConfigUpdatedPayloadV1)
 			guildID := string(p.GuildID)
 
 			h.Logger.InfoContext(ctx, "Guild config updated",
@@ -54,9 +54,9 @@ func (h *GuildHandlers) HandleGuildConfigUpdated(msg *message.Message) ([]*messa
 func (h *GuildHandlers) HandleGuildConfigUpdateFailed(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleGuildConfigUpdateFailed",
-		&guildevents.GuildConfigUpdateFailedPayload{},
+		&guildevents.GuildConfigUpdateFailedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			p := payload.(*guildevents.GuildConfigUpdateFailedPayload)
+			p := payload.(*guildevents.GuildConfigUpdateFailedPayloadV1)
 			guildID := string(p.GuildID)
 
 			h.Logger.ErrorContext(ctx, "Guild config update failed",
@@ -73,9 +73,9 @@ func (h *GuildHandlers) HandleGuildConfigUpdateFailed(msg *message.Message) ([]*
 func (h *GuildHandlers) HandleGuildConfigRetrieved(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleGuildConfigRetrieved",
-		&guildevents.GuildConfigRetrievedPayload{},
+		&guildevents.GuildConfigRetrievedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			p := payload.(*guildevents.GuildConfigRetrievedPayload)
+			p := payload.(*guildevents.GuildConfigRetrievedPayloadV1)
 			guildID := string(p.GuildID)
 
 			h.Logger.InfoContext(ctx, "Guild config retrieved successfully",
@@ -150,9 +150,9 @@ func (h *GuildHandlers) HandleGuildConfigRetrieved(msg *message.Message) ([]*mes
 func (h *GuildHandlers) HandleGuildConfigRetrievalFailed(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleGuildConfigRetrievalFailed",
-		&guildevents.GuildConfigRetrievalFailedPayload{},
+		&guildevents.GuildConfigRetrievalFailedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			p := payload.(*guildevents.GuildConfigRetrievalFailedPayload)
+			p := payload.(*guildevents.GuildConfigRetrievalFailedPayloadV1)
 			guildID := string(p.GuildID)
 
 			h.Logger.ErrorContext(ctx, "Guild config retrieval failed",

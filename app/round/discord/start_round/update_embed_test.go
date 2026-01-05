@@ -36,7 +36,7 @@ func Test_startRoundManager_UpdateRoundToScorecard(t *testing.T) {
 	tests := []struct {
 		name       string
 		setupMocks func(mockSession *discordmocks.MockSession)
-		payload    *roundevents.DiscordRoundStartPayload
+		payload    *roundevents.DiscordRoundStartPayloadV1
 		channelID  string
 		messageID  string
 		expectErr  bool
@@ -79,12 +79,12 @@ func Test_startRoundManager_UpdateRoundToScorecard(t *testing.T) {
 					Return(&discordgo.Member{Nick: ""}, nil).
 					AnyTimes()
 			},
-			payload: &roundevents.DiscordRoundStartPayload{
+			payload: &roundevents.DiscordRoundStartPayloadV1{
 				RoundID:      testRoundID,
 				Title:        "Test Round",
 				Location:     (*roundtypes.Location)(strPtr("Test Course")),
 				StartTime:    (*sharedtypes.StartTime)(timePtr(fixedTime)),
-				Participants: []roundevents.RoundParticipant{},
+				Participants: []roundevents.RoundParticipantV1{},
 			},
 			channelID: "test-channel",
 			messageID: "test-message",
@@ -119,12 +119,12 @@ func Test_startRoundManager_UpdateRoundToScorecard(t *testing.T) {
 					Return(nil, fmt.Errorf("discord API error")).
 					Times(1)
 			},
-			payload: &roundevents.DiscordRoundStartPayload{
+			payload: &roundevents.DiscordRoundStartPayloadV1{
 				RoundID:      testRoundID,
 				Title:        "Test Round",
 				Location:     (*roundtypes.Location)(strPtr("Test Course")),
 				StartTime:    (*sharedtypes.StartTime)(timePtr(fixedTime)),
-				Participants: []roundevents.RoundParticipant{},
+				Participants: []roundevents.RoundParticipantV1{},
 			},
 			channelID: "test-channel",
 			messageID: "test-message",
@@ -161,12 +161,12 @@ func Test_startRoundManager_UpdateRoundToScorecard(t *testing.T) {
 					Return(&discordgo.Message{ID: "test-message"}, nil).
 					Times(1)
 			},
-			payload: &roundevents.DiscordRoundStartPayload{
+			payload: &roundevents.DiscordRoundStartPayloadV1{
 				RoundID:   testRoundID,
 				Title:     "Test Round",
 				Location:  (*roundtypes.Location)(strPtr("Test Course")),
 				StartTime: (*sharedtypes.StartTime)(timePtr(fixedTime)),
-				Participants: []roundevents.RoundParticipant{
+				Participants: []roundevents.RoundParticipantV1{
 					{
 						UserID: "test-user-1",
 					},
@@ -185,12 +185,12 @@ func Test_startRoundManager_UpdateRoundToScorecard(t *testing.T) {
 					Return(nil, fmt.Errorf("message not found")).
 					Times(1)
 			},
-			payload: &roundevents.DiscordRoundStartPayload{
+			payload: &roundevents.DiscordRoundStartPayloadV1{
 				RoundID:      testRoundID,
 				Title:        "Test Round",
 				Location:     (*roundtypes.Location)(strPtr("Test Course")),
 				StartTime:    (*sharedtypes.StartTime)(timePtr(fixedTime)),
-				Participants: []roundevents.RoundParticipant{},
+				Participants: []roundevents.RoundParticipantV1{},
 			},
 			channelID: "test-channel",
 			messageID: "test-message",
@@ -201,12 +201,12 @@ func Test_startRoundManager_UpdateRoundToScorecard(t *testing.T) {
 			setupMocks: func(mockSession *discordmocks.MockSession) {
 				// No mocks needed, as the function should fail before making any API calls
 			},
-			payload: &roundevents.DiscordRoundStartPayload{
+			payload: &roundevents.DiscordRoundStartPayloadV1{
 				RoundID:      testRoundID,
 				Title:        "Test Round",
 				Location:     (*roundtypes.Location)(strPtr("Test Course")),
 				StartTime:    (*sharedtypes.StartTime)(timePtr(fixedTime)),
-				Participants: []roundevents.RoundParticipant{},
+				Participants: []roundevents.RoundParticipantV1{},
 			},
 			channelID: "",
 			messageID: "test-message",
@@ -217,12 +217,12 @@ func Test_startRoundManager_UpdateRoundToScorecard(t *testing.T) {
 			setupMocks: func(mockSession *discordmocks.MockSession) {
 				// No mocks needed, as the function should fail before making any API calls
 			},
-			payload: &roundevents.DiscordRoundStartPayload{
+			payload: &roundevents.DiscordRoundStartPayloadV1{
 				RoundID:      testRoundID,
 				Title:        "Test Round",
 				Location:     (*roundtypes.Location)(strPtr("Test Course")),
 				StartTime:    (*sharedtypes.StartTime)(timePtr(fixedTime)),
-				Participants: []roundevents.RoundParticipant{},
+				Participants: []roundevents.RoundParticipantV1{},
 			},
 			channelID: "test-channel",
 			messageID: "",

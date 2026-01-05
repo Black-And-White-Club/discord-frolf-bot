@@ -9,10 +9,10 @@ import (
 	"reflect"
 	"testing"
 
-	discorduserevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/user"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord/role"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/user/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
+	discorduserevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/user"
 	userevents "github.com/Black-And-White-Club/frolf-bot-shared/events/user"
 	util_mocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
@@ -45,13 +45,13 @@ func Test_userHandlers_HandleRoleUpdateCommand(t *testing.T) {
 			want:    nil,
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockUserDiscord *mocks.MockUserDiscordInterface, mockHelper *util_mocks.MockHelpers) {
-				expectedPayload := discorduserevents.RoleUpdateCommandPayload{
+				expectedPayload := discorduserevents.RoleUpdateCommandPayloadV1{
 					TargetUserID: "456",
 				}
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discorduserevents.RoleUpdateCommandPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discorduserevents.RoleUpdateCommandPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*discorduserevents.RoleUpdateCommandPayload) = expectedPayload
+						*v.(*discorduserevents.RoleUpdateCommandPayloadV1) = expectedPayload
 						return nil
 					}).
 					Times(1)
@@ -96,13 +96,13 @@ func Test_userHandlers_HandleRoleUpdateCommand(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockUserDiscord *mocks.MockUserDiscordInterface, mockHelper *util_mocks.MockHelpers) {
-				expectedPayload := discorduserevents.RoleUpdateCommandPayload{
+				expectedPayload := discorduserevents.RoleUpdateCommandPayloadV1{
 					TargetUserID: "456",
 				}
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discorduserevents.RoleUpdateCommandPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discorduserevents.RoleUpdateCommandPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*discorduserevents.RoleUpdateCommandPayload) = expectedPayload
+						*v.(*discorduserevents.RoleUpdateCommandPayloadV1) = expectedPayload
 						return nil
 					}).
 					Times(1)
@@ -198,7 +198,7 @@ func Test_userHandlers_HandleRoleUpdateButtonPress(t *testing.T) {
 			},
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockUserDiscord *mocks.MockUserDiscordInterface, mockHelper *util_mocks.MockHelpers, msg *message.Message) {
-				expectedPayload := discorduserevents.RoleUpdateButtonPressPayload{
+				expectedPayload := discorduserevents.RoleUpdateButtonPressPayloadV1{
 					InteractionID:       "123",
 					InteractionToken:    "token",
 					RequesterID:         "456",
@@ -207,9 +207,9 @@ func Test_userHandlers_HandleRoleUpdateButtonPress(t *testing.T) {
 					GuildID:             "guild_123",
 				}
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&discorduserevents.RoleUpdateButtonPressPayload{})).
+					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&discorduserevents.RoleUpdateButtonPressPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*discorduserevents.RoleUpdateButtonPressPayload) = expectedPayload
+						*v.(*discorduserevents.RoleUpdateButtonPressPayloadV1) = expectedPayload
 						return nil
 					})
 
@@ -220,14 +220,14 @@ func Test_userHandlers_HandleRoleUpdateButtonPress(t *testing.T) {
 
 				mockUserDiscord.EXPECT().GetRoleManager().Return(mockRoleManager)
 
-				backendPayload := userevents.UserRoleUpdateRequestPayload{
+				backendPayload := userevents.UserRoleUpdateRequestedPayloadV1{
 					RequesterID: sharedtypes.DiscordID("456"),
 					UserID:      sharedtypes.DiscordID("789"),
 					Role:        sharedtypes.UserRoleEnum("admin"),
 				}
 
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Eq(msg), gomock.AssignableToTypeOf(backendPayload), gomock.Eq(userevents.UserRoleUpdateRequest)).
+					CreateResultMessage(gomock.Eq(msg), gomock.AssignableToTypeOf(backendPayload), gomock.Eq(userevents.UserRoleUpdateRequestedV1)).
 					DoAndReturn(func(_ *message.Message, _ any, _ string) (*message.Message, error) {
 						outMsg := message.NewMessage("1", []byte(`{"requester_id": "456", "user_id": "789", "role": "admin"}`))
 						outMsg.Metadata.Set("interaction_token", "token")
@@ -249,7 +249,7 @@ func Test_userHandlers_HandleRoleUpdateButtonPress(t *testing.T) {
 			msg:  message.NewMessage("1", []byte(`{"interaction_id": "123", "interaction_token": "token", "requester_id": "456", "target_user_id": "789", "interaction_custom_id": "role_button_admin", "guild_id": "guild_123"}`)),
 			want: nil, wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockUserDiscord *mocks.MockUserDiscordInterface, mockHelper *util_mocks.MockHelpers, msg *message.Message) {
-				expectedPayload := discorduserevents.RoleUpdateButtonPressPayload{
+				expectedPayload := discorduserevents.RoleUpdateButtonPressPayloadV1{
 					InteractionID:       "123",
 					InteractionToken:    "token",
 					RequesterID:         "456",
@@ -258,9 +258,9 @@ func Test_userHandlers_HandleRoleUpdateButtonPress(t *testing.T) {
 					GuildID:             "guild_123",
 				}
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discorduserevents.RoleUpdateButtonPressPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discorduserevents.RoleUpdateButtonPressPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*discorduserevents.RoleUpdateButtonPressPayload) = expectedPayload
+						*v.(*discorduserevents.RoleUpdateButtonPressPayloadV1) = expectedPayload
 						return nil
 					})
 
@@ -277,7 +277,7 @@ func Test_userHandlers_HandleRoleUpdateButtonPress(t *testing.T) {
 			msg:  message.NewMessage("1", []byte(`{"interaction_id": "123", "interaction_token": "token", "requester_id": "456", "target_user_id": "789", "interaction_custom_id": "role_button_admin", "guild_id": "guild_123"}`)),
 			want: nil, wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockUserDiscord *mocks.MockUserDiscordInterface, mockHelper *util_mocks.MockHelpers, msg *message.Message) {
-				expectedPayload := discorduserevents.RoleUpdateButtonPressPayload{
+				expectedPayload := discorduserevents.RoleUpdateButtonPressPayloadV1{
 					InteractionID:       "123",
 					InteractionToken:    "token",
 					RequesterID:         "456",
@@ -286,9 +286,9 @@ func Test_userHandlers_HandleRoleUpdateButtonPress(t *testing.T) {
 					GuildID:             "guild_123",
 				}
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discorduserevents.RoleUpdateButtonPressPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discorduserevents.RoleUpdateButtonPressPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*discorduserevents.RoleUpdateButtonPressPayload) = expectedPayload
+						*v.(*discorduserevents.RoleUpdateButtonPressPayloadV1) = expectedPayload
 						return nil
 					})
 
@@ -375,24 +375,24 @@ func Test_userHandlers_HandleAddRole(t *testing.T) {
 			},
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockUserDiscord *mocks.MockUserDiscordInterface, mockHelper *util_mocks.MockHelpers, msg *message.Message) {
-				expectedPayload := discorduserevents.AddRolePayload{
+				expectedPayload := discorduserevents.AddRolePayloadV1{
 					UserID: "123",
 					RoleID: "role_id",
 				}
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&discorduserevents.AddRolePayload{})).
+					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&discorduserevents.AddRolePayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*discorduserevents.AddRolePayload) = expectedPayload
+						*v.(*discorduserevents.AddRolePayloadV1) = expectedPayload
 						return nil
 					})
 				mockRoleManager := mocks.NewMockRoleManager(ctrl)
 				mockUserDiscord.EXPECT().GetRoleManager().Return(mockRoleManager)
 				mockRoleManager.EXPECT().AddRoleToUser(gomock.Any(), "guild_id", sharedtypes.DiscordID("123"), "role_id").Return(role.RoleOperationResult{}, nil)
-				successPayload := discorduserevents.RoleAddedPayload{
+				successPayload := discorduserevents.RoleAddedPayloadV1{
 					UserID: "123",
 				}
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Eq(msg), gomock.AssignableToTypeOf(successPayload), gomock.Eq(discorduserevents.SignupRoleAdded)).
+					CreateResultMessage(gomock.Eq(msg), gomock.AssignableToTypeOf(successPayload), gomock.Eq(discorduserevents.SignupRoleAddedV1)).
 					DoAndReturn(func(_ *message.Message, _ any, _ string) (*message.Message, error) {
 						return message.NewMessage("1", []byte(`{"discord_id": "123"}`)), nil
 					})
@@ -418,25 +418,25 @@ func Test_userHandlers_HandleAddRole(t *testing.T) {
 			},
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockUserDiscord *mocks.MockUserDiscordInterface, mockHelper *util_mocks.MockHelpers, msg *message.Message) {
-				expectedPayload := discorduserevents.AddRolePayload{
+				expectedPayload := discorduserevents.AddRolePayloadV1{
 					UserID: "123",
 					RoleID: "role_id",
 				}
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&discorduserevents.AddRolePayload{})).
+					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&discorduserevents.AddRolePayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*discorduserevents.AddRolePayload) = expectedPayload
+						*v.(*discorduserevents.AddRolePayloadV1) = expectedPayload
 						return nil
 					})
 				mockRoleManager := mocks.NewMockRoleManager(ctrl)
 				mockUserDiscord.EXPECT().GetRoleManager().Return(mockRoleManager)
 				mockRoleManager.EXPECT().AddRoleToUser(gomock.Any(), "guild_id", sharedtypes.DiscordID("123"), "role_id").Return(role.RoleOperationResult{}, errors.New("add role error"))
-				failurePayload := discorduserevents.RoleAdditionFailedPayload{
+				failurePayload := discorduserevents.RoleAdditionFailedPayloadV1{
 					UserID: "123",
 					Reason: "add role error",
 				}
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Eq(msg), gomock.AssignableToTypeOf(failurePayload), gomock.Eq(discorduserevents.SignupRoleAdditionFailed)).
+					CreateResultMessage(gomock.Eq(msg), gomock.AssignableToTypeOf(failurePayload), gomock.Eq(discorduserevents.SignupRoleAdditionFailedV1)).
 					DoAndReturn(func(_ *message.Message, _ any, _ string) (*message.Message, error) {
 						return message.NewMessage("1", []byte(`{"discord_id": "123", "reason": "add role error"}`)), nil
 					})
@@ -450,24 +450,24 @@ func Test_userHandlers_HandleAddRole(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockUserDiscord *mocks.MockUserDiscordInterface, mockHelper *util_mocks.MockHelpers, msg *message.Message) {
-				expectedPayload := discorduserevents.AddRolePayload{
+				expectedPayload := discorduserevents.AddRolePayloadV1{
 					UserID: "123",
 					RoleID: "role_id",
 				}
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&discorduserevents.AddRolePayload{})).
+					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&discorduserevents.AddRolePayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*discorduserevents.AddRolePayload) = expectedPayload
+						*v.(*discorduserevents.AddRolePayloadV1) = expectedPayload
 						return nil
 					})
 				mockRoleManager := mocks.NewMockRoleManager(ctrl)
 				mockUserDiscord.EXPECT().GetRoleManager().Return(mockRoleManager)
 				mockRoleManager.EXPECT().AddRoleToUser(gomock.Any(), "guild_id", sharedtypes.DiscordID("123"), "role_id").Return(role.RoleOperationResult{}, nil)
-				successPayload := discorduserevents.RoleAddedPayload{
+				successPayload := discorduserevents.RoleAddedPayloadV1{
 					UserID: "123",
 				}
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Eq(msg), gomock.AssignableToTypeOf(successPayload), gomock.Eq(discorduserevents.SignupRoleAdded)).
+					CreateResultMessage(gomock.Eq(msg), gomock.AssignableToTypeOf(successPayload), gomock.Eq(discorduserevents.SignupRoleAddedV1)).
 					Return(nil, errors.New("create success message error"))
 			},
 		},
@@ -479,25 +479,25 @@ func Test_userHandlers_HandleAddRole(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockUserDiscord *mocks.MockUserDiscordInterface, mockHelper *util_mocks.MockHelpers, msg *message.Message) {
-				expectedPayload := discorduserevents.AddRolePayload{
+				expectedPayload := discorduserevents.AddRolePayloadV1{
 					UserID: "123",
 					RoleID: "role_id",
 				}
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&discorduserevents.AddRolePayload{})).
+					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&discorduserevents.AddRolePayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*discorduserevents.AddRolePayload) = expectedPayload
+						*v.(*discorduserevents.AddRolePayloadV1) = expectedPayload
 						return nil
 					})
 				mockRoleManager := mocks.NewMockRoleManager(ctrl)
 				mockUserDiscord.EXPECT().GetRoleManager().Return(mockRoleManager)
 				mockRoleManager.EXPECT().AddRoleToUser(gomock.Any(), "guild_id", sharedtypes.DiscordID("123"), "role_id").Return(role.RoleOperationResult{}, errors.New("add role error"))
-				failurePayload := discorduserevents.RoleAdditionFailedPayload{
+				failurePayload := discorduserevents.RoleAdditionFailedPayloadV1{
 					UserID: "123",
 					Reason: "add role error",
 				}
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Eq(msg), gomock.AssignableToTypeOf(failurePayload), gomock.Eq(discorduserevents.SignupRoleAdditionFailed)).
+					CreateResultMessage(gomock.Eq(msg), gomock.AssignableToTypeOf(failurePayload), gomock.Eq(discorduserevents.SignupRoleAdditionFailedV1)).
 					Return(nil, errors.New("create failure message error"))
 			},
 		},
@@ -554,6 +554,189 @@ func Test_userHandlers_HandleAddRole(t *testing.T) {
 				if diff := cmp.Diff(got[0].Metadata, tt.want[0].Metadata); diff != "" {
 					t.Errorf("Metadata mismatch (-got +want):\n%s", diff)
 				}
+			}
+		})
+	}
+}
+
+func Test_userHandlers_HandleRoleUpdated(t *testing.T) {
+	tests := []struct {
+		name    string
+		msg     *message.Message
+		want    []*message.Message
+		wantErr bool
+		setup   func(*gomock.Controller, *util_mocks.MockHelpers)
+	}{
+		{
+			name: "successful role updated",
+			msg: &message.Message{
+				UUID:    "1",
+				Payload: []byte(`{"guild_id": "guild_123", "user_id": "456", "role": "admin"}`),
+				Metadata: message.Metadata{
+					"correlation_id": "correlation_id",
+				},
+			},
+			want:    nil,
+			wantErr: false,
+			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
+				expectedPayload := userevents.UserRoleUpdatedPayloadV1{
+					GuildID: "guild_123",
+					UserID:  "456",
+					Role:    "admin",
+				}
+				mockHelper.EXPECT().
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&userevents.UserRoleUpdatedPayloadV1{})).
+					DoAndReturn(func(_ *message.Message, v any) error {
+						*v.(*userevents.UserRoleUpdatedPayloadV1) = expectedPayload
+						return nil
+					}).
+					Times(1)
+			},
+		},
+		{
+			name: "failed to unmarshal payload",
+			msg: &message.Message{
+				UUID:    "1",
+				Payload: []byte(`invalid payload`),
+				Metadata: message.Metadata{
+					"correlation_id": "correlation_id",
+				},
+			},
+			want:    nil,
+			wantErr: true,
+			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
+				mockHelper.EXPECT().
+					UnmarshalPayload(gomock.Any(), gomock.Any()).
+					Return(errors.New("unmarshal error")).
+					Times(1)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockHelper := util_mocks.NewMockHelpers(ctrl)
+			mockLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
+			mockMetrics := &discordmetrics.NoOpMetrics{}
+			mockTracer := noop.NewTracerProvider().Tracer("test")
+
+			if tt.setup != nil {
+				tt.setup(ctrl, mockHelper)
+			}
+
+			h := &UserHandlers{
+				Logger:      mockLogger,
+				Helper:      mockHelper,
+				Config:      &config.Config{},
+				Metrics:     mockMetrics,
+				Tracer:      mockTracer,
+				handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
+					return wrapHandler(handlerName, unmarshalTo, handlerFunc, mockLogger, mockMetrics, mockTracer, mockHelper)
+				},
+			}
+
+			got, err := h.HandleRoleUpdated(tt.msg)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("HandleRoleUpdated() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("HandleRoleUpdated() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_userHandlers_HandleRoleUpdateFailed(t *testing.T) {
+	tests := []struct {
+		name    string
+		msg     *message.Message
+		want    []*message.Message
+		wantErr bool
+		setup   func(*gomock.Controller, *util_mocks.MockHelpers)
+	}{
+		{
+			name: "successful role update failed",
+			msg: &message.Message{
+				UUID:    "1",
+				Payload: []byte(`{"guild_id": "guild_123", "user_id": "456", "role": "admin", "reason": "user not found"}`),
+				Metadata: message.Metadata{
+					"correlation_id": "correlation_id",
+				},
+			},
+			want:    nil,
+			wantErr: false,
+			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
+				expectedPayload := userevents.UserRoleUpdateFailedPayloadV1{
+					GuildID: "guild_123",
+					UserID:  "456",
+					Role:    "admin",
+					Reason:  "user not found",
+				}
+				mockHelper.EXPECT().
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&userevents.UserRoleUpdateFailedPayloadV1{})).
+					DoAndReturn(func(_ *message.Message, v any) error {
+						*v.(*userevents.UserRoleUpdateFailedPayloadV1) = expectedPayload
+						return nil
+					}).
+					Times(1)
+			},
+		},
+		{
+			name: "failed to unmarshal payload",
+			msg: &message.Message{
+				UUID:    "1",
+				Payload: []byte(`invalid payload`),
+				Metadata: message.Metadata{
+					"correlation_id": "correlation_id",
+				},
+			},
+			want:    nil,
+			wantErr: true,
+			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
+				mockHelper.EXPECT().
+					UnmarshalPayload(gomock.Any(), gomock.Any()).
+					Return(errors.New("unmarshal error")).
+					Times(1)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockHelper := util_mocks.NewMockHelpers(ctrl)
+			mockLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
+			mockMetrics := &discordmetrics.NoOpMetrics{}
+			mockTracer := noop.NewTracerProvider().Tracer("test")
+
+			if tt.setup != nil {
+				tt.setup(ctrl, mockHelper)
+			}
+
+			h := &UserHandlers{
+				Logger:      mockLogger,
+				Helper:      mockHelper,
+				Config:      &config.Config{},
+				Metrics:     mockMetrics,
+				Tracer:      mockTracer,
+				handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
+					return wrapHandler(handlerName, unmarshalTo, handlerFunc, mockLogger, mockMetrics, mockTracer, mockHelper)
+				},
+			}
+
+			got, err := h.HandleRoleUpdateFailed(tt.msg)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("HandleRoleUpdateFailed() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("HandleRoleUpdateFailed() = %v, want %v", got, tt.want)
 			}
 		})
 	}

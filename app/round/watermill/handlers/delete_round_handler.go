@@ -14,9 +14,9 @@ import (
 func (h *RoundHandlers) HandleRoundDeleted(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleRoundDeleted",
-		&roundevents.RoundDeletedPayload{},
+		&roundevents.RoundDeletedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			p := payload.(*roundevents.RoundDeletedPayload)
+			p := payload.(*roundevents.RoundDeletedPayloadV1)
 
 			h.Logger.InfoContext(ctx, "Received RoundDeleted event",
 				attr.CorrelationIDFromMsg(msg),
@@ -94,7 +94,7 @@ func (h *RoundHandlers) HandleRoundDeleted(msg *message.Message) ([]*message.Mes
 				"embed_deletion_error":      result.Error,
 			}
 
-			traceMsg, err := h.Helpers.CreateResultMessage(msg, tracePayload, roundevents.RoundTraceEvent)
+			traceMsg, err := h.Helpers.CreateResultMessage(msg, tracePayload, roundevents.RoundTraceEventV1)
 			if err != nil {
 				h.Logger.ErrorContext(ctx, "Failed to create trace event for RoundDeleted event",
 					attr.CorrelationIDFromMsg(msg),

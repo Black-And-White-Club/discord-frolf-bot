@@ -48,7 +48,7 @@ func TestRoundHandlers_ScorecardUploadedEvent(t *testing.T) {
 	})
 
 	t.Run("missing identifiers", func(t *testing.T) {
-		payload := roundevents.ScorecardUploadedPayload{}
+		payload := roundevents.ScorecardUploadedPayloadV1{}
 		b, err := json.Marshal(payload)
 		if err != nil {
 			t.Fatalf("marshal: %v", err)
@@ -62,7 +62,7 @@ func TestRoundHandlers_ScorecardUploadedEvent(t *testing.T) {
 
 	t.Run("unsupported extension", func(t *testing.T) {
 		roundID := uuid.New()
-		payload := roundevents.ScorecardUploadedPayload{
+		payload := roundevents.ScorecardUploadedPayloadV1{
 			ImportID: "import-id",
 			GuildID:  sharedtypes.GuildID("guild-id"),
 			RoundID:  sharedtypes.RoundID(roundID),
@@ -91,7 +91,7 @@ func TestRoundHandlers_ScorecardUploadedEvent(t *testing.T) {
 		guildRateLimiterLock.Unlock()
 
 		roundID := uuid.New()
-		payload := roundevents.ScorecardUploadedPayload{
+		payload := roundevents.ScorecardUploadedPayloadV1{
 			ImportID: "import-id",
 			GuildID:  guildID,
 			RoundID:  sharedtypes.RoundID(roundID),
@@ -112,7 +112,7 @@ func TestRoundHandlers_ScorecardUploadedEvent(t *testing.T) {
 		resetGuildRateLimiter(t)
 
 		roundID := uuid.New()
-		payload := roundevents.ScorecardUploadedPayload{
+		payload := roundevents.ScorecardUploadedPayloadV1{
 			ImportID: "import-id",
 			GuildID:  sharedtypes.GuildID("guild-id"),
 			RoundID:  sharedtypes.RoundID(roundID),

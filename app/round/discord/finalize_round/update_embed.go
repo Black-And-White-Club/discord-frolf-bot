@@ -13,7 +13,7 @@ import (
 )
 
 // FinalizeScorecardEmbed updates the round embed when a round is finalized
-func (frm *finalizeRoundManager) FinalizeScorecardEmbed(ctx context.Context, eventMessageID string, channelID string, embedPayload roundevents.RoundFinalizedEmbedUpdatePayload) (FinalizeRoundOperationResult, error) {
+func (frm *finalizeRoundManager) FinalizeScorecardEmbed(ctx context.Context, eventMessageID string, channelID string, embedPayload roundevents.RoundFinalizedEmbedUpdatePayloadV1) (FinalizeRoundOperationResult, error) {
 	return frm.operationWrapper(ctx, "FinalizeScorecardEmbed", func(ctx context.Context) (FinalizeRoundOperationResult, error) {
 		// Validate input arguments
 		if frm.session == nil {

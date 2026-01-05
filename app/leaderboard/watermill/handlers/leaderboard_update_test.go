@@ -39,11 +39,11 @@ func TestLeaderboardHandlers_HandleBatchTagAssigned(t *testing.T) {
 			want:    []*message.Message{{}},
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockLeaderboardDiscord *mocks.MockLeaderboardDiscordInterface, mockHelper *util_mocks.MockHelpers, cfg *config.Config) {
-				expectedPayload := leaderboardevents.BatchTagAssignedPayload{
+				expectedPayload := leaderboardevents.LeaderboardBatchTagAssignedPayloadV1{
 					RequestingUserID: "user123",
 					BatchID:          "batch456",
 					AssignmentCount:  3,
-					Assignments: []leaderboardevents.TagAssignmentInfo{
+					Assignments: []leaderboardevents.TagAssignmentInfoV1{
 						{UserID: "user1", TagNumber: 1},
 						{UserID: "user2", TagNumber: 2},
 						{UserID: "user3", TagNumber: 3},
@@ -55,9 +55,9 @@ func TestLeaderboardHandlers_HandleBatchTagAssigned(t *testing.T) {
 
 				// Make sure this is called by the wrapper
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&leaderboardevents.BatchTagAssignedPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&leaderboardevents.LeaderboardBatchTagAssignedPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*leaderboardevents.BatchTagAssignedPayload) = expectedPayload
+						*v.(*leaderboardevents.LeaderboardBatchTagAssignedPayloadV1) = expectedPayload
 						return nil
 					}).
 					Times(1)
@@ -109,18 +109,18 @@ func TestLeaderboardHandlers_HandleBatchTagAssigned(t *testing.T) {
 			want:    nil,
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockLeaderboardDiscord *mocks.MockLeaderboardDiscordInterface, mockHelper *util_mocks.MockHelpers, cfg *config.Config) {
-				expectedPayload := leaderboardevents.BatchTagAssignedPayload{
+				expectedPayload := leaderboardevents.LeaderboardBatchTagAssignedPayloadV1{
 					RequestingUserID: "user123",
 					BatchID:          "batch456",
 					AssignmentCount:  0,
-					Assignments:      []leaderboardevents.TagAssignmentInfo{},
+					Assignments:      []leaderboardevents.TagAssignmentInfoV1{},
 				}
 
 				// Make sure this is called by the wrapper
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&leaderboardevents.BatchTagAssignedPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&leaderboardevents.LeaderboardBatchTagAssignedPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*leaderboardevents.BatchTagAssignedPayload) = expectedPayload
+						*v.(*leaderboardevents.LeaderboardBatchTagAssignedPayloadV1) = expectedPayload
 						return nil
 					}).
 					Times(1)
@@ -144,11 +144,11 @@ func TestLeaderboardHandlers_HandleBatchTagAssigned(t *testing.T) {
 			want:    []*message.Message{{}},
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockLeaderboardDiscord *mocks.MockLeaderboardDiscordInterface, mockHelper *util_mocks.MockHelpers, cfg *config.Config) {
-				expectedPayload := leaderboardevents.BatchTagAssignedPayload{
+				expectedPayload := leaderboardevents.LeaderboardBatchTagAssignedPayloadV1{
 					RequestingUserID: "user999",
 					BatchID:          "batch999",
 					AssignmentCount:  1,
-					Assignments: []leaderboardevents.TagAssignmentInfo{
+					Assignments: []leaderboardevents.TagAssignmentInfoV1{
 						{UserID: "user999", TagNumber: 10},
 					},
 				}
@@ -157,9 +157,9 @@ func TestLeaderboardHandlers_HandleBatchTagAssigned(t *testing.T) {
 				cfg.Discord.LeaderboardChannelID = "configured-leaderboard-channel"
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&leaderboardevents.BatchTagAssignedPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&leaderboardevents.LeaderboardBatchTagAssignedPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*leaderboardevents.BatchTagAssignedPayload) = expectedPayload
+						*v.(*leaderboardevents.LeaderboardBatchTagAssignedPayloadV1) = expectedPayload
 						return nil
 					}).
 					Times(1)

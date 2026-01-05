@@ -70,7 +70,7 @@ func (rh *RoundHandlers) ScorecardUploadedEvent(msg *message.Message) error {
 		return err
 	}
 
-	var payload roundevents.ScorecardUploadedPayload
+	var payload roundevents.ScorecardUploadedPayloadV1
 	err := json.Unmarshal(msg.Payload, &payload)
 	if err != nil {
 		rh.Logger.ErrorContext(ctx, "Failed to unmarshal scorecard uploaded event",
@@ -138,7 +138,7 @@ func (rh *RoundHandlers) ScorecardParseFailedEvent(msg *message.Message) error {
 	ctx, span := rh.Tracer.Start(context.Background(), "scorecard_parse_failed_event")
 	defer span.End()
 
-	var payload roundevents.ScorecardParseFailedPayload
+	var payload roundevents.ScorecardParseFailedPayloadV1
 	err := json.Unmarshal(msg.Payload, &payload)
 	if err != nil {
 		rh.Logger.ErrorContext(ctx, "Failed to unmarshal scorecard parse failed event",
@@ -172,7 +172,7 @@ func (rh *RoundHandlers) ImportFailedEvent(msg *message.Message) error {
 	ctx, span := rh.Tracer.Start(context.Background(), "import_failed_event")
 	defer span.End()
 
-	var payload roundevents.ImportFailedPayload
+	var payload roundevents.ImportFailedPayloadV1
 	err := json.Unmarshal(msg.Payload, &payload)
 	if err != nil {
 		rh.Logger.ErrorContext(ctx, "Failed to unmarshal import failed event",
@@ -206,7 +206,7 @@ func (rh *RoundHandlers) ScorecardURLRequestedEvent(msg *message.Message) error 
 	ctx, span := rh.Tracer.Start(context.Background(), "scorecard_url_requested_event")
 	defer span.End()
 
-	var payload roundevents.ScorecardURLRequestedPayload
+	var payload roundevents.ScorecardURLRequestedPayloadV1
 	err := json.Unmarshal(msg.Payload, &payload)
 	if err != nil {
 		rh.Logger.ErrorContext(ctx, "Failed to unmarshal scorecard URL requested event",

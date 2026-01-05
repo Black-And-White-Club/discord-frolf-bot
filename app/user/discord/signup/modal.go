@@ -201,7 +201,7 @@ func (sm *signupManager) HandleSignupModalSubmit(ctx context.Context, i *discord
 			_ = sm.sendFollowupMessage(i.Interaction, "Error: Could not determine guild ID. Please try again or contact support.")
 			return SignupOperationResult{Error: errors.New("guildID is empty")}, errors.New("guildID is empty")
 		}
-		payload := userevents.UserSignupRequestPayload{
+		payload := userevents.UserSignupRequestedPayloadV1{
 			GuildID:       sharedtypes.GuildID(guildID),
 			UserID:        sharedtypes.DiscordID(userID),
 			TagNumber:     tagNumberPtr,
@@ -219,7 +219,7 @@ func (sm *signupManager) HandleSignupModalSubmit(ctx context.Context, i *discord
 		}
 		// Overwrite correlation id with deterministic one for trace continuity if needed
 		msg.Metadata.Set("correlation_id", correlationID)
-		if err := sm.publisher.Publish(userevents.UserSignupRequest, msg); err != nil {
+		if err := sm.publisher.Publish(userevents.UserSignupRequestedV1, msg); err != nil {
 			_ = sm.sendFollowupMessage(i.Interaction, "Failed to publish signup event.")
 			return SignupOperationResult{Error: fmt.Errorf("failed to publish signup event: %w", err)}, err
 		}

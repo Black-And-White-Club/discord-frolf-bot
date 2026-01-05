@@ -43,7 +43,7 @@ func (m *MockRoundReminderManager) EXPECT() *MockRoundReminderManagerMockRecorde
 }
 
 // SendRoundReminder mocks base method.
-func (m *MockRoundReminderManager) SendRoundReminder(ctx context.Context, payload *roundevents.DiscordReminderPayload) (roundreminder.RoundReminderOperationResult, error) {
+func (m *MockRoundReminderManager) SendRoundReminder(ctx context.Context, payload *roundevents.DiscordReminderPayloadV1) (roundreminder.RoundReminderOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SendRoundReminder", ctx, payload)
 	ret0, _ := ret[0].(roundreminder.RoundReminderOperationResult)

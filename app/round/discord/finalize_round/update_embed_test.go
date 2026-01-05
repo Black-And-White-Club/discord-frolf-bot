@@ -37,7 +37,7 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 	tests := []struct {
 		name           string
 		setupMocks     func(mockSession *discordmocks.MockSession)
-		embedPayload   roundevents.RoundFinalizedEmbedUpdatePayload
+		embedPayload   roundevents.RoundFinalizedEmbedUpdatePayloadV1
 		channelID      string
 		eventMessageID sharedtypes.RoundID
 		expectErr      bool
@@ -88,7 +88,7 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 					}).
 					Times(1)
 			},
-			embedPayload: roundevents.RoundFinalizedEmbedUpdatePayload{
+			embedPayload: roundevents.RoundFinalizedEmbedUpdatePayloadV1{
 				RoundID:   sharedtypes.RoundID(testRoundID),
 				Title:     "Test Round",
 				Location:  (*roundtypes.Location)(strPtr("Test Course")),
@@ -140,7 +140,7 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 					Return(nil, fmt.Errorf("discord API error")).
 					Times(1)
 			},
-			embedPayload: roundevents.RoundFinalizedEmbedUpdatePayload{
+			embedPayload: roundevents.RoundFinalizedEmbedUpdatePayloadV1{
 				RoundID:        sharedtypes.RoundID(testRoundID),
 				Title:          "Test Round",
 				Location:       (*roundtypes.Location)(strPtr("Test Course")),
@@ -182,7 +182,7 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 					Return(&discordgo.Message{ID: "test-message"}, nil).
 					Times(1)
 			},
-			embedPayload: roundevents.RoundFinalizedEmbedUpdatePayload{
+			embedPayload: roundevents.RoundFinalizedEmbedUpdatePayloadV1{
 				RoundID:   sharedtypes.RoundID(testRoundID),
 				Title:     "Test Round",
 				Location:  (*roundtypes.Location)(strPtr("Test Course")),
@@ -203,7 +203,7 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 			name: "Missing channel ID",
 			setupMocks: func(mockSession *discordmocks.MockSession) {
 			},
-			embedPayload: roundevents.RoundFinalizedEmbedUpdatePayload{
+			embedPayload: roundevents.RoundFinalizedEmbedUpdatePayloadV1{
 				RoundID:        sharedtypes.RoundID(testRoundID),
 				Title:          "Test Round",
 				Location:       (*roundtypes.Location)(strPtr("Test Course")),
@@ -218,7 +218,7 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 			name: "Missing message ID",
 			setupMocks: func(mockSession *discordmocks.MockSession) {
 			},
-			embedPayload: roundevents.RoundFinalizedEmbedUpdatePayload{
+			embedPayload: roundevents.RoundFinalizedEmbedUpdatePayloadV1{
 				RoundID:        testRoundID,
 				Title:          "Test Round",
 				Location:       (*roundtypes.Location)(strPtr("Test Course")),
@@ -233,7 +233,7 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 			name: "Nil session",
 			setupMocks: func(mockSession *discordmocks.MockSession) {
 			},
-			embedPayload: roundevents.RoundFinalizedEmbedUpdatePayload{
+			embedPayload: roundevents.RoundFinalizedEmbedUpdatePayloadV1{
 				RoundID:        sharedtypes.RoundID(testRoundID),
 				Title:          "Test Round",
 				Location:       (*roundtypes.Location)(strPtr("Test Course")),

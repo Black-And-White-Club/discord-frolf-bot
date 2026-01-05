@@ -10,7 +10,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-func (m *startRoundManager) UpdateRoundToScorecard(ctx context.Context, channelID, messageID string, payload *roundevents.DiscordRoundStartPayload) (StartRoundOperationResult, error) {
+func (m *startRoundManager) UpdateRoundToScorecard(ctx context.Context, channelID, messageID string, payload *roundevents.DiscordRoundStartPayloadV1) (StartRoundOperationResult, error) {
 	return m.operationWrapper(ctx, "UpdateRoundToScorecard", func(ctx context.Context) (StartRoundOperationResult, error) {
 		// Multi-tenant: resolve channel ID from guild config if not provided
 		resolvedChannelID := channelID

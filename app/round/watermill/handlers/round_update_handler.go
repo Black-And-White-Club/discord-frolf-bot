@@ -3,9 +3,8 @@ package roundhandlers
 import (
 	"context"
 	"fmt"
-	"time"
 
-	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
+	sharedroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
@@ -16,19 +15,17 @@ import (
 func (h *RoundHandlers) HandleRoundUpdateRequested(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleRoundUpdateRequested",
-		&discordroundevents.DiscordRoundUpdateRequestPayload{},
+		&sharedroundevents.RoundUpdateModalSubmittedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			discordPayload := payload.(*discordroundevents.DiscordRoundUpdateRequestPayload)
+			discordPayload := payload.(*sharedroundevents.RoundUpdateModalSubmittedPayloadV1)
 
 			// Convert to backend payload and set GuildID
 			var startTimeStr *string
 			if discordPayload.StartTime != nil {
-				timeValue := time.Time(*discordPayload.StartTime)
-				timeStr := timeValue.Format("2006-01-02T15:04:05Z07:00")
-				startTimeStr = &timeStr
+				startTimeStr = discordPayload.StartTime
 			}
 
-			backendPayload := roundevents.UpdateRoundRequestedPayload{
+			backendPayload := roundevents.UpdateRoundRequestedPayloadV1{
 				GuildID:     sharedtypes.GuildID(discordPayload.GuildID),
 				RoundID:     discordPayload.RoundID,
 				UserID:      discordPayload.UserID,
@@ -58,7 +55,7 @@ func (h *RoundHandlers) HandleRoundUpdateRequested(msg *message.Message) ([]*mes
 				attr.String("payload_message_id", discordPayload.MessageID),
 				attr.String("payload_channel_id", discordPayload.ChannelID))
 
-			backendMsg, err := h.Helpers.CreateResultMessage(msg, backendPayload, roundevents.RoundUpdateRequest)
+			backendMsg, err := h.Helpers.CreateResultMessage(msg, backendPayload, roundevents.RoundUpdateRequestedV1)
 			if err != nil {
 				h.Logger.ErrorContext(ctx, "Failed to create result message", attr.Error(err))
 				return nil, err
@@ -94,9 +91,9 @@ func (h *RoundHandlers) HandleRoundUpdateRequested(msg *message.Message) ([]*mes
 func (h *RoundHandlers) HandleRoundUpdated(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleRoundUpdated",
-		&roundevents.RoundEntityUpdatedPayload{},
+		&roundevents.RoundEntityUpdatedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			updatedPayload := payload.(*roundevents.RoundEntityUpdatedPayload)
+			updatedPayload := payload.(*roundevents.RoundEntityUpdatedPayloadV1)
 
 			// Extract Discord metadata from message metadata
 			channelID := msg.Metadata.Get("channel_id")
@@ -189,9 +186,9 @@ func (h *RoundHandlers) HandleRoundUpdated(msg *message.Message) ([]*message.Mes
 func (h *RoundHandlers) HandleRoundUpdateFailed(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleRoundUpdateFailed",
-		&roundevents.RoundUpdateErrorPayload{},
+		&roundevents.RoundUpdateErrorPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			failedPayload := payload.(*roundevents.RoundUpdateErrorPayload)
+			failedPayload := payload.(*roundevents.RoundUpdateErrorPayloadV1)
 
 			// Log the error
 			h.Logger.ErrorContext(ctx, "Round update failed", attr.String("error", failedPayload.Error))
@@ -204,9 +201,9 @@ func (h *RoundHandlers) HandleRoundUpdateFailed(msg *message.Message) ([]*messag
 func (h *RoundHandlers) HandleRoundUpdateValidationFailed(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleRoundUpdateValidationFailed",
-		&roundevents.RoundUpdateValidatedPayload{},
+		&roundevents.RoundUpdateValidatedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			validatedPayload := payload.(*roundevents.RoundUpdateValidatedPayload)
+			validatedPayload := payload.(*roundevents.RoundUpdateValidatedPayloadV1)
 
 			h.Logger.InfoContext(ctx, "Round update validated", attr.RoundID("round_id", validatedPayload.RoundUpdateRequestPayload.RoundID))
 

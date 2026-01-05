@@ -12,9 +12,9 @@ import (
 func (h *RoundHandlers) HandleRoundStarted(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleRoundStarted",
-		&roundevents.DiscordRoundStartPayload{},
+		&roundevents.DiscordRoundStartPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			startPayload, ok := payload.(*roundevents.DiscordRoundStartPayload)
+			startPayload, ok := payload.(*roundevents.DiscordRoundStartPayloadV1)
 			if !ok {
 				return nil, fmt.Errorf("invalid payload type for HandleRoundStarted")
 			}
@@ -47,7 +47,7 @@ func (h *RoundHandlers) HandleRoundStarted(msg *message.Message) ([]*message.Mes
 				"message_id": eventMessageID,
 			}
 
-			traceMsg, err := h.Helpers.CreateResultMessage(msg, tracePayload, roundevents.RoundTraceEvent)
+			traceMsg, err := h.Helpers.CreateResultMessage(msg, tracePayload, roundevents.RoundTraceEventV1)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create trace event: %w", err)
 			}

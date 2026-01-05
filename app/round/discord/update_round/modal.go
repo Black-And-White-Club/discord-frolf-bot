@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
+	sharedroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
@@ -327,7 +327,8 @@ func (urm *updateRoundManager) HandleUpdateRoundModalSubmit(ctx context.Context,
 		}
 
 		// Build Discord payload for internal bus; backend handler will convert to backend payload
-		payload := discordroundevents.DiscordRoundUpdateRequestPayload{
+		tz := roundtypes.Timezone(timezone)
+		payload := sharedroundevents.RoundUpdateModalSubmittedPayloadV1{
 			GuildID:     sharedtypes.GuildID(i.GuildID),
 			RoundID:     roundID,
 			UserID:      sharedtypes.DiscordID(userID),
@@ -336,7 +337,8 @@ func (urm *updateRoundManager) HandleUpdateRoundModalSubmit(ctx context.Context,
 			Title:       &title,
 			Description: &description,
 			Location:    &location,
-			// StartTime omitted; backend derives timing from metadata (submitted_at, user_timezone, raw_start_time)
+			StartTime:   &startTimeStr,
+			Timezone:    &tz,
 		}
 
 		// ✅ Add debugging for payload
@@ -352,7 +354,7 @@ func (urm *updateRoundManager) HandleUpdateRoundModalSubmit(ctx context.Context,
 			return UpdateRoundOperationResult{Error: storeErr}, storeErr
 		}
 
-		msg, err := urm.createEvent(ctx, discordroundevents.RoundUpdateRequestTopic, payload, i)
+		msg, err := urm.createEvent(ctx, sharedroundevents.RoundUpdateModalSubmittedV1, payload, i)
 		if err != nil {
 			updateErr := fmt.Errorf("failed to update event: %w", err)
 			return UpdateRoundOperationResult{Error: updateErr}, updateErr
@@ -365,7 +367,7 @@ func (urm *updateRoundManager) HandleUpdateRoundModalSubmit(ctx context.Context,
 		msg.Metadata.Set("user_timezone", string(timezone))
 		msg.Metadata.Set("raw_start_time", startTimeStr)
 
-		if err := urm.publisher.Publish(discordroundevents.RoundUpdateRequestTopic, msg); err != nil {
+		if err := urm.publisher.Publish(sharedroundevents.RoundUpdateModalSubmittedV1, msg); err != nil {
 			publishErr := fmt.Errorf("failed to publish event: %w", err)
 			return UpdateRoundOperationResult{Error: publishErr}, publishErr
 		}

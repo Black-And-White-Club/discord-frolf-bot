@@ -3,7 +3,7 @@ package leaderboardhandlers
 import (
 	"context"
 
-	discordleaderboardevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/leaderboard"
+	sharedleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	leaderboardtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/leaderboard"
@@ -15,18 +15,18 @@ import (
 func (h *LeaderboardHandlers) HandleLeaderboardRetrieveRequest(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleLeaderboardRetrieveRequest",
-		&discordleaderboardevents.LeaderboardRetrieveRequestPayload{},
+		&sharedleaderboardevents.LeaderboardRetrieveRequestPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
 			h.Logger.InfoContext(ctx, "Handling leaderboard retrieve request", attr.CorrelationIDFromMsg(msg))
 
-			discordPayload := payload.(*discordleaderboardevents.LeaderboardRetrieveRequestPayload)
+			discordPayload := payload.(*sharedleaderboardevents.LeaderboardRetrieveRequestPayloadV1)
 
 			// Convert to backend payload
-			backendPayload := leaderboardevents.GetLeaderboardRequestPayload{
+			backendPayload := leaderboardevents.GetLeaderboardRequestedPayloadV1{
 				GuildID: sharedtypes.GuildID(discordPayload.GuildID),
 			}
 
-			backendMsg, err := h.Helpers.CreateResultMessage(msg, backendPayload, leaderboardevents.GetLeaderboardRequest)
+			backendMsg, err := h.Helpers.CreateResultMessage(msg, backendPayload, leaderboardevents.GetLeaderboardRequestedV1)
 			if err != nil {
 				h.Logger.ErrorContext(ctx, "Failed to create backend message", attr.Error(err))
 				return nil, err
@@ -49,11 +49,18 @@ func (h *LeaderboardHandlers) HandleLeaderboardData(msg *message.Message) ([]*me
 			h.Logger.InfoContext(ctx, "Handling leaderboard data", attr.CorrelationIDFromMsg(msg), attr.Topic(topic))
 
 			// Special case: If topic is "LeaderboardUpdated", trigger a re-request
-			if topic == leaderboardevents.LeaderboardUpdated {
-				// For LeaderboardUpdated, we don't need to unmarshal - just send empty request
-				backendPayload := leaderboardevents.GetLeaderboardRequestPayload{}
+			if topic == leaderboardevents.LeaderboardUpdatedV1 {
+				var updatePayload leaderboardevents.LeaderboardUpdatedPayloadV1
+				if err := h.Helpers.UnmarshalPayload(msg, &updatePayload); err != nil {
+					h.Logger.ErrorContext(ctx, "Failed to unmarshal leaderboard update payload", attr.Error(err))
+					return nil, err
+				}
 
-				backendMsg, err := h.Helpers.CreateResultMessage(msg, backendPayload, leaderboardevents.GetLeaderboardRequest)
+				backendPayload := leaderboardevents.GetLeaderboardRequestedPayloadV1{
+					GuildID: updatePayload.GuildID,
+				}
+
+				backendMsg, err := h.Helpers.CreateResultMessage(msg, backendPayload, leaderboardevents.GetLeaderboardRequestedV1)
 				if err != nil {
 					h.Logger.ErrorContext(ctx, "Failed to create backend message after update", attr.Error(err))
 					return nil, err
@@ -64,7 +71,7 @@ func (h *LeaderboardHandlers) HandleLeaderboardData(msg *message.Message) ([]*me
 			}
 
 			// Otherwise, assume it's a leaderboard response
-			var payloadData leaderboardevents.GetLeaderboardResponsePayload
+			var payloadData leaderboardevents.GetLeaderboardResponsePayloadV1
 			if err := h.Helpers.UnmarshalPayload(msg, &payloadData); err != nil {
 				h.Logger.ErrorContext(ctx, "Failed to unmarshal leaderboard response", attr.Error(err))
 				return nil, err
@@ -78,11 +85,14 @@ func (h *LeaderboardHandlers) HandleLeaderboardData(msg *message.Message) ([]*me
 				}
 			}
 
-			discordPayload := discordleaderboardevents.LeaderboardRetrievedPayload{
+			discordPayload := sharedleaderboardevents.LeaderboardRetrievedPayloadV1{
 				Leaderboard: leaderboardData,
+				GuildID:     string(payloadData.GuildID),
+				ChannelID:   msg.Metadata.Get("channel_id"),
+				MessageID:   msg.Metadata.Get("message_id"),
 			}
 
-			discordMsg, err := h.Helpers.CreateResultMessage(msg, discordPayload, discordleaderboardevents.LeaderboardRetrievedTopic)
+			discordMsg, err := h.Helpers.CreateResultMessage(msg, discordPayload, sharedleaderboardevents.LeaderboardRetrievedV1)
 			if err != nil {
 				h.Logger.ErrorContext(ctx, "Failed to create discord message from leaderboard data", attr.Error(err))
 				return nil, err

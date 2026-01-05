@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"log/slog"
 
-	discorduserevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/user"
 	userdiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord/signup"
 	userhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/user/watermill/handlers"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
+	shareduserevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/user"
+	userevents "github.com/Black-And-White-Club/frolf-bot-shared/events/user"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	tracingfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/tracing"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
@@ -79,16 +80,15 @@ func (r *UserRouter) RegisterHandlers(ctx context.Context, handlers userhandlers
 	r.logger.InfoContext(ctx, "Registering User Handlers")
 
 	eventsToHandlers := map[string]message.HandlerFunc{
-		discorduserevents.RoleResponse:             handlers.HandleRoleUpdateResult,
-		discorduserevents.RoleResponseFailed:       handlers.HandleRoleUpdateResult,
-		discorduserevents.SignupSuccess:            handlers.HandleUserCreated,
-		discorduserevents.SignupAddRole:            handlers.HandleAddRole,
-		discorduserevents.SignupRoleAdded:          handlers.HandleRoleAdded,
-		discorduserevents.SignupRoleAdditionFailed: handlers.HandleRoleAdditionFailed,
-		discorduserevents.SignupFailed:             handlers.HandleUserCreationFailed,
-		discorduserevents.RoleUpdateCommand:        handlers.HandleRoleUpdateCommand,
-		discorduserevents.RoleUpdateButtonPress:    handlers.HandleRoleUpdateButtonPress,
-		discorduserevents.SignupFormSubmitted:      handlers.HandleUserSignupRequest,
+		userevents.UserRoleUpdatedV1:               handlers.HandleRoleUpdated,
+		userevents.UserRoleUpdateFailedV1:          handlers.HandleRoleUpdateFailed,
+		userevents.UserCreatedV1:                   handlers.HandleUserCreated,
+		shareduserevents.SignupAddRoleV1:           handlers.HandleAddRole,
+		shareduserevents.SignupRoleAddedV1:         handlers.HandleRoleAdded,
+		shareduserevents.SignupRoleAdditionFailedV1: handlers.HandleRoleAdditionFailed,
+		userevents.UserCreationFailedV1:            handlers.HandleUserCreationFailed,
+		shareduserevents.RoleUpdateCommandV1:       handlers.HandleRoleUpdateCommand,
+		shareduserevents.RoleUpdateButtonPressV1:   handlers.HandleRoleUpdateButtonPress,
 	}
 
 	for topic, handlerFunc := range eventsToHandlers {

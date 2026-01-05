@@ -16,9 +16,9 @@ func (h *RoundHandlers) HandleParticipantScoreUpdated(msg *message.Message) ([]*
 	return h.handlerWrapper( // Assuming handlerWrapper is defined elsewhere
 		"HandleParticipantScoreUpdated",
 		// Expecting a simpler payload without the full participant list
-		&roundevents.ParticipantScoreUpdatedPayload{},
+		&roundevents.ParticipantScoreUpdatedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) { // Corrected return type here
-			updatePayload, ok := payload.(*roundevents.ParticipantScoreUpdatedPayload)
+			updatePayload, ok := payload.(*roundevents.ParticipantScoreUpdatedPayloadV1)
 			if !ok {
 				h.Logger.ErrorContext(ctx, "Invalid payload type for HandleParticipantScoreUpdated",
 					attr.Any("payload", payload), // Log the received payload
@@ -112,9 +112,9 @@ func (h *RoundHandlers) HandleParticipantScoreUpdated(msg *message.Message) ([]*
 func (h *RoundHandlers) HandleScoreUpdateError(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleScoreUpdateError",
-		&roundevents.RoundScoreUpdateErrorPayload{},
+		&roundevents.RoundScoreUpdateErrorPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			errorPayload, ok := payload.(*roundevents.RoundScoreUpdateErrorPayload)
+			errorPayload, ok := payload.(*roundevents.RoundScoreUpdateErrorPayloadV1)
 			if !ok {
 				return nil, fmt.Errorf("invalid payload type for HandleScoreUpdateError")
 			}
@@ -136,7 +136,7 @@ func (h *RoundHandlers) HandleScoreUpdateError(msg *message.Message) ([]*message
 				"error":       errorPayload.Error,
 			}
 
-			traceMsg, err := h.Helpers.CreateResultMessage(msg, tracePayload, roundevents.RoundTraceEvent)
+			traceMsg, err := h.Helpers.CreateResultMessage(msg, tracePayload, roundevents.RoundTraceEventV1)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create trace event: %w", err)
 			}

@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"log/slog"
 
-	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
 	roundhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/round/watermill/handlers"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
+	sharedroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	scoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/score"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
@@ -80,47 +80,49 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 
 	eventsToHandlers := map[string]message.HandlerFunc{
 		// Creation flow
-		discordroundevents.RoundCreateModalSubmit: handlers.HandleRoundCreateRequested,
-		roundevents.RoundCreated:                  handlers.HandleRoundCreated,
-		roundevents.RoundCreationFailed:           handlers.HandleRoundCreationFailed,
-		roundevents.RoundValidationFailed:         handlers.HandleRoundValidationFailed,
+		sharedroundevents.RoundCreateModalSubmittedV1: handlers.HandleRoundCreateRequested,
+		roundevents.RoundCreatedV1:                    handlers.HandleRoundCreated,
+		roundevents.RoundCreationFailedV1:             handlers.HandleRoundCreationFailed,
+		roundevents.RoundValidationFailedV1:           handlers.HandleRoundValidationFailed,
 
 		// Update flow
-		discordroundevents.RoundUpdateRequestTopic: handlers.HandleRoundUpdateRequested,
-		roundevents.RoundScheduleUpdate:            handlers.HandleRoundUpdated,
-		roundevents.RoundScheduled:                 handlers.HandleRoundUpdateFailed,
+		sharedroundevents.RoundUpdateModalSubmittedV1: handlers.HandleRoundUpdateRequested,
+		roundevents.RoundUpdatedV1:                    handlers.HandleRoundUpdated,
+		roundevents.RoundUpdateErrorV1:                handlers.HandleRoundUpdateFailed,
 
 		// Participation
-		discordroundevents.RoundParticipantJoinReqTopic: handlers.HandleRoundParticipantJoinRequest,
-		roundevents.RoundParticipantRemoved:             handlers.HandleRoundParticipantRemoved,
+		sharedroundevents.RoundParticipantJoinRequestDiscordV1: handlers.HandleRoundParticipantJoinRequest,
+		roundevents.RoundParticipantRemovedV1:                  handlers.HandleRoundParticipantRemoved,
 
 		// Scoring
-		roundevents.RoundParticipantScoreUpdated: handlers.HandleParticipantScoreUpdated,
-		roundevents.RoundScoreUpdateError:        handlers.HandleScoreUpdateError,
+		roundevents.RoundParticipantScoreUpdatedV1: handlers.HandleParticipantScoreUpdated,
+		roundevents.RoundScoreUpdateErrorV1:        handlers.HandleScoreUpdateError,
 
 		// Score override bridging (CorrectScore service)
-		scoreevents.ScoreUpdateSuccess: handlers.HandleScoreOverrideSuccess,
+		scoreevents.ScoreUpdatedV1: handlers.HandleScoreOverrideSuccess,
 		// NOTE: We intentionally do NOT map ScoreBulkUpdateSuccess to per-user handler.
 		// The per-user success events (score.update.success) are expected to be emitted individually
 		// for each updated participant. The aggregate bulk success event lacks a specific user/score
 		// and was causing empty participant payloads & failed embed updates when bridged.
 
 		// Scorecard import flow
-		roundevents.ScorecardParseFailedTopic: handlers.HandleScorecardParseFailed,
-		roundevents.ImportFailedTopic:         handlers.HandleImportFailed,
+		roundevents.ScorecardUploadedV1:     handlers.HandleScorecardUploaded,
+		roundevents.ScorecardParseFailedV1:  handlers.HandleScorecardParseFailed,
+		roundevents.ImportFailedV1:          handlers.HandleImportFailed,
+		roundevents.ScorecardURLRequestedV1: handlers.HandleScorecardURLRequested,
 
 		// Lifecycle
-		roundevents.RoundDeleted:          handlers.HandleRoundDeleted,
-		roundevents.RoundFinalizedDiscord: handlers.HandleRoundFinalized,
-		roundevents.RoundStarted:          handlers.HandleRoundStarted,
+		roundevents.RoundDeletedV1:          handlers.HandleRoundDeleted,
+		roundevents.RoundFinalizedDiscordV1: handlers.HandleRoundFinalized,
+		roundevents.RoundStartedV1:          handlers.HandleRoundStarted,
 
 		// Tag handling
-		roundevents.RoundParticipantJoined: handlers.HandleRoundParticipantJoined,
+		roundevents.RoundParticipantJoinedV1: handlers.HandleRoundParticipantJoined,
 
 		// Reminders
-		roundevents.RoundReminder: handlers.HandleRoundReminder,
+		roundevents.RoundReminderSentV1: handlers.HandleRoundReminder,
 
-		roundevents.TagsUpdatedForScheduledRounds: handlers.HandleTagsUpdatedForScheduledRounds,
+		roundevents.TagsUpdatedForScheduledRoundsV1: handlers.HandleTagsUpdatedForScheduledRounds,
 	}
 
 	for topic, handlerFunc := range eventsToHandlers {

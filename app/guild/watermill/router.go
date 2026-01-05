@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	discordguildevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/guild"
 	guildhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/guild/watermill/handlers"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
@@ -76,24 +75,21 @@ func (r *GuildRouter) RegisterHandlers(ctx context.Context, handlers guildhandle
 	r.logger.InfoContext(ctx, "Registering Guild Handlers")
 
 	eventsToHandlers := map[string]message.HandlerFunc{
-		// Initial guild setup request from Discord
-		discordguildevents.GuildSetupEventTopic: handlers.HandleGuildSetupRequest,
-
 		// Guild config creation/setup flow - affects command registration
-		guildevents.GuildConfigCreated:        handlers.HandleGuildConfigCreated,
-		guildevents.GuildConfigCreationFailed: handlers.HandleGuildConfigCreationFailed,
+		guildevents.GuildConfigCreatedV1:        handlers.HandleGuildConfigCreated,
+		guildevents.GuildConfigCreationFailedV1: handlers.HandleGuildConfigCreationFailed,
 
 		// Guild config update flow - may affect command permissions
-		guildevents.GuildConfigUpdated:      handlers.HandleGuildConfigUpdated,
-		guildevents.GuildConfigUpdateFailed: handlers.HandleGuildConfigUpdateFailed,
+		guildevents.GuildConfigUpdatedV1:      handlers.HandleGuildConfigUpdated,
+		guildevents.GuildConfigUpdateFailedV1: handlers.HandleGuildConfigUpdateFailed,
 
 		// Guild config retrieval flow - informational only, no command action
-		guildevents.GuildConfigRetrieved:       handlers.HandleGuildConfigRetrieved,
-		guildevents.GuildConfigRetrievalFailed: handlers.HandleGuildConfigRetrievalFailed,
+		guildevents.GuildConfigRetrievedV1:       handlers.HandleGuildConfigRetrieved,
+		guildevents.GuildConfigRetrievalFailedV1: handlers.HandleGuildConfigRetrievalFailed,
 
 		// Guild config deletion flow - affects command registration
-		guildevents.GuildConfigDeleted:        handlers.HandleGuildConfigDeleted,
-		guildevents.GuildConfigDeletionFailed: handlers.HandleGuildConfigDeletionFailed,
+		guildevents.GuildConfigDeletedV1:        handlers.HandleGuildConfigDeleted,
+		guildevents.GuildConfigDeletionFailedV1: handlers.HandleGuildConfigDeletionFailed,
 	}
 
 	for topic, handlerFunc := range eventsToHandlers {

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"testing"
 
+	sharedscoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/score"
 	scoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/score"
 	util_mocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
@@ -48,23 +49,31 @@ func Test_ScoreHandlers_HandleScoreUpdateRequest(t *testing.T) {
 			},
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, msg *message.Message) {
-				expectedPayload := &scoreevents.ScoreUpdateRequestPayload{
+				expectedPayload := &sharedscoreevents.ScoreUpdateRequestDiscordPayloadV1{
+					RoundID:   sharedtypes.RoundID(validRoundID),
+					UserID:    "12345",
+					Score:     72,
+					ChannelID: "channel-123",
+					MessageID: "message-456",
+				}
+
+				mockHelper.EXPECT().
+					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&sharedscoreevents.ScoreUpdateRequestDiscordPayloadV1{})).
+					DoAndReturn(func(_ *message.Message, v any) error {
+						*v.(*sharedscoreevents.ScoreUpdateRequestDiscordPayloadV1) = *expectedPayload
+						return nil
+					})
+
+				backendPayload := scoreevents.ScoreUpdateRequestedPayloadV1{
 					RoundID: sharedtypes.RoundID(validRoundID),
 					UserID:  "12345",
 					Score:   72,
 				}
 
-				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&scoreevents.ScoreUpdateRequestPayload{})).
-					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*scoreevents.ScoreUpdateRequestPayload) = *expectedPayload
-						return nil
-					})
-
 				backendMsg := message.NewMessage("backend-msg-id", []byte(`{"round_id": "`+validRoundID.String()+`", "user_id": "12345", "score": 72}`))
 
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Eq(msg), gomock.Eq(expectedPayload), gomock.Eq(scoreevents.ScoreUpdateRequest)).
+					CreateResultMessage(gomock.Eq(msg), gomock.Eq(backendPayload), gomock.Eq(scoreevents.ScoreUpdateRequestedV1)).
 					Return(backendMsg, nil)
 			},
 		},
@@ -76,16 +85,16 @@ func Test_ScoreHandlers_HandleScoreUpdateRequest(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, msg *message.Message) {
-				expectedPayload := &scoreevents.ScoreUpdateRequestPayload{
+				expectedPayload := &sharedscoreevents.ScoreUpdateRequestDiscordPayloadV1{
 					UserID: "12345",
 					Score:  72,
 					// Missing RoundID
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&scoreevents.ScoreUpdateRequestPayload{})).
+					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&sharedscoreevents.ScoreUpdateRequestDiscordPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*scoreevents.ScoreUpdateRequestPayload) = *expectedPayload
+						*v.(*sharedscoreevents.ScoreUpdateRequestDiscordPayloadV1) = *expectedPayload
 						return nil
 					})
 			},
@@ -112,21 +121,29 @@ func Test_ScoreHandlers_HandleScoreUpdateRequest(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, msg *message.Message) {
-				expectedPayload := &scoreevents.ScoreUpdateRequestPayload{
+				expectedPayload := &sharedscoreevents.ScoreUpdateRequestDiscordPayloadV1{
+					RoundID:   sharedtypes.RoundID(validRoundID),
+					UserID:    "12345",
+					Score:     72,
+					ChannelID: "channel-123",
+					MessageID: "message-456",
+				}
+
+				mockHelper.EXPECT().
+					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&sharedscoreevents.ScoreUpdateRequestDiscordPayloadV1{})).
+					DoAndReturn(func(_ *message.Message, v any) error {
+						*v.(*sharedscoreevents.ScoreUpdateRequestDiscordPayloadV1) = *expectedPayload
+						return nil
+					})
+
+				backendPayload := scoreevents.ScoreUpdateRequestedPayloadV1{
 					RoundID: sharedtypes.RoundID(validRoundID),
 					UserID:  "12345",
 					Score:   72,
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&scoreevents.ScoreUpdateRequestPayload{})).
-					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*scoreevents.ScoreUpdateRequestPayload) = *expectedPayload
-						return nil
-					})
-
-				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Eq(msg), gomock.Eq(expectedPayload), gomock.Eq(scoreevents.ScoreUpdateRequest)).
+					CreateResultMessage(gomock.Eq(msg), gomock.Eq(backendPayload), gomock.Eq(scoreevents.ScoreUpdateRequestedV1)).
 					Return(nil, errors.New("failed to create message"))
 			},
 		},
@@ -209,15 +226,15 @@ func Test_ScoreHandlers_HandleScoreUpdateSuccess(t *testing.T) {
 			},
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, msg *message.Message) {
-				expectedPayload := &scoreevents.ScoreUpdateSuccessPayload{
+				expectedPayload := &scoreevents.ScoreUpdatedPayloadV1{
 					RoundID: sharedtypes.RoundID(validRoundID),
 					Score:   72,
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&scoreevents.ScoreUpdateSuccessPayload{})).
+					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&scoreevents.ScoreUpdatedPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*scoreevents.ScoreUpdateSuccessPayload) = *expectedPayload
+						*v.(*scoreevents.ScoreUpdatedPayloadV1) = *expectedPayload
 						return nil
 					})
 
@@ -232,7 +249,7 @@ func Test_ScoreHandlers_HandleScoreUpdateSuccess(t *testing.T) {
 				discordMsg := message.NewMessage("discord-msg-id", []byte(`{"type":"score_update_success","user_id":"12345","round_id":"`+validRoundID.String()+`","score":72,"message_id":"message-456"}`))
 
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Eq(msg), gomock.Eq(expectedResp), gomock.Eq(scoreevents.ScoreUpdateSuccess)).
+					CreateResultMessage(gomock.Eq(msg), gomock.Eq(expectedResp), gomock.Eq(sharedscoreevents.ScoreUpdateResponseDiscordV1)).
 					Return(discordMsg, nil)
 			},
 		},
@@ -247,15 +264,15 @@ func Test_ScoreHandlers_HandleScoreUpdateSuccess(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, msg *message.Message) {
-				expectedPayload := &scoreevents.ScoreUpdateSuccessPayload{
+				expectedPayload := &scoreevents.ScoreUpdatedPayloadV1{
 					RoundID: sharedtypes.RoundID(validRoundID),
 					Score:   72,
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&scoreevents.ScoreUpdateSuccessPayload{})).
+					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&scoreevents.ScoreUpdatedPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*scoreevents.ScoreUpdateSuccessPayload) = *expectedPayload
+						*v.(*scoreevents.ScoreUpdatedPayloadV1) = *expectedPayload
 						return nil
 					})
 			},
@@ -283,20 +300,20 @@ func Test_ScoreHandlers_HandleScoreUpdateSuccess(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, msg *message.Message) {
-				expectedPayload := &scoreevents.ScoreUpdateSuccessPayload{
+				expectedPayload := &scoreevents.ScoreUpdatedPayloadV1{
 					RoundID: sharedtypes.RoundID(validRoundID),
 					Score:   72,
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&scoreevents.ScoreUpdateSuccessPayload{})).
+					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&scoreevents.ScoreUpdatedPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*scoreevents.ScoreUpdateSuccessPayload) = *expectedPayload
+						*v.(*scoreevents.ScoreUpdatedPayloadV1) = *expectedPayload
 						return nil
 					})
 
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Eq(msg), gomock.Any(), gomock.Eq(scoreevents.ScoreUpdateSuccess)).
+					CreateResultMessage(gomock.Eq(msg), gomock.Any(), gomock.Eq(sharedscoreevents.ScoreUpdateResponseDiscordV1)).
 					Return(nil, errors.New("failed to create message"))
 			},
 		},
@@ -375,15 +392,15 @@ func Test_ScoreHandlers_HandleScoreUpdateFailure(t *testing.T) {
 			},
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, msg *message.Message) {
-				expectedPayload := &scoreevents.ScoreUpdateFailurePayload{
+				expectedPayload := &scoreevents.ScoreUpdateFailedPayloadV1{
 					RoundID: sharedtypes.RoundID(validRoundID),
-					Error:   "Score already recorded",
+					Reason:  "Score already recorded",
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&scoreevents.ScoreUpdateFailurePayload{})).
+					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&scoreevents.ScoreUpdateFailedPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*scoreevents.ScoreUpdateFailurePayload) = *expectedPayload
+						*v.(*scoreevents.ScoreUpdateFailedPayloadV1) = *expectedPayload
 						return nil
 					})
 
@@ -391,14 +408,14 @@ func Test_ScoreHandlers_HandleScoreUpdateFailure(t *testing.T) {
 					"type":       "score_update_failure",
 					"user_id":    "12345",
 					"round_id":   expectedPayload.RoundID,
-					"error":      expectedPayload.Error,
+					"error":      expectedPayload.Reason,
 					"message_id": "message-456",
 				}
 
 				discordMsg := message.NewMessage("discord-msg-id", []byte(`{"type":"score_update_failure","user_id":"12345","round_id":"`+validRoundID.String()+`","error":"Score already recorded","message_id":"message-456"}`))
 
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Eq(msg), gomock.Eq(expectedResp), gomock.Eq(scoreevents.ScoreUpdateFailure)).
+					CreateResultMessage(gomock.Eq(msg), gomock.Eq(expectedResp), gomock.Eq(sharedscoreevents.ScoreUpdateFailedDiscordV1)).
 					Return(discordMsg, nil)
 			},
 		},
@@ -412,15 +429,15 @@ func Test_ScoreHandlers_HandleScoreUpdateFailure(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, msg *message.Message) {
-				expectedPayload := &scoreevents.ScoreUpdateFailurePayload{
+				expectedPayload := &scoreevents.ScoreUpdateFailedPayloadV1{
 					RoundID: sharedtypes.RoundID(validRoundID),
-					Error:   "Score already recorded",
+					Reason:  "Score already recorded",
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&scoreevents.ScoreUpdateFailurePayload{})).
+					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&scoreevents.ScoreUpdateFailedPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*scoreevents.ScoreUpdateFailurePayload) = *expectedPayload
+						*v.(*scoreevents.ScoreUpdateFailedPayloadV1) = *expectedPayload
 						return nil
 					})
 			},
@@ -448,20 +465,20 @@ func Test_ScoreHandlers_HandleScoreUpdateFailure(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, msg *message.Message) {
-				expectedPayload := &scoreevents.ScoreUpdateFailurePayload{
+				expectedPayload := &scoreevents.ScoreUpdateFailedPayloadV1{
 					RoundID: sharedtypes.RoundID(validRoundID),
-					Error:   "Score already recorded",
+					Reason:  "Score already recorded",
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&scoreevents.ScoreUpdateFailurePayload{})).
+					UnmarshalPayload(gomock.Eq(msg), gomock.AssignableToTypeOf(&scoreevents.ScoreUpdateFailedPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*scoreevents.ScoreUpdateFailurePayload) = *expectedPayload
+						*v.(*scoreevents.ScoreUpdateFailedPayloadV1) = *expectedPayload
 						return nil
 					})
 
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Eq(msg), gomock.Any(), gomock.Eq(scoreevents.ScoreUpdateFailure)).
+					CreateResultMessage(gomock.Eq(msg), gomock.Any(), gomock.Eq(sharedscoreevents.ScoreUpdateFailedDiscordV1)).
 					Return(nil, errors.New("failed to create message"))
 			},
 		},

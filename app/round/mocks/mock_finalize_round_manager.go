@@ -44,7 +44,7 @@ func (m *MockFinalizeRoundManager) EXPECT() *MockFinalizeRoundManagerMockRecorde
 }
 
 // FinalizeScorecardEmbed mocks base method.
-func (m *MockFinalizeRoundManager) FinalizeScorecardEmbed(ctx context.Context, eventMessageID, channelID string, embedPayload roundevents.RoundFinalizedEmbedUpdatePayload) (finalizeround.FinalizeRoundOperationResult, error) {
+func (m *MockFinalizeRoundManager) FinalizeScorecardEmbed(ctx context.Context, eventMessageID, channelID string, embedPayload roundevents.RoundFinalizedEmbedUpdatePayloadV1) (finalizeround.FinalizeRoundOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FinalizeScorecardEmbed", ctx, eventMessageID, channelID, embedPayload)
 	ret0, _ := ret[0].(finalizeround.FinalizeRoundOperationResult)
@@ -59,7 +59,7 @@ func (mr *MockFinalizeRoundManagerMockRecorder) FinalizeScorecardEmbed(ctx, even
 }
 
 // TransformRoundToFinalizedScorecard mocks base method.
-func (m *MockFinalizeRoundManager) TransformRoundToFinalizedScorecard(payload roundevents.RoundFinalizedEmbedUpdatePayload) (*discordgo.MessageEmbed, []discordgo.MessageComponent, error) {
+func (m *MockFinalizeRoundManager) TransformRoundToFinalizedScorecard(payload roundevents.RoundFinalizedEmbedUpdatePayloadV1) (*discordgo.MessageEmbed, []discordgo.MessageComponent, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "TransformRoundToFinalizedScorecard", payload)
 	ret0, _ := ret[0].(*discordgo.MessageEmbed)

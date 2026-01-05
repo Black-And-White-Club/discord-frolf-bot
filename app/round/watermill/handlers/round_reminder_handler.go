@@ -17,9 +17,9 @@ import (
 func (h *RoundHandlers) HandleRoundReminder(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleRoundReminder",
-		&roundevents.DiscordReminderPayload{},
+		&roundevents.DiscordReminderPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			reminderPayload, ok := payload.(*roundevents.DiscordReminderPayload)
+			reminderPayload, ok := payload.(*roundevents.DiscordReminderPayloadV1)
 			if !ok {
 				return nil, fmt.Errorf("invalid payload type for HandleRoundReminder")
 			}
@@ -65,7 +65,7 @@ func (h *RoundHandlers) HandleRoundReminder(msg *message.Message) ([]*message.Me
 					attr.String("message_id", msg.UUID))
 
 				// Create new payload with default channel
-				reminderPayload = &roundevents.DiscordReminderPayload{
+				reminderPayload = &roundevents.DiscordReminderPayloadV1{
 					RoundID:          reminderPayload.RoundID,
 					DiscordChannelID: defaultChannelID,
 					ReminderType:     reminderPayload.ReminderType,

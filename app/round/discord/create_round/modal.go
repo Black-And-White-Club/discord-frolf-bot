@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
+	sharedroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
@@ -252,7 +252,7 @@ func (crm *createRoundManager) HandleCreateRoundModalSubmit(ctx context.Context,
 		}
 
 		// Publish event for backend validation
-		payload := discordroundevents.CreateRoundRequestedPayload{
+		payload := sharedroundevents.CreateRoundModalPayloadV1{
 			UserID:      sharedtypes.DiscordID(userID),
 			Title:       roundtypes.Title(title),
 			Description: description,
@@ -265,7 +265,7 @@ func (crm *createRoundManager) HandleCreateRoundModalSubmit(ctx context.Context,
 
 		crm.logger.InfoContext(ctx, "Publishing event for Modal validation", attr.Any("payload", payload))
 
-		msg, correlationID, err := crm.createEvent(ctx, discordroundevents.RoundCreateModalSubmit, payload, i)
+		msg, correlationID, err := crm.createEvent(ctx, sharedroundevents.RoundCreateModalSubmittedV1, payload, i)
 		if err != nil {
 			createErr := fmt.Errorf("failed to create event: %w", err)
 			return CreateRoundOperationResult{Error: createErr}, createErr
@@ -281,7 +281,7 @@ func (crm *createRoundManager) HandleCreateRoundModalSubmit(ctx context.Context,
 		msg.Metadata.Set("correlation_id", correlationID)
 		msg.Metadata.Set("user_id", userID)
 
-		if err := crm.publisher.Publish(discordroundevents.RoundCreateModalSubmit, msg); err != nil {
+		if err := crm.publisher.Publish(sharedroundevents.RoundCreateModalSubmittedV1, msg); err != nil {
 			publishErr := fmt.Errorf("failed to publish event: %w", err)
 			return CreateRoundOperationResult{Error: publishErr}, publishErr
 		}

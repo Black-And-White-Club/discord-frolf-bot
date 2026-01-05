@@ -46,22 +46,22 @@ func TestRoundHandlers_HandleRoundFinalized(t *testing.T) {
 			want:    []*message.Message{{}},
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockHelper *util_mocks.MockHelpers, mockFinalizeRoundManager *mocks.MockFinalizeRoundManager) {
-				expectedDiscordPayload := roundevents.RoundFinalizedDiscordPayload{
+				expectedDiscordPayload := roundevents.RoundFinalizedDiscordPayloadV1{
 					RoundID:          testRoundID,
 					DiscordChannelID: "1234",
 					EventMessageID:   eventMessageID.String(),
 				}
 
-				expectedEmbedPayload := roundevents.RoundFinalizedEmbedUpdatePayload{
+				expectedEmbedPayload := roundevents.RoundFinalizedEmbedUpdatePayloadV1{
 					RoundID:          testRoundID,
 					DiscordChannelID: "1234",
 					EventMessageID:   eventMessageID.String(),
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundFinalizedDiscordPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundFinalizedDiscordPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.RoundFinalizedDiscordPayload) = expectedDiscordPayload
+						*v.(*roundevents.RoundFinalizedDiscordPayloadV1) = expectedDiscordPayload
 						return nil
 					}).
 					Times(1)
@@ -78,7 +78,7 @@ func TestRoundHandlers_HandleRoundFinalized(t *testing.T) {
 					Times(1)
 
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Any(), roundevents.RoundTraceEvent).
+					CreateResultMessage(gomock.Any(), gomock.Any(), roundevents.RoundTraceEventV1).
 					Return(&message.Message{}, nil).
 					Times(1)
 			},
@@ -96,22 +96,22 @@ func TestRoundHandlers_HandleRoundFinalized(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockHelper *util_mocks.MockHelpers, mockFinalizeRoundManager *mocks.MockFinalizeRoundManager) {
-				expectedDiscordPayload := roundevents.RoundFinalizedDiscordPayload{
+				expectedDiscordPayload := roundevents.RoundFinalizedDiscordPayloadV1{
 					RoundID:          testRoundID,
 					DiscordChannelID: "1234",
 					EventMessageID:   eventMessageID.String(),
 				}
 
-				expectedEmbedPayload := roundevents.RoundFinalizedEmbedUpdatePayload{
+				expectedEmbedPayload := roundevents.RoundFinalizedEmbedUpdatePayloadV1{
 					RoundID:          testRoundID,
 					DiscordChannelID: "1234",
 					EventMessageID:   eventMessageID.String(),
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundFinalizedDiscordPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundFinalizedDiscordPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.RoundFinalizedDiscordPayload) = expectedDiscordPayload
+						*v.(*roundevents.RoundFinalizedDiscordPayloadV1) = expectedDiscordPayload
 						return nil
 					}).
 					Times(1)
@@ -141,22 +141,22 @@ func TestRoundHandlers_HandleRoundFinalized(t *testing.T) {
 			want:    []*message.Message{},
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockHelper *util_mocks.MockHelpers, mockFinalizeRoundManager *mocks.MockFinalizeRoundManager) {
-				expectedDiscordPayload := roundevents.RoundFinalizedDiscordPayload{
+				expectedDiscordPayload := roundevents.RoundFinalizedDiscordPayloadV1{
 					RoundID:          testRoundID,
 					DiscordChannelID: "1234",
 					EventMessageID:   eventMessageID.String(),
 				}
 
-				expectedEmbedPayload := roundevents.RoundFinalizedEmbedUpdatePayload{
+				expectedEmbedPayload := roundevents.RoundFinalizedEmbedUpdatePayloadV1{
 					RoundID:          testRoundID,
 					DiscordChannelID: "1234",
 					EventMessageID:   eventMessageID.String(),
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundFinalizedDiscordPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundFinalizedDiscordPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.RoundFinalizedDiscordPayload) = expectedDiscordPayload
+						*v.(*roundevents.RoundFinalizedDiscordPayloadV1) = expectedDiscordPayload
 						return nil
 					}).
 					Times(1)
@@ -173,7 +173,7 @@ func TestRoundHandlers_HandleRoundFinalized(t *testing.T) {
 					Times(1)
 
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Any(), roundevents.RoundTraceEvent).
+					CreateResultMessage(gomock.Any(), gomock.Any(), roundevents.RoundTraceEventV1).
 					Return(nil, errors.New("failed to create trace event")).
 					Times(1)
 			},
@@ -191,16 +191,16 @@ func TestRoundHandlers_HandleRoundFinalized(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockHelper *util_mocks.MockHelpers, mockFinalizeRoundManager *mocks.MockFinalizeRoundManager) {
-				expectedDiscordPayload := roundevents.RoundFinalizedDiscordPayload{
+				expectedDiscordPayload := roundevents.RoundFinalizedDiscordPayloadV1{
 					RoundID:          testRoundID,
 					DiscordChannelID: "1234",
 					EventMessageID:   eventMessageID.String(),
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundFinalizedDiscordPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundFinalizedDiscordPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.RoundFinalizedDiscordPayload) = expectedDiscordPayload
+						*v.(*roundevents.RoundFinalizedDiscordPayloadV1) = expectedDiscordPayload
 						return nil
 					}).
 					Times(1)
@@ -226,22 +226,22 @@ func TestRoundHandlers_HandleRoundFinalized(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockHelper *util_mocks.MockHelpers, mockFinalizeRoundManager *mocks.MockFinalizeRoundManager) {
-				expectedDiscordPayload := roundevents.RoundFinalizedDiscordPayload{
+				expectedDiscordPayload := roundevents.RoundFinalizedDiscordPayloadV1{
 					RoundID:          testRoundID,
 					DiscordChannelID: "1234",
 					EventMessageID:   eventMessageID.String(),
 				}
 
-				expectedEmbedPayload := roundevents.RoundFinalizedEmbedUpdatePayload{
+				expectedEmbedPayload := roundevents.RoundFinalizedEmbedUpdatePayloadV1{
 					RoundID:          testRoundID,
 					DiscordChannelID: "1234",
 					EventMessageID:   eventMessageID.String(),
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundFinalizedDiscordPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundFinalizedDiscordPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.RoundFinalizedDiscordPayload) = expectedDiscordPayload
+						*v.(*roundevents.RoundFinalizedDiscordPayloadV1) = expectedDiscordPayload
 						return nil
 					}).
 					Times(1)

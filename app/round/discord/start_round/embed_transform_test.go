@@ -37,7 +37,7 @@ func Test_startRoundManager_TransformRoundToScorecard(t *testing.T) {
 	tests := []struct {
 		name               string
 		setup              func(mockSession *discordmocks.MockSession)
-		payload            *roundevents.DiscordRoundStartPayload
+		payload            *roundevents.DiscordRoundStartPayloadV1
 		expectedEmbed      *discordgo.MessageEmbed
 		expectedComponents []discordgo.MessageComponent
 		expectError        bool
@@ -47,12 +47,12 @@ func Test_startRoundManager_TransformRoundToScorecard(t *testing.T) {
 			setup: func(mockSession *discordmocks.MockSession) {
 				// No setup needed for this case
 			},
-			payload: &roundevents.DiscordRoundStartPayload{
+			payload: &roundevents.DiscordRoundStartPayloadV1{
 				RoundID:      testRoundID,
 				Title:        "Test Round",
 				Location:     (*roundtypes.Location)(strPtr("Test Course")),
 				StartTime:    (*sharedtypes.StartTime)(timePtr(fixedTime)),
-				Participants: []roundevents.RoundParticipant{},
+				Participants: []roundevents.RoundParticipantV1{},
 			},
 			expectedEmbed: &discordgo.MessageEmbed{
 				Title:       "**Test Round** - Round Started",
@@ -109,12 +109,12 @@ func Test_startRoundManager_TransformRoundToScorecard(t *testing.T) {
 			setup: func(mockSession *discordmocks.MockSession) {
 				// No mock calls needed since the function uses Discord mentions directly
 			},
-			payload: &roundevents.DiscordRoundStartPayload{
+			payload: &roundevents.DiscordRoundStartPayloadV1{
 				RoundID:   testRoundID,
 				Title:     "Test Round",
 				Location:  (*roundtypes.Location)(strPtr("Test Course")),
 				StartTime: (*sharedtypes.StartTime)(timePtr(fixedTime)),
-				Participants: []roundevents.RoundParticipant{
+				Participants: []roundevents.RoundParticipantV1{
 					{
 						UserID:    "user-123",
 						TagNumber: nil,
@@ -194,12 +194,12 @@ func Test_startRoundManager_TransformRoundToScorecard(t *testing.T) {
 			setup: func(mockSession *discordmocks.MockSession) {
 				// No mock calls needed
 			},
-			payload: &roundevents.DiscordRoundStartPayload{
+			payload: &roundevents.DiscordRoundStartPayloadV1{
 				RoundID:   testRoundID,
 				Title:     "Mixed Round",
 				Location:  (*roundtypes.Location)(strPtr("Test Course")),
 				StartTime: (*sharedtypes.StartTime)(timePtr(fixedTime)),
-				Participants: []roundevents.RoundParticipant{
+				Participants: []roundevents.RoundParticipantV1{
 					{
 						UserID:    "user-123",
 						TagNumber: nil,
@@ -285,12 +285,12 @@ func Test_startRoundManager_TransformRoundToScorecard(t *testing.T) {
 			setup: func(mockSession *discordmocks.MockSession) {
 				// No mock calls needed
 			},
-			payload: &roundevents.DiscordRoundStartPayload{
+			payload: &roundevents.DiscordRoundStartPayloadV1{
 				RoundID:   testRoundID,
 				Title:     "Tagged Round",
 				Location:  (*roundtypes.Location)(strPtr("Test Course")),
 				StartTime: (*sharedtypes.StartTime)(timePtr(fixedTime)),
-				Participants: []roundevents.RoundParticipant{
+				Participants: []roundevents.RoundParticipantV1{
 					{
 						UserID:    "user-123",
 						TagNumber: func() *sharedtypes.TagNumber { t := sharedtypes.TagNumber(1); return &t }(),

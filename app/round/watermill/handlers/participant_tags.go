@@ -18,9 +18,9 @@ const guildIDKey contextKey = "guild_id"
 func (h *RoundHandlers) HandleTagsUpdatedForScheduledRounds(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleTagsUpdatedForScheduledRounds",
-		&roundevents.TagsUpdatedForScheduledRoundsPayload{}, // Correct payload type
+		&roundevents.TagsUpdatedForScheduledRoundsPayloadV1{}, // Correct payload type
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			tagsUpdatedPayload := payload.(*roundevents.TagsUpdatedForScheduledRoundsPayload)
+			tagsUpdatedPayload := payload.(*roundevents.TagsUpdatedForScheduledRoundsPayloadV1)
 
 			h.Logger.InfoContext(ctx, "Received TagsUpdatedForScheduledRounds event",
 				attr.CorrelationIDFromMsg(msg),

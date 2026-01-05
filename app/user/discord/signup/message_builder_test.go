@@ -9,7 +9,7 @@ import (
 )
 
 func TestBuildUserSignupRequestMessage_Success(t *testing.T) {
-	payload := userevents.UserSignupRequestPayload{
+	payload := userevents.UserSignupRequestedPayloadV1{
 		GuildID: sharedtypes.GuildID("123"),
 		UserID:  sharedtypes.DiscordID("456"),
 	}
@@ -33,11 +33,11 @@ func TestBuildUserSignupRequestMessage_Success(t *testing.T) {
 
 func TestBuildUserSignupRequestMessage_Validation(t *testing.T) {
 	// Missing both
-	if _, err := BuildUserSignupRequestMessage(context.TODO(), userevents.UserSignupRequestPayload{}, nil); err == nil {
+	if _, err := BuildUserSignupRequestMessage(context.TODO(), userevents.UserSignupRequestedPayloadV1{}, nil); err == nil {
 		t.Fatalf("expected error for missing guild/user ids")
 	}
 	// Only user missing
-	if _, err := BuildUserSignupRequestMessage(context.TODO(), userevents.UserSignupRequestPayload{GuildID: sharedtypes.GuildID("123")}, nil); err == nil {
+	if _, err := BuildUserSignupRequestMessage(context.TODO(), userevents.UserSignupRequestedPayloadV1{GuildID: sharedtypes.GuildID("123")}, nil); err == nil {
 		t.Fatalf("expected error for missing user id")
 	}
 }

@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	guildevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/guild"
+	guildevents "github.com/Black-And-White-Club/frolf-bot-shared/events/guild"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -99,8 +100,8 @@ func (s *setupManager) publishSetupEvent(i *discordgo.InteractionCreate, result 
 		return fmt.Errorf("admin role ID is required but empty")
 	}
 
-	// Get guild info
-	guild, err := s.session.Guild(i.GuildID)
+	// Get guild info to validate guild exists
+	_, err := s.session.Guild(i.GuildID)
 	if err != nil {
 		return fmt.Errorf("failed to get guild info: %w", err)
 	}
@@ -112,35 +113,29 @@ func (s *setupManager) publishSetupEvent(i *discordgo.InteractionCreate, result 
 		signupEmoji = "🥏" // Default fallback
 	}
 
-	event := guildevents.GuildSetupEvent{
-		GuildID:                i.GuildID,
-		GuildName:              guild.Name,
-		AdminUserID:            i.Member.User.ID,
-		EventChannelID:         result.EventChannelID,
-		EventChannelName:       result.EventChannelName,
-		LeaderboardChannelID:   result.LeaderboardChannelID,
-		LeaderboardChannelName: result.LeaderboardChannelName,
-		SignupChannelID:        result.SignupChannelID,
-		SignupChannelName:      result.SignupChannelName,
-		RoleMappings:           result.RoleMappings,
-		RegisteredRoleID:       result.UserRoleID, // Legacy field for backward compatibility
-		UserRoleID:             result.UserRoleID,
-		EditorRoleID:           result.EditorRoleID,
-		AdminRoleID:            result.AdminRoleID,
-		SignupEmoji:            signupEmoji,
-		SignupMessageID:        result.SignupMessageID,
-		SetupCompletedAt:       setupTime,
+	payload := guildevents.GuildConfigCreationRequestedPayloadV1{
+		GuildID:              sharedtypes.GuildID(i.GuildID),
+		SignupChannelID:      result.SignupChannelID,
+		SignupMessageID:      result.SignupMessageID,
+		EventChannelID:       result.EventChannelID,
+		LeaderboardChannelID: result.LeaderboardChannelID,
+		UserRoleID:           result.UserRoleID,
+		EditorRoleID:         result.EditorRoleID,
+		AdminRoleID:          result.AdminRoleID,
+		SignupEmoji:          signupEmoji,
+		AutoSetupCompleted:   true,
+		SetupCompletedAt:     &setupTime,
 	}
 
 	// Create and publish the message using the helper
-	msg, err := s.helper.CreateNewMessage(event, guildevents.GuildSetupEventTopic)
+	msg, err := s.helper.CreateNewMessage(payload, guildevents.GuildConfigCreationRequestedV1)
 	if err != nil {
 		return fmt.Errorf("failed to create setup event message: %w", err)
 	}
 
 	msg.Metadata.Set("guild_id", i.GuildID)
 
-	return s.publisher.Publish(guildevents.GuildSetupEventTopic, msg)
+	return s.publisher.Publish(guildevents.GuildConfigCreationRequestedV1, msg)
 }
 
 // createOrFindChannel creates a new channel or finds an existing one

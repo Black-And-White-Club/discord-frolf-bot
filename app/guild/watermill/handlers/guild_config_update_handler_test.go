@@ -111,7 +111,7 @@ func TestGuildHandlers_HandleGuildConfigUpdated(t *testing.T) {
 				Metrics:      metrics,
 				handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
 					return func(msg *message.Message) ([]*message.Message, error) {
-						payload := &guildevents.GuildConfigUpdatedPayload{
+						payload := &guildevents.GuildConfigUpdatedPayloadV1{
 							GuildID:       sharedtypes.GuildID("123456789"),
 							UpdatedFields: []string{"signup_channel_id", "event_channel_id"},
 						}
@@ -200,7 +200,7 @@ func TestGuildHandlers_HandleGuildConfigUpdateFailed(t *testing.T) {
 				Metrics:      metrics,
 				handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
 					return func(msg *message.Message) ([]*message.Message, error) {
-						payload := &guildevents.GuildConfigUpdateFailedPayload{
+						payload := &guildevents.GuildConfigUpdateFailedPayloadV1{
 							GuildID: sharedtypes.GuildID("123456789"),
 							Reason:  "database connection failed",
 						}
@@ -271,7 +271,7 @@ func TestGuildHandlers_HandleGuildConfigRetrieved(t *testing.T) {
 				Metrics:      metrics,
 				handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
 					return func(msg *message.Message) ([]*message.Message, error) {
-						payload := &guildevents.GuildConfigRetrievedPayload{
+						payload := &guildevents.GuildConfigRetrievedPayloadV1{
 							GuildID: sharedtypes.GuildID("123456789"),
 						}
 						return handlerFunc(context.Background(), msg, payload)
@@ -342,7 +342,7 @@ func TestGuildHandlers_HandleGuildConfigRetrievalFailed(t *testing.T) {
 				Metrics:      metrics,
 				handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
 					return func(msg *message.Message) ([]*message.Message, error) {
-						payload := &guildevents.GuildConfigRetrievalFailedPayload{
+						payload := &guildevents.GuildConfigRetrievalFailedPayloadV1{
 							GuildID: sharedtypes.GuildID("123456789"),
 							Reason:  "config not found",
 						}

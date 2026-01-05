@@ -30,8 +30,8 @@ type StartRoundOperationResult struct {
 
 // StartRoundManager defines the interface for create round operations.
 type StartRoundManager interface {
-	TransformRoundToScorecard(ctx context.Context, payload *roundevents.DiscordRoundStartPayload, existingEmbed *discordgo.MessageEmbed) (StartRoundOperationResult, error)
-	UpdateRoundToScorecard(ctx context.Context, channelID, messageID string, payload *roundevents.DiscordRoundStartPayload) (StartRoundOperationResult, error)
+	TransformRoundToScorecard(ctx context.Context, payload *roundevents.DiscordRoundStartPayloadV1, existingEmbed *discordgo.MessageEmbed) (StartRoundOperationResult, error)
+	UpdateRoundToScorecard(ctx context.Context, channelID, messageID string, payload *roundevents.DiscordRoundStartPayloadV1) (StartRoundOperationResult, error)
 }
 
 // startRoundManager implements the StartRoundManager interface.

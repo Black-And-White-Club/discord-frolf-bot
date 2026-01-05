@@ -11,7 +11,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-func (rm *roundReminderManager) SendRoundReminder(ctx context.Context, payload *roundevents.DiscordReminderPayload) (RoundReminderOperationResult, error) {
+func (rm *roundReminderManager) SendRoundReminder(ctx context.Context, payload *roundevents.DiscordReminderPayloadV1) (RoundReminderOperationResult, error) {
 	return rm.operationWrapper(ctx, "SendRoundReminder", func(ctx context.Context) (RoundReminderOperationResult, error) {
 		rm.logger.InfoContext(ctx, "Processing round reminder",
 			attr.RoundID("round_id", payload.RoundID),

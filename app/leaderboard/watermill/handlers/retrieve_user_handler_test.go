@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"testing"
 
-	discordleaderboardevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/leaderboard"
+	sharedleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	util_mocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
@@ -35,16 +35,16 @@ func TestLeaderboardHandlers_HandleGetTagByDiscordID(t *testing.T) {
 			want:    []*message.Message{{}},
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
-				discordPayload := discordleaderboardevents.LeaderboardTagAvailabilityRequestPayload{UserID: "user123"}
-				mockHelper.EXPECT().UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discordleaderboardevents.LeaderboardTagAvailabilityRequestPayload{})).
+				discordPayload := sharedleaderboardevents.LeaderboardTagAvailabilityRequestPayloadV1{UserID: "user123"}
+				mockHelper.EXPECT().UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&sharedleaderboardevents.LeaderboardTagAvailabilityRequestPayloadV1{})).
 					DoAndReturn(func(msg *message.Message, v interface{}) error {
-						payload := v.(*discordleaderboardevents.LeaderboardTagAvailabilityRequestPayload)
+						payload := v.(*sharedleaderboardevents.LeaderboardTagAvailabilityRequestPayloadV1)
 						*payload = discordPayload
 						return nil
 					}).Times(1)
 
-				backendPayload := leaderboardevents.SoloTagNumberRequestPayload{UserID: sharedtypes.DiscordID("user123")}
-				mockHelper.EXPECT().CreateResultMessage(gomock.Any(), backendPayload, leaderboardevents.GetTagByUserIDRequest).
+				backendPayload := leaderboardevents.SoloTagNumberRequestPayloadV1{UserID: sharedtypes.DiscordID("user123")}
+				mockHelper.EXPECT().CreateResultMessage(gomock.Any(), backendPayload, leaderboardevents.GetTagByUserIDRequestedV1).
 					Return(&message.Message{}, nil).Times(1)
 			},
 		},
@@ -70,10 +70,10 @@ func TestLeaderboardHandlers_HandleGetTagByDiscordID(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
-				discordPayload := discordleaderboardevents.LeaderboardTagAvailabilityRequestPayload{UserID: "user123"}
+				discordPayload := sharedleaderboardevents.LeaderboardTagAvailabilityRequestPayloadV1{UserID: "user123"}
 				mockHelper.EXPECT().UnmarshalPayload(gomock.Any(), gomock.Any()).
 					DoAndReturn(func(msg *message.Message, v interface{}) error {
-						payload := v.(*discordleaderboardevents.LeaderboardTagAvailabilityRequestPayload)
+						payload := v.(*sharedleaderboardevents.LeaderboardTagAvailabilityRequestPayloadV1)
 						*payload = discordPayload
 						return nil
 					}).Times(1)
@@ -133,22 +133,22 @@ func TestLeaderboardHandlers_HandleGetTagByDiscordIDResponse(t *testing.T) {
 			name: "successful_response_translation",
 			msg: &message.Message{
 				UUID:     "test-uuid",
-				Metadata: message.Metadata{"topic": leaderboardevents.GetTagNumberResponse, "correlation_id": "test-correlation"},
+				Metadata: message.Metadata{"topic": leaderboardevents.GetTagNumberResponseV1, "correlation_id": "test-correlation"},
 				Payload:  []byte(`{"tag_number": 123}`),
 			},
 			want:    []*message.Message{{}},
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
-				backendPayload := leaderboardevents.GetTagNumberResponsePayload{TagNumber: &testTagNumber}
-				mockHelper.EXPECT().UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&leaderboardevents.GetTagNumberResponsePayload{})).
+				backendPayload := leaderboardevents.GetTagNumberResponsePayloadV1{TagNumber: &testTagNumber}
+				mockHelper.EXPECT().UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&leaderboardevents.GetTagNumberResponsePayloadV1{})).
 					DoAndReturn(func(msg *message.Message, v interface{}) error {
-						payload := v.(*leaderboardevents.GetTagNumberResponsePayload)
+						payload := v.(*leaderboardevents.GetTagNumberResponsePayloadV1)
 						payload.TagNumber = backendPayload.TagNumber
 						return nil
 					}).Times(1)
 
-				discordPayload := discordleaderboardevents.LeaderboardTagAvailabilityResponsePayload{TagNumber: 123}
-				mockHelper.EXPECT().CreateResultMessage(gomock.Any(), discordPayload, leaderboardevents.GetTagByUserIDResponse).
+				discordPayload := sharedleaderboardevents.LeaderboardTagAvailabilityResponsePayloadV1{TagNumber: 123}
+				mockHelper.EXPECT().CreateResultMessage(gomock.Any(), discordPayload, sharedleaderboardevents.LeaderboardTagAvailabilityResponseV1).
 					Return(&message.Message{}, nil).Times(1)
 			},
 		},
@@ -156,7 +156,7 @@ func TestLeaderboardHandlers_HandleGetTagByDiscordIDResponse(t *testing.T) {
 			name: "handle_failed_event",
 			msg: &message.Message{
 				UUID:     "test-uuid",
-				Metadata: message.Metadata{"topic": leaderboardevents.GetTagNumberFailed, "correlation_id": "test-correlation"},
+				Metadata: message.Metadata{"topic": leaderboardevents.GetTagNumberFailedV1, "correlation_id": "test-correlation"},
 			},
 			want:    nil,
 			wantErr: false,
@@ -176,7 +176,7 @@ func TestLeaderboardHandlers_HandleGetTagByDiscordIDResponse(t *testing.T) {
 			name: "unmarshal_error_in_response",
 			msg: &message.Message{
 				UUID:     "test-uuid",
-				Metadata: message.Metadata{"topic": leaderboardevents.GetTagNumberResponse, "correlation_id": "test-correlation"},
+				Metadata: message.Metadata{"topic": leaderboardevents.GetTagNumberResponseV1, "correlation_id": "test-correlation"},
 				Payload:  []byte(`invalid`),
 			},
 			want:    nil,
@@ -190,16 +190,16 @@ func TestLeaderboardHandlers_HandleGetTagByDiscordIDResponse(t *testing.T) {
 			name: "create_result_message_error_in_response",
 			msg: &message.Message{
 				UUID:     "test-uuid",
-				Metadata: message.Metadata{"topic": leaderboardevents.GetTagNumberResponse, "correlation_id": "test-correlation"},
+				Metadata: message.Metadata{"topic": leaderboardevents.GetTagNumberResponseV1, "correlation_id": "test-correlation"},
 				Payload:  []byte(`{"tag_number": 123}`),
 			},
 			want:    nil,
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
-				backendPayload := leaderboardevents.GetTagNumberResponsePayload{TagNumber: &testTagNumber}
+				backendPayload := leaderboardevents.GetTagNumberResponsePayloadV1{TagNumber: &testTagNumber}
 				mockHelper.EXPECT().UnmarshalPayload(gomock.Any(), gomock.Any()).
 					DoAndReturn(func(msg *message.Message, v interface{}) error {
-						payload := v.(*leaderboardevents.GetTagNumberResponsePayload)
+						payload := v.(*leaderboardevents.GetTagNumberResponsePayloadV1)
 						payload.TagNumber = backendPayload.TagNumber
 						return nil
 					}).Times(1)

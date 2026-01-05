@@ -159,18 +159,3 @@ func (mr *MockHandlersMockRecorder) HandleGuildConfigUpdated(msg any) *gomock.Ca
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleGuildConfigUpdated", reflect.TypeOf((*MockHandlers)(nil).HandleGuildConfigUpdated), msg)
 }
-
-// HandleGuildSetupRequest mocks base method.
-func (m *MockHandlers) HandleGuildSetupRequest(msg *message.Message) ([]*message.Message, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HandleGuildSetupRequest", msg)
-	ret0, _ := ret[0].([]*message.Message)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// HandleGuildSetupRequest indicates an expected call of HandleGuildSetupRequest.
-func (mr *MockHandlersMockRecorder) HandleGuildSetupRequest(msg any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleGuildSetupRequest", reflect.TypeOf((*MockHandlers)(nil).HandleGuildSetupRequest), msg)
-}

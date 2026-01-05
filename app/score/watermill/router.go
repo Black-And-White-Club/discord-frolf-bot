@@ -8,6 +8,7 @@ import (
 	scorehandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/score/watermill/handlers"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
+	sharedscoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/score"
 	scoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/score"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	tracingfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/tracing"
@@ -74,9 +75,9 @@ func (r *ScoreRouter) RegisterHandlers(ctx context.Context, handlers scorehandle
 	r.logger.InfoContext(ctx, "Registering Score Handlers")
 
 	eventsToHandlers := map[string]message.HandlerFunc{
-		scoreevents.ScoreUpdateRequest: handlers.HandleScoreUpdateRequest,
-		scoreevents.ScoreUpdateSuccess: handlers.HandleScoreUpdateSuccess,
-		scoreevents.ScoreUpdateFailure: handlers.HandleScoreUpdateFailure,
+		sharedscoreevents.ScoreUpdateRequestDiscordV1: handlers.HandleScoreUpdateRequest,
+		scoreevents.ScoreUpdatedV1:                    handlers.HandleScoreUpdateSuccess,
+		scoreevents.ScoreUpdateFailedV1:               handlers.HandleScoreUpdateFailure,
 	}
 
 	for topic, handlerFunc := range eventsToHandlers {

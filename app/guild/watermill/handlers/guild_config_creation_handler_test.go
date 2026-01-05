@@ -86,7 +86,7 @@ func TestGuildHandlers_HandleGuildConfigCreated(t *testing.T) {
 				Metrics:             metrics,
 				handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
 					return func(msg *message.Message) ([]*message.Message, error) {
-						payload := &guildevents.GuildConfigCreatedPayload{GuildID: sharedtypes.GuildID("123456789")}
+						payload := &guildevents.GuildConfigCreatedPayloadV1{GuildID: sharedtypes.GuildID("123456789")}
 						payload.Config.GuildID = sharedtypes.GuildID("123456789")
 						payload.Config.SignupChannelID = "signup-channel"
 						payload.Config.EventChannelID = "event-channel"
@@ -153,7 +153,7 @@ func TestGuildHandlers_HandleGuildConfigCreationFailed(t *testing.T) {
 				Metrics:      metrics,
 				handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
 					return func(msg *message.Message) ([]*message.Message, error) {
-						payload := &guildevents.GuildConfigCreationFailedPayload{
+						payload := &guildevents.GuildConfigCreationFailedPayloadV1{
 							GuildID: sharedtypes.GuildID("123456789"),
 							Reason:  "database connection failed",
 						}

@@ -22,7 +22,7 @@ import (
 
 // RoundReminderManager defines the interface for round reminder operations.
 type RoundReminderManager interface {
-	SendRoundReminder(ctx context.Context, payload *roundevents.DiscordReminderPayload) (RoundReminderOperationResult, error)
+	SendRoundReminder(ctx context.Context, payload *roundevents.DiscordReminderPayloadV1) (RoundReminderOperationResult, error)
 }
 type roundReminderManager struct {
 	session             discord.Session

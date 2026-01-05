@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
-	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
+	discordroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	helpersmocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
@@ -117,7 +117,7 @@ func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
 					Times(1)
 
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(discordroundevents.RoundParticipantJoinReqTopic)).
+					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(discordroundevents.RoundParticipantJoinRequestDiscordV1)).
 					Return(nil, errors.New("failed to create result message")).
 					Times(1)
 			},
@@ -139,12 +139,12 @@ func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
 					Times(1)
 
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(discordroundevents.RoundParticipantJoinReqTopic)).
+					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(discordroundevents.RoundParticipantJoinRequestDiscordV1)).
 					Return(&message.Message{UUID: "msg-123"}, nil).
 					Times(1)
 
 				mockPublisher.EXPECT().
-					Publish(gomock.Eq(discordroundevents.RoundParticipantJoinReqTopic), gomock.Any()).
+					Publish(gomock.Eq(discordroundevents.RoundParticipantJoinRequestDiscordV1), gomock.Any()).
 					Return(errors.New("failed to publish message")).
 					Times(1)
 			},
@@ -293,12 +293,12 @@ func Test_roundRsvpManager_InteractionJoinRoundLate(t *testing.T) {
 					Times(1)
 
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(discordroundevents.RoundParticipantJoinReqTopic)).
+					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(discordroundevents.RoundParticipantJoinRequestDiscordV1)).
 					Return(&message.Message{UUID: "msg-123"}, nil).
 					Times(1)
 
 				mockPublisher.EXPECT().
-					Publish(gomock.Eq(discordroundevents.RoundParticipantJoinReqTopic), gomock.Any()).
+					Publish(gomock.Eq(discordroundevents.RoundParticipantJoinRequestDiscordV1), gomock.Any()).
 					Return(errors.New("failed to publish")).
 					Times(1)
 			},
