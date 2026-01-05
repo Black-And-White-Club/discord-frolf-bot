@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"testing"
 
-	discordleaderboardevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/leaderboard"
+	sharedleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	util_mocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
@@ -74,7 +74,7 @@ func TestLeaderboardHandlers_HandleTagSwapRequest(t *testing.T) {
 			},
 			want: []*message.Message{
 				{
-					Payload: []byte(`{"GuildID":"","requestor_id":"requestor","target_id":"user2"}`),
+					Payload: []byte(`{"guild_id":"","requestor_id":"requestor","target_id":"user2"}`),
 					Metadata: message.Metadata{
 						"user_id":    "requestor",
 						"channel_id": "channel",
@@ -85,7 +85,7 @@ func TestLeaderboardHandlers_HandleTagSwapRequest(t *testing.T) {
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
 				// 1. Ensure UnmarshalPayload uses the EXACT type from the handler
-				expectedPayload := discordleaderboardevents.LeaderboardTagSwapRequestPayload{
+				expectedPayload := sharedleaderboardevents.LeaderboardTagSwapRequestPayloadV1{
 					User1ID:     "user1",
 					User2ID:     "user2",
 					RequestorID: "requestor",
@@ -94,23 +94,23 @@ func TestLeaderboardHandlers_HandleTagSwapRequest(t *testing.T) {
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discordleaderboardevents.LeaderboardTagSwapRequestPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&sharedleaderboardevents.LeaderboardTagSwapRequestPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
 						// Type-assert to the specific pointer type
-						target := v.(*discordleaderboardevents.LeaderboardTagSwapRequestPayload)
+						target := v.(*sharedleaderboardevents.LeaderboardTagSwapRequestPayloadV1)
 						*target = expectedPayload
 						return nil
 					}).
 					Times(1)
 
 				// 2. Match CreateResultMessage arguments exactly
-				backendPayload := leaderboardevents.TagSwapRequestedPayload{
+				backendPayload := leaderboardevents.TagSwapRequestedPayloadV1{
 					RequestorID: sharedtypes.DiscordID("requestor"),
 					TargetID:    sharedtypes.DiscordID("user2"),
 				}
 
 				// The real CreateResultMessage helper adds GuildID to the payload
-				expectedPayloadWithGuildID := leaderboardevents.TagSwapRequestedPayload{
+				expectedPayloadWithGuildID := leaderboardevents.TagSwapRequestedPayloadV1{
 					GuildID:     sharedtypes.GuildID(""), // Empty string as no guild_id in metadata
 					RequestorID: sharedtypes.DiscordID("requestor"),
 					TargetID:    sharedtypes.DiscordID("user2"),
@@ -122,7 +122,7 @@ func TestLeaderboardHandlers_HandleTagSwapRequest(t *testing.T) {
 					CreateResultMessage(
 						gomock.Any(),
 						gomock.Eq(backendPayload), // Use gomock.Eq for exact payload match
-						leaderboardevents.TagSwapRequested,
+						leaderboardevents.TagSwapRequestedV1,
 					).
 					Return(&message.Message{
 						Payload:  payloadBytes,
@@ -144,7 +144,7 @@ func TestLeaderboardHandlers_HandleTagSwapRequest(t *testing.T) {
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discordleaderboardevents.LeaderboardTagSwapRequestPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&sharedleaderboardevents.LeaderboardTagSwapRequestPayloadV1{})).
 					Return(nil).
 					Times(1)
 			},
@@ -230,20 +230,20 @@ func TestLeaderboardHandlers_HandleTagSwappedResponse(t *testing.T) {
 			want:    []*message.Message{{}}, // Assuming a message is returned
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
-				expectedPayload := leaderboardevents.TagSwapProcessedPayload{
+				expectedPayload := leaderboardevents.TagSwapProcessedPayloadV1{
 					RequestorID: "requestor",
 					TargetID:    "target",
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&leaderboardevents.TagSwapProcessedPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&leaderboardevents.TagSwapProcessedPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*leaderboardevents.TagSwapProcessedPayload) = expectedPayload
+						*v.(*leaderboardevents.TagSwapProcessedPayloadV1) = expectedPayload
 						return nil
 					}).
 					Times(1)
 
-				discordPayload := discordleaderboardevents.LeaderboardTagSwappedPayload{
+				discordPayload := sharedleaderboardevents.LeaderboardTagSwappedPayloadV1{
 					User1ID:   "requestor",
 					User2ID:   "target",
 					ChannelID: "channel_id",
@@ -251,7 +251,7 @@ func TestLeaderboardHandlers_HandleTagSwappedResponse(t *testing.T) {
 				}
 
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), discordPayload, discordleaderboardevents.LeaderboardTagSwappedTopic).
+					CreateResultMessage(gomock.Any(), discordPayload, sharedleaderboardevents.LeaderboardTagSwappedV1).
 					Return(&message.Message{}, nil).
 					Times(1)
 			},
@@ -272,7 +272,7 @@ func TestLeaderboardHandlers_HandleTagSwappedResponse(t *testing.T) {
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&leaderboardevents.TagSwapProcessedPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&leaderboardevents.TagSwapProcessedPayloadV1{})).
 					Return(nil).
 					Times(1)
 			},
@@ -358,21 +358,21 @@ func TestLeaderboardHandlers_HandleTagSwapFailedResponse(t *testing.T) {
 			want:    []*message.Message{{}}, // Assuming a message is returned
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
-				expectedPayload := leaderboardevents.TagSwapFailedPayload{
+				expectedPayload := leaderboardevents.TagSwapFailedPayloadV1{
 					RequestorID: "requestor",
 					TargetID:    "target",
 					Reason:      "reason",
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&leaderboardevents.TagSwapFailedPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&leaderboardevents.TagSwapFailedPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*leaderboardevents.TagSwapFailedPayload) = expectedPayload
+						*v.(*leaderboardevents.TagSwapFailedPayloadV1) = expectedPayload
 						return nil
 					}).
 					Times(1)
 
-				discordPayload := discordleaderboardevents.LeaderboardTagSwapFailedPayload{
+				discordPayload := sharedleaderboardevents.LeaderboardTagSwapFailedPayloadV1{
 					User1ID:   "requestor",
 					User2ID:   "target",
 					Reason:    "reason",
@@ -381,7 +381,7 @@ func TestLeaderboardHandlers_HandleTagSwapFailedResponse(t *testing.T) {
 				}
 
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), discordPayload, discordleaderboardevents.LeaderboardTagSwapFailedTopic).
+					CreateResultMessage(gomock.Any(), discordPayload, sharedleaderboardevents.LeaderboardTagSwapFailedV1).
 					Return(&message.Message{}, nil).
 					Times(1)
 			},
@@ -402,7 +402,7 @@ func TestLeaderboardHandlers_HandleTagSwapFailedResponse(t *testing.T) {
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&leaderboardevents.TagSwapFailedPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&leaderboardevents.TagSwapFailedPayloadV1{})).
 					Return(nil).
 					Times(1)
 			},

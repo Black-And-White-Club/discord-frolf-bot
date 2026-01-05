@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	sharedroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
@@ -144,29 +145,31 @@ func (srm *scoreRoundManager) HandleScoreSubmission(ctx context.Context, i *disc
 		}
 
 		scoreValue := sharedtypes.Score(scoreVal)
-		payload := &roundevents.ScoreUpdateRequestPayload{
-			GuildID:     sharedtypes.GuildID(i.GuildID),
-			RoundID:     sharedtypes.RoundID(roundID),
-			Participant: sharedtypes.DiscordID(participantID),
-			Score:       &scoreValue,
+		payload := &sharedroundevents.RoundScoreUpdateRequestDiscordPayloadV1{
+			GuildID:   i.GuildID,
+			RoundID:   sharedtypes.RoundID(roundID),
+			UserID:    sharedtypes.DiscordID(participantID),
+			Score:     scoreValue,
+			ChannelID: i.ChannelID,
+			MessageID: i.Message.ID,
 		}
 		msg := message.NewMessage(watermill.NewUUID(), nil)
 		if msg.Metadata == nil {
 			msg.Metadata = message.Metadata{}
 		}
-		msg.Metadata.Set("topic", roundevents.RoundScoreUpdateRequest)
+		msg.Metadata.Set("topic", sharedroundevents.RoundScoreUpdateRequestDiscordV1)
 		if i.GuildID != "" {
 			msg.Metadata.Set("guild_id", i.GuildID)
 		}
 		if i.Message != nil {
 			msg.Metadata.Set("discord_message_id", i.Message.ID)
 		}
-		resultMsg, err := srm.helper.CreateResultMessage(msg, payload, roundevents.RoundScoreUpdateRequest)
+		resultMsg, err := srm.helper.CreateResultMessage(msg, payload, sharedroundevents.RoundScoreUpdateRequestDiscordV1)
 		if err != nil {
 			_, _ = srm.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{Content: "Something went wrong while submitting your score. Please try again later.", Flags: discordgo.MessageFlagsEphemeral})
 			return ScoreRoundOperationResult{Error: fmt.Errorf("failed to create result message")}, nil
 		}
-		if err = srm.publisher.Publish(roundevents.RoundScoreUpdateRequest, resultMsg); err != nil {
+		if err = srm.publisher.Publish(sharedroundevents.RoundScoreUpdateRequestDiscordV1, resultMsg); err != nil {
 			_, _ = srm.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{Content: "Failed to submit your score. Please try again later.", Flags: discordgo.MessageFlagsEphemeral})
 			return ScoreRoundOperationResult{Error: fmt.Errorf("failed to publish message")}, nil
 		}
@@ -178,8 +181,8 @@ func (srm *scoreRoundManager) HandleScoreSubmission(ctx context.Context, i *disc
 			"channel_id":     i.ChannelID,
 			"status":         "score_submitted",
 		}
-		if traceMsg, errTrace := srm.helper.CreateResultMessage(msg, tracePayload, roundevents.RoundTraceEvent); errTrace == nil {
-			_ = srm.publisher.Publish(roundevents.RoundTraceEvent, traceMsg)
+		if traceMsg, errTrace := srm.helper.CreateResultMessage(msg, tracePayload, roundevents.RoundTraceEventV1); errTrace == nil {
+			_ = srm.publisher.Publish(roundevents.RoundTraceEventV1, traceMsg)
 		}
 
 		_, _ = srm.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{Content: fmt.Sprintf("Your score of %d has been submitted!", scoreVal), Flags: discordgo.MessageFlagsEphemeral})

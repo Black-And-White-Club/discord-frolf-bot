@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"log/slog"
 
-	discordleaderboardevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/leaderboard"
 	leaderboardhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/watermill/handlers"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
+	sharedleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	tracingfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/tracing"
@@ -77,22 +77,24 @@ func (r *LeaderboardRouter) Configure(ctx context.Context, handlers leaderboardh
 func (r *LeaderboardRouter) RegisterHandlers(ctx context.Context, handlers leaderboardhandlers.Handlers) error {
 	eventsToHandlers := map[string]message.HandlerFunc{
 		// Tag management
-		discordleaderboardevents.LeaderboardTagAssignRequestTopic: handlers.HandleTagAssignRequest,
-		leaderboardevents.LeaderboardTagAssignmentSuccess:         handlers.HandleTagAssignedResponse,
-		leaderboardevents.LeaderboardTagAssignmentFailed:          handlers.HandleTagAssignFailedResponse,
+		sharedleaderboardevents.LeaderboardTagAssignRequestV1: handlers.HandleTagAssignRequest,
+		leaderboardevents.LeaderboardTagAssignedV1:            handlers.HandleTagAssignedResponse,
+		leaderboardevents.LeaderboardTagAssignmentFailedV1:    handlers.HandleTagAssignFailedResponse,
 
 		// Tag lookup
-		discordleaderboardevents.LeaderboardTagAvailabilityRequestTopic: handlers.HandleGetTagByDiscordID,
-		leaderboardevents.GetTagNumberResponse:                          handlers.HandleGetTagByDiscordIDResponse,
+		sharedleaderboardevents.LeaderboardTagAvailabilityRequestV1: handlers.HandleGetTagByDiscordID,
+		leaderboardevents.GetTagNumberResponseV1:                    handlers.HandleGetTagByDiscordIDResponse,
 
 		// Leaderboard updates
-		leaderboardevents.LeaderboardBatchTagAssigned:      handlers.HandleBatchTagAssigned,
-		discordleaderboardevents.LeaderboardRetrievedTopic: handlers.HandleLeaderboardData,
+		leaderboardevents.LeaderboardBatchTagAssignedV1:      handlers.HandleBatchTagAssigned,
+		sharedleaderboardevents.LeaderboardRetrieveRequestV1: handlers.HandleLeaderboardRetrieveRequest,
+		leaderboardevents.GetLeaderboardResponseV1:           handlers.HandleLeaderboardData,
+		leaderboardevents.LeaderboardUpdatedV1:               handlers.HandleLeaderboardData,
 
 		// Tag swaps
-		discordleaderboardevents.LeaderboardTagSwapRequestTopic: handlers.HandleTagSwapRequest,
-		leaderboardevents.TagSwapProcessed:                      handlers.HandleTagSwappedResponse,
-		leaderboardevents.TagSwapFailed:                         handlers.HandleTagSwapFailedResponse,
+		sharedleaderboardevents.LeaderboardTagSwapRequestV1: handlers.HandleTagSwapRequest,
+		leaderboardevents.TagSwapProcessedV1:                handlers.HandleTagSwappedResponse,
+		leaderboardevents.TagSwapFailedV1:                   handlers.HandleTagSwapFailedResponse,
 	}
 
 	for topic, handlerFunc := range eventsToHandlers {

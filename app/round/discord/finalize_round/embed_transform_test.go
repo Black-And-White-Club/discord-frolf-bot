@@ -41,7 +41,7 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 	tests := []struct {
 		name               string
 		setup              func(mockSession *discordmocks.MockSession)
-		payload            *roundevents.RoundFinalizedEmbedUpdatePayload
+		payload            *roundevents.RoundFinalizedEmbedUpdatePayloadV1
 		expectedEmbed      *discordgo.MessageEmbed
 		expectedComponents []discordgo.MessageComponent
 		expectError        bool
@@ -51,7 +51,7 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 			setup: func(mockSession *discordmocks.MockSession) {
 				// No setup needed for this case
 			},
-			payload: &roundevents.RoundFinalizedEmbedUpdatePayload{
+			payload: &roundevents.RoundFinalizedEmbedUpdatePayloadV1{
 				RoundID:      sharedtypes.RoundID(testRoundID),
 				Title:        "Test Round",
 				Location:     (*roundtypes.Location)(strPtr("Test Course")),
@@ -116,7 +116,7 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 					Return(&discordgo.Member{Nick: ""}, nil).
 					Times(1)
 			},
-			payload: &roundevents.RoundFinalizedEmbedUpdatePayload{
+			payload: &roundevents.RoundFinalizedEmbedUpdatePayloadV1{
 				RoundID:   sharedtypes.RoundID(testRoundID),
 				Title:     "Test Round",
 				Location:  (*roundtypes.Location)(strPtr("Test Course")),
@@ -202,7 +202,7 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 					Return(&discordgo.Member{Nick: "NickUser2"}, nil).
 					Times(1)
 			},
-			payload: &roundevents.RoundFinalizedEmbedUpdatePayload{
+			payload: &roundevents.RoundFinalizedEmbedUpdatePayloadV1{
 				RoundID:   sharedtypes.RoundID(testRoundID),
 				Title:     "Test Round",
 				Location:  (*roundtypes.Location)(strPtr("Test Course")),
@@ -272,7 +272,7 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 					Return(nil, fmt.Errorf("failed to fetch user")).
 					Times(1)
 			},
-			payload: &roundevents.RoundFinalizedEmbedUpdatePayload{
+			payload: &roundevents.RoundFinalizedEmbedUpdatePayloadV1{
 				RoundID:   sharedtypes.RoundID(testRoundID),
 				Title:     "Test Round",
 				Location:  (*roundtypes.Location)(strPtr("Test Course")),
@@ -333,7 +333,7 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 					Return(nil, fmt.Errorf("failed to fetch guild member")).
 					Times(1)
 			},
-			payload: &roundevents.RoundFinalizedEmbedUpdatePayload{
+			payload: &roundevents.RoundFinalizedEmbedUpdatePayloadV1{
 				RoundID:   sharedtypes.RoundID(testRoundID),
 				Title:     "Test Round",
 				Location:  (*roundtypes.Location)(strPtr("Test Course")),
@@ -389,7 +389,7 @@ func Test_finalizeRoundManager_TransformRoundToFinalizedScorecard(t *testing.T) 
 			setup: func(mockSession *discordmocks.MockSession) {
 				// No setup needed for this case
 			},
-			payload: &roundevents.RoundFinalizedEmbedUpdatePayload{
+			payload: &roundevents.RoundFinalizedEmbedUpdatePayloadV1{
 				RoundID:      sharedtypes.RoundID(testRoundID),
 				Title:        "Test Round",
 				Location:     nil,

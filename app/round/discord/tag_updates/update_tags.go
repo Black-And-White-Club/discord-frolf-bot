@@ -8,7 +8,7 @@ import (
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 )
 
-func (tum *tagUpdateManager) UpdateDiscordEmbedsWithTagChanges(ctx context.Context, payload roundevents.TagsUpdatedForScheduledRoundsPayload, tagUpdates map[sharedtypes.DiscordID]*sharedtypes.TagNumber) (TagUpdateOperationResult, error) {
+func (tum *tagUpdateManager) UpdateDiscordEmbedsWithTagChanges(ctx context.Context, payload roundevents.TagsUpdatedForScheduledRoundsPayloadV1, tagUpdates map[sharedtypes.DiscordID]*sharedtypes.TagNumber) (TagUpdateOperationResult, error) {
 	return tum.operationWrapper(ctx, "UpdateDiscordEmbedsWithTagChanges", func(ctx context.Context) (TagUpdateOperationResult, error) {
 		tum.logger.InfoContext(ctx, "Processing Discord embed updates for tag changes",
 			attr.Int("rounds_to_update", len(payload.UpdatedRounds)),

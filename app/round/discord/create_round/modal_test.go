@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
-	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
 	storagemocks "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
+	sharedroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	utilsmocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
@@ -241,7 +241,7 @@ func Test_createRoundManager_HandleCreateRoundModalSubmit(t *testing.T) {
 					Return(nil).
 					Times(1)
 				mockPublisher.EXPECT().
-					Publish(gomock.Eq(discordroundevents.RoundCreateModalSubmit), gomock.Any()).
+					Publish(gomock.Eq(sharedroundevents.RoundCreateModalSubmittedV1), gomock.Any()).
 					Return(nil).
 					Times(1)
 			},
@@ -275,7 +275,7 @@ func Test_createRoundManager_HandleCreateRoundModalSubmit(t *testing.T) {
 					Return(nil).
 					Times(1)
 				mockPublisher.EXPECT().
-					Publish(gomock.Eq(discordroundevents.RoundCreateModalSubmit), gomock.Any()).
+					Publish(gomock.Eq(sharedroundevents.RoundCreateModalSubmittedV1), gomock.Any()).
 					Return(nil).
 					Times(1)
 			},
@@ -339,7 +339,7 @@ func Test_createRoundManager_HandleCreateRoundModalSubmit(t *testing.T) {
 					Return(nil).
 					Times(1)
 				mockPublisher.EXPECT().
-					Publish(gomock.Eq(discordroundevents.RoundCreateModalSubmit), gomock.Any()).
+					Publish(gomock.Eq(sharedroundevents.RoundCreateModalSubmittedV1), gomock.Any()).
 					Return(errors.New("failed to publish")).
 					Times(1)
 			},

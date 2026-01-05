@@ -34,7 +34,7 @@ func Test_roundReminderManager_SendRoundReminder(t *testing.T) {
 	sampleLocation := "Test Location"
 	testRoundID := uuid.New()
 
-	samplePayload := &roundevents.DiscordReminderPayload{
+	samplePayload := &roundevents.DiscordReminderPayloadV1{
 		RoundID:          sharedtypes.RoundID(testRoundID),
 		RoundTitle:       "Test Round",
 		UserIDs:          []sharedtypes.DiscordID{"user-123", "user-456"},
@@ -50,7 +50,7 @@ func Test_roundReminderManager_SendRoundReminder(t *testing.T) {
 	tests := []struct {
 		name    string
 		setup   func()
-		payload *roundevents.DiscordReminderPayload
+		payload *roundevents.DiscordReminderPayloadV1
 		want    RoundReminderOperationResult
 		wantErr bool
 	}{
@@ -195,7 +195,7 @@ func Test_roundReminderManager_SendRoundReminder(t *testing.T) {
 			setup: func() {
 				// No setup needed as we'll get early return
 			},
-			payload: &roundevents.DiscordReminderPayload{
+			payload: &roundevents.DiscordReminderPayloadV1{
 				RoundID:          sharedtypes.RoundID(testRoundID),
 				RoundTitle:       "Test Round",
 				UserIDs:          []sharedtypes.DiscordID{"user-123", "user-456"},

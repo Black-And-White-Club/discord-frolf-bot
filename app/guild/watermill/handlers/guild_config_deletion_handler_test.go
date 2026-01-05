@@ -88,7 +88,7 @@ func TestGuildHandlers_HandleGuildConfigDeleted(t *testing.T) {
 				Metrics:      metrics,
 				handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
 					return func(msg *message.Message) ([]*message.Message, error) {
-						payload := &guildevents.GuildConfigDeletedPayload{
+						payload := &guildevents.GuildConfigDeletedPayloadV1{
 							GuildID: sharedtypes.GuildID("123456789"),
 						}
 						return handlerFunc(context.Background(), msg, payload)
@@ -170,7 +170,7 @@ func TestGuildHandlers_HandleGuildConfigDeletionFailed(t *testing.T) {
 				Metrics:      metrics,
 				handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
 					return func(msg *message.Message) ([]*message.Message, error) {
-						payload := &guildevents.GuildConfigDeletionFailedPayload{
+						payload := &guildevents.GuildConfigDeletionFailedPayloadV1{
 							GuildID: sharedtypes.GuildID("123456789"),
 							Reason:  "database connection failed",
 						}

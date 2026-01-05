@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	discordleaderboardevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/leaderboard"
+	sharedleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	util_mocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
 	"github.com/ThreeDotsLabs/watermill/message"
@@ -35,8 +35,8 @@ func TestLeaderboardHandlers_HandleLeaderboardRetrieveRequest(t *testing.T) {
 			mockSetup: func(mockHelper *util_mocks.MockHelpers) {
 				mockHelper.EXPECT().CreateResultMessage(
 					gomock.Any(),
-					leaderboardevents.GetLeaderboardRequestPayload{},
-					leaderboardevents.GetLeaderboardRequest,
+					leaderboardevents.GetLeaderboardRequestedPayloadV1{},
+					leaderboardevents.GetLeaderboardRequestedV1,
 				).Return(&message.Message{}, nil).Times(1)
 			},
 		},
@@ -72,7 +72,7 @@ func TestLeaderboardHandlers_HandleLeaderboardRetrieveRequest(t *testing.T) {
 				Helpers: mockHelper,
 				handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
 					return func(msg *message.Message) ([]*message.Message, error) {
-						return handlerFunc(context.Background(), msg, &discordleaderboardevents.LeaderboardRetrieveRequestPayload{})
+						return handlerFunc(context.Background(), msg, &sharedleaderboardevents.LeaderboardRetrieveRequestPayloadV1{})
 					}
 				},
 			}
@@ -100,14 +100,19 @@ func TestLeaderboardHandlers_HandleLeaderboardData(t *testing.T) {
 		{
 			name: "handle leaderboard update notification",
 			msg: &message.Message{
-				Metadata: message.Metadata{"topic": leaderboardevents.LeaderboardUpdated},
+				Metadata: message.Metadata{"topic": leaderboardevents.LeaderboardUpdatedV1},
 			},
 			want: []*message.Message{{}},
 			mockSetup: func(mockHelper *util_mocks.MockHelpers) {
+				mockHelper.EXPECT().UnmarshalPayload(
+					gomock.Any(),
+					gomock.Any(),
+				).Return(nil).Times(1)
+
 				mockHelper.EXPECT().CreateResultMessage(
 					gomock.Any(),
-					leaderboardevents.GetLeaderboardRequestPayload{},
-					leaderboardevents.GetLeaderboardRequest,
+					leaderboardevents.GetLeaderboardRequestedPayloadV1{},
+					leaderboardevents.GetLeaderboardRequestedV1,
 				).Return(&message.Message{}, nil).Times(1)
 			},
 		},
@@ -127,7 +132,7 @@ func TestLeaderboardHandlers_HandleLeaderboardData(t *testing.T) {
 				mockHelper.EXPECT().CreateResultMessage(
 					gomock.Any(),
 					gomock.Any(),
-					discordleaderboardevents.LeaderboardRetrievedTopic,
+					sharedleaderboardevents.LeaderboardRetrievedV1,
 				).Return(&message.Message{}, nil).Times(1)
 			},
 		},
@@ -160,7 +165,7 @@ func TestLeaderboardHandlers_HandleLeaderboardData(t *testing.T) {
 				mockHelper.EXPECT().CreateResultMessage(
 					gomock.Any(),
 					gomock.Any(),
-					discordleaderboardevents.LeaderboardRetrievedTopic,
+					sharedleaderboardevents.LeaderboardRetrievedV1,
 				).Return(nil, errors.New("creation failed")).Times(1)
 			},
 		},

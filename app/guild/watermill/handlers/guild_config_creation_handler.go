@@ -13,9 +13,9 @@ import (
 func (h *GuildHandlers) HandleGuildConfigCreated(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleGuildConfigCreated",
-		&guildevents.GuildConfigCreatedPayload{},
+		&guildevents.GuildConfigCreatedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			p := payload.(*guildevents.GuildConfigCreatedPayload)
+			p := payload.(*guildevents.GuildConfigCreatedPayloadV1)
 			guildID := string(p.GuildID)
 
 			h.Logger.InfoContext(ctx, "Guild config created successfully - registering all commands for this guild",
@@ -69,9 +69,9 @@ func (h *GuildHandlers) HandleGuildConfigCreated(msg *message.Message) ([]*messa
 func (h *GuildHandlers) HandleGuildConfigCreationFailed(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleGuildConfigCreationFailed",
-		&guildevents.GuildConfigCreationFailedPayload{},
+		&guildevents.GuildConfigCreationFailedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			p := payload.(*guildevents.GuildConfigCreationFailedPayload)
+			p := payload.(*guildevents.GuildConfigCreationFailedPayloadV1)
 			guildID := string(p.GuildID)
 
 			h.Logger.WarnContext(ctx, "Guild config creation failed, commands remain limited to setup only",

@@ -13,9 +13,9 @@ import (
 func (h *GuildHandlers) HandleGuildConfigDeleted(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleGuildConfigDeleted",
-		&guildevents.GuildConfigDeletedPayload{},
+		&guildevents.GuildConfigDeletedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			p := payload.(*guildevents.GuildConfigDeletedPayload)
+			p := payload.(*guildevents.GuildConfigDeletedPayloadV1)
 			guildID := string(p.GuildID)
 
 			h.Logger.InfoContext(ctx, "Guild config deleted - unregistering all commands",
@@ -41,9 +41,9 @@ func (h *GuildHandlers) HandleGuildConfigDeleted(msg *message.Message) ([]*messa
 func (h *GuildHandlers) HandleGuildConfigDeletionFailed(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleGuildConfigDeletionFailed",
-		&guildevents.GuildConfigDeletionFailedPayload{},
+		&guildevents.GuildConfigDeletionFailedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			p := payload.(*guildevents.GuildConfigDeletionFailedPayload)
+			p := payload.(*guildevents.GuildConfigDeletionFailedPayloadV1)
 			guildID := string(p.GuildID)
 
 			h.Logger.WarnContext(ctx, "Guild config deletion failed, commands remain active",

@@ -54,7 +54,7 @@ func TestRoundHandlers_HandleParticipantScoreUpdated(t *testing.T) {
 			want:    nil, // Handler returns nil, nil (no messages)
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, mockScoreManager *mocks.MockScoreRoundManager) {
-				expectedPayload := roundevents.ParticipantScoreUpdatedPayload{
+				expectedPayload := roundevents.ParticipantScoreUpdatedPayloadV1{
 					RoundID:        testRoundID,
 					ChannelID:      testChannelID,
 					Participant:    testParticipant,
@@ -63,9 +63,9 @@ func TestRoundHandlers_HandleParticipantScoreUpdated(t *testing.T) {
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.ParticipantScoreUpdatedPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.ParticipantScoreUpdatedPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.ParticipantScoreUpdatedPayload) = expectedPayload
+						*v.(*roundevents.ParticipantScoreUpdatedPayloadV1) = expectedPayload
 						return nil
 					}).
 					Times(1)
@@ -111,7 +111,7 @@ func TestRoundHandlers_HandleParticipantScoreUpdated(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, mockScoreManager *mocks.MockScoreRoundManager) {
-				expectedPayload := roundevents.ParticipantScoreUpdatedPayload{
+				expectedPayload := roundevents.ParticipantScoreUpdatedPayloadV1{
 					RoundID:        testRoundID,
 					ChannelID:      testChannelID,
 					Participant:    testParticipant,
@@ -120,9 +120,9 @@ func TestRoundHandlers_HandleParticipantScoreUpdated(t *testing.T) {
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.ParticipantScoreUpdatedPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.ParticipantScoreUpdatedPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.ParticipantScoreUpdatedPayload) = expectedPayload
+						*v.(*roundevents.ParticipantScoreUpdatedPayloadV1) = expectedPayload
 						return nil
 					}).
 					Times(1)
@@ -148,7 +148,7 @@ func TestRoundHandlers_HandleParticipantScoreUpdated(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, mockScoreManager *mocks.MockScoreRoundManager) {
-				expectedPayload := roundevents.ParticipantScoreUpdatedPayload{
+				expectedPayload := roundevents.ParticipantScoreUpdatedPayloadV1{
 					RoundID:        testRoundID,
 					ChannelID:      testChannelID,
 					Participant:    testParticipant,
@@ -157,9 +157,9 @@ func TestRoundHandlers_HandleParticipantScoreUpdated(t *testing.T) {
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.ParticipantScoreUpdatedPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.ParticipantScoreUpdatedPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.ParticipantScoreUpdatedPayload) = expectedPayload
+						*v.(*roundevents.ParticipantScoreUpdatedPayloadV1) = expectedPayload
 						return nil
 					}).
 					Times(1)
@@ -187,7 +187,7 @@ func TestRoundHandlers_HandleParticipantScoreUpdated(t *testing.T) {
 			want:    nil,
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, mockScoreManager *mocks.MockScoreRoundManager) {
-				expectedPayload := roundevents.ParticipantScoreUpdatedPayload{
+				expectedPayload := roundevents.ParticipantScoreUpdatedPayloadV1{
 					RoundID:        testRoundID,
 					ChannelID:      "", // Empty in payload
 					Participant:    testParticipant,
@@ -196,9 +196,9 @@ func TestRoundHandlers_HandleParticipantScoreUpdated(t *testing.T) {
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.ParticipantScoreUpdatedPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.ParticipantScoreUpdatedPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.ParticipantScoreUpdatedPayload) = expectedPayload
+						*v.(*roundevents.ParticipantScoreUpdatedPayloadV1) = expectedPayload
 						return nil
 					}).
 					Times(1)
@@ -290,8 +290,8 @@ func TestRoundHandlers_HandleScoreUpdateError(t *testing.T) {
 			want:    []*message.Message{{}},
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, mockScoreManager *mocks.MockScoreRoundManager) {
-				expectedPayload := roundevents.RoundScoreUpdateErrorPayload{
-					ScoreUpdateRequest: &roundevents.ScoreUpdateRequestPayload{
+				expectedPayload := roundevents.RoundScoreUpdateErrorPayloadV1{
+					ScoreUpdateRequest: &roundevents.ScoreUpdateRequestPayloadV1{
 						RoundID:     testRoundID,
 						Participant: testParticipant,
 					},
@@ -299,9 +299,9 @@ func TestRoundHandlers_HandleScoreUpdateError(t *testing.T) {
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundScoreUpdateErrorPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundScoreUpdateErrorPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.RoundScoreUpdateErrorPayload) = expectedPayload
+						*v.(*roundevents.RoundScoreUpdateErrorPayloadV1) = expectedPayload
 						return nil
 					}).
 					Times(1)
@@ -312,7 +312,7 @@ func TestRoundHandlers_HandleScoreUpdateError(t *testing.T) {
 					Times(1)
 
 				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Any(), roundevents.RoundTraceEvent).
+					CreateResultMessage(gomock.Any(), gomock.Any(), roundevents.RoundTraceEventV1).
 					Return(&message.Message{}, nil).
 					Times(1)
 			},
@@ -347,8 +347,8 @@ func TestRoundHandlers_HandleScoreUpdateError(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, mockScoreManager *mocks.MockScoreRoundManager) {
-				expectedPayload := roundevents.RoundScoreUpdateErrorPayload{
-					ScoreUpdateRequest: &roundevents.ScoreUpdateRequestPayload{
+				expectedPayload := roundevents.RoundScoreUpdateErrorPayloadV1{
+					ScoreUpdateRequest: &roundevents.ScoreUpdateRequestPayloadV1{
 						RoundID:     testRoundID,
 						Participant: testParticipant,
 					},
@@ -356,9 +356,9 @@ func TestRoundHandlers_HandleScoreUpdateError(t *testing.T) {
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundScoreUpdateErrorPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundScoreUpdateErrorPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.RoundScoreUpdateErrorPayload) = expectedPayload
+						*v.(*roundevents.RoundScoreUpdateErrorPayloadV1) = expectedPayload
 						return nil
 					}).
 					Times(1)
@@ -379,8 +379,8 @@ func TestRoundHandlers_HandleScoreUpdateError(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, mockScoreManager *mocks.MockScoreRoundManager) {
-				expectedPayload := roundevents.RoundScoreUpdateErrorPayload{
-					ScoreUpdateRequest: &roundevents.ScoreUpdateRequestPayload{
+				expectedPayload := roundevents.RoundScoreUpdateErrorPayloadV1{
+					ScoreUpdateRequest: &roundevents.ScoreUpdateRequestPayloadV1{
 						RoundID:     testRoundID,
 						Participant: testParticipant,
 					},
@@ -388,9 +388,9 @@ func TestRoundHandlers_HandleScoreUpdateError(t *testing.T) {
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundScoreUpdateErrorPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundScoreUpdateErrorPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.RoundScoreUpdateErrorPayload) = expectedPayload
+						*v.(*roundevents.RoundScoreUpdateErrorPayloadV1) = expectedPayload
 						return nil
 					}).
 					Times(1)

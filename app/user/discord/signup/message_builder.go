@@ -20,7 +20,7 @@ import (
 // Lightweight alternative to a global publisher wrapper focused on signup flow.
 func BuildUserSignupRequestMessage(
 	ctx context.Context,
-	payload userevents.UserSignupRequestPayload,
+	payload userevents.UserSignupRequestedPayloadV1,
 	i *discordgo.InteractionCreate,
 ) (*message.Message, error) {
 	// Fallback: derive guild ID from interaction modal custom ID if missing
@@ -64,7 +64,7 @@ func BuildUserSignupRequestMessage(
 	md.Set("correlation_id", correlationID)
 	md.Set("causation_id", msg.UUID)
 
-	md.Set("message_type", userevents.UserSignupRequest+".v1")
+	md.Set("message_type", userevents.UserSignupRequestedV1)
 	md.Set("emitted_at", time.Now().UTC().Format(time.RFC3339Nano))
 
 	if i != nil && i.Interaction != nil {
@@ -79,7 +79,7 @@ func BuildUserSignupRequestMessage(
 	}
 
 	md.Set("domain", "discord")
-	md.Set("topic", userevents.UserSignupRequest)
+	md.Set("topic", userevents.UserSignupRequestedV1)
 
 	return msg, nil
 }

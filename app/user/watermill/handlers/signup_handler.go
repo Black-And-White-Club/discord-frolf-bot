@@ -4,58 +4,26 @@ import (
 	"context"
 	"fmt"
 
-	discorduserevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/user"
+	shareduserevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/user"
 	userevents "github.com/Black-And-White-Club/frolf-bot-shared/events/user"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	"github.com/ThreeDotsLabs/watermill/message"
 )
 
-// HandleUserSignupRequest handles the UserSignupRequest event from the Discord bot.
-func (h *UserHandlers) HandleUserSignupRequest(msg *message.Message) ([]*message.Message, error) {
-	return h.handlerWrapper(
-		"HandleUserSignupRequest",
-		&userevents.UserSignupRequestPayload{},
-		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			h.Logger.DebugContext(ctx, "HandleUserSignupRequest called", attr.String("msg_uuid", msg.UUID))
-			reqPayload := payload.(*userevents.UserSignupRequestPayload)
-			h.Logger.DebugContext(
-				ctx,
-				"Parsed UserSignupRequestPayload",
-				attr.String("guild_id", string(reqPayload.GuildID)),
-				attr.String("user_id", string(reqPayload.UserID)),
-				attr.Any("tag_number", reqPayload.TagNumber),
-			)
-
-			backendPayload := userevents.UserSignupRequestPayload{
-				GuildID:   reqPayload.GuildID,
-				UserID:    reqPayload.UserID,
-				TagNumber: reqPayload.TagNumber,
-			}
-			backendEvent, err := h.Helper.CreateResultMessage(msg, backendPayload, userevents.UserSignupRequest)
-			if err != nil {
-				h.Logger.ErrorContext(ctx, "Failed to create backend event", attr.Error(err))
-				return nil, fmt.Errorf("failed to create backend event: %w", err)
-			}
-			h.Logger.InfoContext(ctx, "Created backend event for signup", attr.String("guild_id", string(backendPayload.GuildID)), attr.String("user_id", string(backendPayload.UserID)), attr.Any("tag_number", backendPayload.TagNumber))
-			return []*message.Message{backendEvent}, nil
-		},
-	)(msg)
-}
-
 // HandleUserCreated handles the UserCreated event from the backend.
 func (h *UserHandlers) HandleUserCreated(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleUserCreated",
-		&userevents.UserCreatedPayload{},
+		&userevents.UserCreatedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			createdPayload := payload.(*userevents.UserCreatedPayload)
+			createdPayload := payload.(*userevents.UserCreatedPayloadV1)
 
-			rolePayload := discorduserevents.AddRolePayload{
+			rolePayload := shareduserevents.AddRolePayloadV1{
 				UserID:  createdPayload.UserID,
 				RoleID:  h.Config.GetRegisteredRoleID(),
 				GuildID: string(createdPayload.GuildID),
 			}
-			roleMsg, err := h.Helper.CreateResultMessage(msg, rolePayload, discorduserevents.SignupAddRole)
+			roleMsg, err := h.Helper.CreateResultMessage(msg, rolePayload, shareduserevents.SignupAddRoleV1)
 			if err != nil {
 				h.Logger.ErrorContext(ctx, "Failed to create add role event", attr.Error(err))
 				return nil, fmt.Errorf("failed to create add role event: %w", err)
@@ -69,9 +37,9 @@ func (h *UserHandlers) HandleUserCreated(msg *message.Message) ([]*message.Messa
 func (h *UserHandlers) HandleUserCreationFailed(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleUserCreationFailed",
-		&userevents.UserCreationFailedPayload{},
+		&userevents.UserCreationFailedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			failPayload := payload.(*userevents.UserCreationFailedPayload)
+			failPayload := payload.(*userevents.UserCreationFailedPayloadV1)
 			correlationID := msg.Metadata.Get("correlation_id")
 
 			// Log the failure reason explicitly
@@ -100,7 +68,7 @@ func (h *UserHandlers) HandleUserCreationFailed(msg *message.Message) ([]*messag
 func (h *UserHandlers) HandleRoleAdded(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleRoleAdded",
-		&discorduserevents.RoleAddedPayload{},
+		&shareduserevents.RoleAddedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
 			correlationID := msg.Metadata.Get("correlation_id")
 
@@ -120,7 +88,7 @@ func (h *UserHandlers) HandleRoleAdded(msg *message.Message) ([]*message.Message
 func (h *UserHandlers) HandleRoleAdditionFailed(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleRoleAdditionFailed",
-		&discorduserevents.RoleAdditionFailedPayload{},
+		&shareduserevents.RoleAdditionFailedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
 			correlationID := msg.Metadata.Get("correlation_id")
 

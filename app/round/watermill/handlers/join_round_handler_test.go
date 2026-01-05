@@ -8,11 +8,11 @@ import (
 	"reflect"
 	"testing"
 
-	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
 	roundrsvp "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/round_rsvp"
 	scoreround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/score_round"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/round/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
+	discordroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	util_mocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
@@ -48,15 +48,15 @@ func TestRoundHandlers_HandleRoundParticipantJoinRequest(t *testing.T) {
 			want:    []*message.Message{{}},
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
-				expectedPayload := discordroundevents.DiscordRoundParticipantJoinRequestPayload{
+				expectedPayload := discordroundevents.RoundParticipantJoinRequestDiscordPayloadV1{
 					RoundID: testRoundID,
 					UserID:  testUserID,
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discordroundevents.DiscordRoundParticipantJoinRequestPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discordroundevents.RoundParticipantJoinRequestDiscordPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*discordroundevents.DiscordRoundParticipantJoinRequestPayload) = expectedPayload
+						*v.(*discordroundevents.RoundParticipantJoinRequestDiscordPayloadV1) = expectedPayload
 						return nil
 					}).
 					Times(1)
@@ -66,12 +66,12 @@ func TestRoundHandlers_HandleRoundParticipantJoinRequest(t *testing.T) {
 					CreateResultMessage(
 						gomock.Any(),
 						gomock.Any(),
-						roundevents.RoundParticipantJoinRequest,
+						roundevents.RoundParticipantJoinRequestedV1,
 					).
 					DoAndReturn(func(_ *message.Message, payload any, _ string) (*message.Message, error) {
-						backendPayload, ok := payload.(roundevents.ParticipantJoinRequestPayload)
+						backendPayload, ok := payload.(roundevents.ParticipantJoinRequestPayloadV1)
 						if !ok {
-							t.Errorf("Expected roundevents.ParticipantJoinRequestPayload, got %T", payload)
+							t.Errorf("Expected roundevents.ParticipantJoinRequestPayloadV1, got %T", payload)
 						}
 						if backendPayload.RoundID != testRoundID {
 							t.Errorf("Expected RoundID %v, got %v", testRoundID, backendPayload.RoundID)
@@ -106,15 +106,15 @@ func TestRoundHandlers_HandleRoundParticipantJoinRequest(t *testing.T) {
 			want:    []*message.Message{{}},
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
-				expectedPayload := discordroundevents.DiscordRoundParticipantJoinRequestPayload{
+				expectedPayload := discordroundevents.RoundParticipantJoinRequestDiscordPayloadV1{
 					RoundID: testRoundID,
 					UserID:  testUserID,
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discordroundevents.DiscordRoundParticipantJoinRequestPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discordroundevents.RoundParticipantJoinRequestDiscordPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*discordroundevents.DiscordRoundParticipantJoinRequestPayload) = expectedPayload
+						*v.(*discordroundevents.RoundParticipantJoinRequestDiscordPayloadV1) = expectedPayload
 						return nil
 					}).
 					Times(1)
@@ -124,12 +124,12 @@ func TestRoundHandlers_HandleRoundParticipantJoinRequest(t *testing.T) {
 					CreateResultMessage(
 						gomock.Any(),
 						gomock.Any(),
-						roundevents.RoundParticipantJoinRequest,
+						roundevents.RoundParticipantJoinRequestedV1,
 					).
 					DoAndReturn(func(_ *message.Message, payload any, _ string) (*message.Message, error) {
-						backendPayload, ok := payload.(roundevents.ParticipantJoinRequestPayload)
+						backendPayload, ok := payload.(roundevents.ParticipantJoinRequestPayloadV1)
 						if !ok {
-							t.Errorf("Expected roundevents.ParticipantJoinRequestPayload, got %T", payload)
+							t.Errorf("Expected roundevents.ParticipantJoinRequestPayloadV1, got %T", payload)
 						}
 						if backendPayload.Response != roundtypes.ResponseDecline {
 							t.Errorf("Expected Response %v, got %v", roundtypes.ResponseDecline, backendPayload.Response)
@@ -152,15 +152,15 @@ func TestRoundHandlers_HandleRoundParticipantJoinRequest(t *testing.T) {
 			want:    []*message.Message{{}},
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
-				expectedPayload := discordroundevents.DiscordRoundParticipantJoinRequestPayload{
+				expectedPayload := discordroundevents.RoundParticipantJoinRequestDiscordPayloadV1{
 					RoundID: testRoundID,
 					UserID:  testUserID,
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discordroundevents.DiscordRoundParticipantJoinRequestPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discordroundevents.RoundParticipantJoinRequestDiscordPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*discordroundevents.DiscordRoundParticipantJoinRequestPayload) = expectedPayload
+						*v.(*discordroundevents.RoundParticipantJoinRequestDiscordPayloadV1) = expectedPayload
 						return nil
 					}).
 					Times(1)
@@ -170,12 +170,12 @@ func TestRoundHandlers_HandleRoundParticipantJoinRequest(t *testing.T) {
 					CreateResultMessage(
 						gomock.Any(),
 						gomock.Any(),
-						roundevents.RoundParticipantJoinRequest,
+						roundevents.RoundParticipantJoinRequestedV1,
 					).
 					DoAndReturn(func(_ *message.Message, payload any, _ string) (*message.Message, error) {
-						backendPayload, ok := payload.(roundevents.ParticipantJoinRequestPayload)
+						backendPayload, ok := payload.(roundevents.ParticipantJoinRequestPayloadV1)
 						if !ok {
-							t.Errorf("Expected roundevents.ParticipantJoinRequestPayload, got %T", payload)
+							t.Errorf("Expected roundevents.ParticipantJoinRequestPayloadV1, got %T", payload)
 						}
 						if backendPayload.Response != roundtypes.ResponseTentative {
 							t.Errorf("Expected Response %v, got %v", roundtypes.ResponseTentative, backendPayload.Response)
@@ -198,15 +198,15 @@ func TestRoundHandlers_HandleRoundParticipantJoinRequest(t *testing.T) {
 			want:    []*message.Message{{}},
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
-				expectedPayload := discordroundevents.DiscordRoundParticipantJoinRequestPayload{
+				expectedPayload := discordroundevents.RoundParticipantJoinRequestDiscordPayloadV1{
 					RoundID: testRoundID,
 					UserID:  testUserID,
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discordroundevents.DiscordRoundParticipantJoinRequestPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discordroundevents.RoundParticipantJoinRequestDiscordPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*discordroundevents.DiscordRoundParticipantJoinRequestPayload) = expectedPayload
+						*v.(*discordroundevents.RoundParticipantJoinRequestDiscordPayloadV1) = expectedPayload
 						return nil
 					}).
 					Times(1)
@@ -216,12 +216,12 @@ func TestRoundHandlers_HandleRoundParticipantJoinRequest(t *testing.T) {
 					CreateResultMessage(
 						gomock.Any(),
 						gomock.Any(),
-						roundevents.RoundParticipantJoinRequest,
+						roundevents.RoundParticipantJoinRequestedV1,
 					).
 					DoAndReturn(func(_ *message.Message, payload any, _ string) (*message.Message, error) {
-						backendPayload, ok := payload.(roundevents.ParticipantJoinRequestPayload)
+						backendPayload, ok := payload.(roundevents.ParticipantJoinRequestPayloadV1)
 						if !ok {
-							t.Errorf("Expected roundevents.ParticipantJoinRequestPayload, got %T", payload)
+							t.Errorf("Expected roundevents.ParticipantJoinRequestPayloadV1, got %T", payload)
 						}
 						if backendPayload.Response != roundtypes.ResponseAccept {
 							t.Errorf("Expected Response %v, got %v", roundtypes.ResponseAccept, backendPayload.Response)
@@ -245,16 +245,16 @@ func TestRoundHandlers_HandleRoundParticipantJoinRequest(t *testing.T) {
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
 				joinedLate := true
-				expectedPayload := discordroundevents.DiscordRoundParticipantJoinRequestPayload{
+				expectedPayload := discordroundevents.RoundParticipantJoinRequestDiscordPayloadV1{
 					RoundID:    testRoundID,
 					UserID:     testUserID,
 					JoinedLate: &joinedLate,
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discordroundevents.DiscordRoundParticipantJoinRequestPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discordroundevents.RoundParticipantJoinRequestDiscordPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*discordroundevents.DiscordRoundParticipantJoinRequestPayload) = expectedPayload
+						*v.(*discordroundevents.RoundParticipantJoinRequestDiscordPayloadV1) = expectedPayload
 						return nil
 					}).
 					Times(1)
@@ -264,12 +264,12 @@ func TestRoundHandlers_HandleRoundParticipantJoinRequest(t *testing.T) {
 					CreateResultMessage(
 						gomock.Any(),
 						gomock.Any(),
-						roundevents.RoundParticipantJoinRequest,
+						roundevents.RoundParticipantJoinRequestedV1,
 					).
 					DoAndReturn(func(_ *message.Message, payload any, _ string) (*message.Message, error) {
-						backendPayload, ok := payload.(roundevents.ParticipantJoinRequestPayload)
+						backendPayload, ok := payload.(roundevents.ParticipantJoinRequestPayloadV1)
 						if !ok {
-							t.Errorf("Expected roundevents.ParticipantJoinRequestPayload, got %T", payload)
+							t.Errorf("Expected roundevents.ParticipantJoinRequestPayloadV1, got %T", payload)
 						}
 						if !*backendPayload.JoinedLate {
 							t.Errorf("Expected JoinedLate true, got %v", *backendPayload.JoinedLate)
@@ -292,15 +292,15 @@ func TestRoundHandlers_HandleRoundParticipantJoinRequest(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
-				expectedPayload := discordroundevents.DiscordRoundParticipantJoinRequestPayload{
+				expectedPayload := discordroundevents.RoundParticipantJoinRequestDiscordPayloadV1{
 					RoundID: testRoundID,
 					UserID:  testUserID,
 				}
 
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discordroundevents.DiscordRoundParticipantJoinRequestPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&discordroundevents.RoundParticipantJoinRequestDiscordPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*discordroundevents.DiscordRoundParticipantJoinRequestPayload) = expectedPayload
+						*v.(*discordroundevents.RoundParticipantJoinRequestDiscordPayloadV1) = expectedPayload
 						return nil
 					}).
 					Times(1)
@@ -310,7 +310,7 @@ func TestRoundHandlers_HandleRoundParticipantJoinRequest(t *testing.T) {
 					CreateResultMessage(
 						gomock.Any(),
 						gomock.Any(),
-						roundevents.RoundParticipantJoinRequest,
+						roundevents.RoundParticipantJoinRequestedV1,
 					).
 					Return(nil, errors.New("failed to create message")).
 					Times(1)
@@ -390,9 +390,9 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 			wantErr: false,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockRoundRsvpManager *mocks.MockRoundRsvpManager, mockConfig *config.Config) {
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.ParticipantJoinedPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.ParticipantJoinedPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.ParticipantJoinedPayload) = roundevents.ParticipantJoinedPayload{
+						*v.(*roundevents.ParticipantJoinedPayloadV1) = roundevents.ParticipantJoinedPayloadV1{
 							RoundID:        testRoundID,
 							EventMessageID: testMessageID,
 							AcceptedParticipants: []roundtypes.Participant{
@@ -449,9 +449,9 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockRoundRsvpManager *mocks.MockRoundRsvpManager, mockConfig *config.Config) {
 				joinedLate := true
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.ParticipantJoinedPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.ParticipantJoinedPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.ParticipantJoinedPayload) = roundevents.ParticipantJoinedPayload{
+						*v.(*roundevents.ParticipantJoinedPayloadV1) = roundevents.ParticipantJoinedPayloadV1{
 							RoundID:        testRoundID,
 							EventMessageID: testMessageID,
 							AcceptedParticipants: []roundtypes.Participant{
@@ -502,9 +502,9 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 			wantErr: true,
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockRoundRsvpManager *mocks.MockRoundRsvpManager, mockConfig *config.Config) {
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.ParticipantJoinedPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.ParticipantJoinedPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.ParticipantJoinedPayload) = roundevents.ParticipantJoinedPayload{
+						*v.(*roundevents.ParticipantJoinedPayloadV1) = roundevents.ParticipantJoinedPayloadV1{
 							RoundID:        testRoundID,
 							EventMessageID: testMessageID,
 							AcceptedParticipants: []roundtypes.Participant{
@@ -559,9 +559,9 @@ func TestRoundHandlers_HandleRoundParticipantJoined(t *testing.T) {
 			wantErr: false, // Function continues with empty messageID
 			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockRoundRsvpManager *mocks.MockRoundRsvpManager, mockConfig *config.Config) {
 				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.ParticipantJoinedPayload{})).
+					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.ParticipantJoinedPayloadV1{})).
 					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.ParticipantJoinedPayload) = roundevents.ParticipantJoinedPayload{
+						*v.(*roundevents.ParticipantJoinedPayloadV1) = roundevents.ParticipantJoinedPayloadV1{
 							RoundID:        testRoundID,
 							EventMessageID: testMessageID,
 							AcceptedParticipants: []roundtypes.Participant{

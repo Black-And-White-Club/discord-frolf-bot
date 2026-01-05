@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
-	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
+	discordroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	"github.com/google/uuid"
 
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
@@ -105,7 +104,7 @@ func (rrm *roundRsvpManager) HandleRoundResponse(ctx context.Context, i *discord
 			}
 		}
 
-		payload := discordroundevents.DiscordRoundParticipantJoinRequestPayload{
+		payload := discordroundevents.RoundParticipantJoinRequestDiscordPayloadV1{
 			RoundID:    sharedtypes.RoundID(roundUUID),
 			UserID:     sharedtypes.DiscordID(user.ID),
 			ChannelID:  resolvedChannelID,
@@ -116,17 +115,17 @@ func (rrm *roundRsvpManager) HandleRoundResponse(ctx context.Context, i *discord
 		msg := &wmmessage.Message{
 			Metadata: wmmessage.Metadata{
 				"discord_message_id": messageID, // Use the safely extracted messageID
-				"topic":              discordroundevents.RoundParticipantJoinReqTopic,
+				"topic":              discordroundevents.RoundParticipantJoinRequestDiscordV1,
 				"response":           string(response),
 			},
 		}
 
-		resultMsg, err := rrm.helper.CreateResultMessage(msg, payload, discordroundevents.RoundParticipantJoinReqTopic)
+		resultMsg, err := rrm.helper.CreateResultMessage(msg, payload, discordroundevents.RoundParticipantJoinRequestDiscordV1)
 		if err != nil {
 			return RoundRsvpOperationResult{Error: err}, nil
 		}
 
-		if err := rrm.publisher.Publish(discordroundevents.RoundParticipantJoinReqTopic, resultMsg); err != nil {
+		if err := rrm.publisher.Publish(discordroundevents.RoundParticipantJoinRequestDiscordV1, resultMsg); err != nil {
 			return RoundRsvpOperationResult{Error: err}, nil
 		}
 
@@ -245,16 +244,14 @@ func (rrm *roundRsvpManager) InteractionJoinRoundLate(ctx context.Context, i *di
 			return RoundRsvpOperationResult{Error: err}, nil
 		}
 
-		tagNumber := sharedtypes.TagNumber(0)
 		joinedLate := true
 
-		payload := roundevents.ParticipantJoinRequestPayload{
+		payload := discordroundevents.RoundParticipantJoinRequestDiscordPayloadV1{
 			RoundID:    sharedtypes.RoundID(roundUUID),
 			UserID:     sharedtypes.DiscordID(user.ID),
-			Response:   roundtypes.ResponseAccept,
-			TagNumber:  &tagNumber,
+			ChannelID:  resolvedChannelID,
 			JoinedLate: &joinedLate,
-			GuildID:    sharedtypes.GuildID(i.GuildID),
+			GuildID:    i.GuildID,
 		}
 
 		// Add nil check for Message before accessing ID
@@ -266,16 +263,17 @@ func (rrm *roundRsvpManager) InteractionJoinRoundLate(ctx context.Context, i *di
 		msg := &wmmessage.Message{
 			Metadata: wmmessage.Metadata{
 				"discord_message_id": messageID, // Use the safely extracted messageID
-				"topic":              discordroundevents.RoundParticipantJoinReqTopic,
+				"topic":              discordroundevents.RoundParticipantJoinRequestDiscordV1,
+				"response":           "ACCEPT",
 			},
 		}
 
-		resultMsg, err := rrm.helper.CreateResultMessage(msg, payload, discordroundevents.RoundParticipantJoinReqTopic)
+		resultMsg, err := rrm.helper.CreateResultMessage(msg, payload, discordroundevents.RoundParticipantJoinRequestDiscordV1)
 		if err != nil {
 			return RoundRsvpOperationResult{Error: err}, nil
 		}
 
-		if err := rrm.publisher.Publish(discordroundevents.RoundParticipantJoinReqTopic, resultMsg); err != nil {
+		if err := rrm.publisher.Publish(discordroundevents.RoundParticipantJoinRequestDiscordV1, resultMsg); err != nil {
 			return RoundRsvpOperationResult{Error: err}, nil
 		}
 

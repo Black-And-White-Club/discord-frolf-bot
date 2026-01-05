@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	discordleaderboardevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/leaderboard"
+	sharedleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
@@ -64,7 +64,7 @@ func (ctm *claimTagManager) HandleClaimTagCommand(ctx context.Context, i *discor
 		}
 
 		// Create the payload for tag assignment request
-		payload := discordleaderboardevents.LeaderboardTagAssignRequestPayload{
+		payload := sharedleaderboardevents.LeaderboardTagAssignRequestPayloadV1{
 			TargetUserID: sharedtypes.DiscordID(i.Member.User.ID),
 			RequestorID:  sharedtypes.DiscordID(i.Member.User.ID),
 			TagNumber:    sharedtypes.TagNumber(tagValue),
@@ -75,7 +75,7 @@ func (ctm *claimTagManager) HandleClaimTagCommand(ctx context.Context, i *discor
 		}
 
 		// Create and publish the message
-		msg, err := ctm.helper.CreateNewMessage(payload, discordleaderboardevents.LeaderboardTagAssignRequestTopic)
+		msg, err := ctm.helper.CreateNewMessage(payload, sharedleaderboardevents.LeaderboardTagAssignRequestV1)
 		if err != nil {
 			ctm.logger.ErrorContext(ctx, "Failed to create tag claim message", attr.Error(err))
 			return ClaimTagOperationResult{Error: err}, err
@@ -88,7 +88,7 @@ func (ctm *claimTagManager) HandleClaimTagCommand(ctx context.Context, i *discor
 		msg.Metadata.Set("correlation_id", requestID)
 
 		// Publish the request
-		err = ctm.eventBus.Publish(discordleaderboardevents.LeaderboardTagAssignRequestTopic, msg)
+		err = ctm.eventBus.Publish(sharedleaderboardevents.LeaderboardTagAssignRequestV1, msg)
 		if err != nil {
 			ctm.logger.ErrorContext(ctx, "Failed to publish tag claim request", attr.Error(err))
 			return ClaimTagOperationResult{Error: err}, err

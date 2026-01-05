@@ -22,8 +22,8 @@ import (
 type Handler interface {
 	HandleRoleUpdateCommand(msg *message.Message) ([]*message.Message, error)
 	HandleRoleUpdateButtonPress(msg *message.Message) ([]*message.Message, error)
-	HandleRoleUpdateResult(msg *message.Message) ([]*message.Message, error)
-	HandleUserSignupRequest(msg *message.Message) ([]*message.Message, error)
+	HandleRoleUpdated(msg *message.Message) ([]*message.Message, error)
+	HandleRoleUpdateFailed(msg *message.Message) ([]*message.Message, error)
 	HandleUserCreated(msg *message.Message) ([]*message.Message, error)
 	HandleUserCreationFailed(msg *message.Message) ([]*message.Message, error)
 	HandleRoleAdded(msg *message.Message) ([]*message.Message, error)

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
+	sharedroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
@@ -17,9 +17,9 @@ import (
 func (h *RoundHandlers) HandleRoundParticipantJoinRequest(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleRoundParticipantJoinRequest",
-		&discordroundevents.DiscordRoundParticipantJoinRequestPayload{},
+		&sharedroundevents.RoundParticipantJoinRequestDiscordPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			p := payload.(*discordroundevents.DiscordRoundParticipantJoinRequestPayload)
+			p := payload.(*sharedroundevents.RoundParticipantJoinRequestDiscordPayloadV1)
 
 			// Extract and normalize response from message metadata. Support multiple token styles
 			// so Discord side can just send the enum value from shared types.
@@ -50,7 +50,7 @@ func (h *RoundHandlers) HandleRoundParticipantJoinRequest(msg *message.Message) 
 
 			// Construct the backend payload. TagNumber left nil so backend performs lookup.
 			zeroTag := sharedtypes.TagNumber(0)
-			backendPayload := roundevents.ParticipantJoinRequestPayload{
+			backendPayload := roundevents.ParticipantJoinRequestPayloadV1{
 				GuildID:    sharedtypes.GuildID(p.GuildID),
 				RoundID:    p.RoundID,
 				UserID:     p.UserID,
@@ -60,7 +60,7 @@ func (h *RoundHandlers) HandleRoundParticipantJoinRequest(msg *message.Message) 
 			}
 
 			// Create message to send to backend
-			backendMsg, err := h.Helpers.CreateResultMessage(msg, backendPayload, roundevents.RoundParticipantJoinRequest)
+			backendMsg, err := h.Helpers.CreateResultMessage(msg, backendPayload, roundevents.RoundParticipantJoinRequestedV1)
 			if err != nil {
 				return nil, err
 			}
@@ -81,9 +81,9 @@ func (h *RoundHandlers) HandleRoundParticipantJoined(msg *message.Message) ([]*m
 	// The outer handlerWrapper handles the high-level span, metrics, and start/end logs
 	return h.handlerWrapper(
 		"HandleRoundParticipantJoined",
-		&roundevents.ParticipantJoinedPayload{}, // Unmarshal target
+		&roundevents.ParticipantJoinedPayloadV1{}, // Unmarshal target
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			p := payload.(*roundevents.ParticipantJoinedPayload)
+			p := payload.(*roundevents.ParticipantJoinedPayloadV1)
 
 			h.Logger.InfoContext(ctx, "Received ParticipantJoinedPayload",
 				attr.CorrelationIDFromMsg(msg),
@@ -178,9 +178,9 @@ func (h *RoundHandlers) HandleRoundParticipantJoined(msg *message.Message) ([]*m
 func (h *RoundHandlers) HandleRoundParticipantRemoved(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleRoundParticipantRemoved",
-		&roundevents.ParticipantRemovedPayload{},
+		&roundevents.ParticipantRemovedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			p := payload.(*roundevents.ParticipantRemovedPayload)
+			p := payload.(*roundevents.ParticipantRemovedPayloadV1)
 
 			h.Logger.InfoContext(ctx, "Received RoundParticipantRemoved event",
 				attr.CorrelationIDFromMsg(msg),

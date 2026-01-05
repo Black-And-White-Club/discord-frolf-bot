@@ -15,9 +15,9 @@ import (
 func (h *LeaderboardHandlers) HandleBatchTagAssigned(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleBatchTagAssigned",
-		&leaderboardevents.BatchTagAssignedPayload{},
+		&leaderboardevents.LeaderboardBatchTagAssignedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			batchPayload := payload.(*leaderboardevents.BatchTagAssignedPayload)
+			batchPayload := payload.(*leaderboardevents.LeaderboardBatchTagAssignedPayloadV1)
 
 			// Extract guild ID (prefer payload, fallback to metadata)
 			guildID := ""

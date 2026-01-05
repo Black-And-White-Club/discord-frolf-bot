@@ -2,10 +2,9 @@ package leaderboardhandlers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
-	discordleaderboardevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/leaderboard"
+	sharedleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
@@ -17,11 +16,11 @@ import (
 func (h *LeaderboardHandlers) HandleTagSwapRequest(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleTagSwapRequest",
-		&discordleaderboardevents.LeaderboardTagSwapRequestPayload{},
+		&sharedleaderboardevents.LeaderboardTagSwapRequestPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
 			h.Logger.InfoContext(ctx, "Handling TagSwapRequest", attr.CorrelationIDFromMsg(msg))
 
-			discordPayload := payload.(*discordleaderboardevents.LeaderboardTagSwapRequestPayload)
+			discordPayload := payload.(*sharedleaderboardevents.LeaderboardTagSwapRequestPayloadV1)
 
 			user1ID := sharedtypes.DiscordID(discordPayload.User1ID)
 			user2ID := sharedtypes.DiscordID(discordPayload.User2ID)
@@ -39,30 +38,16 @@ func (h *LeaderboardHandlers) HandleTagSwapRequest(msg *message.Message) ([]*mes
 				return nil, err
 			}
 
-			backendPayload := leaderboardevents.TagSwapRequestedPayload{
+			backendPayload := leaderboardevents.TagSwapRequestedPayloadV1{
 				GuildID:     sharedtypes.GuildID(discordPayload.GuildID),
 				RequestorID: requestorID,
 				TargetID:    user2ID,
 			}
 
-			backendMsg, err := h.Helpers.CreateResultMessage(msg, backendPayload, leaderboardevents.TagSwapRequested)
+			backendMsg, err := h.Helpers.CreateResultMessage(msg, backendPayload, leaderboardevents.TagSwapRequestedV1)
 			if err != nil {
 				h.Logger.ErrorContext(ctx, "Failed to create backend message", attr.CorrelationIDFromMsg(msg), attr.Error(err))
 				return nil, fmt.Errorf("failed to create backend message: %w", err)
-			}
-
-			// Normalize payload key casing to match expected format in tests (GuildID vs guild_id)
-			var tmp map[string]any
-			if err := json.Unmarshal(backendMsg.Payload, &tmp); err == nil {
-				if _, ok := tmp["GuildID"]; !ok {
-					if v, ok2 := tmp["guild_id"]; ok2 {
-						tmp["GuildID"] = v
-						delete(tmp, "guild_id")
-						if b, mErr := json.Marshal(tmp); mErr == nil {
-							backendMsg.Payload = b
-						}
-					}
-				}
 			}
 
 			backendMsg.Metadata.Set("user_id", string(requestorID))
@@ -79,11 +64,11 @@ func (h *LeaderboardHandlers) HandleTagSwapRequest(msg *message.Message) ([]*mes
 func (h *LeaderboardHandlers) HandleTagSwappedResponse(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleTagSwappedResponse",
-		&leaderboardevents.TagSwapProcessedPayload{},
+		&leaderboardevents.TagSwapProcessedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
 			h.Logger.InfoContext(ctx, "Handling TagSwappedResponse", attr.CorrelationIDFromMsg(msg))
 
-			backendPayload := payload.(*leaderboardevents.TagSwapProcessedPayload)
+			backendPayload := payload.(*leaderboardevents.TagSwapProcessedPayloadV1)
 
 			userID := msg.Metadata.Get("user_id")
 			channelID := msg.Metadata.Get("channel_id")
@@ -94,14 +79,15 @@ func (h *LeaderboardHandlers) HandleTagSwappedResponse(msg *message.Message) ([]
 				return nil, fmt.Errorf("missing required metadata (user_id or channel_id)")
 			}
 
-			discordPayload := discordleaderboardevents.LeaderboardTagSwappedPayload{
+			discordPayload := sharedleaderboardevents.LeaderboardTagSwappedPayloadV1{
 				User1ID:   backendPayload.RequestorID,
 				User2ID:   backendPayload.TargetID,
 				ChannelID: channelID,
 				MessageID: messageID,
+				GuildID:   string(backendPayload.GuildID),
 			}
 
-			discordMsg, err := h.Helpers.CreateResultMessage(msg, discordPayload, discordleaderboardevents.LeaderboardTagSwappedTopic)
+			discordMsg, err := h.Helpers.CreateResultMessage(msg, discordPayload, sharedleaderboardevents.LeaderboardTagSwappedV1)
 			if err != nil {
 				h.Logger.ErrorContext(ctx, "Failed to create discord message", attr.CorrelationIDFromMsg(msg), attr.Error(err))
 				return nil, fmt.Errorf("failed to create discord message: %w", err)
@@ -121,11 +107,11 @@ func (h *LeaderboardHandlers) HandleTagSwappedResponse(msg *message.Message) ([]
 func (h *LeaderboardHandlers) HandleTagSwapFailedResponse(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleTagSwapFailedResponse",
-		&leaderboardevents.TagSwapFailedPayload{},
+		&leaderboardevents.TagSwapFailedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
 			h.Logger.InfoContext(ctx, "Handling TagSwapFailedResponse", attr.CorrelationIDFromMsg(msg))
 
-			backendPayload := payload.(*leaderboardevents.TagSwapFailedPayload)
+			backendPayload := payload.(*leaderboardevents.TagSwapFailedPayloadV1)
 
 			userID := msg.Metadata.Get("user_id")
 			channelID := msg.Metadata.Get("channel_id")
@@ -136,15 +122,16 @@ func (h *LeaderboardHandlers) HandleTagSwapFailedResponse(msg *message.Message) 
 				return nil, fmt.Errorf("missing required metadata (user_id or channel_id)")
 			}
 
-			discordPayload := discordleaderboardevents.LeaderboardTagSwapFailedPayload{
+			discordPayload := sharedleaderboardevents.LeaderboardTagSwapFailedPayloadV1{
 				User1ID:   backendPayload.RequestorID,
 				User2ID:   backendPayload.TargetID,
 				Reason:    backendPayload.Reason,
 				ChannelID: channelID,
 				MessageID: messageID,
+				GuildID:   string(backendPayload.GuildID),
 			}
 
-			discordMsg, err := h.Helpers.CreateResultMessage(msg, discordPayload, discordleaderboardevents.LeaderboardTagSwapFailedTopic)
+			discordMsg, err := h.Helpers.CreateResultMessage(msg, discordPayload, sharedleaderboardevents.LeaderboardTagSwapFailedV1)
 			if err != nil {
 				h.Logger.ErrorContext(ctx, "Failed to create discord message", attr.CorrelationIDFromMsg(msg), attr.Error(err))
 				return nil, fmt.Errorf("failed to create discord message: %w", err)

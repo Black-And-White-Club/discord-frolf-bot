@@ -111,7 +111,7 @@ func TestUpdateDiscordEmbedsWithTagChanges_Variants(t *testing.T) {
 	sess.EXPECT().ChannelMessage("c1", "m1").Return(&discordgo.Message{Embeds: []*discordgo.MessageEmbed{{Fields: []*discordgo.MessageEmbedField{{Name: "Accepted", Value: "<@u1>"}}}}}, nil)
 	sess.EXPECT().ChannelMessageEditComplex(gomock.Any()).Return(&discordgo.Message{ID: "ok"}, nil)
 
-	payload := roundevents.TagsUpdatedForScheduledRoundsPayload{UpdatedRounds: []roundevents.RoundUpdateInfo{{GuildID: "g1", EventMessageID: "m1"}}}
+	payload := roundevents.TagsUpdatedForScheduledRoundsPayloadV1{UpdatedRounds: []roundevents.RoundUpdateInfoV1{{GuildID: "g1", EventMessageID: "m1"}}}
 	tn := sharedtypes.TagNumber(9)
 	if res, err := mgr.UpdateDiscordEmbedsWithTagChanges(context.Background(), payload, map[sharedtypes.DiscordID]*sharedtypes.TagNumber{"u1": &tn}); err != nil || res.Error != nil {
 		t.Fatalf("expected success, got res=%v err=%v", res, err)
@@ -119,7 +119,7 @@ func TestUpdateDiscordEmbedsWithTagChanges_Variants(t *testing.T) {
 
 	// resolver error
 	resolver.EXPECT().GetGuildConfigWithContext(gomock.Any(), "g2").Return(nil, context.DeadlineExceeded)
-	payload2 := roundevents.TagsUpdatedForScheduledRoundsPayload{UpdatedRounds: []roundevents.RoundUpdateInfo{{GuildID: "g2", EventMessageID: "m2"}}}
+	payload2 := roundevents.TagsUpdatedForScheduledRoundsPayloadV1{UpdatedRounds: []roundevents.RoundUpdateInfoV1{{GuildID: "g2", EventMessageID: "m2"}}}
 	if res, err := mgr.UpdateDiscordEmbedsWithTagChanges(context.Background(), payload2, map[sharedtypes.DiscordID]*sharedtypes.TagNumber{}); err != nil && res.Error == nil {
 		t.Fatalf("should not return underlying error; expected wrapped in result only")
 	}

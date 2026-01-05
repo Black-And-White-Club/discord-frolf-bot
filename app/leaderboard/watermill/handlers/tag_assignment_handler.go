@@ -6,9 +6,8 @@ import (
 
 	"github.com/google/uuid"
 
-	discordleaderboardevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/leaderboard"
+	sharedleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
-	sharedevents "github.com/Black-And-White-Club/frolf-bot-shared/events/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/ThreeDotsLabs/watermill/message"
@@ -18,11 +17,11 @@ import (
 func (h *LeaderboardHandlers) HandleTagAssignRequest(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleTagAssignRequest",
-		&discordleaderboardevents.LeaderboardTagAssignRequestPayload{},
+		&sharedleaderboardevents.LeaderboardTagAssignRequestPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
 			h.Logger.InfoContext(ctx, "Handling TagAssignRequest", attr.CorrelationIDFromMsg(msg))
 
-			discordPayload := payload.(*discordleaderboardevents.LeaderboardTagAssignRequestPayload)
+			discordPayload := payload.(*sharedleaderboardevents.LeaderboardTagAssignRequestPayloadV1)
 
 			// Validation
 			if discordPayload.TargetUserID == "" || discordPayload.RequestorID == "" ||
@@ -39,48 +38,52 @@ func (h *LeaderboardHandlers) HandleTagAssignRequest(msg *message.Message) ([]*m
 				return nil, err
 			}
 
-			// Create batch assignment payload with single assignment
-			batchPayload := sharedevents.BatchTagAssignmentRequestedPayload{
-				ScopedGuildID:    sharedevents.ScopedGuildID{GuildID: sharedtypes.GuildID(discordPayload.GuildID)},
-				RequestingUserID: discordPayload.TargetUserID,
-				BatchID:          discordPayload.MessageID, // Use messageID as batchID
-				Assignments: []sharedevents.TagAssignmentInfo{
-					{
-						UserID:    discordPayload.TargetUserID,
-						TagNumber: discordPayload.TagNumber,
-					},
-				},
+			// Create single assignment payload
+			tagNumber := discordPayload.TagNumber
+			// Parse MessageID as UUID for the update tracking ID
+			updateUUID, err := uuid.Parse(discordPayload.MessageID)
+			if err != nil {
+				h.Logger.ErrorContext(ctx, "Failed to parse message ID as UUID", attr.Error(err), attr.CorrelationIDFromMsg(msg))
+				return nil, fmt.Errorf("failed to parse message ID as UUID: %w", err)
+			}
+			updateID := sharedtypes.RoundID(updateUUID)
+			backendPayload := leaderboardevents.LeaderboardTagAssignmentRequestedPayloadV1{
+				GuildID:    sharedtypes.GuildID(discordPayload.GuildID),
+				UserID:     discordPayload.TargetUserID,
+				TagNumber:  &tagNumber,
+				UpdateID:   updateID,
+				Source:     "discord_claim",
+				UpdateType: "manual_assignment",
 			}
 
-			// Create batch assignment message
-			batchMsg, err := h.Helpers.CreateResultMessage(
+			// Create assignment message
+			backendMsg, err := h.Helpers.CreateResultMessage(
 				msg,
-				batchPayload,
-				sharedevents.LeaderboardBatchTagAssignmentRequested,
+				backendPayload,
+				leaderboardevents.LeaderboardTagAssignmentRequestedV1,
 			)
 			if err != nil {
-				h.Logger.ErrorContext(ctx, "Failed to create batch assignment message",
+				h.Logger.ErrorContext(ctx, "Failed to create assignment message",
 					attr.CorrelationIDFromMsg(msg), attr.Error(err))
-				return nil, fmt.Errorf("failed to create batch assignment message: %w", err)
+				return nil, fmt.Errorf("failed to create assignment message: %w", err)
 			}
 
 			// Preserve Discord-specific metadata for response handling
-			batchMsg.Metadata.Set("user_id", string(discordPayload.TargetUserID))
-			batchMsg.Metadata.Set("requestor_id", string(discordPayload.RequestorID))
-			batchMsg.Metadata.Set("channel_id", discordPayload.ChannelID)
-			batchMsg.Metadata.Set("message_id", discordPayload.MessageID)
+			backendMsg.Metadata.Set("user_id", string(discordPayload.TargetUserID))
+			backendMsg.Metadata.Set("requestor_id", string(discordPayload.RequestorID))
+			backendMsg.Metadata.Set("channel_id", discordPayload.ChannelID)
+			backendMsg.Metadata.Set("message_id", discordPayload.MessageID)
 			// Propagate guild_id metadata for multi-tenant routing across services
 			if discordPayload.GuildID != "" {
-				batchMsg.Metadata.Set("guild_id", discordPayload.GuildID)
+				backendMsg.Metadata.Set("guild_id", discordPayload.GuildID)
 			}
-			batchMsg.Metadata.Set("source", "discord_claim")
-			batchMsg.Metadata.Set("single_assignment", "true") // Flag for response handling
+			backendMsg.Metadata.Set("source", "discord_claim")
 
-			h.Logger.InfoContext(ctx, "Successfully created batch assignment for Discord claim",
+			h.Logger.InfoContext(ctx, "Successfully created assignment for Discord claim",
 				attr.CorrelationIDFromMsg(msg),
-				attr.String("batch_id", batchPayload.BatchID))
+				attr.String("update_id", backendPayload.UpdateID.String()))
 
-			return []*message.Message{batchMsg}, nil
+			return []*message.Message{backendMsg}, nil
 		},
 	)(msg)
 }
@@ -89,11 +92,11 @@ func (h *LeaderboardHandlers) HandleTagAssignRequest(msg *message.Message) ([]*m
 func (h *LeaderboardHandlers) HandleTagAssignedResponse(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleTagAssignedResponse",
-		&leaderboardevents.TagAssignedPayload{},
+		&leaderboardevents.LeaderboardTagAssignedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
 			h.Logger.InfoContext(ctx, "Handling TagAssignedResponse", attr.CorrelationIDFromMsg(msg))
 
-			backendPayload := payload.(*leaderboardevents.TagAssignedPayload)
+			backendPayload := payload.(*leaderboardevents.LeaderboardTagAssignedPayloadV1)
 			correlationID := msg.Metadata.Get("correlation_id")
 
 			// If this is from a Discord claim command, update the interaction directly
@@ -134,14 +137,15 @@ func (h *LeaderboardHandlers) HandleTagAssignedResponse(msg *message.Message) ([
 			channelID := msg.Metadata.Get("channel_id")
 			messageID := msg.Metadata.Get("message_id")
 
-			discordPayload := discordleaderboardevents.LeaderboardTagAssignedPayload{
+			discordPayload := sharedleaderboardevents.LeaderboardTagAssignedPayloadV1{
 				TargetUserID: string(backendPayload.UserID),
 				TagNumber:    *backendPayload.TagNumber,
 				ChannelID:    channelID,
 				MessageID:    messageID,
+				GuildID:      string(backendPayload.GuildID),
 			}
 
-			discordMsg, err := h.Helpers.CreateResultMessage(msg, discordPayload, discordleaderboardevents.LeaderboardTagAssignedTopic)
+			discordMsg, err := h.Helpers.CreateResultMessage(msg, discordPayload, sharedleaderboardevents.LeaderboardTagAssignedV1)
 			if err != nil {
 				h.Logger.ErrorContext(ctx, "Failed to create discord message", attr.CorrelationIDFromMsg(msg), attr.Error(err))
 				return nil, fmt.Errorf("failed to create discord message: %w", err)
@@ -162,11 +166,11 @@ func (h *LeaderboardHandlers) HandleTagAssignedResponse(msg *message.Message) ([
 func (h *LeaderboardHandlers) HandleTagAssignFailedResponse(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleTagAssignFailedResponse",
-		&leaderboardevents.TagAssignmentFailedPayload{},
+		&leaderboardevents.LeaderboardTagAssignmentFailedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
 			h.Logger.InfoContext(ctx, "Handling TagAssignFailedResponse", attr.CorrelationIDFromMsg(msg))
 
-			backendPayload := payload.(*leaderboardevents.TagAssignmentFailedPayload)
+			backendPayload := payload.(*leaderboardevents.LeaderboardTagAssignmentFailedPayloadV1)
 			correlationID := msg.Metadata.Get("correlation_id")
 
 			// If this is from a Discord claim command, update the interaction directly
@@ -207,15 +211,16 @@ func (h *LeaderboardHandlers) HandleTagAssignFailedResponse(msg *message.Message
 			channelID := msg.Metadata.Get("channel_id")
 			messageID := msg.Metadata.Get("message_id")
 
-			discordPayload := discordleaderboardevents.LeaderboardTagAssignFailedPayload{
+			discordPayload := sharedleaderboardevents.LeaderboardTagAssignFailedPayloadV1{
 				TargetUserID: string(backendPayload.UserID),
 				TagNumber:    *backendPayload.TagNumber,
 				Reason:       backendPayload.Reason,
 				ChannelID:    channelID,
 				MessageID:    messageID,
+				GuildID:      string(backendPayload.GuildID),
 			}
 
-			discordMsg, err := h.Helpers.CreateResultMessage(msg, discordPayload, discordleaderboardevents.LeaderboardTagAssignFailedTopic)
+			discordMsg, err := h.Helpers.CreateResultMessage(msg, discordPayload, sharedleaderboardevents.LeaderboardTagAssignFailedV1)
 			if err != nil {
 				h.Logger.ErrorContext(ctx, "Failed to create discord message", attr.CorrelationIDFromMsg(msg), attr.Error(err))
 				return nil, fmt.Errorf("failed to create discord message: %w", err)

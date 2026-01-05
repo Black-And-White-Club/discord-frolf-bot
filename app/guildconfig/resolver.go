@@ -191,10 +191,10 @@ func (r *Resolver) coordinateConfigRequest(ctx context.Context, guildID string, 
 	// Create message with structured payload
 	msg := message.NewMessage(watermill.NewUUID(), payloadBytes)
 	msg.SetContext(requestCtx)                                          // Attach context to the message
-	msg.Metadata.Set("type", guildevents.GuildConfigRetrievalRequested) // Use proper event topic
+	msg.Metadata.Set("type", guildevents.GuildConfigRetrievalRequestedV1) // Use proper event topic
 
 	// Publish guild configuration retrieval request event to backend
-	publishErr := r.eventBus.Publish(guildevents.GuildConfigRetrievalRequested, msg)
+	publishErr := r.eventBus.Publish(guildevents.GuildConfigRetrievalRequestedV1, msg)
 	if publishErr != nil {
 		req.err = &ConfigTemporaryError{
 			GuildID: guildID,

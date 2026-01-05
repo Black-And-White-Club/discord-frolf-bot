@@ -15,7 +15,7 @@ import (
 
 // TransformRoundToFinalizedScorecard transforms the round event embed into a finalized scorecard format
 // showing participants with their final scores and modifying the UI to indicate the round is finalized
-func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roundevents.RoundFinalizedEmbedUpdatePayload) (*discordgo.MessageEmbed, []discordgo.MessageComponent, error) {
+func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roundevents.RoundFinalizedEmbedUpdatePayloadV1) (*discordgo.MessageEmbed, []discordgo.MessageComponent, error) {
 	var embed *discordgo.MessageEmbed
 	var components []discordgo.MessageComponent
 	var err error

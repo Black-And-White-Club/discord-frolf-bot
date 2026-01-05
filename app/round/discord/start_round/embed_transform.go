@@ -138,7 +138,7 @@ func parseInt(s string) (int, error) {
 
 // TransformRoundToScorecard transforms the round data into a scorecard embed and components,
 // merging participant status from the existing embed with the new payload data.
-func (m *startRoundManager) TransformRoundToScorecard(ctx context.Context, payload *roundevents.DiscordRoundStartPayload, existingEmbed *discordgo.MessageEmbed) (StartRoundOperationResult, error) {
+func (m *startRoundManager) TransformRoundToScorecard(ctx context.Context, payload *roundevents.DiscordRoundStartPayloadV1, existingEmbed *discordgo.MessageEmbed) (StartRoundOperationResult, error) {
 	return m.operationWrapper(ctx, "TransformRoundToScorecard", func(ctx context.Context) (StartRoundOperationResult, error) {
 		// Multi-tenant: resolve channel ID from guild config if not provided (if needed for embed operations)
 		// Channel resolution logic is present for future use, but not needed in this function. Removed unused variable.

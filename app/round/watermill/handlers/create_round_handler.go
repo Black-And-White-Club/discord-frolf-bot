@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	discordroundevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/round"
+	sharedroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
@@ -21,7 +21,7 @@ func (h *RoundHandlers) HandleRoundCreateRequested(msg *message.Message) ([]*mes
 	}
 	return h.handlerWrapper(
 		"HandleRoundCreateRequested",
-		&discordroundevents.CreateRoundRequestedPayload{},
+		&sharedroundevents.CreateRoundModalPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
 			// Check context health at start of handler logic
 			if err := ctx.Err(); err != nil {
@@ -32,14 +32,14 @@ func (h *RoundHandlers) HandleRoundCreateRequested(msg *message.Message) ([]*mes
 				return nil, fmt.Errorf("context cancelled: %w", err)
 			}
 
-			discordPayload := payload.(*discordroundevents.CreateRoundRequestedPayload)
+			discordPayload := payload.(*sharedroundevents.CreateRoundModalPayloadV1)
 
 			if h.Logger != nil {
 				h.Logger.InfoContext(ctx, "HandleRoundCreateRequested processing payload", attr.Any("payload", discordPayload))
 			}
 
 			// Convert to backend payload and set GuildID
-			backendPayload := roundevents.CreateRoundRequestedPayload{
+			backendPayload := roundevents.CreateRoundRequestedPayloadV1{
 				GuildID:     sharedtypes.GuildID(discordPayload.GuildID),
 				Title:       discordPayload.Title,
 				Description: discordPayload.Description,
@@ -55,7 +55,7 @@ func (h *RoundHandlers) HandleRoundCreateRequested(msg *message.Message) ([]*mes
 			}
 
 			// Directly publish to the backend without additional checks
-			backendMsg, err := h.Helpers.CreateResultMessage(msg, backendPayload, roundevents.RoundCreateRequest)
+			backendMsg, err := h.Helpers.CreateResultMessage(msg, backendPayload, roundevents.RoundCreationRequestedV1)
 			if err != nil {
 				_, updateErr := h.RoundDiscord.GetCreateRoundManager().UpdateInteractionResponseWithRetryButton(ctx, msg.Metadata.Get("correlation_id"), "Failed to create result message: "+err.Error())
 				if updateErr != nil {
@@ -82,9 +82,9 @@ func (h *RoundHandlers) HandleRoundCreateRequested(msg *message.Message) ([]*mes
 func (h *RoundHandlers) HandleRoundCreated(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleRoundCreated",
-		&roundevents.RoundCreatedPayload{},
+		&roundevents.RoundCreatedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			createdPayload := payload.(*roundevents.RoundCreatedPayload)
+			createdPayload := payload.(*roundevents.RoundCreatedPayloadV1)
 
 			h.Logger.InfoContext(ctx, "Received RoundCreated event",
 				attr.CorrelationIDFromMsg(msg),
@@ -186,7 +186,7 @@ func (h *RoundHandlers) HandleRoundCreated(msg *message.Message) ([]*message.Mes
 				}
 			}
 
-			updatePayload := roundevents.RoundMessageIDUpdatePayload{
+			updatePayload := roundevents.RoundMessageIDUpdatePayloadV1{
 				GuildID: finalGuildID,
 				RoundID: roundID,
 			}
@@ -199,7 +199,7 @@ func (h *RoundHandlers) HandleRoundCreated(msg *message.Message) ([]*message.Mes
 			}
 			tempMsgWithMetadata.Metadata["discord_message_id"] = discordMessageID
 
-			resultMsg, err := h.Helpers.CreateResultMessage(tempMsgWithMetadata, updatePayload, roundevents.RoundEventMessageIDUpdate)
+			resultMsg, err := h.Helpers.CreateResultMessage(tempMsgWithMetadata, updatePayload, roundevents.RoundEventMessageIDUpdateV1)
 			if err != nil {
 				h.Logger.ErrorContext(ctx, "Failed to create RoundEventMessageIDUpdate message",
 					attr.CorrelationIDFromMsg(msg),
@@ -224,13 +224,13 @@ func (h *RoundHandlers) HandleRoundCreated(msg *message.Message) ([]*message.Mes
 func (h *RoundHandlers) HandleRoundCreationFailed(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleRoundCreationFailed",
-		&discordroundevents.RoundCreationFailedPayload{},
+		&roundevents.RoundCreationFailedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			failedPayload := payload.(*discordroundevents.RoundCreationFailedPayload)
+			failedPayload := payload.(*roundevents.RoundCreationFailedPayloadV1)
 			correlationID := msg.Metadata.Get("correlation_id")
 
 			// Prepare the error message
-			errorMessage := "❌ Round creation failed: " + failedPayload.Reason
+			errorMessage := "❌ Round creation failed: " + failedPayload.ErrorMessage
 
 			// Call the gateway handler to update the interaction response with a retry button
 			_, err := h.RoundDiscord.GetCreateRoundManager().UpdateInteractionResponseWithRetryButton(ctx, correlationID, errorMessage)
@@ -246,12 +246,12 @@ func (h *RoundHandlers) HandleRoundCreationFailed(msg *message.Message) ([]*mess
 func (h *RoundHandlers) HandleRoundValidationFailed(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleRoundValidationFailed",
-		&roundevents.RoundValidationFailedPayload{},
+		&roundevents.RoundValidationFailedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			validationPayload := payload.(*roundevents.RoundValidationFailedPayload)
+			validationPayload := payload.(*roundevents.RoundValidationFailedPayloadV1)
 			correlationID := msg.Metadata.Get("correlation_id")
 
-			errorMessages := validationPayload.ErrorMessage
+			errorMessages := validationPayload.ErrorMessages
 			errorMessage := "❌ " + strings.Join(errorMessages, "\n") + " Please try again."
 			h.Logger.WarnContext(ctx, "Round validation failed",
 				attr.UserID(validationPayload.UserID),

@@ -20,9 +20,9 @@ const (
 func (h *RoundHandlers) HandleScoreOverrideSuccess(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
 		"HandleScoreOverrideSuccess",
-		&scoreevents.ScoreUpdateSuccessPayload{},
+		&scoreevents.ScoreUpdatedPayloadV1{},
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			p, ok := payload.(*scoreevents.ScoreUpdateSuccessPayload)
+			p, ok := payload.(*scoreevents.ScoreUpdatedPayloadV1)
 			if !ok {
 				return nil, fmt.Errorf("invalid payload type for HandleScoreOverrideSuccess")
 			}
@@ -36,7 +36,7 @@ func (h *RoundHandlers) HandleScoreOverrideSuccess(msg *message.Message) ([]*mes
 				// We still continue; UpdateScoreEmbed requires message id so we will publish anyway (maybe downstream fills it)
 			}
 
-			participantPayload := &roundevents.ParticipantScoreUpdatedPayload{
+			participantPayload := &roundevents.ParticipantScoreUpdatedPayloadV1{
 				GuildID:        p.GuildID,
 				RoundID:        p.RoundID,
 				Participant:    p.UserID,
@@ -45,12 +45,12 @@ func (h *RoundHandlers) HandleScoreOverrideSuccess(msg *message.Message) ([]*mes
 				EventMessageID: messageID,
 			}
 
-			bridgeMsg, err := h.Helpers.CreateResultMessage(msg, participantPayload, roundevents.RoundParticipantScoreUpdated)
+			bridgeMsg, err := h.Helpers.CreateResultMessage(msg, participantPayload, roundevents.RoundParticipantScoreUpdatedV1)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create bridge message: %w", err)
 			}
 			// Ensure topic metadata set
-			bridgeMsg.Metadata.Set("topic", roundevents.RoundParticipantScoreUpdated)
+			bridgeMsg.Metadata.Set("topic", roundevents.RoundParticipantScoreUpdatedV1)
 
 			h.Logger.InfoContext(ctx, "Bridged score override success to discord participant score updated",
 				attr.RoundID("round_id", p.RoundID),

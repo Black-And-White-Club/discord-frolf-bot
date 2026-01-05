@@ -13,12 +13,12 @@ import (
 // HandleRoundFinalized handles the DiscordRoundFinalized event and updates the Discord embed
 func (h *RoundHandlers) HandleRoundFinalized(msg *message.Message) ([]*message.Message, error) {
 	return h.handlerWrapper(
-		"HandleRoundFinalized (Discord)",            // Descriptive handler name
-		&roundevents.RoundFinalizedDiscordPayload{}, // Expecting Discord-specific finalized payload
+		"HandleRoundFinalized (Discord)",              // Descriptive handler name
+		&roundevents.RoundFinalizedDiscordPayloadV1{}, // Expecting Discord-specific finalized payload
 		// Corrected return type here: []message.Message
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
 			// Assert the payload to the expected type
-			p, ok := payload.(*roundevents.RoundFinalizedDiscordPayload)
+			p, ok := payload.(*roundevents.RoundFinalizedDiscordPayloadV1)
 			if !ok {
 				h.Logger.ErrorContext(ctx, "Invalid payload type for HandleRoundFinalized (Discord)",
 					attr.Any("payload", payload), // Log the received payload
@@ -69,7 +69,7 @@ func (h *RoundHandlers) HandleRoundFinalized(msg *message.Message) ([]*message.M
 
 			// Convert the Discord-specific payload into the embed update payload
 			// expected by the FinalizeScorecardEmbed manager.
-			embedPayload := roundevents.RoundFinalizedEmbedUpdatePayload{
+			embedPayload := roundevents.RoundFinalizedEmbedUpdatePayloadV1{
 				GuildID:          p.GuildID,
 				RoundID:          p.RoundID,
 				Title:            p.Title,
@@ -120,7 +120,7 @@ func (h *RoundHandlers) HandleRoundFinalized(msg *message.Message) ([]*message.M
 				"channel_id":         discordChannelID,              // Use channel ID from payload
 			}
 
-			traceMsg, err := h.Helpers.CreateResultMessage(msg, tracePayload, roundevents.RoundTraceEvent) // Assuming roundevents.RoundTraceEvent topic
+			traceMsg, err := h.Helpers.CreateResultMessage(msg, tracePayload, roundevents.RoundTraceEventV1)
 			if err != nil {
 				h.Logger.ErrorContext(ctx, "Failed to create trace event for embed finalization", attr.Error(err))
 				return []*message.Message{}, nil // Return no messages if trace fails

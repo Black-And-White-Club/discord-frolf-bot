@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	discorduserevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/user"
 	messagecreator "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/utils"
+	discorduserevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/user"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
@@ -296,7 +296,7 @@ func (rm *roleManager) HandleRoleButtonPress(ctx context.Context, i *discordgo.I
 		ctx = discordmetrics.WithValue(ctx, discordmetrics.UserIDKey, requesterID)
 
 		// Construct event payload
-		payload := discorduserevents.RoleUpdateButtonPressPayload{
+		payload := discorduserevents.RoleUpdateButtonPressPayloadV1{
 			RequesterID:         requesterID,
 			TargetUserID:        targetUserID,
 			SelectedRole:        roleEnum,
@@ -319,7 +319,7 @@ func (rm *roleManager) HandleRoleButtonPress(ctx context.Context, i *discordgo.I
 
 		// Create Watermill event
 		msg, err := messagecreator.BuildWatermillMessageFromInteraction(
-			discorduserevents.RoleUpdateButtonPress,
+			discorduserevents.RoleUpdateButtonPressV1,
 			payload,
 			i,
 			rm.helper,
@@ -333,13 +333,13 @@ func (rm *roleManager) HandleRoleButtonPress(ctx context.Context, i *discordgo.I
 		msg.Metadata.Set("correlation_id", correlationID)
 
 		// Publish the event to JetStream
-		rm.logger.DebugContext(ctx, "Publishing event to JetStream", attr.String("event", discorduserevents.RoleUpdateButtonPress))
-		if err := rm.publisher.Publish(discorduserevents.RoleUpdateButtonPress, msg); err != nil {
+		rm.logger.DebugContext(ctx, "Publishing event to JetStream", attr.String("event", discorduserevents.RoleUpdateButtonPressV1))
+		if err := rm.publisher.Publish(discorduserevents.RoleUpdateButtonPressV1, msg); err != nil {
 			rm.logger.ErrorContext(ctx, "Failed to publish event", attr.Error(err))
 			return RoleOperationResult{Error: err}, nil
 		}
 
-		rm.logger.InfoContext(ctx, "Event published successfully", attr.String("event", discorduserevents.RoleUpdateButtonPress))
+		rm.logger.InfoContext(ctx, "Event published successfully", attr.String("event", discorduserevents.RoleUpdateButtonPressV1))
 		return RoleOperationResult{Success: "role button processed"}, nil
 	})
 	if err != nil {

@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
-	guildevents "github.com/Black-And-White-Club/discord-frolf-bot/app/events/guild"
 	sharedmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
+	guildevents "github.com/Black-And-White-Club/frolf-bot-shared/events/guild"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/bwmarrin/discordgo"
@@ -159,7 +159,7 @@ func TestPublishSetupEvent_Success(t *testing.T) {
 	eb := sharedmocks.NewMockEventBus(ctrl)
 
 	ms.EXPECT().Guild("g1", gomock.Any()).Return(&discordgo.Guild{ID: "g1", Name: "Guild"}, nil)
-	eb.EXPECT().Publish(guildevents.GuildSetupEventTopic, gomock.Any()).Return(nil)
+	eb.EXPECT().Publish(guildevents.GuildConfigCreationRequestedV1, gomock.Any()).Return(nil)
 
 	m := &setupManager{
 		session:   ms,
@@ -221,7 +221,7 @@ func TestPublishSetupEvent_Errors(t *testing.T) {
 
 	// Case 3: publish fails
 	ms.EXPECT().Guild("g1", gomock.Any()).Return(&discordgo.Guild{ID: "g1", Name: "Guild"}, nil)
-	eb.EXPECT().Publish(guildevents.GuildSetupEventTopic, gomock.Any()).Return(fmt.Errorf("pub fail"))
+	eb.EXPECT().Publish(guildevents.GuildConfigCreationRequestedV1, gomock.Any()).Return(fmt.Errorf("pub fail"))
 	m3 := &setupManager{session: ms, publisher: eb, logger: discardLogger(), helper: utils.NewHelper(discardLogger())}
 	if err := m3.publishSetupEvent(i, &SetupResult{UserRoleID: "u", EditorRoleID: "e", AdminRoleID: "a"}); err == nil {
 		t.Fatalf("expected error when publish fails")

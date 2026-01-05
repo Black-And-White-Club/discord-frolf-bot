@@ -44,7 +44,7 @@ func (m *MockStartRoundManager) EXPECT() *MockStartRoundManagerMockRecorder {
 }
 
 // TransformRoundToScorecard mocks base method.
-func (m *MockStartRoundManager) TransformRoundToScorecard(ctx context.Context, payload *roundevents.DiscordRoundStartPayload, existingEmbed *discordgo.MessageEmbed) (startround.StartRoundOperationResult, error) {
+func (m *MockStartRoundManager) TransformRoundToScorecard(ctx context.Context, payload *roundevents.DiscordRoundStartPayloadV1, existingEmbed *discordgo.MessageEmbed) (startround.StartRoundOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "TransformRoundToScorecard", ctx, payload, existingEmbed)
 	ret0, _ := ret[0].(startround.StartRoundOperationResult)
@@ -59,7 +59,7 @@ func (mr *MockStartRoundManagerMockRecorder) TransformRoundToScorecard(ctx, payl
 }
 
 // UpdateRoundToScorecard mocks base method.
-func (m *MockStartRoundManager) UpdateRoundToScorecard(ctx context.Context, channelID, messageID string, payload *roundevents.DiscordRoundStartPayload) (startround.StartRoundOperationResult, error) {
+func (m *MockStartRoundManager) UpdateRoundToScorecard(ctx context.Context, channelID, messageID string, payload *roundevents.DiscordRoundStartPayloadV1) (startround.StartRoundOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateRoundToScorecard", ctx, channelID, messageID, payload)
 	ret0, _ := ret[0].(startround.StartRoundOperationResult)
