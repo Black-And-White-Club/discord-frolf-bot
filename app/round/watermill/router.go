@@ -111,6 +111,9 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 		roundevents.ImportFailedV1:          handlers.HandleImportFailed,
 		roundevents.ScorecardURLRequestedV1: handlers.HandleScorecardURLRequested,
 
+		// Deletion flow
+		sharedroundevents.RoundDeleteRequestDiscordV1: handlers.HandleRoundDeleteRequested,
+
 		// Lifecycle
 		roundevents.RoundDeletedV1:          handlers.HandleRoundDeleted,
 		roundevents.RoundFinalizedDiscordV1: handlers.HandleRoundFinalized,

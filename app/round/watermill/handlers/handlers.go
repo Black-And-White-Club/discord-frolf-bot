@@ -27,6 +27,7 @@ type Handlers interface {
 	HandleRoundParticipantJoinRequest(msg *message.Message) ([]*message.Message, error)
 	HandleRoundParticipantJoined(msg *message.Message) ([]*message.Message, error)
 	HandleRoundFinalized(msg *message.Message) ([]*message.Message, error)
+	HandleRoundDeleteRequested(msg *message.Message) ([]*message.Message, error)
 	HandleRoundDeleted(msg *message.Message) ([]*message.Message, error)
 	HandleRoundCreateRequested(msg *message.Message) ([]*message.Message, error)
 	HandleRoundCreated(msg *message.Message) ([]*message.Message, error)

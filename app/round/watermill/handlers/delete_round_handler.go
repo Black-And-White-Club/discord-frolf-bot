@@ -4,11 +4,50 @@ import (
 	"context"
 	"fmt"
 
+	sharedroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/google/uuid"
 )
+
+// HandleRoundDeleteRequested handles the RoundDeleteRequestDiscordV1 event
+// and publishes the domain event RoundDeleteRequestedV1.
+func (h *RoundHandlers) HandleRoundDeleteRequested(msg *message.Message) ([]*message.Message, error) {
+	return h.handlerWrapper(
+		"HandleRoundDeleteRequested",
+		&sharedroundevents.RoundDeleteRequestDiscordPayloadV1{},
+		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
+			discordPayload := payload.(*sharedroundevents.RoundDeleteRequestDiscordPayloadV1)
+
+			h.Logger.InfoContext(ctx, "Received RoundDeleteRequestDiscordV1 event",
+				attr.CorrelationIDFromMsg(msg),
+				attr.RoundID("round_id", discordPayload.RoundID),
+				attr.String("user_id", string(discordPayload.UserID)),
+			)
+
+			// Map to domain payload
+			domainPayload := roundevents.RoundDeleteRequestPayloadV1{
+				GuildID:              sharedtypes.GuildID(discordPayload.GuildID),
+				RoundID:              discordPayload.RoundID,
+				RequestingUserUserID: discordPayload.UserID,
+			}
+
+			// Create result message for domain event
+			domainMsg, err := h.Helpers.CreateResultMessage(msg, domainPayload, roundevents.RoundDeleteRequestedV1)
+			if err != nil {
+				h.Logger.ErrorContext(ctx, "Failed to create result message for RoundDeleteRequestedV1",
+					attr.CorrelationIDFromMsg(msg),
+					attr.Error(err),
+				)
+				return nil, fmt.Errorf("failed to create result message: %w", err)
+			}
+
+			return []*message.Message{domainMsg}, nil
+		},
+	)(msg)
+}
 
 // HandleRoundDeleted handles the RoundDeleted event using the standardized wrapper
 func (h *RoundHandlers) HandleRoundDeleted(msg *message.Message) ([]*message.Message, error) {
