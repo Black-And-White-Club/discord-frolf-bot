@@ -210,7 +210,7 @@ func (sm *signupManager) HandleSignupModalSubmit(ctx context.Context, i *discord
 		}
 
 		correlationID := uuid.New().String()
-		sm.interactionStore.Set(i.Interaction.Token, i.Interaction, 10*time.Minute)
+		sm.interactionStore.Set(correlationID, i.Interaction, 10*time.Minute)
 
 		msg, err := BuildUserSignupRequestMessage(ctx, payload, i)
 		if err != nil {
