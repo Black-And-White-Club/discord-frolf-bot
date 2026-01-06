@@ -24,16 +24,26 @@ func (rm *resetManager) HandleResetConfirmButton(ctx context.Context, i *discord
 
 		// Acknowledge the interaction with a deferred response
 		err := rm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Flags: discordgo.MessageFlagsEphemeral,
-			},
+			Type: discordgo.InteractionResponseDeferredMessageUpdate,
 		})
 		if err != nil {
 			rm.logger.ErrorContext(ctx, "Failed to acknowledge interaction",
 				attr.String("guild_id", i.GuildID),
 				attr.Error(err))
 			return fmt.Errorf("failed to acknowledge interaction: %w", err)
+		}
+
+		// Immediately update the message to show processing state
+		processingContent := "⏳ Resetting server configuration...\n\nThis may take a few moments."
+		_, err = rm.session.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+			Content:    &processingContent,
+			Components: &[]discordgo.MessageComponent{}, // Remove buttons
+		})
+		if err != nil {
+			rm.logger.ErrorContext(ctx, "Failed to update message with processing state",
+				attr.String("guild_id", i.GuildID),
+				attr.Error(err))
+			// Don't return error - continue with the operation even if UI update fails
 		}
 
 		// Store the interaction so watermill handlers can send the final response
@@ -51,12 +61,13 @@ func (rm *resetManager) HandleResetConfirmButton(ctx context.Context, i *discord
 		err = rm.publishDeletionRequest(ctx, i.GuildID)
 		if err != nil {
 			// Only handle publish errors here, not backend processing errors
-			_, followupErr := rm.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
-				Content: "❌ Failed to send reset request. Please try again or contact support.",
-				Flags:   discordgo.MessageFlagsEphemeral,
+			content := "❌ Failed to send reset request. Please try again or contact support."
+			_, editErr := rm.session.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+				Content:    &content,
+				Components: &[]discordgo.MessageComponent{}, // Remove buttons to stop spinner
 			})
-			if followupErr != nil {
-				rm.logger.ErrorContext(ctx, "Failed to send error followup", attr.Error(followupErr))
+			if editErr != nil {
+				rm.logger.ErrorContext(ctx, "Failed to send error response", attr.Error(editErr))
 			}
 			return err
 		}

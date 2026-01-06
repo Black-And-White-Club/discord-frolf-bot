@@ -38,10 +38,11 @@ func (h *GuildHandlers) HandleGuildConfigDeleted(msg *message.Message) ([]*messa
 				if interactionData, exists := h.InteractionStore.Get(guildID); exists {
 					h.InteractionStore.Delete(guildID)
 					if interaction, ok := interactionData.(*discordgo.Interaction); ok {
-						_, err := h.Session.FollowupMessageCreate(interaction, true, &discordgo.WebhookParams{
-							Content: "✅ Server configuration reset successfully!\n\n" +
-								"Bot commands have been unregistered. Run `/frolf-setup` when you're ready to set up again.",
-							Flags: discordgo.MessageFlagsEphemeral,
+						content := "✅ Server configuration reset successfully!\n\n" +
+							"Bot commands have been unregistered. Run `/frolf-setup` when you're ready to set up again."
+						_, err := h.Session.InteractionResponseEdit(interaction, &discordgo.WebhookEdit{
+							Content:    &content,
+							Components: &[]discordgo.MessageComponent{},
 						})
 						if err != nil {
 							h.Logger.ErrorContext(ctx, "Failed to send success followup to user",
@@ -78,9 +79,9 @@ func (h *GuildHandlers) HandleGuildConfigDeletionFailed(msg *message.Message) ([
 					if interaction, ok := interactionData.(*discordgo.Interaction); ok {
 						errorMsg := fmt.Sprintf("❌ Failed to reset server configuration.\n\n**Reason:** %s\n\n"+
 							"Please try again or contact support if the issue persists.", p.Reason)
-						_, err := h.Session.FollowupMessageCreate(interaction, true, &discordgo.WebhookParams{
-							Content: errorMsg,
-							Flags:   discordgo.MessageFlagsEphemeral,
+						_, err := h.Session.InteractionResponseEdit(interaction, &discordgo.WebhookEdit{
+							Content:    &errorMsg,
+							Components: &[]discordgo.MessageComponent{},
 						})
 						if err != nil {
 							h.Logger.ErrorContext(ctx, "Failed to send failure followup to user",
