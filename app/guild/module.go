@@ -7,6 +7,7 @@ import (
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	guilddiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/guild/discord"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guild/discord/reset"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/guild/discord/setup"
 	guildwatermill "github.com/Black-And-White-Club/discord-frolf-bot/app/guild/watermill"
 	guildhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/guild/watermill/handlers"
@@ -61,6 +62,7 @@ func InitializeGuildModule(
 
 	// Register Discord interactions
 	setup.RegisterHandlers(interactionRegistry, guildDiscord.GetSetupManager())
+	reset.RegisterHandlers(interactionRegistry, guildDiscord.GetResetManager())
 
 	// Build Watermill Handlers
 	guildHandlers := guildhandlers.NewGuildHandlers(
@@ -69,6 +71,8 @@ func InitializeGuildModule(
 		helper,
 		guildDiscord,
 		guildConfigResolver,
+		interactionStore,
+		session,
 		tracer,
 		discordMetrics,
 		signupManager,

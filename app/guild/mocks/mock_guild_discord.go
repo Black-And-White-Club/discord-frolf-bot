@@ -12,6 +12,7 @@ package mocks
 import (
 	reflect "reflect"
 
+	reset "github.com/Black-And-White-Club/discord-frolf-bot/app/guild/discord/reset"
 	setup "github.com/Black-And-White-Club/discord-frolf-bot/app/guild/discord/setup"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -38,6 +39,20 @@ func NewMockGuildDiscordInterface(ctrl *gomock.Controller) *MockGuildDiscordInte
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockGuildDiscordInterface) EXPECT() *MockGuildDiscordInterfaceMockRecorder {
 	return m.recorder
+}
+
+// GetResetManager mocks base method.
+func (m *MockGuildDiscordInterface) GetResetManager() reset.ResetManager {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetResetManager")
+	ret0, _ := ret[0].(reset.ResetManager)
+	return ret0
+}
+
+// GetResetManager indicates an expected call of GetResetManager.
+func (mr *MockGuildDiscordInterfaceMockRecorder) GetResetManager() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetResetManager", reflect.TypeOf((*MockGuildDiscordInterface)(nil).GetResetManager))
 }
 
 // GetSetupManager mocks base method.

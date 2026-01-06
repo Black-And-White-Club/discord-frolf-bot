@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	discordgocommands "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guild/discord/reset"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/guild/discord/setup"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
@@ -20,6 +21,7 @@ import (
 // GuildDiscordInterface defines the interface for GuildDiscord.
 type GuildDiscordInterface interface {
 	GetSetupManager() setup.SetupManager
+	GetResetManager() reset.ResetManager
 	RegisterAllCommands(guildID string) error
 	UnregisterAllCommands(guildID string) error
 }
@@ -29,6 +31,7 @@ type GuildDiscord struct {
 	session      discordgocommands.Session
 	logger       *slog.Logger
 	SetupManager setup.SetupManager
+	ResetManager reset.ResetManager
 }
 
 // NewGuildDiscord creates a new GuildDiscord instance.
@@ -49,16 +52,27 @@ func NewGuildDiscord(
 		return nil, err
 	}
 
+	resetManager, err := reset.NewResetManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics)
+	if err != nil {
+		return nil, err
+	}
+
 	return &GuildDiscord{
 		session:      session,
 		logger:       logger,
 		SetupManager: setupManager,
+		ResetManager: resetManager,
 	}, nil
 }
 
 // GetSetupManager returns the SetupManager.
 func (gd *GuildDiscord) GetSetupManager() setup.SetupManager {
 	return gd.SetupManager
+}
+
+// GetResetManager returns the ResetManager.
+func (gd *GuildDiscord) GetResetManager() reset.ResetManager {
+	return gd.ResetManager
 }
 
 // RegisterAllCommands registers all guild-specific commands for the given guild.

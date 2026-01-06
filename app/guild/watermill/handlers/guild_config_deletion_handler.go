@@ -7,6 +7,7 @@ import (
 	guildevents "github.com/Black-And-White-Club/frolf-bot-shared/events/guild"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	"github.com/ThreeDotsLabs/watermill/message"
+	"github.com/bwmarrin/discordgo"
 )
 
 // HandleGuildConfigDeleted handles guild config deletion by unregistering all commands
@@ -32,6 +33,26 @@ func (h *GuildHandlers) HandleGuildConfigDeleted(msg *message.Message) ([]*messa
 			h.Logger.InfoContext(ctx, "Successfully unregistered all commands for guild after config deletion",
 				attr.String("guild_id", guildID))
 
+			// Send user feedback if we have a stored interaction
+			if h.InteractionStore != nil && h.Session != nil {
+				if interactionData, exists := h.InteractionStore.Get(guildID); exists {
+					h.InteractionStore.Delete(guildID)
+					if interaction, ok := interactionData.(*discordgo.Interaction); ok {
+						_, err := h.Session.FollowupMessageCreate(interaction, true, &discordgo.WebhookParams{
+							Content: "✅ Server configuration reset successfully!\n\n" +
+								"Bot commands have been unregistered. Run `/frolf-setup` when you're ready to set up again.",
+							Flags: discordgo.MessageFlagsEphemeral,
+						})
+						if err != nil {
+							h.Logger.ErrorContext(ctx, "Failed to send success followup to user",
+								attr.String("guild_id", guildID),
+								attr.Error(err))
+							// Don't return error - the operation succeeded even if followup failed
+						}
+					}
+				}
+			}
+
 			return nil, nil
 		},
 	)(msg)
@@ -50,8 +71,25 @@ func (h *GuildHandlers) HandleGuildConfigDeletionFailed(msg *message.Message) ([
 				attr.String("guild_id", guildID),
 				attr.String("reason", p.Reason))
 
-			// Guild config deletion failed, so commands should remain active
-			// No action needed
+			// Send user feedback if we have a stored interaction
+			if h.InteractionStore != nil && h.Session != nil {
+				if interactionData, exists := h.InteractionStore.Get(guildID); exists {
+					h.InteractionStore.Delete(guildID)
+					if interaction, ok := interactionData.(*discordgo.Interaction); ok {
+						errorMsg := fmt.Sprintf("❌ Failed to reset server configuration.\n\n**Reason:** %s\n\n"+
+							"Please try again or contact support if the issue persists.", p.Reason)
+						_, err := h.Session.FollowupMessageCreate(interaction, true, &discordgo.WebhookParams{
+							Content: errorMsg,
+							Flags:   discordgo.MessageFlagsEphemeral,
+						})
+						if err != nil {
+							h.Logger.ErrorContext(ctx, "Failed to send failure followup to user",
+								attr.String("guild_id", guildID),
+								attr.Error(err))
+						}
+					}
+				}
+			}
 
 			return nil, nil
 		},

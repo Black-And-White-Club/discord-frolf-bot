@@ -8,6 +8,7 @@ import (
 
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
+	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"github.com/bwmarrin/discordgo"
 	"go.uber.org/mock/gomock"
@@ -26,7 +27,8 @@ func TestRegisterAllCommands_Global(t *testing.T) {
 
 	ms.EXPECT().GetBotUser().Return(&discordgo.User{ID: "bot"}, nil)
 	ms.EXPECT().ApplicationCommands("bot", "").Return([]*discordgo.ApplicationCommand{}, nil)
-	ms.EXPECT().ApplicationCommandCreate("bot", "", gomock.Any(), gomock.Any()).Return(&discordgo.ApplicationCommand{ID: "cmd1"}, nil)
+	// Expect 2 global commands: frolf-setup and frolf-reset
+	ms.EXPECT().ApplicationCommandCreate("bot", "", gomock.Any(), gomock.Any()).Times(2).Return(&discordgo.ApplicationCommand{ID: "cmd1"}, nil)
 
 	gd := &GuildDiscord{session: ms, logger: logger}
 	if err := gd.RegisterAllCommands(""); err != nil {
@@ -84,10 +86,12 @@ func TestNewGuildDiscord_And_GetSetupManager(t *testing.T) {
 	helper := utils.NewHelper(logger)
 	var resolver guildconfig.GuildConfigResolver = nil
 
+	mockEventBus := eventbusmocks.NewMockEventBus(ctrl)
+
 	gdIface, err := NewGuildDiscord(
 		context.Background(),
 		ms,
-		nil, // eventbus
+		mockEventBus, // eventbus
 		logger,
 		helper,
 		nil, // config
@@ -102,5 +106,8 @@ func TestNewGuildDiscord_And_GetSetupManager(t *testing.T) {
 	gd := gdIface.(*GuildDiscord)
 	if gd.GetSetupManager() == nil {
 		t.Fatalf("expected non-nil setup manager")
+	}
+	if gd.GetResetManager() == nil {
+		t.Fatalf("expected non-nil reset manager")
 	}
 }

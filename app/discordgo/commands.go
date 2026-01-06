@@ -80,6 +80,16 @@ func RegisterCommands(s Session, logger *slog.Logger, guildID string) error {
 			logger.Error("Failed to create global '/frolf-setup' command", attr.Error(err))
 			return fmt.Errorf("failed to create global '/frolf-setup' command: %w", err)
 		}
+
+		err = createIfMissing(&discordgo.ApplicationCommand{
+			Name:                     "frolf-reset",
+			Description:              "Reset Frolf Bot configuration for this server (Admin only)",
+			DefaultMemberPermissions: &[]int64{discordgo.PermissionAdministrator}[0],
+		})
+		if err != nil {
+			logger.Error("Failed to create global '/frolf-reset' command", attr.Error(err))
+			return fmt.Errorf("failed to create global '/frolf-reset' command: %w", err)
+		}
 		return nil
 	}
 
