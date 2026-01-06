@@ -22,6 +22,11 @@ func (h *GuildHandlers) HandleGuildConfigDeleted(msg *message.Message) ([]*messa
 			h.Logger.InfoContext(ctx, "Guild config deleted - unregistering all commands",
 				attr.String("guild_id", guildID))
 
+			// Clear any inflight config requests to prevent "being loaded" errors
+			if h.GuildConfigResolver != nil {
+				h.GuildConfigResolver.ClearInflightRequest(ctx, guildID)
+			}
+
 			// Unregister all bot commands for the guild
 			if err := h.GuildDiscord.UnregisterAllCommands(guildID); err != nil {
 				h.Logger.ErrorContext(ctx, "Failed to unregister all commands for guild after config deletion",

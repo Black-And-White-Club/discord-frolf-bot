@@ -14,4 +14,6 @@ type GuildConfigResolver interface {
 	IsGuildSetupComplete(guildID string) bool
 	// HandleGuildConfigReceived processes config responses from backend and notifies waiters.
 	HandleGuildConfigReceived(ctx context.Context, guildID string, config *storage.GuildConfig)
+	// ClearInflightRequest removes any in-flight request for a guild, allowing fresh requests.
+	ClearInflightRequest(ctx context.Context, guildID string)
 }

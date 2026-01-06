@@ -97,6 +97,7 @@ func (s *stubResolver) GetGuildConfigWithContext(_ context.Context, _ string) (*
 func (s *stubResolver) IsGuildSetupComplete(_ string) bool { return s.setupComplete }
 func (s *stubResolver) HandleGuildConfigReceived(_ context.Context, _ string, _ *storage.GuildConfig) {
 }
+func (s *stubResolver) ClearInflightRequest(_ context.Context, _ string) {}
 
 func TestRequiresSetup_NotConfigured_SendsError_NoPanic(t *testing.T) {
 	r := NewRegistry()

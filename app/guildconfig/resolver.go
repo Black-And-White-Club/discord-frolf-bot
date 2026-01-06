@@ -320,6 +320,29 @@ func (r *Resolver) HandleBackendError(ctx context.Context, guildID string, err e
 
 // Cache-related methods were removed; resolver always queries backend.
 
+// ClearInflightRequest removes any in-flight request for a guild, allowing fresh requests.
+// This should be called when a guild config is deleted to clear any stale loading state.
+func (r *Resolver) ClearInflightRequest(ctx context.Context, guildID string) {
+	if reqInterface, existed := r.inflightRequests.LoadAndDelete(guildID); existed {
+		if req, ok := reqInterface.(*configRequest); ok {
+			// Close the channel if it's still open to unblock any waiters
+			select {
+			case <-req.ready:
+				// Already closed
+			default:
+				// Set error and close to unblock waiters
+				req.err = &ConfigNotFoundError{
+					GuildID: guildID,
+					Reason:  "guild config was deleted",
+				}
+				close(req.ready)
+			}
+		}
+		slog.InfoContext(ctx, "Cleared inflight request for deleted guild config",
+			attr.String("guild_id", guildID))
+	}
+}
+
 // IsGuildSetupComplete fetches config with a short timeout and evaluates required fields.
 func (r *Resolver) IsGuildSetupComplete(guildID string) bool {
 	// Create a short-timeout context for quick setup checks

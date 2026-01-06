@@ -41,6 +41,18 @@ func (m *MockGuildConfigResolver) EXPECT() *MockGuildConfigResolverMockRecorder 
 	return m.recorder
 }
 
+// ClearInflightRequest mocks base method.
+func (m *MockGuildConfigResolver) ClearInflightRequest(ctx context.Context, guildID string) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "ClearInflightRequest", ctx, guildID)
+}
+
+// ClearInflightRequest indicates an expected call of ClearInflightRequest.
+func (mr *MockGuildConfigResolverMockRecorder) ClearInflightRequest(ctx, guildID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClearInflightRequest", reflect.TypeOf((*MockGuildConfigResolver)(nil).ClearInflightRequest), ctx, guildID)
+}
+
 // GetGuildConfigWithContext mocks base method.
 func (m *MockGuildConfigResolver) GetGuildConfigWithContext(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
 	m.ctrl.T.Helper()
