@@ -22,6 +22,7 @@ type Handler interface {
 	HandleScoreUpdateRequest(msg *message.Message) ([]*message.Message, error)
 	HandleScoreUpdateSuccess(msg *message.Message) ([]*message.Message, error)
 	HandleScoreUpdateFailure(msg *message.Message) ([]*message.Message, error)
+	HandleProcessRoundScoresFailed(msg *message.Message) ([]*message.Message, error)
 }
 
 // ScoreHandlers handles score-related events.

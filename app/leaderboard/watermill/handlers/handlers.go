@@ -25,6 +25,10 @@ type Handlers interface {
 	HandleLeaderboardRetrieveRequest(msg *message.Message) ([]*message.Message, error)
 	HandleLeaderboardData(msg *message.Message) ([]*message.Message, error)
 
+	// Leaderboard Errors
+	HandleLeaderboardUpdateFailed(msg *message.Message) ([]*message.Message, error)
+	HandleLeaderboardRetrievalFailed(msg *message.Message) ([]*message.Message, error)
+
 	// Tag Number Lookups
 	HandleGetTagByDiscordID(msg *message.Message) ([]*message.Message, error)
 	HandleGetTagByDiscordIDResponse(msg *message.Message) ([]*message.Message, error)

@@ -91,6 +91,10 @@ func (r *LeaderboardRouter) RegisterHandlers(ctx context.Context, handlers leade
 		leaderboardevents.GetLeaderboardResponseV1:           handlers.HandleLeaderboardData,
 		leaderboardevents.LeaderboardUpdatedV1:               handlers.HandleLeaderboardData,
 
+		// Leaderboard errors
+		leaderboardevents.LeaderboardUpdateFailedV1: handlers.HandleLeaderboardUpdateFailed,
+		leaderboardevents.GetLeaderboardFailedV1:    handlers.HandleLeaderboardRetrievalFailed,
+
 		// Tag swaps
 		sharedleaderboardevents.LeaderboardTagSwapRequestV1: handlers.HandleTagSwapRequest,
 		leaderboardevents.TagSwapProcessedV1:                handlers.HandleTagSwappedResponse,

@@ -78,6 +78,7 @@ func (r *ScoreRouter) RegisterHandlers(ctx context.Context, handlers scorehandle
 		sharedscoreevents.ScoreUpdateRequestDiscordV1: handlers.HandleScoreUpdateRequest,
 		scoreevents.ScoreUpdatedV1:                    handlers.HandleScoreUpdateSuccess,
 		scoreevents.ScoreUpdateFailedV1:               handlers.HandleScoreUpdateFailure,
+		scoreevents.ProcessRoundScoresFailedV1:        handlers.HandleProcessRoundScoresFailed,
 	}
 
 	for topic, handlerFunc := range eventsToHandlers {

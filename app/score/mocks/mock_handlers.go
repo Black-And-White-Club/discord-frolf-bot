@@ -40,6 +40,21 @@ func (m *MockHandler) EXPECT() *MockHandlerMockRecorder {
 	return m.recorder
 }
 
+// HandleProcessRoundScoresFailed mocks base method.
+func (m *MockHandler) HandleProcessRoundScoresFailed(msg *message.Message) ([]*message.Message, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HandleProcessRoundScoresFailed", msg)
+	ret0, _ := ret[0].([]*message.Message)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// HandleProcessRoundScoresFailed indicates an expected call of HandleProcessRoundScoresFailed.
+func (mr *MockHandlerMockRecorder) HandleProcessRoundScoresFailed(msg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleProcessRoundScoresFailed", reflect.TypeOf((*MockHandler)(nil).HandleProcessRoundScoresFailed), msg)
+}
+
 // HandleScoreUpdateFailure mocks base method.
 func (m *MockHandler) HandleScoreUpdateFailure(msg *message.Message) ([]*message.Message, error) {
 	m.ctrl.T.Helper()
