@@ -9,8 +9,9 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-// SendSignupResult sends the signup result back to the user
-func (sm *signupManager) SendSignupResult(ctx context.Context, correlationID string, success bool) (SignupOperationResult, error) {
+// SendSignupResult sends the signup result back to the user.
+// failureReason is optional and only used when success is false.
+func (sm *signupManager) SendSignupResult(ctx context.Context, correlationID string, success bool, failureReason ...string) (SignupOperationResult, error) {
 	// Enrich context for observability
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.CorrelationIDKey, correlationID)
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.CommandNameKey, "send_signup_result")
@@ -44,6 +45,9 @@ func (sm *signupManager) SendSignupResult(ctx context.Context, correlationID str
 		content := "❌ Signup failed. Please try again."
 		if success {
 			content = "🎉 Signup successful! Welcome!"
+		} else if len(failureReason) > 0 && failureReason[0] != "" {
+			// Use the specific failure reason if provided
+			content = fmt.Sprintf("❌ Signup failed: %s", failureReason[0])
 		}
 
 		_, err := sm.session.InteractionResponseEdit(interactionObj, &discordgo.WebhookEdit{

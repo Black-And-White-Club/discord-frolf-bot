@@ -47,8 +47,8 @@ func (h *UserHandlers) HandleUserCreationFailed(msg *message.Message) ([]*messag
 				attr.CorrelationIDFromMsg(msg),
 				attr.String("reason", failPayload.Reason))
 
-			// Respond with the default failure message to the user
-			_, err := h.UserDiscord.GetSignupManager().SendSignupResult(ctx, correlationID, false)
+			// Respond with the specific failure reason to the user
+			_, err := h.UserDiscord.GetSignupManager().SendSignupResult(ctx, correlationID, false, failPayload.Reason)
 			if err != nil {
 				h.Logger.ErrorContext(ctx, "Failed to send signup failure response",
 					attr.Error(err),

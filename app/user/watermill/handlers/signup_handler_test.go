@@ -304,7 +304,7 @@ func Test_userHandlers_HandleUserCreationFailed(t *testing.T) {
 					})
 				mockSignupManager := mocks.NewMockSignupManager(ctrl)
 				mockUserDiscord.EXPECT().GetSignupManager().Return(mockSignupManager)
-				mockSignupManager.EXPECT().SendSignupResult(gomock.Any(), "correlation_id", false).Return(signup.SignupOperationResult{}, nil) // Assuming signup.SignupOperationResult is compatible; if not, we'd need signup.SignupOperationResult{}
+				mockSignupManager.EXPECT().SendSignupResult(gomock.Any(), "correlation_id", false, "test reason").Return(signup.SignupOperationResult{}, nil)
 			},
 		},
 		{
@@ -339,7 +339,7 @@ func Test_userHandlers_HandleUserCreationFailed(t *testing.T) {
 					})
 				mockSignupManager := mocks.NewMockSignupManager(ctrl)
 				mockUserDiscord.EXPECT().GetSignupManager().Return(mockSignupManager)
-				mockSignupManager.EXPECT().SendSignupResult(gomock.Any(), "correlation_id", false).Return(signup.SignupOperationResult{}, errors.New("send error")) // Assuming signup.SignupOperationResult is compatible
+				mockSignupManager.EXPECT().SendSignupResult(gomock.Any(), "correlation_id", false, "test reason").Return(signup.SignupOperationResult{}, errors.New("send error"))
 			},
 		},
 	}

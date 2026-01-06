@@ -119,18 +119,23 @@ func (mr *MockSignupManagerMockRecorder) SendSignupModal(ctx, i any) *gomock.Cal
 }
 
 // SendSignupResult mocks base method.
-func (m *MockSignupManager) SendSignupResult(ctx context.Context, interactionToken string, success bool) (signup.SignupOperationResult, error) {
+func (m *MockSignupManager) SendSignupResult(ctx context.Context, interactionToken string, success bool, failureReason ...string) (signup.SignupOperationResult, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SendSignupResult", ctx, interactionToken, success)
+	varargs := []any{ctx, interactionToken, success}
+	for _, a := range failureReason {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "SendSignupResult", varargs...)
 	ret0, _ := ret[0].(signup.SignupOperationResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // SendSignupResult indicates an expected call of SendSignupResult.
-func (mr *MockSignupManagerMockRecorder) SendSignupResult(ctx, interactionToken, success any) *gomock.Call {
+func (mr *MockSignupManagerMockRecorder) SendSignupResult(ctx, interactionToken, success any, failureReason ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendSignupResult", reflect.TypeOf((*MockSignupManager)(nil).SendSignupResult), ctx, interactionToken, success)
+	varargs := append([]any{ctx, interactionToken, success}, failureReason...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendSignupResult", reflect.TypeOf((*MockSignupManager)(nil).SendSignupResult), varargs...)
 }
 
 // TrackChannelForReactions mocks base method.

@@ -32,7 +32,7 @@ type SignupManager interface {
 	MessageReactionAdd(s discord.Session, r *discordgo.MessageReactionAdd) (SignupOperationResult, error)
 	HandleSignupReactionAdd(ctx context.Context, r *discordgo.MessageReactionAdd) (SignupOperationResult, error)
 	HandleSignupButtonPress(ctx context.Context, i *discordgo.InteractionCreate) (SignupOperationResult, error)
-	SendSignupResult(ctx context.Context, interactionToken string, success bool) (SignupOperationResult, error)
+	SendSignupResult(ctx context.Context, interactionToken string, success bool, failureReason ...string) (SignupOperationResult, error)
 	// TrackChannelForReactions registers a channel to have its reactions processed
 	TrackChannelForReactions(channelID string)
 }
