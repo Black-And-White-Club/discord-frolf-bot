@@ -18,6 +18,18 @@ func (h *UserHandlers) HandleUserCreated(msg *message.Message) ([]*message.Messa
 		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
 			createdPayload := payload.(*userevents.UserCreatedPayloadV1)
 
+			// Log different messages based on whether this is a new or returning user
+			logMsg := "New user created and signup role added"
+			if createdPayload.IsReturningUser {
+				logMsg = "Returning user joined new guild and signup role added"
+			}
+
+			h.Logger.InfoContext(ctx, logMsg,
+				attr.String("user_id", string(createdPayload.UserID)),
+				attr.String("guild_id", string(createdPayload.GuildID)),
+				attr.Bool("is_returning_user", createdPayload.IsReturningUser),
+			)
+
 			rolePayload := shareduserevents.AddRolePayloadV1{
 				UserID:  createdPayload.UserID,
 				RoleID:  h.Config.GetRegisteredRoleID(),
