@@ -70,6 +70,39 @@ func (r *ScoreRouter) Configure(ctx context.Context, handlers scorehandlers.Hand
 	return nil
 }
 
+// getPublishTopic resolves the topic to publish for a given handler's returned message.
+// This centralizes routing logic in the router (not in handlers or helpers).
+func (r *ScoreRouter) getPublishTopic(handlerName string, msg *message.Message) string {
+	// Extract base topic from handlerName format: "discord-score.{topic}"
+	// Map handler input topic → output topic(s)
+
+	switch {
+	case handlerName == "discord-score."+sharedscoreevents.ScoreUpdateRequestDiscordV1:
+		// HandleScoreUpdateRequest always returns ScoreUpdateRequestedV1
+		return scoreevents.ScoreUpdateRequestedV1
+
+	case handlerName == "discord-score."+scoreevents.ScoreUpdatedV1:
+		// HandleScoreUpdateSuccess always returns ScoreUpdateResponseDiscordV1
+		return sharedscoreevents.ScoreUpdateResponseDiscordV1
+
+	case handlerName == "discord-score."+scoreevents.ScoreUpdateFailedV1:
+		// HandleScoreUpdateFailure returns either ScoreUpdateFailedDiscordV1 or nil (suppressed)
+		// Check metadata for result (fallback to metadata temporarily for conditional case)
+		return msg.Metadata.Get("topic")
+
+	case handlerName == "discord-score."+scoreevents.ProcessRoundScoresFailedV1:
+		// HandleProcessRoundScoresFailed doesn't return messages (nil)
+		return ""
+
+	default:
+		r.logger.Warn("unknown handler in topic resolution",
+			attr.String("handler", handlerName),
+		)
+		// Fallback to metadata (graceful degradation during migration)
+		return msg.Metadata.Get("topic")
+	}
+}
+
 // RegisterHandlers registers event handlers.
 func (r *ScoreRouter) RegisterHandlers(ctx context.Context, handlers scorehandlers.Handler) error {
 	r.logger.InfoContext(ctx, "Registering Score Handlers")
@@ -100,19 +133,28 @@ func (r *ScoreRouter) RegisterHandlers(ctx context.Context, handlers scorehandle
 				}
 
 				for _, m := range messages {
-					publishTopic := m.Metadata.Get("topic")
-					if publishTopic != "" {
-						r.logger.InfoContext(ctx, "Publishing message",
-							attr.String("message_id", m.UUID),
-							attr.String("topic", publishTopic),
+					// Router resolves topic (not metadata)
+					publishTopic := r.getPublishTopic(handlerName, m)
+
+					// INVARIANT: Topic must be resolvable
+					if publishTopic == "" {
+						r.logger.Error("router failed to resolve publish topic - MESSAGE DROPPED",
+							attr.String("handler", handlerName),
+							attr.String("msg_uuid", m.UUID),
+							attr.String("correlation_id", m.Metadata.Get("correlation_id")),
 						)
-						if err := r.publisher.Publish(publishTopic, m); err != nil {
-							return nil, fmt.Errorf("failed to publish to %s: %w", publishTopic, err)
-						}
-					} else {
-						r.logger.WarnContext(ctx, "Message missing topic metadata",
-							attr.String("message_id", m.UUID),
-						)
+						// Skip publishing but don't fail entire batch
+						continue
+					}
+
+					r.logger.InfoContext(ctx, "Publishing message",
+						attr.String("topic", publishTopic),
+						attr.String("handler", handlerName),
+						attr.String("correlation_id", m.Metadata.Get("correlation_id")),
+					)
+
+					if err := r.publisher.Publish(publishTopic, m); err != nil {
+						return nil, fmt.Errorf("failed to publish to %s: %w", publishTopic, err)
 					}
 				}
 				return nil, nil

@@ -74,6 +74,124 @@ func (r *RoundRouter) Configure(ctx context.Context, handlers roundhandlers.Hand
 	return nil
 }
 
+// getPublishTopic resolves the topic to publish for a given handler's returned message.
+// This centralizes routing logic in the router (not in handlers or helpers).
+func (r *RoundRouter) getPublishTopic(handlerName string, msg *message.Message) string {
+	// Map handler input topic → output topic(s)
+	// Based on analysis of all 23 handlers in handlers/ directory
+
+	switch {
+	// Creation flow
+	case handlerName == "discord-round."+sharedroundevents.RoundCreateModalSubmittedV1:
+		// HandleRoundCreateRequested always returns RoundCreationRequestedV1
+		return roundevents.RoundCreationRequestedV1
+
+	case handlerName == "discord-round."+roundevents.RoundCreatedV1:
+		// HandleRoundCreated always returns RoundEventMessageIDUpdateV1
+		return roundevents.RoundEventMessageIDUpdateV1
+
+	case handlerName == "discord-round."+roundevents.RoundCreationFailedV1:
+		// HandleRoundCreationFailed returns nil (Discord API only)
+		return ""
+
+	case handlerName == "discord-round."+roundevents.RoundValidationFailedV1:
+		// HandleRoundValidationFailed returns nil (Discord API only)
+		return ""
+
+	// Update flow
+	case handlerName == "discord-round."+sharedroundevents.RoundUpdateModalSubmittedV1:
+		// HandleRoundUpdateRequested always returns RoundUpdateRequestedV1
+		return roundevents.RoundUpdateRequestedV1
+
+	case handlerName == "discord-round."+roundevents.RoundUpdatedV1:
+		// HandleRoundUpdated returns nil (Discord API only)
+		return ""
+
+	case handlerName == "discord-round."+roundevents.RoundUpdateErrorV1:
+		// HandleRoundUpdateFailed returns nil (logs error only)
+		return ""
+
+	// Participation
+	case handlerName == "discord-round."+sharedroundevents.RoundParticipantJoinRequestDiscordV1:
+		// HandleRoundParticipantJoinRequest always returns RoundParticipantJoinRequestedV1
+		return roundevents.RoundParticipantJoinRequestedV1
+
+	case handlerName == "discord-round."+roundevents.RoundParticipantRemovedV1:
+		// HandleRoundParticipantRemoved returns nil (Discord API only)
+		return ""
+
+	// Scoring
+	case handlerName == "discord-round."+roundevents.RoundParticipantScoreUpdatedV1:
+		// HandleParticipantScoreUpdated returns nil (Discord API only)
+		return ""
+
+	case handlerName == "discord-round."+roundevents.RoundScoreUpdateErrorV1:
+		// HandleScoreUpdateError always returns RoundTraceEventV1
+		return roundevents.RoundTraceEventV1
+
+	// Score override bridging (CorrectScore service)
+	case handlerName == "discord-round."+scoreevents.ScoreUpdatedV1:
+		// HandleScoreOverrideSuccess bridges to RoundParticipantScoreUpdatedV1
+		return roundevents.RoundParticipantScoreUpdatedV1
+
+	// Scorecard import flow
+	case handlerName == "discord-round."+roundevents.ScorecardUploadedV1:
+		// HandleScorecardUploaded returns nil (validation only)
+		return ""
+
+	case handlerName == "discord-round."+roundevents.ScorecardParseFailedV1:
+		// HandleScorecardParseFailed returns nil (Discord API only)
+		return ""
+
+	case handlerName == "discord-round."+roundevents.ImportFailedV1:
+		// HandleImportFailed returns nil (Discord API only)
+		return ""
+
+	case handlerName == "discord-round."+roundevents.ScorecardURLRequestedV1:
+		// HandleScorecardURLRequested returns nil (TODO: future Discord API)
+		return ""
+
+	// Deletion flow
+	case handlerName == "discord-round."+sharedroundevents.RoundDeleteRequestDiscordV1:
+		// HandleRoundDeleteRequested always returns RoundDeleteRequestedV1
+		return roundevents.RoundDeleteRequestedV1
+
+	// Lifecycle
+	case handlerName == "discord-round."+roundevents.RoundDeletedV1:
+		// HandleRoundDeleted always returns RoundTraceEventV1
+		return roundevents.RoundTraceEventV1
+
+	case handlerName == "discord-round."+roundevents.RoundFinalizedDiscordV1:
+		// HandleRoundFinalized always returns RoundTraceEventV1
+		return roundevents.RoundTraceEventV1
+
+	case handlerName == "discord-round."+roundevents.RoundStartedV1:
+		// HandleRoundStarted always returns RoundTraceEventV1
+		return roundevents.RoundTraceEventV1
+
+	// Tag handling
+	case handlerName == "discord-round."+roundevents.RoundParticipantJoinedV1:
+		// HandleRoundParticipantJoined returns nil (Discord API only)
+		return ""
+
+	// Reminders
+	case handlerName == "discord-round."+roundevents.RoundReminderSentV1:
+		// HandleRoundReminder returns nil (Discord API only)
+		return ""
+
+	case handlerName == "discord-round."+roundevents.TagsUpdatedForScheduledRoundsV1:
+		// HandleTagsUpdatedForScheduledRounds returns nil (Discord API only)
+		return ""
+
+	default:
+		r.logger.Warn("unknown handler in topic resolution",
+			attr.String("handler", handlerName),
+		)
+		// Fallback to metadata (graceful degradation during migration)
+		return msg.Metadata.Get("topic")
+	}
+}
+
 // RegisterHandlers registers event handlers.
 func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandlers.Handlers) error {
 	r.logger.InfoContext(ctx, "RoundRouter.RegisterHandlers called")
@@ -151,19 +269,28 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 				}
 
 				for _, m := range messages {
-					publishTopic := m.Metadata.Get("topic")
-					if publishTopic != "" {
-						r.logger.InfoContext(msgCtx, "Publishing message",
-							attr.String("message_id", m.UUID),
-							attr.String("topic", publishTopic),
+					// Router resolves topic (not metadata)
+					publishTopic := r.getPublishTopic(handlerName, m)
+
+					// INVARIANT: Topic must be resolvable
+					if publishTopic == "" {
+						r.logger.Error("router failed to resolve publish topic - MESSAGE DROPPED",
+							attr.String("handler", handlerName),
+							attr.String("msg_uuid", m.UUID),
+							attr.String("correlation_id", m.Metadata.Get("correlation_id")),
 						)
-						if err := r.publisher.Publish(publishTopic, m); err != nil {
-							return nil, fmt.Errorf("failed to publish to %s: %w", publishTopic, err)
-						}
-					} else {
-						r.logger.WarnContext(msgCtx, "Message missing topic metadata",
-							attr.String("message_id", m.UUID),
-						)
+						// Skip publishing but don't fail entire batch
+						continue
+					}
+
+					r.logger.InfoContext(msgCtx, "Publishing message",
+						attr.String("topic", publishTopic),
+						attr.String("handler", handlerName),
+						attr.String("correlation_id", m.Metadata.Get("correlation_id")),
+					)
+
+					if err := r.publisher.Publish(publishTopic, m); err != nil {
+						return nil, fmt.Errorf("failed to publish to %s: %w", publishTopic, err)
 					}
 				}
 				return nil, nil

@@ -75,6 +75,59 @@ func (r *UserRouter) Configure(ctx context.Context, handlers userhandlers.Handle
 	return nil
 }
 
+// getPublishTopic resolves the topic to publish for a given handler's returned message.
+// This centralizes routing logic in the router (not in handlers or helpers).
+func (r *UserRouter) getPublishTopic(handlerName string, msg *message.Message) string {
+	// Extract base topic from handlerName format: "discord-user.{topic}"
+	// Map handler input topic → output topic(s)
+
+	switch {
+	case handlerName == "discord-user."+userevents.UserCreatedV1:
+		// HandleUserCreated always returns SignupAddRoleV1
+		return shareduserevents.SignupAddRoleV1
+
+	case handlerName == "discord-user."+shareduserevents.SignupAddRoleV1:
+		// HandleAddRole returns either SignupRoleAddedV1 or SignupRoleAdditionFailedV1
+		// Check metadata for result (fallback to metadata temporarily for complex case)
+		return msg.Metadata.Get("topic")
+
+	case handlerName == "discord-user."+shareduserevents.SignupRoleAddedV1:
+		// HandleRoleAdded doesn't return messages (nil)
+		return ""
+
+	case handlerName == "discord-user."+shareduserevents.SignupRoleAdditionFailedV1:
+		// HandleRoleAdditionFailed doesn't return messages (nil)
+		return ""
+
+	case handlerName == "discord-user."+userevents.UserCreationFailedV1:
+		// HandleUserCreationFailed doesn't return messages (nil)
+		return ""
+
+	case handlerName == "discord-user."+userevents.UserRoleUpdatedV1:
+		// HandleRoleUpdated doesn't return messages (nil)
+		return ""
+
+	case handlerName == "discord-user."+userevents.UserRoleUpdateFailedV1:
+		// HandleRoleUpdateFailed doesn't return messages (nil)
+		return ""
+
+	case handlerName == "discord-user."+shareduserevents.RoleUpdateCommandV1:
+		// HandleRoleUpdateCommand doesn't return messages (nil)
+		return ""
+
+	case handlerName == "discord-user."+shareduserevents.RoleUpdateButtonPressV1:
+		// HandleRoleUpdateButtonPress always returns UserRoleUpdateRequestedV1
+		return userevents.UserRoleUpdateRequestedV1
+
+	default:
+		r.logger.Warn("unknown handler in topic resolution",
+			attr.String("handler", handlerName),
+		)
+		// Fallback to metadata (graceful degradation during migration)
+		return msg.Metadata.Get("topic")
+	}
+}
+
 // RegisterHandlers wires all event handlers.
 func (r *UserRouter) RegisterHandlers(ctx context.Context, handlers userhandlers.Handler) error {
 	r.logger.InfoContext(ctx, "Registering User Handlers")
@@ -114,19 +167,28 @@ func (r *UserRouter) RegisterHandlers(ctx context.Context, handlers userhandlers
 					return nil, err
 				}
 				for _, m := range messages {
-					publishTopic := m.Metadata.Get("topic")
-					if publishTopic != "" {
-						r.logger.InfoContext(ctx, "Publishing message",
-							attr.String("message_id", m.UUID),
-							attr.String("topic", publishTopic),
+					// Router resolves topic (not metadata)
+					publishTopic := r.getPublishTopic(handlerName, m)
+
+					// INVARIANT: Topic must be resolvable
+					if publishTopic == "" {
+						r.logger.Error("router failed to resolve publish topic - MESSAGE DROPPED",
+							attr.String("handler", handlerName),
+							attr.String("msg_uuid", m.UUID),
+							attr.String("correlation_id", m.Metadata.Get("correlation_id")),
 						)
-						if err := r.publisher.Publish(publishTopic, m); err != nil {
-							return nil, fmt.Errorf("failed to publish to %s: %w", publishTopic, err)
-						}
-					} else {
-						r.logger.WarnContext(ctx, "Message missing topic metadata",
-							attr.String("message_id", m.UUID),
-						)
+						// Skip publishing but don't fail entire batch
+						continue
+					}
+
+					r.logger.InfoContext(ctx, "Publishing message",
+						attr.String("topic", publishTopic),
+						attr.String("handler", handlerName),
+						attr.String("correlation_id", m.Metadata.Get("correlation_id")),
+					)
+
+					if err := r.publisher.Publish(publishTopic, m); err != nil {
+						return nil, fmt.Errorf("failed to publish to %s: %w", publishTopic, err)
 					}
 				}
 				return nil, nil

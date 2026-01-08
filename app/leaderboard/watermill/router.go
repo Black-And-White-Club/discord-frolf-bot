@@ -73,6 +73,79 @@ func (r *LeaderboardRouter) Configure(ctx context.Context, handlers leaderboardh
 	return nil
 }
 
+// getPublishTopic resolves the topic to publish for a given handler's returned message.
+// This centralizes routing logic in the router (not in handlers or helpers).
+func (r *LeaderboardRouter) getPublishTopic(handlerName string, msg *message.Message) string {
+	// Extract base topic from handlerName format: "discord-leaderboard.{topic}"
+	// Map handler input topic → output topic(s)
+
+	switch {
+	case handlerName == "discord-leaderboard."+sharedleaderboardevents.LeaderboardTagAssignRequestV1:
+		// HandleTagAssignRequest always returns LeaderboardBatchTagAssignmentRequestedV1
+		return leaderboardevents.LeaderboardBatchTagAssignmentRequestedV1
+
+	case handlerName == "discord-leaderboard."+leaderboardevents.LeaderboardTagAssignedV1:
+		// HandleTagAssignedResponse always returns LeaderboardTagAssignedV1
+		return sharedleaderboardevents.LeaderboardTagAssignedV1
+
+	case handlerName == "discord-leaderboard."+leaderboardevents.LeaderboardTagAssignmentFailedV1:
+		// HandleTagAssignFailedResponse always returns LeaderboardTagAssignFailedV1
+		return sharedleaderboardevents.LeaderboardTagAssignFailedV1
+
+	case handlerName == "discord-leaderboard."+sharedleaderboardevents.LeaderboardTagAvailabilityRequestV1:
+		// HandleGetTagByDiscordID always returns GetTagByUserIDRequestedV1
+		return leaderboardevents.GetTagByUserIDRequestedV1
+
+	case handlerName == "discord-leaderboard."+leaderboardevents.GetTagNumberResponseV1:
+		// HandleGetTagByDiscordIDResponse returns LeaderboardTagAvailabilityResponseV1 or nil (conditional)
+		// Check metadata for result (fallback to metadata temporarily for conditional case)
+		return msg.Metadata.Get("topic")
+
+	case handlerName == "discord-leaderboard."+leaderboardevents.LeaderboardBatchTagAssignedV1:
+		// HandleBatchTagAssigned always returns LeaderboardTraceEvent
+		return leaderboardevents.LeaderboardTraceEvent
+
+	case handlerName == "discord-leaderboard."+sharedleaderboardevents.LeaderboardRetrieveRequestV1:
+		// HandleLeaderboardRetrieveRequest always returns GetLeaderboardRequestedV1
+		return leaderboardevents.GetLeaderboardRequestedV1
+
+	case handlerName == "discord-leaderboard."+leaderboardevents.GetLeaderboardResponseV1:
+		// HandleLeaderboardData returns LeaderboardRetrievedV1
+		return sharedleaderboardevents.LeaderboardRetrievedV1
+
+	case handlerName == "discord-leaderboard."+leaderboardevents.LeaderboardUpdatedV1:
+		// HandleLeaderboardData (when topic is LeaderboardUpdated) returns GetLeaderboardRequestedV1
+		return leaderboardevents.GetLeaderboardRequestedV1
+
+	case handlerName == "discord-leaderboard."+leaderboardevents.LeaderboardUpdateFailedV1:
+		// HandleLeaderboardUpdateFailed doesn't return messages (nil)
+		return ""
+
+	case handlerName == "discord-leaderboard."+leaderboardevents.GetLeaderboardFailedV1:
+		// HandleLeaderboardRetrievalFailed doesn't return messages (nil)
+		return ""
+
+	case handlerName == "discord-leaderboard."+sharedleaderboardevents.LeaderboardTagSwapRequestV1:
+		// HandleTagSwapRequest always returns TagSwapRequestedV1
+		return leaderboardevents.TagSwapRequestedV1
+
+	case handlerName == "discord-leaderboard."+leaderboardevents.TagSwapProcessedV1:
+		// HandleTagSwappedResponse always returns LeaderboardTagSwappedV1
+		return sharedleaderboardevents.LeaderboardTagSwappedV1
+
+	case handlerName == "discord-leaderboard."+leaderboardevents.TagSwapFailedV1:
+		// HandleTagSwapFailedResponse always returns LeaderboardTagSwapFailedV1
+		return sharedleaderboardevents.LeaderboardTagSwapFailedV1
+
+	default:
+		r.logger.Warn("unknown handler in topic resolution",
+			attr.String("handler", handlerName),
+		)
+		// Fallback to metadata (graceful degradation during migration)
+		return msg.Metadata.Get("topic")
+	}
+}
+
 // RegisterHandlers registers event handlers.
 func (r *LeaderboardRouter) RegisterHandlers(ctx context.Context, handlers leaderboardhandlers.Handlers) error {
 	eventsToHandlers := map[string]message.HandlerFunc{
@@ -125,19 +198,28 @@ func (r *LeaderboardRouter) RegisterHandlers(ctx context.Context, handlers leade
 				}
 
 				for _, m := range messages {
-					publishTopic := m.Metadata.Get("topic")
-					if publishTopic != "" {
-						r.logger.InfoContext(ctx, "Publishing message",
-							attr.String("message_id", m.UUID),
-							attr.String("topic", publishTopic),
+					// Router resolves topic (not metadata)
+					publishTopic := r.getPublishTopic(handlerName, m)
+
+					// INVARIANT: Topic must be resolvable
+					if publishTopic == "" {
+						r.logger.Error("router failed to resolve publish topic - MESSAGE DROPPED",
+							attr.String("handler", handlerName),
+							attr.String("msg_uuid", m.UUID),
+							attr.String("correlation_id", m.Metadata.Get("correlation_id")),
 						)
-						if err := r.publisher.Publish(publishTopic, m); err != nil {
-							return nil, fmt.Errorf("failed to publish to %s: %w", publishTopic, err)
-						}
-					} else {
-						r.logger.WarnContext(ctx, "Message missing topic metadata",
-							attr.String("message_id", m.UUID),
-						)
+						// Skip publishing but don't fail entire batch
+						continue
+					}
+
+					r.logger.InfoContext(ctx, "Publishing message",
+						attr.String("topic", publishTopic),
+						attr.String("handler", handlerName),
+						attr.String("correlation_id", m.Metadata.Get("correlation_id")),
+					)
+
+					if err := r.publisher.Publish(publishTopic, m); err != nil {
+						return nil, fmt.Errorf("failed to publish to %s: %w", publishTopic, err)
 					}
 				}
 				return nil, nil
