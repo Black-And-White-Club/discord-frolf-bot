@@ -60,7 +60,7 @@ func (h *LeaderboardHandlers) HandleTagAssignRequest(msg *message.Message) ([]*m
 			backendMsg, err := h.Helpers.CreateResultMessage(
 				msg,
 				backendPayload,
-				leaderboardevents.LeaderboardTagAssignmentRequestedV1,
+				leaderboardevents.LeaderboardBatchTagAssignmentRequestedV1,
 			)
 			if err != nil {
 				h.Logger.ErrorContext(ctx, "Failed to create assignment message",
