@@ -2,6 +2,7 @@ package reset
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -157,12 +158,36 @@ func (rm *resetManager) DeleteResources(ctx context.Context, guildID string, sta
 	// Signup message
 	if state.SignupMessageID != "" && state.SignupChannelID != "" {
 		if err := rm.session.ChannelMessageDelete(state.SignupChannelID, state.SignupMessageID); err != nil {
-			rm.logger.ErrorContext(ctx, "Failed to delete signup message",
-				attr.String("guild_id", guildID),
-				attr.String("channel_id", state.SignupChannelID),
-				attr.String("message_id", state.SignupMessageID),
-				attr.Error(err))
-			recordFailure(resultSignupMessage, err)
+			// Treat Unknown Message as already deleted (success). Other REST errors
+			// such as Missing Permissions should be logged but not retried.
+			var restErr *discordgo.RESTError
+			if errors.As(err, &restErr) {
+				switch restErr.Message.Code {
+				case discordgo.ErrCodeUnknownMessage, discordgo.ErrCodeUnknownChannel:
+					rm.logger.InfoContext(ctx, "Signup message or channel already deleted",
+						attr.String("guild_id", guildID),
+						attr.String("channel_id", state.SignupChannelID),
+						attr.String("message_id", state.SignupMessageID),
+						"code", restErr.Message.Code)
+					recordSuccess(resultSignupMessage)
+				case discordgo.ErrCodeMissingPermissions:
+					rm.logger.WarnContext(ctx, "Missing permissions to delete signup message",
+						attr.String("guild_id", guildID),
+						attr.String("channel_id", state.SignupChannelID),
+						attr.String("message_id", state.SignupMessageID))
+					recordFailure(resultSignupMessage, fmt.Errorf("missing permissions"))
+				default:
+					// Unknown error type — return to trigger retry
+					return results, fmt.Errorf("failed to delete signup message %s/%s: %w", state.SignupChannelID, state.SignupMessageID, err)
+				}
+			} else {
+				rm.logger.ErrorContext(ctx, "Failed to delete signup message",
+					attr.String("guild_id", guildID),
+					attr.String("channel_id", state.SignupChannelID),
+					attr.String("message_id", state.SignupMessageID),
+					attr.Error(err))
+				recordFailure(resultSignupMessage, err)
+			}
 		} else {
 			recordSuccess(resultSignupMessage)
 		}
@@ -179,11 +204,34 @@ func (rm *resetManager) DeleteResources(ctx context.Context, guildID string, sta
 			continue
 		}
 		if err := rm.session.ChannelDelete(channelID); err != nil {
+			var restErr *discordgo.RESTError
+			if errors.As(err, &restErr) {
+				// 10003 = Unknown Channel, 10004 = Unknown Guild
+				if restErr.Message.Code == discordgo.ErrCodeUnknownChannel || restErr.Message.Code == discordgo.ErrCodeUnknownGuild {
+					rm.logger.InfoContext(ctx, "Channel already deleted or guild missing",
+						attr.String("guild_id", guildID),
+						attr.String("channel_id", channelID),
+						"code", restErr.Message.Code)
+					recordSuccess(key)
+					continue
+				}
+
+				// 50013 = Missing Permissions — log and continue without retry
+				if restErr.Message.Code == discordgo.ErrCodeMissingPermissions {
+					rm.logger.WarnContext(ctx, "Missing permissions to delete channel",
+						attr.String("guild_id", guildID),
+						attr.String("channel_id", channelID))
+					recordFailure(key, fmt.Errorf("missing permissions"))
+					continue
+				}
+			}
+
+			// Any other error should be returned to trigger a retry
 			rm.logger.ErrorContext(ctx, "Failed to delete channel",
 				attr.String("guild_id", guildID),
 				attr.String("channel_id", channelID),
 				attr.Error(err))
-			recordFailure(key, err)
+			return results, fmt.Errorf("failed to delete channel %s: %w", channelID, err)
 		} else {
 			recordSuccess(key)
 		}
@@ -200,11 +248,34 @@ func (rm *resetManager) DeleteResources(ctx context.Context, guildID string, sta
 			continue
 		}
 		if err := rm.session.GuildRoleDelete(guildID, roleID); err != nil {
+			var restErr *discordgo.RESTError
+			if errors.As(err, &restErr) {
+				// 10011 = Unknown Role, 10004 = Unknown Guild
+				if restErr.Message.Code == discordgo.ErrCodeUnknownRole || restErr.Message.Code == discordgo.ErrCodeUnknownGuild {
+					rm.logger.InfoContext(ctx, "Role already deleted or guild missing",
+						attr.String("guild_id", guildID),
+						attr.String("role_id", roleID),
+						"code", restErr.Message.Code)
+					recordSuccess(key)
+					continue
+				}
+
+				// 50013 = Missing Permissions — log and continue without retry
+				if restErr.Message.Code == discordgo.ErrCodeMissingPermissions {
+					rm.logger.WarnContext(ctx, "Missing permissions to delete role",
+						attr.String("guild_id", guildID),
+						attr.String("role_id", roleID))
+					recordFailure(key, fmt.Errorf("missing permissions"))
+					continue
+				}
+			}
+
+			// Any other error should be returned to trigger a retry
 			rm.logger.ErrorContext(ctx, "Failed to delete role",
 				attr.String("guild_id", guildID),
 				attr.String("role_id", roleID),
 				attr.Error(err))
-			recordFailure(key, err)
+			return results, fmt.Errorf("failed to delete role %s: %w", roleID, err)
 		} else {
 			recordSuccess(key)
 		}
