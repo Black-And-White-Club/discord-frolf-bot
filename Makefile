@@ -197,7 +197,7 @@ mocks-user: mocks-user-discord mocks-user-handlers mocks-user-role-manager mocks
 mocks-round: mocks-create-round-manager mocks-round-rsvp-manager mocks-round-discord mocks-round-reminder-manager mocks-start-round-manager mocks-score-round-manager mocks-finalize-round-manager mocks-delete-round-manager mocks-update-round-manager mocks-tag-update-manager
 mocks-leaderboard: mocks-leaderboard-discord mocks-leaderboard-update-manager mocks-leaderboard-tag-claim
 mocks-score: mocks-score-handlers
-mocks-guild: mocks-guild-discord mocks-guild-handlers mocks-guild-setup-manager mocks-guildconfig
+mocks-guild: mocks-guild-discord mocks-guild-handlers mocks-guild-setup-manager mocks-guild-reset mocks-guildconfig
 
 mocks-user-discord:
 	$(MOCKGEN) -source=$(USER_DIR)/discord/discord.go -destination=$(USER_DIR)/mocks/mock_user_discord.go -package=mocks
@@ -247,13 +247,17 @@ mocks-guildconfig:
 	$(MOCKGEN) -source=./app/guildconfig/interface.go -destination=./app/guildconfig/mocks/mock_guildconfig_resolver.go -package=mocks
 
 # Mocks for Guild Domain (aggregate)
-mocks-guild: mocks-guild-discord mocks-guild-handlers mocks-guild-setup-manager mocks-guildconfig
+mocks-guild: mocks-guild-discord mocks-guild-handlers mocks-guild-setup-manager mocks-guildconfig mocks-guild-reset
 mocks-guild-discord:
 	$(MOCKGEN) -source=$(GUILD_DIR)/discord/discord.go -destination=$(GUILD_DIR)/mocks/mock_guild_discord.go -package=mocks
 mocks-guild-handlers:
 	$(MOCKGEN) -source=$(GUILD_DIR)/watermill/handlers/handlers.go -destination=$(GUILD_DIR)/mocks/mock_guild_handlers.go -package=mocks
 mocks-guild-setup-manager:
 	$(MOCKGEN) -source=$(GUILD_DIR)/discord/setup/setup_config_manager.go -destination=$(GUILD_DIR)/mocks/mock_setup_manager.go -package=mocks
+
+# Mocks for Guild Reset Manager (delete resources, reset flow)
+mocks-guild-reset:
+	$(MOCKGEN) -source=$(GUILD_DIR)/discord/reset/reset.go -destination=$(GUILD_DIR)/mocks/mock_reset_manager.go -package=mocks
 
 
 mocks-all: mocks-user mocks-round mocks-leaderboard mocks-score mocks-guild generate-mocks

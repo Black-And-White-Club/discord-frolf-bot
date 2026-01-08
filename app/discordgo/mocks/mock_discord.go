@@ -132,6 +132,25 @@ func (mr *MockSessionMockRecorder) ApplicationCommands(appID, guildID any, optio
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplicationCommands", reflect.TypeOf((*MockSession)(nil).ApplicationCommands), varargs...)
 }
 
+// ChannelDelete mocks base method.
+func (m *MockSession) ChannelDelete(channelID string, options ...discordgo.RequestOption) error {
+	m.ctrl.T.Helper()
+	varargs := []any{channelID}
+	for _, a := range options {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ChannelDelete", varargs...)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ChannelDelete indicates an expected call of ChannelDelete.
+func (mr *MockSessionMockRecorder) ChannelDelete(channelID any, options ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{channelID}, options...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChannelDelete", reflect.TypeOf((*MockSession)(nil).ChannelDelete), varargs...)
+}
+
 // ChannelEdit mocks base method.
 func (m *MockSession) ChannelEdit(channelID string, data *discordgo.ChannelEdit, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
 	m.ctrl.T.Helper()
@@ -516,6 +535,25 @@ func (mr *MockSessionMockRecorder) GuildRoleCreate(guildID, params any, options 
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{guildID, params}, options...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GuildRoleCreate", reflect.TypeOf((*MockSession)(nil).GuildRoleCreate), varargs...)
+}
+
+// GuildRoleDelete mocks base method.
+func (m *MockSession) GuildRoleDelete(guildID, roleID string, options ...discordgo.RequestOption) error {
+	m.ctrl.T.Helper()
+	varargs := []any{guildID, roleID}
+	for _, a := range options {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GuildRoleDelete", varargs...)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// GuildRoleDelete indicates an expected call of GuildRoleDelete.
+func (mr *MockSessionMockRecorder) GuildRoleDelete(guildID, roleID any, options ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{guildID, roleID}, options...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GuildRoleDelete", reflect.TypeOf((*MockSession)(nil).GuildRoleDelete), varargs...)
 }
 
 // GuildScheduledEventCreate mocks base method.
