@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	sharedleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
+	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
@@ -63,19 +63,22 @@ func (ctm *claimTagManager) HandleClaimTagCommand(ctx context.Context, i *discor
 			return ClaimTagOperationResult{Error: err}, err
 		}
 
-		// Create the payload for tag assignment request
-		payload := sharedleaderboardevents.LeaderboardTagAssignRequestPayloadV1{
-			TargetUserID: sharedtypes.DiscordID(i.Member.User.ID),
-			RequestorID:  sharedtypes.DiscordID(i.Member.User.ID),
-			TagNumber:    sharedtypes.TagNumber(tagValue),
-			ChannelID:    i.ChannelID,
-			MessageID:    requestID,
-			GuildID:      i.GuildID,
-			// You can now use guildConfig for any per-guild logic here
+		// Create the batch payload (single-assignment batch) so backend receives the expected schema
+		batchPayload := leaderboardevents.LeaderboardBatchTagAssignmentRequestedPayloadV1{
+			GuildID:          sharedtypes.GuildID(i.GuildID),
+			RequestingUserID: sharedtypes.DiscordID(i.Member.User.ID),
+			BatchID:          requestID,
+			Assignments: []leaderboardevents.TagAssignmentInfoV1{
+				{
+					GuildID:   sharedtypes.GuildID(i.GuildID),
+					UserID:    sharedtypes.DiscordID(i.Member.User.ID),
+					TagNumber: sharedtypes.TagNumber(tagValue),
+				},
+			},
 		}
 
-		// Create and publish the message
-		msg, err := ctm.helper.CreateNewMessage(payload, sharedleaderboardevents.LeaderboardTagAssignRequestV1)
+		// Create and publish the message using the batch topic (keep batch topic as requested)
+		msg, err := ctm.helper.CreateNewMessage(batchPayload, leaderboardevents.LeaderboardBatchTagAssignmentRequestedV1)
 		if err != nil {
 			ctm.logger.ErrorContext(ctx, "Failed to create tag claim message", attr.Error(err))
 			return ClaimTagOperationResult{Error: err}, err
@@ -88,7 +91,7 @@ func (ctm *claimTagManager) HandleClaimTagCommand(ctx context.Context, i *discor
 		msg.Metadata.Set("correlation_id", requestID)
 
 		// Publish the request
-		err = ctm.eventBus.Publish(sharedleaderboardevents.LeaderboardTagAssignRequestV1, msg)
+		err = ctm.eventBus.Publish(leaderboardevents.LeaderboardBatchTagAssignmentRequestedV1, msg)
 		if err != nil {
 			ctm.logger.ErrorContext(ctx, "Failed to publish tag claim request", attr.Error(err))
 			return ClaimTagOperationResult{Error: err}, err

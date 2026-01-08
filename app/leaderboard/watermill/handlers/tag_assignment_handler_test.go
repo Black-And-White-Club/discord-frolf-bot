@@ -68,7 +68,7 @@ func TestLeaderboardHandlers_HandleTagAssignRequest(t *testing.T) {
 					"message_id":   testMessageID.String(),
 				}
 
-				mockHelper.EXPECT().CreateResultMessage(gomock.Any(), expectedPayload, leaderboardevents.LeaderboardTagAssignmentRequestedV1).
+				mockHelper.EXPECT().CreateResultMessage(gomock.Any(), expectedPayload, leaderboardevents.LeaderboardBatchTagAssignmentRequestedV1).
 					Return(mockMsg, nil).Times(1)
 			},
 		},
@@ -175,7 +175,7 @@ func TestLeaderboardHandlers_HandleTagAssignRequest(t *testing.T) {
 					UpdateType: "manual_assignment",
 				}
 
-				mockHelper.EXPECT().CreateResultMessage(gomock.Any(), expectedPayload, leaderboardevents.LeaderboardTagAssignmentRequestedV1).
+				mockHelper.EXPECT().CreateResultMessage(gomock.Any(), expectedPayload, leaderboardevents.LeaderboardBatchTagAssignmentRequestedV1).
 					Return(nil, errors.New("failed to create message")).Times(1)
 			},
 		},
