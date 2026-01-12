@@ -41,7 +41,7 @@ func TestRoundHandlers_HandleRoundFinalized(t *testing.T) {
 			},
 			ctx:     context.WithValue(context.Background(), "discord_message_id", discordMessageID),
 			wantErr: false,
-			wantLen: 1,
+			wantLen: 0, // Handler intentionally returns empty results on success to avoid trace publish retries
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockFinalizeRoundManager *mocks.MockFinalizeRoundManager) {
 				mockRoundDiscord.EXPECT().
 					GetFinalizeRoundManager().
