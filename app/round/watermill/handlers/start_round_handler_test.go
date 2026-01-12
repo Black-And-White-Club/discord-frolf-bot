@@ -40,7 +40,7 @@ func TestRoundHandlers_HandleRoundStarted(t *testing.T) {
 			},
 			ctx:     context.Background(),
 			wantErr: false,
-			wantLen: 1,
+			wantLen: 0, // Handler intentionally returns empty results on success to avoid trace publish retries
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockStartRoundManager *mocks.MockStartRoundManager) {
 				mockRoundDiscord.EXPECT().
 					GetStartRoundManager().
