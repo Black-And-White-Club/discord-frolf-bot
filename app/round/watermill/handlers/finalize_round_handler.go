@@ -13,7 +13,7 @@ func (h *RoundHandlers) HandleRoundFinalized(ctx context.Context, payload *round
 	discordChannelID := h.Config.GetEventChannelID()
 
 	// Get message ID from context (set by wrapper from message metadata)
-	discordMessageID, ok := ctx.Value("discord_message_id").(string)
+	discordMessageID, ok := ctx.Value("message_id").(string)
 	if !ok || discordMessageID == "" {
 		return nil, fmt.Errorf("missing discord_message_id in metadata for round finalized")
 	}

@@ -21,6 +21,6 @@ func (d *discordOperations) SendDM(ctx context.Context, userID, message string) 
 		d.logger.Error("Failed to send DM", attr.Error(err))
 		return nil, fmt.Errorf("failed to send DM: %w", err)
 	}
-	d.logger.Info("DM sent successfully", attr.String("discord_message_id", msg.ID), attr.String("discord_channel_id", msg.ChannelID))
+	d.logger.Info("DM sent successfully", attr.String("message_id", msg.ID), attr.String("discord_channel_id", msg.ChannelID))
 	return msg, nil
 }

@@ -153,7 +153,7 @@ func (drm *deleteRoundManager) sendDeleteRequest(ctx context.Context, roundID sh
 		msg.Metadata = make(message.Metadata)
 	}
 	msg.Metadata.Set("interaction_id", interactionID)
-	msg.Metadata.Set("discord_message_id", discordMessageID)
+	msg.Metadata.Set("message_id", discordMessageID)
 	msg.Metadata.Set("requesting_user_id", string(userID))
 	msg.Metadata.Set("guild_id", guildID)
 	msg.Metadata.Set("channel_id", channelID)

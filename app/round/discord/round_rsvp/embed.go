@@ -37,7 +37,7 @@ func (rrm *roundRsvpManager) UpdateRoundEventEmbed(ctx context.Context, channelI
 			rrm.logger.ErrorContext(ctx, "Failed to fetch message for embed update",
 				attr.Error(wrappedErr),
 				attr.String("channel_id", resolvedChannelID),
-				attr.String("discord_message_id", messageID))
+				attr.String("message_id", messageID))
 			return RoundRsvpOperationResult{Error: wrappedErr}, wrappedErr
 		}
 
@@ -45,7 +45,7 @@ func (rrm *roundRsvpManager) UpdateRoundEventEmbed(ctx context.Context, channelI
 			err := fmt.Errorf("no embeds found in message")
 			rrm.logger.ErrorContext(ctx, "No embeds found in message",
 				attr.String("channel_id", resolvedChannelID),
-				attr.String("discord_message_id", messageID))
+				attr.String("message_id", messageID))
 			return RoundRsvpOperationResult{Error: err}, err
 		}
 
@@ -55,7 +55,7 @@ func (rrm *roundRsvpManager) UpdateRoundEventEmbed(ctx context.Context, channelI
 			err := fmt.Errorf("embed does not have expected fields (expected at least 5, got %d)", len(embed.Fields))
 			rrm.logger.ErrorContext(ctx, "Embed doesn't have expected fields",
 				attr.String("channel_id", resolvedChannelID),
-				attr.String("discord_message_id", messageID),
+				attr.String("message_id", messageID),
 				attr.Int("field_count", len(embed.Fields)))
 			return RoundRsvpOperationResult{Error: err}, err
 		}
@@ -72,13 +72,13 @@ func (rrm *roundRsvpManager) UpdateRoundEventEmbed(ctx context.Context, channelI
 			rrm.logger.ErrorContext(ctx, "Failed to update round event embed",
 				attr.Error(wrappedErr),
 				attr.String("channel_id", resolvedChannelID),
-				attr.String("discord_message_id", messageID))
+				attr.String("message_id", messageID))
 			return RoundRsvpOperationResult{Error: wrappedErr}, wrappedErr
 		}
 
 		rrm.logger.InfoContext(ctx, "Successfully updated round event embed",
 			attr.String("channel_id", resolvedChannelID),
-			attr.String("discord_message_id", messageID),
+			attr.String("message_id", messageID),
 			attr.Int("accepted_count", len(acceptedParticipants)),
 			attr.Int("declined_count", len(declinedParticipants)),
 			attr.Int("tentative_count", len(tentativeParticipants)))

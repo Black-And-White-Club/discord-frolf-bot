@@ -44,7 +44,7 @@ func (rrm *roundRsvpManager) HandleRoundResponse(ctx context.Context, i *discord
 
 	rrm.logger.InfoContext(ctx, "Processing RSVP interaction",
 		attr.String("interaction_id", i.ID),
-		attr.String("discord_message_id", messageID),
+		attr.String("message_id", messageID),
 	)
 
 	return rrm.operationWrapper(ctx, "handle_round_response", func(ctx context.Context) (RoundRsvpOperationResult, error) {
@@ -114,7 +114,7 @@ func (rrm *roundRsvpManager) HandleRoundResponse(ctx context.Context, i *discord
 
 		msg := &wmmessage.Message{
 			Metadata: wmmessage.Metadata{
-				"discord_message_id": messageID, // Use the safely extracted messageID
+				"message_id": messageID, // Use the safely extracted messageID
 				"topic":              discordroundevents.RoundParticipantJoinRequestDiscordV1,
 				"response":           string(response),
 			},
@@ -262,7 +262,7 @@ func (rrm *roundRsvpManager) InteractionJoinRoundLate(ctx context.Context, i *di
 
 		msg := &wmmessage.Message{
 			Metadata: wmmessage.Metadata{
-				"discord_message_id": messageID, // Use the safely extracted messageID
+				"message_id": messageID, // Use the safely extracted messageID
 				"topic":              discordroundevents.RoundParticipantJoinRequestDiscordV1,
 				"response":           "ACCEPT",
 			},

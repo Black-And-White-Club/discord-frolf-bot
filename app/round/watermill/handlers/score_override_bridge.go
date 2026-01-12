@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	metaDiscordMessageID = "discord_message_id"
+	metaDiscordMessageID = "message_id"
 	metaChannelID        = "channel_id"
 )
 
@@ -40,7 +40,7 @@ func (h *RoundHandlers) HandleScoreOverrideSuccess(ctx context.Context, payload 
 			Topic:   roundevents.RoundParticipantScoreUpdatedV1,
 			Payload: participantPayload,
 			Metadata: map[string]string{
-				"discord_message_id": messageID,
+				"message_id": messageID,
 			},
 		},
 	}, nil

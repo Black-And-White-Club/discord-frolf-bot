@@ -30,15 +30,19 @@ func (h *RoundHandlers) HandleRoundUpdateRequested(ctx context.Context, payload 
 		Location:    payload.Location,
 	}
 
+	md := map[string]string{
+		"channel_id": payload.ChannelID,
+		"user_id":    string(payload.UserID),
+	}
+	if payload.MessageID != "" {
+		md["message_id"] = payload.MessageID
+	}
+
 	return []handlerwrapper.Result{
 		{
-			Topic:   roundevents.RoundUpdateRequestedV1,
-			Payload: backendPayload,
-			Metadata: map[string]string{
-				"channel_id": payload.ChannelID,
-				"discord_message_id": payload.MessageID,
-				"user_id":    string(payload.UserID),
-			},
+			Topic:    roundevents.RoundUpdateRequestedV1,
+			Payload:  backendPayload,
+			Metadata: md,
 		},
 	}, nil
 }
@@ -53,7 +57,7 @@ func (h *RoundHandlers) HandleRoundUpdated(ctx context.Context, payload *roundev
 		return nil, fmt.Errorf("channel ID is required for updating round embed")
 	}
 
-	messageID, ok := ctx.Value("discord_message_id").(string)
+	messageID, ok := ctx.Value("message_id").(string)
 	if !ok || messageID == "" {
 		return nil, fmt.Errorf("message ID is required for updating round embed")
 	}

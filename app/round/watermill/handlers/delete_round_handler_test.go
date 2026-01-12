@@ -106,7 +106,7 @@ func TestRoundHandlers_HandleRoundDeleted(t *testing.T) {
 				RoundID:        testRoundID,
 				EventMessageID: "some_other_id",
 			},
-			ctx:     context.WithValue(context.Background(), "discord_message_id", testDiscordMessageID),
+			ctx:     context.WithValue(context.Background(), "message_id", testDiscordMessageID),
 			wantErr: false,
 			wantLen: 0, // Handler intentionally returns empty results on success to avoid trace publish retries
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockDeleteRoundManager *mocks.MockDeleteRoundManager) {
@@ -127,7 +127,7 @@ func TestRoundHandlers_HandleRoundDeleted(t *testing.T) {
 				RoundID:        testRoundID,
 				EventMessageID: "some_other_id",
 			},
-			ctx:     context.WithValue(context.Background(), "discord_message_id", testDiscordMessageID),
+			ctx:     context.WithValue(context.Background(), "message_id", testDiscordMessageID),
 			wantErr: true,
 			wantLen: 0,
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockDeleteRoundManager *mocks.MockDeleteRoundManager) {

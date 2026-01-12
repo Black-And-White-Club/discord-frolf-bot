@@ -50,7 +50,7 @@ func (frm *finalizeRoundManager) FinalizeScorecardEmbed(ctx context.Context, eve
 		if err != nil {
 			frm.logger.ErrorContext(ctx, "Failed to fetch existing message for finalization",
 				attr.Error(err),
-				attr.String("discord_message_id", eventMessageID),
+				attr.String("message_id", eventMessageID),
 				attr.String("channel_id", resolvedChannelID))
 			return FinalizeRoundOperationResult{Error: fmt.Errorf("failed to fetch existing message: %w", err)}, fmt.Errorf("failed to fetch existing message: %w", err)
 		}
@@ -83,7 +83,7 @@ func (frm *finalizeRoundManager) FinalizeScorecardEmbed(ctx context.Context, eve
 			frm.logger.ErrorContext(ctx, "Failed to transform round to finalized scorecard embed data",
 				attr.Error(err),
 				attr.RoundID("round_id", embedPayload.RoundID),    // Assuming RoundID is in payload and attr helper supports it
-				attr.String("discord_message_id", eventMessageID), // Log message ID for context
+				attr.String("message_id", eventMessageID), // Log message ID for context
 				attr.String("channel_id", channelID),              // Log channel ID for context
 			)
 			return FinalizeRoundOperationResult{Error: fmt.Errorf("failed to prepare embed data: %w", err)}, fmt.Errorf("failed to prepare embed data: %w", err) // Return both result and error
@@ -94,7 +94,7 @@ func (frm *finalizeRoundManager) FinalizeScorecardEmbed(ctx context.Context, eve
 			err := fmt.Errorf("transformed embed is nil")
 			frm.logger.ErrorContext(ctx, "Transformed embed is nil",
 				attr.RoundID("round_id", embedPayload.RoundID),
-				attr.String("discord_message_id", eventMessageID),
+				attr.String("message_id", eventMessageID),
 				attr.String("channel_id", channelID),
 			)
 			return FinalizeRoundOperationResult{Error: err}, err // Return both result and error
@@ -114,7 +114,7 @@ func (frm *finalizeRoundManager) FinalizeScorecardEmbed(ctx context.Context, eve
 			wrappedErr := fmt.Errorf("failed to edit embed for finalization: %w", err)
 			frm.logger.ErrorContext(ctx, "Failed to update embed for finalization",
 				attr.Error(wrappedErr),
-				attr.String("discord_message_id", eventMessageID),
+				attr.String("message_id", eventMessageID),
 				attr.String("channel_id", channelID),
 				attr.RoundID("round_id", embedPayload.RoundID), // Log RoundID for context
 			)
@@ -123,7 +123,7 @@ func (frm *finalizeRoundManager) FinalizeScorecardEmbed(ctx context.Context, eve
 
 		// Log successful embed update
 		frm.logger.InfoContext(ctx, "Successfully finalized round embed on Discord",
-			attr.String("discord_message_id", eventMessageID),
+			attr.String("message_id", eventMessageID),
 			attr.String("channel_id", channelID),
 			attr.RoundID("round_id", embedPayload.RoundID), // Log RoundID for context
 		)
