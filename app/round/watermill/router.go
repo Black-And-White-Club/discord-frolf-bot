@@ -165,7 +165,7 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 	// Lifecycle
 	registerHandler(deps, roundevents.RoundDeletedV1, handlers.HandleRoundDeleted)
 	registerHandler(deps, roundevents.RoundFinalizedDiscordV1, handlers.HandleRoundFinalized)
-	registerHandler(deps, roundevents.RoundStartedV1, handlers.HandleRoundStarted)
+	registerHandler(deps, roundevents.RoundStartedDiscordV1, handlers.HandleRoundStarted)
 
 	// Tag handling
 	registerHandler(deps, roundevents.RoundParticipantJoinedV1, handlers.HandleRoundParticipantJoined)
