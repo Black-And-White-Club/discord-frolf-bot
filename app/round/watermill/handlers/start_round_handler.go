@@ -29,18 +29,9 @@ func (h *RoundHandlers) HandleRoundStarted(ctx context.Context, payload *roundev
 		return nil, fmt.Errorf("failed to update round to scorecard: %w", err)
 	}
 
-	tracePayload := map[string]interface{}{
-		"guild_id":   payload.GuildID,
-		"round_id":   payload.RoundID,
-		"event_type": "round_started",
-		"status":     "scorecard_updated",
-		"message_id": eventMessageID,
-	}
-
-	return []handlerwrapper.Result{
-		{
-			Topic:   roundevents.RoundTraceEventV1,
-			Payload: tracePayload,
-		},
-	}, nil
+	// We don't return a trace event here to avoid downstream publish
+	// failures causing the handler (and its side-effects) to be retried.
+	// Returning an empty result set will ensure the original message is
+	// Acked after successful handling.
+	return []handlerwrapper.Result{}, nil
 }

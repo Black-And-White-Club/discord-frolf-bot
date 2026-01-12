@@ -47,20 +47,10 @@ func (h *RoundHandlers) HandleRoundFinalized(ctx context.Context, payload *round
 		return nil, fmt.Errorf("finalize scorecard embed operation failed: %w", finalizeResult.Error)
 	}
 
-	// Create trace event
-	tracePayload := map[string]interface{}{
-		"guild_id":           payload.GuildID,
-		"round_id":           payload.RoundID,
-		"event_type":         "round_finalized",
-		"status":             "scorecard_finalized_display",
-		"discord_message_id": discordMessageID,
-		"channel_id":         discordChannelID,
-	}
-
-	return []handlerwrapper.Result{
-		{
-			Topic:   roundevents.RoundTraceEventV1,
-			Payload: tracePayload,
-		},
-	}, nil
+	// We intentionally do not emit a trace event here. Returning result
+	// messages causes Watermill to attempt publishing; if the trace topic
+	// has no configured consumer/stream, publish will fail and the input
+	// message will be Nacked, retrying the handler and duplicating side
+	// effects. Returning an empty result set avoids that.
+	return []handlerwrapper.Result{}, nil
 }

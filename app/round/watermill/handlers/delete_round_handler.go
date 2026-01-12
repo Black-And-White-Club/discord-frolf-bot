@@ -46,20 +46,9 @@ func (h *RoundHandlers) HandleRoundDeleted(ctx context.Context, payload *roundev
 		return nil, fmt.Errorf("unexpected type for result.Success in DeleteRoundEventEmbed result for round %s", payload.RoundID.String())
 	}
 
-	tracePayload := map[string]interface{}{
-		"guild_id":                  payload.GuildID,
-		"round_id":                  payload.RoundID,
-		"event_type":                "round_deleted",
-		"status":                    "embed_deletion_attempted",
-		"discord_message_id":        discordMessageID,
-		"embed_deletion_successful": success,
-		"embed_deletion_error":      result.Error,
-	}
-
-	return []handlerwrapper.Result{
-		{
-			Topic:   roundevents.RoundTraceEventV1,
-			Payload: tracePayload,
-		},
-	}, nil
+	// Avoid returning trace events here to prevent publish failures from
+	// causing the handler to be retried (which would duplicate embed
+	// deletion attempts). An empty result list acknowledges successful
+	// handling.
+	return []handlerwrapper.Result{}, nil
 }

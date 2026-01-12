@@ -121,24 +121,11 @@ func (h *LeaderboardHandlers) HandleBatchTagAssigned(ctx context.Context,
 		attr.String("channel_id", channelID),
 	)
 
-	// Create a trace event
-	tracePayload := map[string]interface{}{
-		"event_type":       "batch_assignment_completed",
-		"status":           "embed_sent",
-		"channel_id":       channelID,
-		"entry_count":      len(batchPayload.Assignments),
-		"batch_id":         batchPayload.BatchID,
-		"guild_id":         guildID,
-		"assignment_count": batchPayload.AssignmentCount,
-	}
-
-	return []handlerwrapper.Result{
-		{
-			Topic:   leaderboardevents.LeaderboardTraceEvent,
-			Payload: tracePayload,
-			Metadata: map[string]string{
-				"guild_id": guildID,
-			},
-		},
-	}, nil
+	// We don't return a trace event here because returning a Result causes
+	// Watermill to attempt to publish it. If no consumer/stream exists for
+	// that topic, the publish can fail and the input message is Nacked,
+	// causing the handler (and its side-effects) to be retried. Returning
+	// an empty result set ensures the original message is Acked after
+	// successful handling and prevents duplicate Discord posts.
+	return []handlerwrapper.Result{}, nil
 }
