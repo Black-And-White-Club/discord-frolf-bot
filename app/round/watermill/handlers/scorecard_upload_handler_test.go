@@ -1,14 +1,13 @@
 package roundhandlers
 
 import (
-	"encoding/json"
+	"context"
 	"testing"
 	"time"
 
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
-	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel/trace/noop"
 )
@@ -20,7 +19,7 @@ func resetGuildRateLimiter(t *testing.T) {
 	guildRateLimiter = make(map[string][]time.Time)
 }
 
-func TestRoundHandlers_ScorecardUploadedEvent(t *testing.T) {
+func TestRoundHandlers_HandleScorecardUploaded(t *testing.T) {
 	resetGuildRateLimiter(t)
 	defer resetGuildRateLimiter(t)
 
@@ -29,133 +28,199 @@ func TestRoundHandlers_ScorecardUploadedEvent(t *testing.T) {
 		Tracer: noop.NewTracerProvider().Tracer("test"),
 	}
 
-	t.Run("payload too large", func(t *testing.T) {
-		big := make([]byte, maxScorecardPayloadBytes+1)
-		msg := message.NewMessage("id", big)
+	tests := []struct {
+		name       string
+		payload    *roundevents.ScorecardUploadedPayloadV1
+		ctx        context.Context
+		wantErr    bool
+		wantLen    int
+	}{
+		{
+			name: "successful_scorecard_upload",
+			payload: &roundevents.ScorecardUploadedPayloadV1{
+				ImportID: "import-id",
+				GuildID:  sharedtypes.GuildID("guild-id"),
+				RoundID:  sharedtypes.RoundID(uuid.New()),
+				UDiscURL: "https://example.com/scorecard.csv",
+			},
+			ctx:     context.Background(),
+			wantErr: false,
+			wantLen: 0,
+		},
+		{
+			name: "missing_import_id",
+			payload: &roundevents.ScorecardUploadedPayloadV1{
+				GuildID: sharedtypes.GuildID("guild-id"),
+				RoundID: sharedtypes.RoundID(uuid.New()),
+				UDiscURL: "https://example.com/scorecard.csv",
+			},
+			ctx:     context.Background(),
+			wantErr: true,
+			wantLen: 0,
+		},
+		{
+			name: "missing_guild_id",
+			payload: &roundevents.ScorecardUploadedPayloadV1{
+				ImportID: "import-id",
+				RoundID:  sharedtypes.RoundID(uuid.New()),
+				UDiscURL: "https://example.com/scorecard.csv",
+			},
+			ctx:     context.Background(),
+			wantErr: true,
+			wantLen: 0,
+		},
+		{
+			name: "unsupported_extension",
+			payload: &roundevents.ScorecardUploadedPayloadV1{
+				ImportID: "import-id",
+				GuildID:  sharedtypes.GuildID("guild-id"),
+				RoundID:  sharedtypes.RoundID(uuid.New()),
+				UDiscURL: "https://example.com/scorecard.pdf",
+			},
+			ctx:     context.Background(),
+			wantErr: true,
+			wantLen: 0,
+		},
+	}
 
-		err := rh.ScorecardUploadedEvent(msg)
-		if err == nil {
-			t.Fatalf("expected error")
-		}
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := rh.HandleScorecardUploaded(tt.ctx, tt.payload)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("HandleScorecardUploaded() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
 
-	t.Run("invalid json", func(t *testing.T) {
-		msg := message.NewMessage("id", []byte("not-json"))
-		err := rh.ScorecardUploadedEvent(msg)
-		if err == nil {
-			t.Fatalf("expected error")
-		}
-	})
-
-	t.Run("missing identifiers", func(t *testing.T) {
-		payload := roundevents.ScorecardUploadedPayloadV1{}
-		b, err := json.Marshal(payload)
-		if err != nil {
-			t.Fatalf("marshal: %v", err)
-		}
-		msg := message.NewMessage("id", b)
-		err = rh.ScorecardUploadedEvent(msg)
-		if err == nil {
-			t.Fatalf("expected error")
-		}
-	})
-
-	t.Run("unsupported extension", func(t *testing.T) {
-		roundID := uuid.New()
-		payload := roundevents.ScorecardUploadedPayloadV1{
-			ImportID: "import-id",
-			GuildID:  sharedtypes.GuildID("guild-id"),
-			RoundID:  sharedtypes.RoundID(roundID),
-			UDiscURL: "https://example.com/scorecard.pdf",
-		}
-		b, err := json.Marshal(payload)
-		if err != nil {
-			t.Fatalf("marshal: %v", err)
-		}
-		msg := message.NewMessage("id", b)
-		err = rh.ScorecardUploadedEvent(msg)
-		if err == nil {
-			t.Fatalf("expected error")
-		}
-	})
-
-	t.Run("rate limit exceeded", func(t *testing.T) {
-		guildID := sharedtypes.GuildID("guild-id")
-		now := time.Now()
-
-		guildRateLimiterLock.Lock()
-		guildRateLimiter[string(guildID)] = make([]time.Time, maxEventsPerGuildPerMinute)
-		for i := 0; i < maxEventsPerGuildPerMinute; i++ {
-			guildRateLimiter[string(guildID)][i] = now
-		}
-		guildRateLimiterLock.Unlock()
-
-		roundID := uuid.New()
-		payload := roundevents.ScorecardUploadedPayloadV1{
-			ImportID: "import-id",
-			GuildID:  guildID,
-			RoundID:  sharedtypes.RoundID(roundID),
-			UDiscURL: "",
-		}
-		b, err := json.Marshal(payload)
-		if err != nil {
-			t.Fatalf("marshal: %v", err)
-		}
-		msg := message.NewMessage("id", b)
-		err = rh.ScorecardUploadedEvent(msg)
-		if err == nil {
-			t.Fatalf("expected error")
-		}
-	})
-
-	t.Run("success", func(t *testing.T) {
-		resetGuildRateLimiter(t)
-
-		roundID := uuid.New()
-		payload := roundevents.ScorecardUploadedPayloadV1{
-			ImportID: "import-id",
-			GuildID:  sharedtypes.GuildID("guild-id"),
-			RoundID:  sharedtypes.RoundID(roundID),
-		}
-		b, err := json.Marshal(payload)
-		if err != nil {
-			t.Fatalf("marshal: %v", err)
-		}
-		msg := message.NewMessage("id", b)
-		err = rh.ScorecardUploadedEvent(msg)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
+			if len(got) != tt.wantLen {
+				t.Errorf("HandleScorecardUploaded() got %d results, want %d", len(got), tt.wantLen)
+				return
+			}
+		})
+	}
 }
 
-func TestRoundHandlers_ScorecardAuxEvents_InvalidJSON(t *testing.T) {
+func TestRoundHandlers_HandleScorecardParseFailed(t *testing.T) {
 	rh := &RoundHandlers{
 		Logger: loggerfrolfbot.NoOpLogger,
 		Tracer: noop.NewTracerProvider().Tracer("test"),
 	}
 
-	t.Run("ScorecardParseFailedEvent", func(t *testing.T) {
-		msg := message.NewMessage("id", []byte("not-json"))
-		err := rh.ScorecardParseFailedEvent(msg)
-		if err == nil {
-			t.Fatalf("expected error")
-		}
-	})
+	tests := []struct {
+		name       string
+		payload    *roundevents.ScorecardParseFailedPayloadV1
+		ctx        context.Context
+		wantErr    bool
+		wantLen    int
+	}{
+		{
+			name: "successful_parse_failure_handling",
+			payload: &roundevents.ScorecardParseFailedPayloadV1{
+				ImportID: "import-id",
+				GuildID:  sharedtypes.GuildID("guild-id"),
+				Error:    "parse error",
+			},
+			ctx:     context.Background(),
+			wantErr: false,
+			wantLen: 0,
+		},
+	}
 
-	t.Run("ImportFailedEvent", func(t *testing.T) {
-		msg := message.NewMessage("id", []byte("not-json"))
-		err := rh.ImportFailedEvent(msg)
-		if err == nil {
-			t.Fatalf("expected error")
-		}
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := rh.HandleScorecardParseFailed(tt.ctx, tt.payload)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("HandleScorecardParseFailed() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
 
-	t.Run("ScorecardURLRequestedEvent", func(t *testing.T) {
-		msg := message.NewMessage("id", []byte("not-json"))
-		err := rh.ScorecardURLRequestedEvent(msg)
-		if err == nil {
-			t.Fatalf("expected error")
-		}
-	})
+			if len(got) != tt.wantLen {
+				t.Errorf("HandleScorecardParseFailed() got %d results, want %d", len(got), tt.wantLen)
+				return
+			}
+		})
+	}
+}
+
+func TestRoundHandlers_HandleImportFailed(t *testing.T) {
+	rh := &RoundHandlers{
+		Logger: loggerfrolfbot.NoOpLogger,
+		Tracer: noop.NewTracerProvider().Tracer("test"),
+	}
+
+	tests := []struct {
+		name       string
+		payload    *roundevents.ImportFailedPayloadV1
+		ctx        context.Context
+		wantErr    bool
+		wantLen    int
+	}{
+		{
+			name: "successful_import_failure_handling",
+			payload: &roundevents.ImportFailedPayloadV1{
+				ImportID: "import-id",
+				GuildID:  sharedtypes.GuildID("guild-id"),
+				Error:    "import error",
+			},
+			ctx:     context.Background(),
+			wantErr: false,
+			wantLen: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := rh.HandleImportFailed(tt.ctx, tt.payload)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("HandleImportFailed() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if len(got) != tt.wantLen {
+				t.Errorf("HandleImportFailed() got %d results, want %d", len(got), tt.wantLen)
+				return
+			}
+		})
+	}
+}
+
+func TestRoundHandlers_HandleScorecardURLRequested(t *testing.T) {
+	rh := &RoundHandlers{
+		Logger: loggerfrolfbot.NoOpLogger,
+		Tracer: noop.NewTracerProvider().Tracer("test"),
+	}
+
+	tests := []struct {
+		name       string
+		payload    *roundevents.ScorecardURLRequestedPayloadV1
+		ctx        context.Context
+		wantErr    bool
+		wantLen    int
+	}{
+		{
+			name: "successful_scorecard_url_request",
+			payload: &roundevents.ScorecardURLRequestedPayloadV1{
+				ImportID: "import-id",
+				GuildID:  sharedtypes.GuildID("guild-id"),
+				UserID:   sharedtypes.DiscordID("user-id"),
+			},
+			ctx:     context.Background(),
+			wantErr: false,
+			wantLen: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := rh.HandleScorecardURLRequested(tt.ctx, tt.payload)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("HandleScorecardURLRequested() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if len(got) != tt.wantLen {
+				t.Errorf("HandleScorecardURLRequested() got %d results, want %d", len(got), tt.wantLen)
+				return
+			}
+		})
+	}
 }

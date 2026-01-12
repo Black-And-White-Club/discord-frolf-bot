@@ -83,6 +83,7 @@ func InitializeLeaderboardModule(
 		cfg,
 		helper,
 		tracer,
+		discordMetricsService,
 	)
 
 	// Configure the router with context and handlers

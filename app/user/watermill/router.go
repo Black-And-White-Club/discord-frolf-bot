@@ -13,12 +13,24 @@ import (
 	shareduserevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/user"
 	userevents "github.com/Black-And-White-Club/frolf-bot-shared/events/user"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
+	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	tracingfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/tracing"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
+	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/message/router/middleware"
 	"go.opentelemetry.io/otel/trace"
 )
+
+type handlerDeps struct {
+	router     *message.Router
+	subscriber eventbus.EventBus
+	publisher  eventbus.EventBus
+	logger     *slog.Logger
+	tracer     trace.Tracer
+	helper     utils.Helpers
+	metrics    handlerwrapper.ReturningMetrics
+}
 
 // UserRouter handles routing for user module events.
 type UserRouter struct {
@@ -31,6 +43,7 @@ type UserRouter struct {
 	tracer           trace.Tracer
 	middlewareHelper utils.MiddlewareHelpers
 	userDiscord      interface{} // Store userDiscord for access to signup manager
+	metrics          discordmetrics.DiscordMetrics
 }
 
 // NewUserRouter creates a new UserRouter.
@@ -42,6 +55,7 @@ func NewUserRouter(
 	config *config.Config,
 	helper utils.Helpers,
 	tracer trace.Tracer,
+	metrics discordmetrics.DiscordMetrics,
 ) *UserRouter {
 	return &UserRouter{
 		logger:           logger,
@@ -52,7 +66,33 @@ func NewUserRouter(
 		helper:           helper,
 		tracer:           tracer,
 		middlewareHelper: utils.NewMiddlewareHelper(),
+		metrics:          metrics,
 	}
+}
+
+// registerHandler registers a pure transformation-pattern handler with typed payload
+func registerHandler[T any](
+	deps handlerDeps,
+	topic string,
+	handler func(context.Context, *T) ([]handlerwrapper.Result, error),
+) {
+	handlerName := "discord-user." + topic
+
+	deps.router.AddHandler(
+		handlerName,
+		topic,
+		deps.subscriber,
+		"", // Watermill reads topic from message metadata when empty
+		deps.publisher,
+		handlerwrapper.WrapTransformingTyped(
+			handlerName,
+			deps.logger,
+			deps.tracer,
+			deps.helper,
+			deps.metrics,
+			handler,
+		),
+	)
 }
 
 // Configure sets up the router.
@@ -69,7 +109,7 @@ func (r *UserRouter) Configure(ctx context.Context, handlers userhandlers.Handle
 		tracingfrolfbot.TraceHandler(r.tracer),
 	)
 
-	if err := r.RegisterHandlers(ctx, handlers); err != nil {
+	if err := r.registerHandlers(handlers); err != nil {
 		return fmt.Errorf("failed to register user handlers: %w", err)
 	}
 	return nil
@@ -120,81 +160,38 @@ func (r *UserRouter) getPublishTopic(handlerName string, msg *message.Message) s
 		return userevents.UserRoleUpdateRequestedV1
 
 	default:
-		r.logger.Warn("unknown handler in topic resolution",
+		r.logger.Warn("unknown handler in topic resolution - no metadata fallback in Phase 2",
 			attr.String("handler", handlerName),
 		)
-		// Fallback to metadata (graceful degradation during migration)
-		return msg.Metadata.Get("topic")
+		return ""
 	}
 }
 
-// RegisterHandlers wires all event handlers.
-func (r *UserRouter) RegisterHandlers(ctx context.Context, handlers userhandlers.Handler) error {
-	r.logger.InfoContext(ctx, "Registering User Handlers")
+// registerHandlers registers all user module handlers using the generic pattern
+func (r *UserRouter) registerHandlers(handlers userhandlers.Handler) error {
+	var metrics handlerwrapper.ReturningMetrics // reserved for metrics integration
 
-	eventsToHandlers := map[string]message.HandlerFunc{
-		userevents.UserRoleUpdatedV1:               handlers.HandleRoleUpdated,
-		userevents.UserRoleUpdateFailedV1:          handlers.HandleRoleUpdateFailed,
-		userevents.UserCreatedV1:                   handlers.HandleUserCreated,
-		shareduserevents.SignupAddRoleV1:           handlers.HandleAddRole,
-		shareduserevents.SignupRoleAddedV1:         handlers.HandleRoleAdded,
-		shareduserevents.SignupRoleAdditionFailedV1: handlers.HandleRoleAdditionFailed,
-		userevents.UserCreationFailedV1:            handlers.HandleUserCreationFailed,
-		shareduserevents.RoleUpdateCommandV1:       handlers.HandleRoleUpdateCommand,
-		shareduserevents.RoleUpdateButtonPressV1:   handlers.HandleRoleUpdateButtonPress,
+	deps := handlerDeps{
+		router:     r.Router,
+		subscriber: r.subscriber,
+		publisher:  r.publisher,
+		logger:     r.logger,
+		tracer:     r.tracer,
+		helper:     r.helper,
+		metrics:    metrics,
 	}
 
-	for topic, handlerFunc := range eventsToHandlers {
-		handlerName := fmt.Sprintf("discord-user.%s", topic)
+	// Register all user module handlers
+	registerHandler(deps, userevents.UserCreatedV1, handlers.HandleUserCreated)
+	registerHandler(deps, userevents.UserCreationFailedV1, handlers.HandleUserCreationFailed)
+	registerHandler(deps, shareduserevents.SignupAddRoleV1, handlers.HandleAddRole)
+	registerHandler(deps, shareduserevents.SignupRoleAddedV1, handlers.HandleRoleAdded)
+	registerHandler(deps, shareduserevents.SignupRoleAdditionFailedV1, handlers.HandleRoleAdditionFailed)
+	registerHandler(deps, shareduserevents.RoleUpdateCommandV1, handlers.HandleRoleUpdateCommand)
+	registerHandler(deps, shareduserevents.RoleUpdateButtonPressV1, handlers.HandleRoleUpdateButtonPress)
+	registerHandler(deps, userevents.UserRoleUpdatedV1, handlers.HandleRoleUpdated)
+	registerHandler(deps, userevents.UserRoleUpdateFailedV1, handlers.HandleRoleUpdateFailed)
 
-		// Use environment-specific queue groups for multi-tenant scalability
-		// This ensures only one instance processes each message per environment
-		queueGroup := fmt.Sprintf("user-handlers-%s", r.config.Observability.Environment)
-
-		r.Router.AddHandler(
-			handlerName,
-			topic,
-			r.subscriber,
-			queueGroup,
-			nil,
-			func(msg *message.Message) ([]*message.Message, error) {
-				messages, err := handlerFunc(msg)
-				if err != nil {
-					r.logger.ErrorContext(ctx, "Error processing user message",
-						attr.String("message_id", msg.UUID),
-						attr.Error(err),
-					)
-					return nil, err
-				}
-				for _, m := range messages {
-					// Router resolves topic (not metadata)
-					publishTopic := r.getPublishTopic(handlerName, m)
-
-					// INVARIANT: Topic must be resolvable
-					if publishTopic == "" {
-						r.logger.Error("router failed to resolve publish topic - MESSAGE DROPPED",
-							attr.String("handler", handlerName),
-							attr.String("msg_uuid", m.UUID),
-							attr.String("correlation_id", m.Metadata.Get("correlation_id")),
-						)
-						// Skip publishing but don't fail entire batch
-						continue
-					}
-
-					r.logger.InfoContext(ctx, "Publishing message",
-						attr.String("topic", publishTopic),
-						attr.String("handler", handlerName),
-						attr.String("correlation_id", m.Metadata.Get("correlation_id")),
-					)
-
-					if err := r.publisher.Publish(publishTopic, m); err != nil {
-						return nil, fmt.Errorf("failed to publish to %s: %w", publishTopic, err)
-					}
-				}
-				return nil, nil
-			},
-		)
-	}
 	return nil
 }
 

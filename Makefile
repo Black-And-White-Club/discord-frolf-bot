@@ -194,9 +194,9 @@ generate-mocks:
 
 # Mocks for User Domain
 mocks-user: mocks-user-discord mocks-user-handlers mocks-user-role-manager mocks-user-signup-manager
-mocks-round: mocks-create-round-manager mocks-round-rsvp-manager mocks-round-discord mocks-round-reminder-manager mocks-start-round-manager mocks-score-round-manager mocks-finalize-round-manager mocks-delete-round-manager mocks-update-round-manager mocks-tag-update-manager
-mocks-leaderboard: mocks-leaderboard-discord mocks-leaderboard-update-manager mocks-leaderboard-tag-claim
-mocks-score: mocks-score-handlers
+mocks-round: mocks-create-round-manager mocks-round-rsvp-manager mocks-round-discord mocks-round-reminder-manager mocks-start-round-manager mocks-score-round-manager mocks-finalize-round-manager mocks-delete-round-manager mocks-update-round-manager mocks-tag-update-manager mocks-round-handlers
+mocks-leaderboard: mocks-leaderboard-discord mocks-leaderboard-update-manager mocks-leaderboard-tag-claim mocks-leaderboard-handlers
+mocks-score: mocks-score-handlers mocks-score-discord
 mocks-guild: mocks-guild-discord mocks-guild-handlers mocks-guild-setup-manager mocks-guild-reset mocks-guildconfig
 
 mocks-user-discord:
@@ -230,6 +230,10 @@ mocks-update-round-manager:
 mocks-tag-update-manager:
 	$(MOCKGEN) -source=$(ROUND_DIR)/discord/tag_updates/tag_updates.go -destination=$(ROUND_DIR)/mocks/mock_tag_update_manager.go -package=mocks
 
+# Mock the round watermill handlers (consistent with other modules)
+mocks-round-handlers:
+	$(MOCKGEN) -source=$(ROUND_DIR)/watermill/handlers/handlers.go -destination=$(ROUND_DIR)/mocks/mock_handlers.go -package=mocks
+
 # Mocks for Leaderboard Domain
 mocks-leaderboard-discord:
 	$(MOCKGEN) -source=$(LB_DIR)/discord/discord.go -destination=$(LB_DIR)/mocks/mock_leaderboard_discord.go -package=mocks
@@ -238,9 +242,17 @@ mocks-leaderboard-update-manager:
 mocks-leaderboard-tag-claim:
 	$(MOCKGEN) -source=$(LB_DIR)/discord/claim_tag/claim_tag.go -destination=$(LB_DIR)/mocks/mock_claim_tag.go -package=mocks
 
+# Mocks for Leaderboard handlers (watermill)
+mocks-leaderboard-handlers:
+	$(MOCKGEN) -source=$(LB_DIR)/watermill/handlers/handlers.go -destination=$(LB_DIR)/mocks/mock_handlers.go -package=mocks
+
 # Mocks for Score Domain  
 mocks-score-handlers:
 	$(MOCKGEN) -source=$(SCORE_DIR)/watermill/handlers/handlers.go -destination=$(SCORE_DIR)/mocks/mock_handlers.go -package=mocks
+
+# Mocks for Score Discord interfaces
+mocks-score-discord:
+	$(MOCKGEN) -source=$(SCORE_DIR)/discord/discord.go -destination=$(SCORE_DIR)/mocks/mock_score_discord.go -package=mocks
 
 # Mocks for GuildConfig Resolver (caching interface)
 mocks-guildconfig:
@@ -251,7 +263,7 @@ mocks-guild: mocks-guild-discord mocks-guild-handlers mocks-guild-setup-manager 
 mocks-guild-discord:
 	$(MOCKGEN) -source=$(GUILD_DIR)/discord/discord.go -destination=$(GUILD_DIR)/mocks/mock_guild_discord.go -package=mocks
 mocks-guild-handlers:
-	$(MOCKGEN) -source=$(GUILD_DIR)/watermill/handlers/handlers.go -destination=$(GUILD_DIR)/mocks/mock_guild_handlers.go -package=mocks
+	$(MOCKGEN) -source=$(GUILD_DIR)/watermill/handlers/interface.go -destination=$(GUILD_DIR)/mocks/mock_guild_handlers.go -package=mocks
 mocks-guild-setup-manager:
 	$(MOCKGEN) -source=$(GUILD_DIR)/discord/setup/setup_config_manager.go -destination=$(GUILD_DIR)/mocks/mock_setup_manager.go -package=mocks
 

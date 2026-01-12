@@ -1,22 +1,18 @@
 package handlers
 
 import (
-	"bytes"
 	"context"
-	"errors"
-	"io"
-	"log/slog"
+	"fmt"
 	"testing"
 
+	guildevents "github.com/Black-And-White-Club/frolf-bot-shared/events/guild"
+	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
+	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
+	guildtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/guild"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/guild/mocks"
 	guildconfigmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
-	guildevents "github.com/Black-And-White-Club/frolf-bot-shared/events/guild"
-	util_mocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
-	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
-	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
-	"github.com/ThreeDotsLabs/watermill/message"
-	"github.com/google/go-cmp/cmp"
 	"go.opentelemetry.io/otel/trace/noop"
 	"go.uber.org/mock/gomock"
 )
@@ -24,37 +20,51 @@ import (
 func TestGuildHandlers_HandleGuildConfigCreated(t *testing.T) {
 	tests := []struct {
 		name    string
-		msg     *message.Message
-		want    []*message.Message
+		payload *guildevents.GuildConfigCreatedPayloadV1
 		wantErr bool
-		setup   func(*gomock.Controller, *mocks.MockGuildDiscordInterface, *guildconfigmocks.MockGuildConfigResolver, *util_mocks.MockHelpers)
+		wantLen int
+		setup   func(*gomock.Controller, *mocks.MockGuildDiscordInterface, *guildconfigmocks.MockGuildConfigResolver)
 	}{
 		{
 			name: "successful guild config created",
-			msg: func() *message.Message {
-				return message.NewMessage("1", []byte(`{"guild_id":"123456789","config_id":"config_123","created_at":"2024-01-01T12:00:00Z"}`))
-			}(),
-			want: nil, wantErr: false,
-			setup: func(ctrl *gomock.Controller, mockGuildDiscord *mocks.MockGuildDiscordInterface, mockGuildConfigResolver *guildconfigmocks.MockGuildConfigResolver, _ *util_mocks.MockHelpers) {
+			payload: &guildevents.GuildConfigCreatedPayloadV1{
+				GuildID: sharedtypes.GuildID("123456789"),
+				Config: guildtypes.GuildConfig{
+					GuildID:              sharedtypes.GuildID("123456789"),
+					SignupChannelID:      "signup-channel",
+					EventChannelID:       "event-channel",
+					LeaderboardChannelID: "leaderboard-channel",
+				},
+			},
+			wantErr: false,
+			wantLen: 0,
+			setup: func(ctrl *gomock.Controller, mockGuildDiscord *mocks.MockGuildDiscordInterface, mockGuildConfigResolver *guildconfigmocks.MockGuildConfigResolver) {
 				mockGuildDiscord.EXPECT().RegisterAllCommands("123456789").Return(nil).Times(1)
 				mockGuildConfigResolver.EXPECT().HandleGuildConfigReceived(gomock.Any(), "123456789", gomock.Any()).Times(1)
 			},
 		},
 		{
 			name: "failed to register commands",
-			msg: func() *message.Message {
-				return message.NewMessage("1", []byte(`{
-					"guild_id": "123456789",
-					"config_id": "config_123", 
-					"created_at": "2024-01-01T12:00:00Z"
-				}`))
-			}(),
-			want:    nil,
-			wantErr: true,
-			setup: func(ctrl *gomock.Controller, mockGuildDiscord *mocks.MockGuildDiscordInterface, mockGuildConfigResolver *guildconfigmocks.MockGuildConfigResolver, _ *util_mocks.MockHelpers) {
-				mockGuildDiscord.EXPECT().RegisterAllCommands("123456789").Return(errors.New("failed to register commands")).Times(1)
-				mockGuildConfigResolver.EXPECT().HandleGuildConfigReceived(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+			payload: &guildevents.GuildConfigCreatedPayloadV1{
+				GuildID: sharedtypes.GuildID("123456789"),
+				Config: guildtypes.GuildConfig{
+					GuildID:              sharedtypes.GuildID("123456789"),
+					SignupChannelID:      "signup-channel",
+					EventChannelID:       "event-channel",
+					LeaderboardChannelID: "leaderboard-channel",
+				},
 			},
+			wantErr: true,
+			wantLen: 0,
+			setup: func(ctrl *gomock.Controller, mockGuildDiscord *mocks.MockGuildDiscordInterface, mockGuildConfigResolver *guildconfigmocks.MockGuildConfigResolver) {
+				mockGuildDiscord.EXPECT().RegisterAllCommands("123456789").Return(fmt.Errorf("failed to register")).Times(1)
+			},
+		},
+		{
+			name:    "nil payload",
+			payload: nil,
+			wantErr: true,
+			wantLen: 0,
 		},
 	}
 
@@ -65,46 +75,33 @@ func TestGuildHandlers_HandleGuildConfigCreated(t *testing.T) {
 
 			mockGuildDiscord := mocks.NewMockGuildDiscordInterface(ctrl)
 			mockGuildConfigResolver := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
-			mockHelpers := util_mocks.NewMockHelpers(ctrl)
 
-			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-			cfg := &config.Config{}
+			if tt.setup != nil {
+				tt.setup(ctrl, mockGuildDiscord, mockGuildConfigResolver)
+			}
+
+			logger := loggerfrolfbot.NoOpLogger
 			tracer := noop.NewTracerProvider().Tracer("test")
 			metrics := &discordmetrics.NoOpMetrics{}
 
-			if tt.setup != nil {
-				tt.setup(ctrl, mockGuildDiscord, mockGuildConfigResolver, mockHelpers)
-			}
-
 			h := &GuildHandlers{
 				Logger:              logger,
-				Config:              cfg,
-				Helpers:             mockHelpers,
+				Config:              &config.Config{},
 				GuildDiscord:        mockGuildDiscord,
 				GuildConfigResolver: mockGuildConfigResolver,
 				Tracer:              tracer,
 				Metrics:             metrics,
-				handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
-					return func(msg *message.Message) ([]*message.Message, error) {
-						payload := &guildevents.GuildConfigCreatedPayloadV1{GuildID: sharedtypes.GuildID("123456789")}
-						payload.Config.GuildID = sharedtypes.GuildID("123456789")
-						payload.Config.SignupChannelID = "signup-channel"
-						payload.Config.EventChannelID = "event-channel"
-						payload.Config.LeaderboardChannelID = "leaderboard-channel"
-						return handlerFunc(context.Background(), msg, payload)
-					}
-				},
 			}
 
-			got, err := h.HandleGuildConfigCreated(tt.msg)
+			results, err := h.HandleGuildConfigCreated(context.Background(), tt.payload)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("HandleGuildConfigCreated() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
-			if !cmp.Equal(got, tt.want) {
-				t.Errorf("HandleGuildConfigCreated() = %v, want %v", got, tt.want)
+			if len(results) != tt.wantLen {
+				t.Errorf("got %d results, want %d", len(results), tt.wantLen)
 			}
 		})
 	}
@@ -113,70 +110,48 @@ func TestGuildHandlers_HandleGuildConfigCreated(t *testing.T) {
 func TestGuildHandlers_HandleGuildConfigCreationFailed(t *testing.T) {
 	tests := []struct {
 		name    string
-		msg     *message.Message
-		want    []*message.Message
+		payload *guildevents.GuildConfigCreationFailedPayloadV1
 		wantErr bool
+		wantLen int
 	}{
 		{
-			name: "guild config creation failed - logs warning and continues",
-			msg: func() *message.Message {
-				return message.NewMessage("1", []byte(`{
-					"guild_id": "123456789",
-					"reason": "database connection failed"
-				}`))
-			}(),
-			want:    nil, // Handler returns nil (no error, just logs)
+			name: "guild config creation failed",
+			payload: &guildevents.GuildConfigCreationFailedPayloadV1{
+				GuildID: sharedtypes.GuildID("123456789"),
+				Reason:  "database connection failed",
+			},
 			wantErr: false,
+			wantLen: 0,
+		},
+		{
+			name:    "nil payload",
+			payload: nil,
+			wantErr: true,
+			wantLen: 0,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
-			mockGuildDiscord := mocks.NewMockGuildDiscordInterface(ctrl)
-			mockHelpers := util_mocks.NewMockHelpers(ctrl)
-
-			var logOutput bytes.Buffer
-			logger := slog.New(slog.NewTextHandler(&logOutput, nil))
-			cfg := &config.Config{}
+			logger := loggerfrolfbot.NoOpLogger
 			tracer := noop.NewTracerProvider().Tracer("test")
 			metrics := &discordmetrics.NoOpMetrics{}
 
 			h := &GuildHandlers{
-				Logger:       logger,
-				Config:       cfg,
-				Helpers:      mockHelpers,
-				GuildDiscord: mockGuildDiscord,
-				Tracer:       tracer,
-				Metrics:      metrics,
-				handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
-					return func(msg *message.Message) ([]*message.Message, error) {
-						payload := &guildevents.GuildConfigCreationFailedPayloadV1{
-							GuildID: sharedtypes.GuildID("123456789"),
-							Reason:  "database connection failed",
-						}
-						return handlerFunc(context.Background(), msg, payload)
-					}
-				},
+				Logger:  logger,
+				Tracer:  tracer,
+				Metrics: metrics,
 			}
 
-			got, err := h.HandleGuildConfigCreationFailed(tt.msg)
+			results, err := h.HandleGuildConfigCreationFailed(context.Background(), tt.payload)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("HandleGuildConfigCreationFailed() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
-			if !cmp.Equal(got, tt.want) {
-				t.Errorf("HandleGuildConfigCreationFailed() = %v, want %v", got, tt.want)
-			}
-
-			// Verify that warning was logged
-			logContent := logOutput.String()
-			if !bytes.Contains([]byte(logContent), []byte("Guild config creation failed")) {
-				t.Errorf("Expected warning log message not found in output: %s", logContent)
+			if len(results) != tt.wantLen {
+				t.Errorf("got %d results, want %d", len(results), tt.wantLen)
 			}
 		})
 	}

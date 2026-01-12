@@ -7,84 +7,76 @@ import (
 	sharedleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
+	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
-	"github.com/ThreeDotsLabs/watermill/message"
 )
 
 // HandleGetTagByDiscordID handles a request from Discord to get a user's tag.
-func (h *LeaderboardHandlers) HandleGetTagByDiscordID(msg *message.Message) ([]*message.Message, error) {
-	return h.handlerWrapper(
-		"HandleGetTagByDiscordID",
-		&sharedleaderboardevents.LeaderboardTagAvailabilityRequestPayloadV1{},
-		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			h.Logger.InfoContext(ctx, "Handling GetTagByDiscordID request", attr.CorrelationIDFromMsg(msg))
+func (h *LeaderboardHandlers) HandleGetTagByDiscordID(ctx context.Context,
+	payload interface{}) ([]handlerwrapper.Result, error) {
+	h.Logger.InfoContext(ctx, "Handling GetTagByDiscordID request")
 
-			discordPayload := payload.(*sharedleaderboardevents.LeaderboardTagAvailabilityRequestPayloadV1)
+	discordPayload := payload.(*sharedleaderboardevents.LeaderboardTagAvailabilityRequestPayloadV1)
 
-			userID := discordPayload.UserID
+	userID := discordPayload.UserID
 
-			// Correct backend payload
-			backendPayload := leaderboardevents.SoloTagNumberRequestPayloadV1{
-				GuildID: sharedtypes.GuildID(discordPayload.GuildID),
-				UserID:  sharedtypes.DiscordID(userID),
-			}
+	// Correct backend payload
+	backendPayload := leaderboardevents.SoloTagNumberRequestPayloadV1{
+		GuildID: sharedtypes.GuildID(discordPayload.GuildID),
+		UserID:  sharedtypes.DiscordID(userID),
+	}
 
-			// Correct event topic for backend to trigger
-			backendMsg, err := h.Helpers.CreateResultMessage(msg, backendPayload, leaderboardevents.GetTagByUserIDRequestedV1)
-			if err != nil {
-				h.Logger.ErrorContext(ctx, "Failed to create backend message", attr.CorrelationIDFromMsg(msg), attr.Error(err))
-				return nil, fmt.Errorf("failed to create backend message: %w", err)
-			}
+	h.Logger.InfoContext(ctx, "Successfully translated GetTagByDiscordID request",
+		attr.String("user_id", string(userID)),
+		attr.String("guild_id", discordPayload.GuildID))
 
-			h.Logger.InfoContext(ctx, "Successfully translated GetTagByDiscordID request", attr.CorrelationIDFromMsg(msg))
-			return []*message.Message{backendMsg}, nil
+	return []handlerwrapper.Result{
+		{
+			Topic:   leaderboardevents.GetTagByUserIDRequestedV1,
+			Payload: backendPayload,
 		},
-	)(msg)
+	}, nil
 }
 
-// HandleGetTagByDiscordIDResponse translates a backend tag response to a Discord response.
-func (h *LeaderboardHandlers) HandleGetTagByDiscordIDResponse(msg *message.Message) ([]*message.Message, error) {
-	return h.handlerWrapper(
-		"HandleGetTagByDiscordIDResponse",
-		nil,
-		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			topic := msg.Metadata.Get("topic")
-			h.Logger.InfoContext(ctx, "Handling GetTagByDiscordIDResponse", attr.CorrelationIDFromMsg(msg), attr.Topic(topic))
+// HandleGetTagByDiscordIDResponse translates a backend tag number response to a Discord response.
+func (h *LeaderboardHandlers) HandleGetTagByDiscordIDResponse(ctx context.Context,
+	payload interface{}) ([]handlerwrapper.Result, error) {
+	h.Logger.InfoContext(ctx, "Handling GetTagByDiscordIDResponse")
 
-			switch topic {
-			case leaderboardevents.GetTagNumberResponseV1:
-				var backendPayload leaderboardevents.GetTagNumberResponsePayloadV1
-				if err := h.Helpers.UnmarshalPayload(msg, &backendPayload); err != nil {
-					return nil, err
-				}
+	backendPayload := payload.(*leaderboardevents.GetTagNumberResponsePayloadV1)
 
-				var tagNumber sharedtypes.TagNumber
-				if backendPayload.TagNumber != nil {
-					tagNumber = *backendPayload.TagNumber
-				}
+	var tagNumber sharedtypes.TagNumber
+	if backendPayload.TagNumber != nil {
+		tagNumber = *backendPayload.TagNumber
+	}
 
-				discordPayload := sharedleaderboardevents.LeaderboardTagAvailabilityResponsePayloadV1{
-					TagNumber: tagNumber,
-					GuildID:   string(backendPayload.GuildID),
-					ChannelID: msg.Metadata.Get("channel_id"),
-					MessageID: msg.Metadata.Get("message_id"),
-					Available: backendPayload.Found,
-				}
+	discordPayload := sharedleaderboardevents.LeaderboardTagAvailabilityResponsePayloadV1{
+		TagNumber: tagNumber,
+		GuildID:   string(backendPayload.GuildID),
+		Available: backendPayload.Found,
+	}
 
-				discordMsg, err := h.Helpers.CreateResultMessage(msg, discordPayload, sharedleaderboardevents.LeaderboardTagAvailabilityResponseV1)
-				if err != nil {
-					return nil, fmt.Errorf("failed to create discord message: %w", err)
-				}
-				return []*message.Message{discordMsg}, nil
+	h.Logger.InfoContext(ctx, "Successfully translated GetTagByDiscordIDResponse",
+		attr.String("guild_id", string(backendPayload.GuildID)),
+		attr.String("available", fmt.Sprintf("%v", backendPayload.Found)))
 
-			case leaderboardevents.GetTagNumberFailedV1:
-				h.Logger.ErrorContext(ctx, "Received GetTagNumberFailed event")
-				// Optionally handle the failure on the Discord side.
-				return nil, nil
-
-			default:
-				return nil, fmt.Errorf("unexpected topic for tag number handler: %s", topic)
-			}
+	return []handlerwrapper.Result{
+		{
+			Topic:   sharedleaderboardevents.LeaderboardTagAvailabilityResponseV1,
+			Payload: discordPayload,
 		},
-	)(msg)
+	}, nil
+}
+
+// HandleGetTagByDiscordIDFailed handles a backend tag number lookup failure.
+func (h *LeaderboardHandlers) HandleGetTagByDiscordIDFailed(ctx context.Context,
+	payload interface{}) ([]handlerwrapper.Result, error) {
+	h.Logger.InfoContext(ctx, "Handling GetTagByDiscordIDFailed")
+
+	_ = payload.(*leaderboardevents.GetTagNumberFailedPayloadV1)
+
+	// For now, just log the failure - Discord doesn't have a specific failure response for this
+	h.Logger.WarnContext(ctx, "Tag number lookup failed on backend")
+
+	return []handlerwrapper.Result{}, nil
 }

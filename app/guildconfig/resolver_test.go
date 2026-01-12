@@ -39,6 +39,13 @@ func (f *fakeEventBus) GetJetStream() jetstream.JetStream                       
 func (f *fakeEventBus) GetHealthCheckers() []eventbus.HealthChecker               { return nil }
 func (f *fakeEventBus) CreateStream(ctx context.Context, streamName string) error { return nil }
 
+// SubscribeForTest implements eventbus.EventBus.SubscribeForTest used by tests.
+// It returns a channel that the test harness can read from if needed.
+func (f *fakeEventBus) SubscribeForTest(ctx context.Context, topic string) (<-chan *message.Message, error) {
+	ch := make(chan *message.Message, 1)
+	return ch, nil
+}
+
 func TestNewResolver_PanicsOnInvalidConfig(t *testing.T) {
 	fb := &fakeEventBus{}
 	bad := &ResolverConfig{RequestTimeout: 0, ResponseTimeout: time.Second}

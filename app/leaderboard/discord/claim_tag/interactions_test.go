@@ -67,6 +67,12 @@ func (f *fakeEventBus) GetJetStream() jetstream.JetStream           { return nil
 func (f *fakeEventBus) GetHealthCheckers() []eventbus.HealthChecker { return nil }
 func (f *fakeEventBus) CreateStream(context.Context, string) error  { return nil }
 
+// SubscribeForTest implements eventbus.EventBus.SubscribeForTest used by tests.
+func (f *fakeEventBus) SubscribeForTest(ctx context.Context, topic string) (<-chan *message.Message, error) {
+	ch := make(chan *message.Message, 1)
+	return ch, nil
+}
+
 func discard() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
 
 func TestHandleClaimTagCommand_Variants(t *testing.T) {

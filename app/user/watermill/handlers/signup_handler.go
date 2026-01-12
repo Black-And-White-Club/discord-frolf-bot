@@ -6,112 +6,79 @@ import (
 
 	shareduserevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/user"
 	userevents "github.com/Black-And-White-Club/frolf-bot-shared/events/user"
-	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
-	"github.com/ThreeDotsLabs/watermill/message"
+	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 )
 
 // HandleUserCreated handles the UserCreated event from the backend.
-func (h *UserHandlers) HandleUserCreated(msg *message.Message) ([]*message.Message, error) {
-	return h.handlerWrapper(
-		"HandleUserCreated",
-		&userevents.UserCreatedPayloadV1{},
-		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			createdPayload := payload.(*userevents.UserCreatedPayloadV1)
+func (h *UserHandlers) HandleUserCreated(
+	ctx context.Context,
+	payload *userevents.UserCreatedPayloadV1,
+) ([]handlerwrapper.Result, error) {
+	rolePayload := shareduserevents.AddRolePayloadV1{
+		UserID:  payload.UserID,
+		RoleID:  h.config.GetRegisteredRoleID(),
+		GuildID: string(payload.GuildID),
+	}
 
-			// Log different messages based on whether this is a new or returning user
-			logMsg := "New user created and signup role added"
-			if createdPayload.IsReturningUser {
-				logMsg = "Returning user joined new guild and signup role added"
-			}
-
-			h.Logger.InfoContext(ctx, logMsg,
-				attr.String("user_id", string(createdPayload.UserID)),
-				attr.String("guild_id", string(createdPayload.GuildID)),
-				attr.Bool("is_returning_user", createdPayload.IsReturningUser),
-			)
-
-			rolePayload := shareduserevents.AddRolePayloadV1{
-				UserID:  createdPayload.UserID,
-				RoleID:  h.Config.GetRegisteredRoleID(),
-				GuildID: string(createdPayload.GuildID),
-			}
-			roleMsg, err := h.Helper.CreateResultMessage(msg, rolePayload, shareduserevents.SignupAddRoleV1)
-			if err != nil {
-				h.Logger.ErrorContext(ctx, "Failed to create add role event", attr.Error(err))
-				return nil, fmt.Errorf("failed to create add role event: %w", err)
-			}
-			return []*message.Message{roleMsg}, nil
-		},
-	)(msg)
+	return []handlerwrapper.Result{
+		{Topic: shareduserevents.SignupAddRoleV1, Payload: &rolePayload},
+	}, nil
 }
 
 // HandleUserCreationFailed handles the UserCreationFailed event from the backend.
-func (h *UserHandlers) HandleUserCreationFailed(msg *message.Message) ([]*message.Message, error) {
-	return h.handlerWrapper(
-		"HandleUserCreationFailed",
-		&userevents.UserCreationFailedPayloadV1{},
-		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			failPayload := payload.(*userevents.UserCreationFailedPayloadV1)
-			correlationID := msg.Metadata.Get("correlation_id")
+func (h *UserHandlers) HandleUserCreationFailed(
+	ctx context.Context,
+	payload *userevents.UserCreationFailedPayloadV1,
+) ([]handlerwrapper.Result, error) {
+	// Extract correlation ID from context if available (it should be in metadata)
+	correlationID := ""
+	if v := ctx.Value("correlation_id"); v != nil {
+		correlationID = v.(string)
+	}
 
-			// Log the failure reason explicitly
-			h.Logger.ErrorContext(ctx, "User creation failed",
-				attr.CorrelationIDFromMsg(msg),
-				attr.String("reason", failPayload.Reason))
+	// Respond with the specific failure reason to the user
+	_, err := h.userDiscord.GetSignupManager().SendSignupResult(ctx, correlationID, false, payload.Reason)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send signup failure: %w", err)
+	}
 
-			// Respond with the specific failure reason to the user
-			_, err := h.UserDiscord.GetSignupManager().SendSignupResult(ctx, correlationID, false, failPayload.Reason)
-			if err != nil {
-				h.Logger.ErrorContext(ctx, "Failed to send signup failure response",
-					attr.Error(err),
-					attr.CorrelationIDFromMsg(msg))
-				return nil, fmt.Errorf("failed to send signup failure: %w", err)
-			}
-
-			h.Logger.InfoContext(ctx, "Sent signup failure result",
-				attr.Any("result", nil), // The result is nil in case of success
-				attr.CorrelationIDFromMsg(msg))
-			return nil, nil
-		},
-	)(msg)
+	return nil, nil
 }
 
 // HandleRoleAdded handles the RoleAdded event.
-func (h *UserHandlers) HandleRoleAdded(msg *message.Message) ([]*message.Message, error) {
-	return h.handlerWrapper(
-		"HandleRoleAdded",
-		&shareduserevents.RoleAddedPayloadV1{},
-		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			correlationID := msg.Metadata.Get("correlation_id")
+func (h *UserHandlers) HandleRoleAdded(
+	ctx context.Context,
+	payload *shareduserevents.RoleAddedPayloadV1,
+) ([]handlerwrapper.Result, error) {
+	// Extract correlation ID from context if available
+	correlationID := ""
+	if v := ctx.Value("correlation_id"); v != nil {
+		correlationID = v.(string)
+	}
 
-			result, err := h.UserDiscord.GetSignupManager().SendSignupResult(ctx, correlationID, true)
-			if err != nil {
-				h.Logger.ErrorContext(ctx, "Failed to send signup success response", attr.Error(err), attr.CorrelationIDFromMsg(msg))
-				return nil, fmt.Errorf("failed to send signup success: %w", err)
-			}
+	_, err := h.userDiscord.GetSignupManager().SendSignupResult(ctx, correlationID, true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send signup success: %w", err)
+	}
 
-			h.Logger.InfoContext(ctx, "Sent signup success result", attr.Any("result", result), attr.CorrelationIDFromMsg(msg))
-			return nil, nil
-		},
-	)(msg)
+	return nil, nil
 }
 
 // HandleRoleAdditionFailed handles the RoleAdditionFailed event.
-func (h *UserHandlers) HandleRoleAdditionFailed(msg *message.Message) ([]*message.Message, error) {
-	return h.handlerWrapper(
-		"HandleRoleAdditionFailed",
-		&shareduserevents.RoleAdditionFailedPayloadV1{},
-		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			correlationID := msg.Metadata.Get("correlation_id")
+func (h *UserHandlers) HandleRoleAdditionFailed(
+	ctx context.Context,
+	payload *shareduserevents.RoleAdditionFailedPayloadV1,
+) ([]handlerwrapper.Result, error) {
+	// Extract correlation ID from context if available
+	correlationID := ""
+	if v := ctx.Value("correlation_id"); v != nil {
+		correlationID = v.(string)
+	}
 
-			result, err := h.UserDiscord.GetSignupManager().SendSignupResult(ctx, correlationID, false)
-			if err != nil {
-				h.Logger.ErrorContext(ctx, "Failed to send signup failure response", attr.Error(err), attr.CorrelationIDFromMsg(msg))
-				return nil, fmt.Errorf("failed to send signup failure: %w", err)
-			}
+	_, err := h.userDiscord.GetSignupManager().SendSignupResult(ctx, correlationID, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send signup failure: %w", err)
+	}
 
-			h.Logger.InfoContext(ctx, "Sent signup failure result", attr.Any("result", result), attr.CorrelationIDFromMsg(msg))
-			return nil, nil
-		},
-	)(msg)
+	return nil, nil
 }
