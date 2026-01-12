@@ -6,8 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	sharedroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
-	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
+	sharedscoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/score"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
@@ -144,45 +143,42 @@ func (srm *scoreRoundManager) HandleScoreSubmission(ctx context.Context, i *disc
 			return ScoreRoundOperationResult{Error: fmt.Errorf("score out of range")}, nil
 		}
 
+		// Build and publish the Discord score update request that the score module expects.
+		// This includes channel & message IDs so downstream score handlers and bridges
+		// can propagate those values for embed updates.
 		scoreValue := sharedtypes.Score(scoreVal)
-		payload := &sharedroundevents.RoundScoreUpdateRequestDiscordPayloadV1{
-			GuildID:   i.GuildID,
+		scorePayload := &sharedscoreevents.ScoreUpdateRequestDiscordPayloadV1{
+			GuildID:   sharedtypes.GuildID(i.GuildID),
 			RoundID:   sharedtypes.RoundID(roundID),
 			UserID:    sharedtypes.DiscordID(participantID),
 			Score:     scoreValue,
 			ChannelID: i.ChannelID,
-			MessageID: i.Message.ID,
-		}
-		msg := message.NewMessage(watermill.NewUUID(), nil)
-		if msg.Metadata == nil {
-			msg.Metadata = message.Metadata{}
-		}
-		msg.Metadata.Set("topic", sharedroundevents.RoundScoreUpdateRequestDiscordV1)
-		if i.GuildID != "" {
-			msg.Metadata.Set("guild_id", i.GuildID)
+			MessageID: "",
 		}
 		if i.Message != nil {
-			msg.Metadata.Set("discord_message_id", i.Message.ID)
+			scorePayload.MessageID = i.Message.ID
 		}
-		resultMsg, err := srm.helper.CreateResultMessage(msg, payload, sharedroundevents.RoundScoreUpdateRequestDiscordV1)
+
+		scoreMsg := message.NewMessage(watermill.NewUUID(), nil)
+		if scoreMsg.Metadata == nil {
+			scoreMsg.Metadata = message.Metadata{}
+		}
+		scoreMsg.Metadata.Set("topic", sharedscoreevents.ScoreUpdateRequestDiscordV1)
+		if i.GuildID != "" {
+			scoreMsg.Metadata.Set("guild_id", i.GuildID)
+		}
+		if i.Message != nil {
+			scoreMsg.Metadata.Set("discord_message_id", i.Message.ID)
+		}
+
+		resultScoreMsg, err := srm.helper.CreateResultMessage(scoreMsg, scorePayload, sharedscoreevents.ScoreUpdateRequestDiscordV1)
 		if err != nil {
 			_, _ = srm.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{Content: "Something went wrong while submitting your score. Please try again later.", Flags: discordgo.MessageFlagsEphemeral})
 			return ScoreRoundOperationResult{Error: fmt.Errorf("failed to create result message")}, nil
 		}
-		if err = srm.publisher.Publish(sharedroundevents.RoundScoreUpdateRequestDiscordV1, resultMsg); err != nil {
+		if err = srm.publisher.Publish(sharedscoreevents.ScoreUpdateRequestDiscordV1, resultScoreMsg); err != nil {
 			_, _ = srm.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{Content: "Failed to submit your score. Please try again later.", Flags: discordgo.MessageFlagsEphemeral})
 			return ScoreRoundOperationResult{Error: fmt.Errorf("failed to publish message")}, nil
-		}
-
-		tracePayload := map[string]interface{}{
-			"round_id":       roundID,
-			"participant_id": userIDFromModal,
-			"score":          scoreVal,
-			"channel_id":     i.ChannelID,
-			"status":         "score_submitted",
-		}
-		if traceMsg, errTrace := srm.helper.CreateResultMessage(msg, tracePayload, roundevents.RoundTraceEventV1); errTrace == nil {
-			_ = srm.publisher.Publish(roundevents.RoundTraceEventV1, traceMsg)
 		}
 
 		_, _ = srm.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{Content: fmt.Sprintf("Your score of %d has been submitted!", scoreVal), Flags: discordgo.MessageFlagsEphemeral})
