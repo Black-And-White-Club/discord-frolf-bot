@@ -39,7 +39,7 @@ func TestRoundHandlers_HandleRoundFinalized(t *testing.T) {
 				DiscordChannelID: "1234",
 				EventMessageID:   eventMessageID.String(),
 			},
-			ctx:     context.WithValue(context.Background(), "message_id", discordMessageID),
+			ctx:     context.WithValue(context.Background(), "discord_message_id", discordMessageID),
 			wantErr: false,
 			wantLen: 0, // Handler intentionally returns empty results on success to avoid trace publish retries
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockFinalizeRoundManager *mocks.MockFinalizeRoundManager) {
@@ -67,7 +67,7 @@ func TestRoundHandlers_HandleRoundFinalized(t *testing.T) {
 				DiscordChannelID: "1234",
 				EventMessageID:   eventMessageID.String(),
 			},
-			ctx:     context.WithValue(context.Background(), "message_id", discordMessageID),
+			ctx:     context.WithValue(context.Background(), "discord_message_id", discordMessageID),
 			wantErr: true,
 			wantLen: 0,
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockFinalizeRoundManager *mocks.MockFinalizeRoundManager) {

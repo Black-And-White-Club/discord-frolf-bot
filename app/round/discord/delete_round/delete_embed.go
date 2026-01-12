@@ -25,14 +25,14 @@ func (drm *deleteRoundManager) DeleteRoundEventEmbed(ctx context.Context, discor
 
 		drm.logger.InfoContext(ctx, "Attempting to delete round embed via Discord API",
 			attr.String("channel_id", resolvedChannelID),
-			attr.String("message_id", discordMessageID))
+			attr.String("discord_message_id", discordMessageID))
 
 		// Ensure both channelID and discordMessageID are provided (check for empty string)
 		if resolvedChannelID == "" || discordMessageID == "" {
 			err := fmt.Errorf("channelID or discordMessageID is missing")
 			drm.logger.ErrorContext(ctx, "Missing channelID or discordMessageID for deletion",
 				attr.String("channel_id", resolvedChannelID),
-				attr.String("message_id", discordMessageID),
+				attr.String("discord_message_id", discordMessageID),
 				attr.Error(err))
 			return DeleteRoundOperationResult{Error: err, Success: false}, nil
 		}
@@ -43,14 +43,14 @@ func (drm *deleteRoundManager) DeleteRoundEventEmbed(ctx context.Context, discor
 			wrappedErr := fmt.Errorf("failed to delete message: %w", err)
 			drm.logger.ErrorContext(ctx, "Discord API call failed to delete message",
 				attr.String("channel_id", resolvedChannelID),
-				attr.String("message_id", discordMessageID),
+				attr.String("discord_message_id", discordMessageID),
 				attr.Error(wrappedErr))
 			return DeleteRoundOperationResult{Error: wrappedErr, Success: false}, nil
 		}
 
 		drm.logger.InfoContext(ctx, "Successfully sent Discord API delete command for message",
 			attr.String("channel_id", resolvedChannelID),
-			attr.String("message_id", discordMessageID))
+			attr.String("discord_message_id", discordMessageID))
 
 		return DeleteRoundOperationResult{Success: true}, nil
 	})

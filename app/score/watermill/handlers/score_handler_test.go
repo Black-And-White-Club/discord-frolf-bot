@@ -69,7 +69,7 @@ func TestHandleScoreUpdateRequestTyped(t *testing.T) {
 				if p.RoundID != tt.payload.RoundID || p.UserID != tt.payload.UserID || p.Score != tt.payload.Score {
 					t.Fatalf("payload fields mismatch: got %+v", p)
 				}
-				if res.Metadata["user_id"] != string(tt.payload.UserID) || res.Metadata["channel_id"] != tt.payload.ChannelID || res.Metadata["message_id"] != tt.payload.MessageID {
+				if res.Metadata["user_id"] != string(tt.payload.UserID) || res.Metadata["channel_id"] != tt.payload.ChannelID || res.Metadata["discord_message_id"] != tt.payload.MessageID {
 					t.Fatalf("metadata mismatch: %v", res.Metadata)
 				}
 			}

@@ -49,7 +49,7 @@ func (h *LeaderboardHandlers) HandleTagSwapRequest(ctx context.Context,
 			Metadata: map[string]string{
 				"user_id":    string(requestorID),
 				"channel_id": channelID,
-				"message_id": messageID,
+				"discord_message_id": messageID,
 			},
 		},
 	}, nil

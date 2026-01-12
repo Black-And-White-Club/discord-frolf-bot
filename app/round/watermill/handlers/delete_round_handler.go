@@ -31,7 +31,7 @@ func (h *RoundHandlers) HandleRoundDeleteRequested(ctx context.Context, payload 
 // HandleRoundDeleted handles the RoundDeleted event using the standardized wrapper
 func (h *RoundHandlers) HandleRoundDeleted(ctx context.Context, payload *roundevents.RoundDeletedPayloadV1) ([]handlerwrapper.Result, error) {
 	// Get message ID from context (set by wrapper from message metadata)
-	discordMessageID, ok := ctx.Value("message_id").(string)
+	discordMessageID, ok := ctx.Value("discord_message_id").(string)
 	if !ok || discordMessageID == "" {
 		return nil, fmt.Errorf("discord_message_id not found or is empty in message metadata for round %s", payload.RoundID.String())
 	}

@@ -326,7 +326,7 @@ package bot
 
 // 	bot.Logger.InfoContext(ctx, "Created signup message",
 // 		attr.String("channel_id", channelID),
-// 		attr.String("message_id", message.ID))
+// 		attr.String("discord_message_id", message.ID))
 
 // 	return message.ID, nil
 // }

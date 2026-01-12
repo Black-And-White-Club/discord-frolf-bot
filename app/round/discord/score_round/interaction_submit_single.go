@@ -168,7 +168,7 @@ func (srm *scoreRoundManager) HandleScoreSubmission(ctx context.Context, i *disc
 			scoreMsg.Metadata.Set("guild_id", i.GuildID)
 		}
 		if i.Message != nil {
-			scoreMsg.Metadata.Set("message_id", i.Message.ID)
+			scoreMsg.Metadata.Set("discord_message_id", i.Message.ID)
 		}
 
 		resultScoreMsg, err := srm.helper.CreateResultMessage(scoreMsg, scorePayload, sharedscoreevents.ScoreUpdateRequestDiscordV1)

@@ -167,14 +167,14 @@ func (rm *resetManager) DeleteResources(ctx context.Context, guildID string, sta
 					rm.logger.InfoContext(ctx, "Signup message or channel already deleted",
 						attr.String("guild_id", guildID),
 						attr.String("channel_id", state.SignupChannelID),
-						attr.String("message_id", state.SignupMessageID),
+						attr.String("discord_message_id", state.SignupMessageID),
 						"code", restErr.Message.Code)
 					recordSuccess(resultSignupMessage)
 				case discordgo.ErrCodeMissingPermissions:
 					rm.logger.WarnContext(ctx, "Missing permissions to delete signup message",
 						attr.String("guild_id", guildID),
 						attr.String("channel_id", state.SignupChannelID),
-						attr.String("message_id", state.SignupMessageID))
+						attr.String("discord_message_id", state.SignupMessageID))
 					recordFailure(resultSignupMessage, fmt.Errorf("missing permissions"))
 				default:
 					// Unknown error type — return to trigger retry
@@ -184,7 +184,7 @@ func (rm *resetManager) DeleteResources(ctx context.Context, guildID string, sta
 				rm.logger.ErrorContext(ctx, "Failed to delete signup message",
 					attr.String("guild_id", guildID),
 					attr.String("channel_id", state.SignupChannelID),
-					attr.String("message_id", state.SignupMessageID),
+					attr.String("discord_message_id", state.SignupMessageID),
 					attr.Error(err))
 				recordFailure(resultSignupMessage, err)
 			}

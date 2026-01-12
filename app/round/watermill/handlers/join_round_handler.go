@@ -75,7 +75,7 @@ func (h *RoundHandlers) HandleRoundParticipantJoined(ctx context.Context, payloa
 	}
 
 	// Get message ID from context (set by wrapper from message metadata)
-	messageID, ok := ctx.Value("message_id").(string)
+	messageID, ok := ctx.Value("discord_message_id").(string)
 	if !ok {
 		messageID = ""
 	}
@@ -129,7 +129,7 @@ func (h *RoundHandlers) HandleRoundParticipantRemoved(ctx context.Context, paylo
 	}
 
 	// Get message ID from context (set by wrapper from message metadata)
-	messageID, ok := ctx.Value("message_id").(string)
+	messageID, ok := ctx.Value("discord_message_id").(string)
 	if !ok {
 		messageID = ""
 	}

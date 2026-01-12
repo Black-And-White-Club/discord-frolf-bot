@@ -139,7 +139,7 @@ func TestRoundHandlers_HandleRoundUpdated(t *testing.T) {
 					Location:    testLocation,
 				},
 			},
-			ctx: context.WithValue(context.WithValue(context.Background(), "channel_id", testChannelID), "message_id", testMessageID),
+			ctx: context.WithValue(context.WithValue(context.Background(), "channel_id", testChannelID), "discord_message_id", testMessageID),
 			wantErr: false,
 			wantLen: 0, // Side-effect only
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockUpdateRoundManager *mocks.MockUpdateRoundManager) {
@@ -165,7 +165,7 @@ func TestRoundHandlers_HandleRoundUpdated(t *testing.T) {
 					Location: testLocation,
 				},
 			},
-			ctx: context.WithValue(context.WithValue(context.Background(), "channel_id", testChannelID), "message_id", testMessageID),
+			ctx: context.WithValue(context.WithValue(context.Background(), "channel_id", testChannelID), "discord_message_id", testMessageID),
 			wantErr: false,
 			wantLen: 0, // Side-effect only
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockUpdateRoundManager *mocks.MockUpdateRoundManager) {
@@ -190,7 +190,7 @@ func TestRoundHandlers_HandleRoundUpdated(t *testing.T) {
 					Title: testTitle,
 				},
 			},
-			ctx: context.WithValue(context.WithValue(context.Background(), "channel_id", testChannelID), "message_id", testMessageID),
+			ctx: context.WithValue(context.WithValue(context.Background(), "channel_id", testChannelID), "discord_message_id", testMessageID),
 			wantErr: true,
 			wantLen: 0,
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockUpdateRoundManager *mocks.MockUpdateRoundManager) {

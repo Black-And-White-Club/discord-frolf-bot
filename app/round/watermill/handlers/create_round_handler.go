@@ -95,7 +95,7 @@ func (h *RoundHandlers) HandleRoundCreated(ctx context.Context, payload *roundev
 			Topic:   roundevents.RoundEventMessageIDUpdateV1,
 			Payload: updatePayload,
 			Metadata: map[string]string{
-				"message_id": discordMessageID,
+				"discord_message_id": discordMessageID,
 			},
 		},
 	}, nil
