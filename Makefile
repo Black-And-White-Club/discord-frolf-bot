@@ -251,8 +251,8 @@ mocks-score-handlers:
 	$(MOCKGEN) -source=$(SCORE_DIR)/watermill/handlers/handlers.go -destination=$(SCORE_DIR)/mocks/mock_handlers.go -package=mocks
 
 # Mocks for Score Discord interfaces
-# mocks-score-discord:
-# 	$(MOCKGEN) -source=$(SCORE_DIR)/discord/discord.go -destination=$(SCORE_DIR)/mocks/mock_score_discord.go -package=mocks
+mocks-score-discord:
+	$(MOCKGEN) -source=$(SCORE_DIR)/watermill/handlers/handlers.go -destination=$(SCORE_DIR)/mocks/handlers.go -package=mocks
 
 # Mocks for GuildConfig Resolver (caching interface)
 mocks-guildconfig:
@@ -272,7 +272,7 @@ mocks-guild-reset:
 	$(MOCKGEN) -source=$(GUILD_DIR)/discord/reset/reset.go -destination=$(GUILD_DIR)/mocks/mock_reset_manager.go -package=mocks
 
 
-mocks-all: mocks-user mocks-round mocks-leaderboard mocks-guild generate-mocks
+mocks-all: mocks-user mocks-round mocks-leaderboard mocks-guild generate-mocks mocks-score-discord
 
 # --- Build Targets ---
 build_version_ldflags := -X 'main.Version=$(shell git describe --tags --always)'

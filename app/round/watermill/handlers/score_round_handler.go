@@ -23,10 +23,10 @@ func (h *RoundHandlers) HandleParticipantScoreUpdated(ctx context.Context, paylo
 	// Call UpdateScoreEmbed with the specific user's updated score
 	updateResult, err := scoreRoundManager.UpdateScoreEmbed(
 		ctx,
-		channelID,                    // Pass channel ID
-		payload.EventMessageID,       // Pass message ID of the scorecard
-		payload.Participant,          // Pass the UserID of the updated participant
-		&payload.Score,               // Pass a pointer to the updated score
+		channelID,              // Pass channel ID
+		payload.EventMessageID, // Pass message ID of the scorecard
+		payload.Participant,    // Pass the UserID of the updated participant
+		&payload.Score,         // Pass a pointer to the updated score
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call UpdateScoreEmbed: %w", err)
@@ -50,18 +50,7 @@ func (h *RoundHandlers) HandleScoreUpdateError(ctx context.Context, payload *rou
 		return nil, fmt.Errorf("failed to send score update error notification: %w", err)
 	}
 
-	tracePayload := map[string]interface{}{
-		"round_id":    payload.ScoreUpdateRequest.RoundID,
-		"event_type":  "score_update_error",
-		"status":      "error_notification_sent",
-		"participant": payload.ScoreUpdateRequest.Participant,
-		"error":       payload.Error,
-	}
-
-	return []handlerwrapper.Result{
-		{
-			Topic:   roundevents.RoundTraceEventV1,
-			Payload: tracePayload,
-		},
-	}, nil
+	// No downstream messages are required for score update errors in this module;
+	// return nil so nothing is published. (Trace events are not consumed anywhere.)
+	return nil, nil
 }

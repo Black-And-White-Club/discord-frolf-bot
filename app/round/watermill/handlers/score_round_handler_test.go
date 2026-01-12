@@ -146,7 +146,7 @@ func TestRoundHandlers_HandleScoreUpdateError(t *testing.T) {
 			},
 			ctx:     context.Background(),
 			wantErr: false,
-			wantLen: 1,
+ 			wantLen: 0,
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockScoreManager *mocks.MockScoreRoundManager) {
 				mockRoundDiscord.EXPECT().
 					GetScoreRoundManager().
