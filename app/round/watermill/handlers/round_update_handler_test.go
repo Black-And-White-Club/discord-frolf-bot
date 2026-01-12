@@ -3,10 +3,8 @@ package roundhandlers
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
-	"reflect"
 	"testing"
 	"time"
 
@@ -15,11 +13,10 @@ import (
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	sharedroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
-	util_mocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
-	"github.com/ThreeDotsLabs/watermill/message"
+	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel/trace/noop"
 	"go.uber.org/mock/gomock"
@@ -31,123 +28,43 @@ func TestRoundHandlers_HandleRoundUpdateRequested(t *testing.T) {
 	testDescription := roundtypes.Description("Updated Description")
 
 	tests := []struct {
-		name    string
-		msg     *message.Message
-		want    []*message.Message
-		wantErr bool
-		setup   func(*gomock.Controller, *util_mocks.MockHelpers)
+		name       string
+		payload    *sharedroundevents.RoundUpdateModalSubmittedPayloadV1
+		ctx        context.Context
+		want       []handlerwrapper.Result
+		wantErr    bool
+		wantLen    int // Expected number of results
 	}{
 		{
 			name: "successful_update_request",
-			msg: &message.Message{
-				UUID: "1",
-				Payload: []byte(fmt.Sprintf(`{
-					"guild_id": "123456789",
-					"round_id": "%s",
-					"title": "%s",
-					"description": "%s",
-					"user_id": "user123",
-					"channel_id": "channel123",
-					"message_id": "message123"
-				}`, testRoundID.String(), string(testTitle), string(testDescription))),
-				Metadata: message.Metadata{
-					"correlation_id": "correlation_id",
-				},
+			payload: &sharedroundevents.RoundUpdateModalSubmittedPayloadV1{
+				GuildID:     "123456789",
+				RoundID:     testRoundID,
+				Title:       &testTitle,
+				Description: &testDescription,
+				UserID:      "user123",
+				ChannelID:   "channel123",
+				MessageID:   "message123",
 			},
-			want:    []*message.Message{{}}, // Expect 1 message
+			ctx:     context.Background(),
+			want:    nil, // We'll check the length instead of deep equality
 			wantErr: false,
-			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
-				expectedPayload := sharedroundevents.RoundUpdateModalSubmittedPayloadV1{
-					GuildID:     "123456789",
-					RoundID:     testRoundID,
-					Title:       &testTitle,
-					Description: &testDescription,
-					UserID:      "user123",
-					ChannelID:   "channel123",
-					MessageID:   "message123",
-				}
-
-				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&sharedroundevents.RoundUpdateModalSubmittedPayloadV1{})).
-					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*sharedroundevents.RoundUpdateModalSubmittedPayloadV1) = expectedPayload
-						return nil
-					}).
-					Times(1)
-
-				mockHelper.EXPECT().
-					CreateResultMessage(
-						gomock.Any(),
-						gomock.Any(),
-						roundevents.RoundUpdateRequestedV1,
-					).
-					DoAndReturn(func(_ *message.Message, payload any, _ string) (*message.Message, error) {
-						updatePayload, ok := payload.(roundevents.UpdateRoundRequestedPayloadV1)
-						if !ok {
-							t.Errorf("Expected roundevents.UpdateRoundRequestedPayloadV1, got %T", payload)
-							return nil, fmt.Errorf("invalid payload type")
-						}
-						if updatePayload.RoundID != testRoundID {
-							t.Errorf("Expected RoundID %v, got %v", testRoundID, updatePayload.RoundID)
-						}
-						if updatePayload.Title == nil || *updatePayload.Title != testTitle {
-							t.Errorf("Expected Title %v, got %v", testTitle, updatePayload.Title)
-						}
-						if updatePayload.Description == nil || *updatePayload.Description != testDescription {
-							t.Errorf("Expected Description %v, got %v", testDescription, updatePayload.Description)
-						}
-						return &message.Message{
-							Metadata: message.Metadata{},
-						}, nil
-					}).
-					Times(1)
-			},
+			wantLen: 1,
 		},
 		{
 			name: "create_result_message_error",
-			msg: &message.Message{
-				UUID: "2",
-				Payload: []byte(fmt.Sprintf(`{
-					"guild_id": "123456789",
-					"round_id": "%s",
-					"title": "%s",
-					"user_id": "user123",
-					"channel_id": "channel123",
-					"message_id": "message123"
-				}`, testRoundID.String(), string(testTitle))),
-				Metadata: message.Metadata{
-					"correlation_id": "correlation_id",
-				},
+			payload: &sharedroundevents.RoundUpdateModalSubmittedPayloadV1{
+				GuildID:   "123456789",
+				RoundID:   testRoundID,
+				Title:     &testTitle,
+				UserID:    "user123",
+				ChannelID: "channel123",
+				MessageID: "message123",
 			},
+			ctx:     context.Background(),
 			want:    nil,
-			wantErr: true,
-			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
-				expectedPayload := sharedroundevents.RoundUpdateModalSubmittedPayloadV1{
-					GuildID:   "123456789",
-					RoundID:   testRoundID,
-					Title:     &testTitle,
-					UserID:    "user123",
-					ChannelID: "channel123",
-					MessageID: "message123",
-				}
-
-				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&sharedroundevents.RoundUpdateModalSubmittedPayloadV1{})).
-					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*sharedroundevents.RoundUpdateModalSubmittedPayloadV1) = expectedPayload
-						return nil
-					}).
-					Times(1)
-
-				mockHelper.EXPECT().
-					CreateResultMessage(
-						gomock.Any(),
-						gomock.Any(),
-						roundevents.RoundUpdateRequestedV1,
-					).
-					Return(nil, errors.New("failed to create message")).
-					Times(1)
-			},
+			wantErr: false,
+			wantLen: 1,
 		},
 	}
 
@@ -156,34 +73,38 @@ func TestRoundHandlers_HandleRoundUpdateRequested(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			mockHelper := util_mocks.NewMockHelpers(ctrl)
 			mockRoundDiscord := mocks.NewMockRoundDiscordInterface(ctrl)
 			mockLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
 			mockMetrics := &discordmetrics.NoOpMetrics{}
 			mockTracer := noop.NewTracerProvider().Tracer("test")
 
-			// Setup test-specific expectations
-			tt.setup(ctrl, mockHelper)
-
 			h := &RoundHandlers{
 				Logger:       mockLogger,
 				Config:       &config.Config{},
-				Helpers:      mockHelper,
 				RoundDiscord: mockRoundDiscord,
 				Tracer:       mockTracer,
 				Metrics:      mockMetrics,
-				handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
-					return wrapHandler(handlerName, unmarshalTo, handlerFunc, mockLogger, mockMetrics, mockTracer, mockHelper)
-				},
 			}
 
-			got, err := h.HandleRoundUpdateRequested(tt.msg)
+			got, err := h.HandleRoundUpdateRequested(tt.ctx, tt.payload)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("HandleRoundUpdateRequested() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if tt.want != nil && len(got) != len(tt.want) {
-				t.Errorf("HandleRoundUpdateRequested() returned %d messages, want %d", len(got), len(tt.want))
+
+			if len(got) != tt.wantLen {
+				t.Errorf("HandleRoundUpdateRequested() got %d results, want %d", len(got), tt.wantLen)
+				return
+			}
+
+			if tt.wantLen > 0 {
+				result := got[0]
+				if result.Topic != roundevents.RoundUpdateRequestedV1 {
+					t.Errorf("HandleRoundUpdateRequested() topic = %s, want %s", result.Topic, roundevents.RoundUpdateRequestedV1)
+				}
+				if result.Payload == nil {
+					t.Errorf("HandleRoundUpdateRequested() payload is nil")
+				}
 			}
 		})
 	}
@@ -192,6 +113,7 @@ func TestRoundHandlers_HandleRoundUpdateRequested(t *testing.T) {
 func TestRoundHandlers_HandleRoundUpdated(t *testing.T) {
 	testRoundID := sharedtypes.RoundID(uuid.New())
 	testChannelID := "test-channel-id"
+	testMessageID := "test-message-id"
 	testTitle := roundtypes.Title("Updated Round Title")
 	testDescription := roundtypes.Description("Updated Description")
 	parsedStartTime, _ := time.Parse(time.RFC3339, "2023-05-01T14:00:00Z")
@@ -199,166 +121,89 @@ func TestRoundHandlers_HandleRoundUpdated(t *testing.T) {
 	testLocation := roundtypes.LocationPtr("Updated Location")
 
 	tests := []struct {
-		name    string
-		msg     *message.Message
-		want    []*message.Message
-		wantErr bool
-		setup   func(*gomock.Controller, *util_mocks.MockHelpers, *mocks.MockRoundDiscordInterface, *mocks.MockUpdateRoundManager)
+		name       string
+		payload    *roundevents.RoundEntityUpdatedPayloadV1
+		ctx        context.Context
+		wantErr    bool
+		wantLen    int // Expected number of results
+		setup      func(*gomock.Controller, *mocks.MockRoundDiscordInterface, *mocks.MockUpdateRoundManager)
 	}{
 		{
 			name: "successful_round_updated",
-			msg: &message.Message{
-				UUID: "1",
-				Payload: []byte(fmt.Sprintf(`{
-					"round": {
-						"id": "%s",
-						"title": "%s",
-						"description": "%s",
-						"start_time": "2023-05-01T14:00:00Z",
-						"location": "%s"
-					}
-				}`, testRoundID.String(), string(testTitle), string(testDescription), string(*testLocation))),
-				Metadata: message.Metadata{
-					"correlation_id": "correlation_id",
-					"channel_id":     testChannelID,
-					"message_id":     "test-message-id",
-				},
-			},
-			want:    nil,
-			wantErr: false,
-			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockUpdateRoundManager *mocks.MockUpdateRoundManager) {
-				testRound := roundtypes.Round{
+			payload: &roundevents.RoundEntityUpdatedPayloadV1{
+				Round: roundtypes.Round{
 					ID:          testRoundID,
 					Title:       testTitle,
 					Description: &testDescription,
 					StartTime:   &testStartTime,
 					Location:    testLocation,
-				}
-
-				expectedPayload := roundevents.RoundEntityUpdatedPayloadV1{
-					Round: testRound,
-				}
-
-				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundEntityUpdatedPayloadV1{})).
-					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.RoundEntityUpdatedPayloadV1) = expectedPayload
-						return nil
-					}).
-					Times(1)
-
+				},
+			},
+			ctx: context.WithValue(context.WithValue(context.Background(), "channel_id", testChannelID), "message_id", testMessageID),
+			wantErr: false,
+			wantLen: 0, // Side-effect only
+			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockUpdateRoundManager *mocks.MockUpdateRoundManager) {
 				mockRoundDiscord.EXPECT().GetUpdateRoundManager().Return(mockUpdateRoundManager).Times(1)
 
-				// Return a valid UpdateRoundOperationResult instead of struct{}
 				mockUpdateRoundManager.EXPECT().UpdateRoundEventEmbed(
 					gomock.Any(),
 					testChannelID,
-					"test-message-id",
+					testMessageID,
 					&testTitle,
 					&testDescription,
 					&testStartTime,
 					testLocation,
-				).Return(updateround.UpdateRoundOperationResult{}, nil).Times(1) // Correct return type
+				).Return(updateround.UpdateRoundOperationResult{}, nil).Times(1)
 			},
 		},
 		{
 			name: "update_with_nil_fields",
-			msg: &message.Message{
-				UUID: "2",
-				Payload: []byte(fmt.Sprintf(`{
-					"round": {
-						"id": "%s",
-						"title": "%s",
-						"location": "%s"
-					}
-				}`, testRoundID.String(), string(testTitle), string(*testLocation))),
-				Metadata: message.Metadata{
-					"correlation_id": "correlation_id",
-					"channel_id":     testChannelID,
-					"message_id":     "test-message-id",
-				},
-			},
-			want:    nil,
-			wantErr: false,
-			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockUpdateRoundManager *mocks.MockUpdateRoundManager) {
-				testRound := roundtypes.Round{
+			payload: &roundevents.RoundEntityUpdatedPayloadV1{
+				Round: roundtypes.Round{
 					ID:       testRoundID,
 					Title:    testTitle,
 					Location: testLocation,
-				}
-
-				expectedPayload := roundevents.RoundEntityUpdatedPayloadV1{
-					Round: testRound,
-				}
-
-				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundEntityUpdatedPayloadV1{})).
-					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.RoundEntityUpdatedPayloadV1) = expectedPayload
-						return nil
-					}).
-					Times(1)
-
+				},
+			},
+			ctx: context.WithValue(context.WithValue(context.Background(), "channel_id", testChannelID), "message_id", testMessageID),
+			wantErr: false,
+			wantLen: 0, // Side-effect only
+			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockUpdateRoundManager *mocks.MockUpdateRoundManager) {
 				mockRoundDiscord.EXPECT().GetUpdateRoundManager().Return(mockUpdateRoundManager).Times(1)
 
-				// Return a valid UpdateRoundOperationResult instead of struct{}
 				mockUpdateRoundManager.EXPECT().UpdateRoundEventEmbed(
 					gomock.Any(),
 					testChannelID,
-					"test-message-id",
+					testMessageID,
 					&testTitle,
 					nil,
 					nil,
 					testLocation,
-				).Return(updateround.UpdateRoundOperationResult{}, nil).Times(1) // Correct return type
+				).Return(updateround.UpdateRoundOperationResult{}, nil).Times(1)
 			},
 		},
 		{
 			name: "update_embed_error",
-			msg: &message.Message{
-				UUID: "3",
-				Payload: []byte(fmt.Sprintf(`{
-            "round": {
-						"id": "%s",
-						"title": "%s"
-					}
-        }`, testRoundID.String(), string(testTitle))),
-				Metadata: message.Metadata{
-					"correlation_id": "correlation_id",
-					"channel_id":     testChannelID,
-					"message_id":     "test-message-id",
-				},
-			},
-			want:    nil,
-			wantErr: true,
-			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockUpdateRoundManager *mocks.MockUpdateRoundManager) {
-				testRound := roundtypes.Round{
+			payload: &roundevents.RoundEntityUpdatedPayloadV1{
+				Round: roundtypes.Round{
 					ID:    testRoundID,
 					Title: testTitle,
-				}
-
-				expectedPayload := roundevents.RoundEntityUpdatedPayloadV1{
-					Round: testRound,
-				}
-
-				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundEntityUpdatedPayloadV1{})).
-					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.RoundEntityUpdatedPayloadV1) = expectedPayload
-						return nil
-					}).
-					Times(1)
-
+				},
+			},
+			ctx: context.WithValue(context.WithValue(context.Background(), "channel_id", testChannelID), "message_id", testMessageID),
+			wantErr: true,
+			wantLen: 0,
+			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockUpdateRoundManager *mocks.MockUpdateRoundManager) {
 				mockRoundDiscord.EXPECT().GetUpdateRoundManager().Return(mockUpdateRoundManager).Times(1)
 
 				mockUpdateRoundManager.EXPECT().UpdateRoundEventEmbed(
 					gomock.Any(),
 					testChannelID,
-					"test-message-id",
-					&testTitle, // Correct pointer type
+					testMessageID,
+					&testTitle,
 					nil,
 					nil,
-					nil, // Correct nil instead of ""
+					nil,
 				).Return(updateround.UpdateRoundOperationResult{
 					Error: errors.New("failed to update embed"),
 				}, nil).Times(1)
@@ -371,34 +216,30 @@ func TestRoundHandlers_HandleRoundUpdated(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			mockHelper := util_mocks.NewMockHelpers(ctrl)
 			mockRoundDiscord := mocks.NewMockRoundDiscordInterface(ctrl)
 			mockUpdateRoundManager := mocks.NewMockUpdateRoundManager(ctrl)
 			mockLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
 			mockMetrics := &discordmetrics.NoOpMetrics{}
 			mockTracer := noop.NewTracerProvider().Tracer("test")
 
-			tt.setup(ctrl, mockHelper, mockRoundDiscord, mockUpdateRoundManager)
+			tt.setup(ctrl, mockRoundDiscord, mockUpdateRoundManager)
 
 			h := &RoundHandlers{
 				Logger:       mockLogger,
 				Config:       &config.Config{},
-				Helpers:      mockHelper,
 				RoundDiscord: mockRoundDiscord,
 				Tracer:       mockTracer,
 				Metrics:      mockMetrics,
-				handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
-					return wrapHandler(handlerName, unmarshalTo, handlerFunc, mockLogger, mockMetrics, mockTracer, mockHelper)
-				},
 			}
 
-			got, err := h.HandleRoundUpdated(tt.msg)
+			got, err := h.HandleRoundUpdated(tt.ctx, tt.payload)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("HandleRoundUpdated() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("HandleRoundUpdated() = %v, want %v", got, tt.want)
+
+			if len(got) != tt.wantLen {
+				t.Errorf("HandleRoundUpdated() got %d results, want %d", len(got), tt.wantLen)
 			}
 		})
 	}
@@ -415,83 +256,40 @@ func TestRoundHandlers_HandleRoundUpdateFailed(t *testing.T) {
 	testUserID := sharedtypes.DiscordID("user123")
 
 	tests := []struct {
-		name    string
-		msg     *message.Message
-		want    []*message.Message
-		wantErr bool
-		setup   func(*gomock.Controller, *util_mocks.MockHelpers)
+		name       string
+		payload    *roundevents.RoundUpdateErrorPayloadV1
+		ctx        context.Context
+		wantErr    bool
+		wantLen    int // Expected number of results
 	}{
 		{
 			name: "handle_update_failed_with_full_payload",
-			msg: &message.Message{
-				UUID: "1",
-				Payload: []byte(fmt.Sprintf(`{
-					"round_id": "%s",
-					"title": "%s",
-					"description": "%s",
-					"start_time": "2023-05-01T14:00:00Z",
-					"location": "%s",
-					"user_id": "%s",
-					"error": "%s"
-				}`, testRoundID.String(), string(testTitle), string(testDescription), string(testLocation), string(testUserID), testError)),
-				Metadata: message.Metadata{
-					"correlation_id": "correlation_id",
+			payload: &roundevents.RoundUpdateErrorPayloadV1{
+				RoundUpdateRequest: &roundevents.RoundUpdateRequestPayloadV1{
+					RoundID:     testRoundID,
+					Title:       testTitle,
+					Description: &testDescription,
+					StartTime:   &testStartTime,
+					Location:    &testLocation,
+					UserID:      testUserID,
 				},
+				Error: testError,
 			},
-			want:    nil,
+			ctx:     context.Background(),
 			wantErr: false,
-			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
-				expectedPayload := roundevents.RoundUpdateErrorPayloadV1{
-					RoundUpdateRequest: &roundevents.RoundUpdateRequestPayloadV1{
-						RoundID:     testRoundID,
-						Title:       testTitle,
-						Description: &testDescription,
-						StartTime:   &testStartTime,
-						Location:    &testLocation,
-						UserID:      testUserID,
-					},
-					Error: testError,
-				}
-
-				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundUpdateErrorPayloadV1{})).
-					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.RoundUpdateErrorPayloadV1) = expectedPayload
-						return nil
-					}).
-					Times(1)
-			},
+			wantLen: 0, // Side-effect only
 		},
 		{
 			name: "handle_update_failed_minimal_payload",
-			msg: &message.Message{
-				UUID: "2",
-				Payload: []byte(fmt.Sprintf(`{
-					"round_id": "%s",
-					"error": "%s"
-				}`, testRoundID.String(), testError)),
-				Metadata: message.Metadata{
-					"correlation_id": "correlation_id",
+			payload: &roundevents.RoundUpdateErrorPayloadV1{
+				RoundUpdateRequest: &roundevents.RoundUpdateRequestPayloadV1{
+					RoundID: testRoundID,
 				},
+				Error: testError,
 			},
-			want:    nil,
+			ctx:     context.Background(),
 			wantErr: false,
-			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
-				expectedPayload := roundevents.RoundUpdateErrorPayloadV1{
-					RoundUpdateRequest: &roundevents.RoundUpdateRequestPayloadV1{
-						RoundID: testRoundID,
-					},
-					Error: testError,
-				}
-
-				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundUpdateErrorPayloadV1{})).
-					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.RoundUpdateErrorPayloadV1) = expectedPayload
-						return nil
-					}).
-					Times(1)
-			},
+			wantLen: 0, // Side-effect only
 		},
 	}
 
@@ -500,33 +298,27 @@ func TestRoundHandlers_HandleRoundUpdateFailed(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			mockHelper := util_mocks.NewMockHelpers(ctrl)
 			mockRoundDiscord := mocks.NewMockRoundDiscordInterface(ctrl)
 			mockLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
 			mockMetrics := &discordmetrics.NoOpMetrics{}
 			mockTracer := noop.NewTracerProvider().Tracer("test")
 
-			tt.setup(ctrl, mockHelper)
-
 			h := &RoundHandlers{
 				Logger:       mockLogger,
 				Config:       &config.Config{},
-				Helpers:      mockHelper,
 				RoundDiscord: mockRoundDiscord,
 				Tracer:       mockTracer,
 				Metrics:      mockMetrics,
-				handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
-					return wrapHandler(handlerName, unmarshalTo, handlerFunc, mockLogger, mockMetrics, mockTracer, mockHelper)
-				},
 			}
 
-			got, err := h.HandleRoundUpdateFailed(tt.msg)
+			got, err := h.HandleRoundUpdateFailed(tt.ctx, tt.payload)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("HandleRoundUpdateFailed() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("HandleRoundUpdateFailed() = %v, want %v", got, tt.want)
+
+			if len(got) != tt.wantLen {
+				t.Errorf("HandleRoundUpdateFailed() got %d results, want %d", len(got), tt.wantLen)
 			}
 		})
 	}
@@ -542,85 +334,38 @@ func TestRoundHandlers_HandleRoundUpdateValidationFailed(t *testing.T) {
 	testUserID := sharedtypes.DiscordID("user123")
 
 	tests := []struct {
-		name    string
-		msg     *message.Message
-		want    []*message.Message
-		wantErr bool
-		setup   func(*gomock.Controller, *util_mocks.MockHelpers)
+		name       string
+		payload    *roundevents.RoundUpdateValidatedPayloadV1
+		ctx        context.Context
+		wantErr    bool
+		wantLen    int // Expected number of results
 	}{
 		{
 			name: "handle_validation_failed_full_payload",
-			msg: &message.Message{
-				UUID: "1",
-				Payload: []byte(fmt.Sprintf(`{
-					"round_update_request_payload": {
-						"round_id": "%s",
-						"title": "%s",
-						"description": "%s",
-						"start_time": "2023-05-01T14:00:00Z",
-						"location": "%s",
-						"user_id": "%s"
-					},
-					"validation_errors": ["Title is required", "Start time is invalid"]
-				}`, testRoundID.String(), string(testTitle), string(testDescription), string(testLocation), string(testUserID))),
-				Metadata: message.Metadata{
-					"correlation_id": "correlation_id",
+			payload: &roundevents.RoundUpdateValidatedPayloadV1{
+				RoundUpdateRequestPayload: roundevents.RoundUpdateRequestPayloadV1{
+					RoundID:     testRoundID,
+					Title:       testTitle,
+					Description: &testDescription,
+					StartTime:   &testStartTime,
+					Location:    &testLocation,
+					UserID:      testUserID,
 				},
 			},
-			want:    nil,
+			ctx:     context.Background(),
 			wantErr: false,
-			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
-				expectedPayload := roundevents.RoundUpdateValidatedPayloadV1{
-					RoundUpdateRequestPayload: roundevents.RoundUpdateRequestPayloadV1{
-						RoundID:     testRoundID,
-						Title:       testTitle,
-						Description: &testDescription,
-						StartTime:   &testStartTime,
-						Location:    &testLocation,
-						UserID:      testUserID,
-					},
-				}
-
-				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundUpdateValidatedPayloadV1{})).
-					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.RoundUpdateValidatedPayloadV1) = expectedPayload
-						return nil
-					}).
-					Times(1)
-			},
+			wantLen: 0, // Side-effect only
 		},
 		{
 			name: "handle_validation_failed_minimal_payload",
-			msg: &message.Message{
-				UUID: "2",
-				Payload: []byte(fmt.Sprintf(`{
-					"round_update_request_payload": {
-						"round_id": "%s"
-					},
-					"validation_errors": ["Missing required fields"]
-				}`, testRoundID.String())),
-				Metadata: message.Metadata{
-					"correlation_id": "correlation_id",
+			payload: &roundevents.RoundUpdateValidatedPayloadV1{
+				RoundUpdateRequestPayload: roundevents.RoundUpdateRequestPayloadV1{
+					RoundID: testRoundID,
 				},
 			},
-			want:    nil,
+			ctx:     context.Background(),
 			wantErr: false,
-			setup: func(ctrl *gomock.Controller, mockHelper *util_mocks.MockHelpers) {
-				expectedPayload := roundevents.RoundUpdateValidatedPayloadV1{
-					RoundUpdateRequestPayload: roundevents.RoundUpdateRequestPayloadV1{
-						RoundID: testRoundID,
-					},
-				}
-
-				mockHelper.EXPECT().
-					UnmarshalPayload(gomock.Any(), gomock.AssignableToTypeOf(&roundevents.RoundUpdateValidatedPayloadV1{})).
-					DoAndReturn(func(_ *message.Message, v any) error {
-						*v.(*roundevents.RoundUpdateValidatedPayloadV1) = expectedPayload
-						return nil
-					}).
-					Times(1)
-			},
+			wantLen: 0, // Side-effect only
 		},
 	}
 
@@ -629,33 +374,27 @@ func TestRoundHandlers_HandleRoundUpdateValidationFailed(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			mockHelper := util_mocks.NewMockHelpers(ctrl)
 			mockRoundDiscord := mocks.NewMockRoundDiscordInterface(ctrl)
 			mockLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
 			mockMetrics := &discordmetrics.NoOpMetrics{}
 			mockTracer := noop.NewTracerProvider().Tracer("test")
 
-			tt.setup(ctrl, mockHelper)
-
 			h := &RoundHandlers{
 				Logger:       mockLogger,
 				Config:       &config.Config{},
-				Helpers:      mockHelper,
 				RoundDiscord: mockRoundDiscord,
 				Tracer:       mockTracer,
 				Metrics:      mockMetrics,
-				handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
-					return wrapHandler(handlerName, unmarshalTo, handlerFunc, mockLogger, mockMetrics, mockTracer, mockHelper)
-				},
 			}
 
-			got, err := h.HandleRoundUpdateValidationFailed(tt.msg)
+			got, err := h.HandleRoundUpdateValidationFailed(tt.ctx, tt.payload)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("HandleRoundUpdateValidationFailed() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("HandleRoundUpdateValidationFailed() = %v, want %v", got, tt.want)
+
+			if len(got) != tt.wantLen {
+				t.Errorf("HandleRoundUpdateValidationFailed() got %d results, want %d", len(got), tt.wantLen)
 			}
 		})
 	}

@@ -8,9 +8,12 @@ import (
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
+	sharedscoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/score"
+	scoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/score"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
+	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/message/router/middleware"
 	"go.opentelemetry.io/otel/attribute"
@@ -23,6 +26,14 @@ type Handler interface {
 	HandleScoreUpdateSuccess(msg *message.Message) ([]*message.Message, error)
 	HandleScoreUpdateFailure(msg *message.Message) ([]*message.Message, error)
 	HandleProcessRoundScoresFailed(msg *message.Message) ([]*message.Message, error)
+}
+
+// Handlers is the new typed interface used by the router. Methods are pure
+// functions that accept a typed payload and return []handlerwrapper.Result.
+type Handlers interface {
+	HandleScoreUpdateRequestTyped(ctx context.Context, payload *sharedscoreevents.ScoreUpdateRequestDiscordPayloadV1) ([]handlerwrapper.Result, error)
+	HandleScoreUpdateSuccessTyped(ctx context.Context, payload *scoreevents.ScoreUpdatedPayloadV1) ([]handlerwrapper.Result, error)
+	HandleScoreUpdateFailureTyped(ctx context.Context, payload *scoreevents.ScoreUpdateFailedPayloadV1) ([]handlerwrapper.Result, error)
 }
 
 // ScoreHandlers handles score-related events.
@@ -44,7 +55,7 @@ func NewScoreHandlers(
 	helpers utils.Helpers,
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
-) Handler {
+) *ScoreHandlers {
 	return &ScoreHandlers{
 		Logger:  logger,
 		Config:  config,
@@ -53,7 +64,15 @@ func NewScoreHandlers(
 		Tracer:  tracer,
 		Metrics: metrics,
 		handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
-			return wrapHandler(handlerName, unmarshalTo, handlerFunc, logger, metrics, tracer, helpers)
+			var factory func() interface{}
+			if unmarshalTo != nil {
+				if fn, ok := unmarshalTo.(func() interface{}); ok {
+					factory = fn
+				} else {
+					factory = func() interface{} { return utils.NewInstance(unmarshalTo) }
+				}
+			}
+			return wrapHandler(handlerName, factory, handlerFunc, logger, metrics, tracer, helpers)
 		},
 	}
 }
@@ -61,7 +80,7 @@ func NewScoreHandlers(
 // wrapHandler wraps the message handler with observability and error handling.
 func wrapHandler(
 	handlerName string,
-	unmarshalTo interface{},
+	unmarshalFactory func() interface{},
 	handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error),
 	logger *slog.Logger,
 	metrics discordmetrics.DiscordMetrics,
@@ -88,7 +107,10 @@ func wrapHandler(
 			attr.String("message_id", msg.UUID),
 		)
 
-		payloadInstance := unmarshalTo
+		var payloadInstance interface{}
+		if unmarshalFactory != nil {
+			payloadInstance = unmarshalFactory()
+		}
 
 		if payloadInstance != nil {
 			if err := helpers.UnmarshalPayload(msg, payloadInstance); err != nil {

@@ -13,6 +13,7 @@ import (
 	util_mocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
+	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
@@ -169,7 +170,15 @@ func Test_ScoreHandlers_HandleScoreUpdateRequest(t *testing.T) {
 				Tracer:  mockTracer,
 				Metrics: mockMetrics,
 				handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
-					return wrapHandler(handlerName, unmarshalTo, handlerFunc, mockLogger, mockMetrics, mockTracer, mockHelper)
+					var factory func() interface{}
+					if unmarshalTo != nil {
+						if fn, ok := unmarshalTo.(func() interface{}); ok {
+							factory = fn
+						} else {
+							factory = func() interface{} { return utils.NewInstance(unmarshalTo) }
+						}
+					}
+					return wrapHandler(handlerName, factory, handlerFunc, mockLogger, mockMetrics, mockTracer, mockHelper)
 				},
 			}
 
@@ -339,7 +348,15 @@ func Test_ScoreHandlers_HandleScoreUpdateSuccess(t *testing.T) {
 				Tracer:  mockTracer,
 				Metrics: mockMetrics,
 				handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
-					return wrapHandler(handlerName, unmarshalTo, handlerFunc, mockLogger, mockMetrics, mockTracer, mockHelper)
+					var factory func() interface{}
+					if unmarshalTo != nil {
+						if fn, ok := unmarshalTo.(func() interface{}); ok {
+							factory = fn
+						} else {
+							factory = func() interface{} { return utils.NewInstance(unmarshalTo) }
+						}
+					}
+					return wrapHandler(handlerName, factory, handlerFunc, mockLogger, mockMetrics, mockTracer, mockHelper)
 				},
 			}
 
@@ -504,7 +521,15 @@ func Test_ScoreHandlers_HandleScoreUpdateFailure(t *testing.T) {
 				Tracer:  mockTracer,
 				Metrics: mockMetrics,
 				handlerWrapper: func(handlerName string, unmarshalTo interface{}, handlerFunc func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error)) message.HandlerFunc {
-					return wrapHandler(handlerName, unmarshalTo, handlerFunc, mockLogger, mockMetrics, mockTracer, mockHelper)
+					var factory func() interface{}
+					if unmarshalTo != nil {
+						if fn, ok := unmarshalTo.(func() interface{}); ok {
+							factory = fn
+						} else {
+							factory = func() interface{} { return utils.NewInstance(unmarshalTo) }
+						}
+					}
+					return wrapHandler(handlerName, factory, handlerFunc, mockLogger, mockMetrics, mockTracer, mockHelper)
 				},
 			}
 

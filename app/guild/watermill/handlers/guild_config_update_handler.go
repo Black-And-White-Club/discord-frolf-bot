@@ -8,163 +8,151 @@ import (
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	guildevents "github.com/Black-And-White-Club/frolf-bot-shared/events/guild"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
+	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 	guildtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/guild"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
-	"github.com/ThreeDotsLabs/watermill/message"
 )
 
 // HandleGuildConfigUpdated handles guild config updates - may need to refresh command permissions
-func (h *GuildHandlers) HandleGuildConfigUpdated(msg *message.Message) ([]*message.Message, error) {
-	return h.handlerWrapper(
-		"HandleGuildConfigUpdated",
-		&guildevents.GuildConfigUpdatedPayloadV1{},
-		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			p := payload.(*guildevents.GuildConfigUpdatedPayloadV1)
-			guildID := string(p.GuildID)
+func (h *GuildHandlers) HandleGuildConfigUpdated(ctx context.Context, payload *guildevents.GuildConfigUpdatedPayloadV1) ([]handlerwrapper.Result, error) {
+	if payload == nil {
+		return nil, fmt.Errorf("payload cannot be nil")
+	}
 
-			h.Logger.InfoContext(ctx, "Guild config updated",
-				attr.String("guild_id", guildID),
-				attr.String("updated_fields", fmt.Sprintf("%v", p.UpdatedFields)))
+	guildID := string(payload.GuildID)
 
-			// Check if role-related fields were updated that might affect command permissions
-			needsCommandRefresh := false
-			for _, field := range p.UpdatedFields {
-				if field == "admin_role_id" || field == "editor_role_id" || field == "user_role_id" {
-					needsCommandRefresh = true
-					break
-				}
-			}
+	h.Logger.InfoContext(ctx, "Guild config updated",
+		attr.String("guild_id", guildID),
+		attr.String("updated_fields", fmt.Sprintf("%v", payload.UpdatedFields)))
 
-			if needsCommandRefresh {
-				h.Logger.InfoContext(ctx, "Role configuration updated, refreshing command permissions",
-					attr.String("guild_id", guildID))
+	// Check if role-related fields were updated that might affect command permissions
+	needsCommandRefresh := false
+	for _, field := range payload.UpdatedFields {
+		if field == "admin_role_id" || field == "editor_role_id" || field == "user_role_id" {
+			needsCommandRefresh = true
+			break
+		}
+	}
 
-				// For now, we just log this. In the future, we might need to:
-				// 1. Update command permissions in Discord
-				// 2. Re-register commands with new permission settings
-				// For now, commands are already registered so no action needed
-			}
+	if needsCommandRefresh {
+		h.Logger.InfoContext(ctx, "Role configuration updated, refreshing command permissions",
+			attr.String("guild_id", guildID))
 
-			return nil, nil
-		},
-	)(msg)
+		// For now, we just log this. In the future, we might need to:
+		// 1. Update command permissions in Discord
+		// 2. Re-register commands with new permission settings
+		// For now, commands are already registered so no action needed
+	}
+
+	return []handlerwrapper.Result{}, nil
 }
 
 // HandleGuildConfigUpdateFailed handles guild config update failures
-func (h *GuildHandlers) HandleGuildConfigUpdateFailed(msg *message.Message) ([]*message.Message, error) {
-	return h.handlerWrapper(
-		"HandleGuildConfigUpdateFailed",
-		&guildevents.GuildConfigUpdateFailedPayloadV1{},
-		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			p := payload.(*guildevents.GuildConfigUpdateFailedPayloadV1)
-			guildID := string(p.GuildID)
+func (h *GuildHandlers) HandleGuildConfigUpdateFailed(ctx context.Context, payload *guildevents.GuildConfigUpdateFailedPayloadV1) ([]handlerwrapper.Result, error) {
+	if payload == nil {
+		return nil, fmt.Errorf("payload cannot be nil")
+	}
 
-			h.Logger.ErrorContext(ctx, "Guild config update failed",
-				attr.String("guild_id", guildID),
-				attr.String("reason", p.Reason))
+	guildID := string(payload.GuildID)
 
-			// No action needed on Discord side for update failures - they're just notifications
-			return nil, nil
-		},
-	)(msg)
+	h.Logger.ErrorContext(ctx, "Guild config update failed",
+		attr.String("guild_id", guildID),
+		attr.String("reason", payload.Reason))
+
+	// No action needed on Discord side for update failures - they're just notifications
+	return []handlerwrapper.Result{}, nil
 }
 
 // HandleGuildConfigRetrieved handles successful guild config retrieval
-func (h *GuildHandlers) HandleGuildConfigRetrieved(msg *message.Message) ([]*message.Message, error) {
-	return h.handlerWrapper(
-		"HandleGuildConfigRetrieved",
-		&guildevents.GuildConfigRetrievedPayloadV1{},
-		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			p := payload.(*guildevents.GuildConfigRetrievedPayloadV1)
-			guildID := string(p.GuildID)
+func (h *GuildHandlers) HandleGuildConfigRetrieved(ctx context.Context, payload *guildevents.GuildConfigRetrievedPayloadV1) ([]handlerwrapper.Result, error) {
+	if payload == nil {
+		return nil, fmt.Errorf("payload cannot be nil")
+	}
 
-			h.Logger.InfoContext(ctx, "Guild config retrieved successfully",
-				attr.String("guild_id", guildID))
+	guildID := string(payload.GuildID)
 
-			// Convert the config and notify the resolver that we received the response
-			var convertedConfig *storage.GuildConfig
-			if p.Config.GuildID != "" || p.Config.SignupChannelID != "" || p.Config.LeaderboardChannelID != "" {
-				convertedConfig = convertGuildConfigFromShared(&p.Config)
-			} else {
-				// Provide a minimal placeholder to avoid nil dereference in consumers/tests
-				convertedConfig = &storage.GuildConfig{GuildID: guildID}
-			}
+	h.Logger.InfoContext(ctx, "Guild config retrieved successfully",
+		attr.String("guild_id", guildID))
 
-			// Persist into in-memory runtime config (single-tenant / legacy handlers rely on this)
-			if h.Config != nil && convertedConfig != nil {
-				roleMappings := map[string]string{}
-				for k, v := range convertedConfig.RoleMappings {
-					roleMappings[k] = v
-				}
-				h.Config.UpdateGuildConfig(
-					convertedConfig.GuildID,
-					convertedConfig.SignupChannelID,
-					convertedConfig.EventChannelID,
-					convertedConfig.LeaderboardChannelID,
-					convertedConfig.SignupMessageID,
-					convertedConfig.RegisteredRoleID,
-					convertedConfig.AdminRoleID,
-					roleMappings,
-				)
-				h.Logger.InfoContext(ctx, "In-memory guild config updated",
-					attr.String("guild_id", guildID),
-					attr.String("event_channel_id", convertedConfig.EventChannelID),
-					attr.String("signup_channel_id", convertedConfig.SignupChannelID),
-				)
-			}
+	// Convert the config and notify the resolver that we received the response
+	var convertedConfig *storage.GuildConfig
+	if payload.Config.GuildID != "" || payload.Config.SignupChannelID != "" || payload.Config.LeaderboardChannelID != "" {
+		convertedConfig = convertGuildConfigFromShared(&payload.Config)
+	} else {
+		// Provide a minimal placeholder to avoid nil dereference in consumers/tests
+		convertedConfig = &storage.GuildConfig{GuildID: guildID}
+	}
 
-			// Persist into in-memory config so other handlers (e.g., round joins) can resolve channel IDs
-			if h.Config != nil && convertedConfig != nil {
-				h.Config.UpdateGuildConfig(
-					convertedConfig.GuildID,
-					convertedConfig.SignupChannelID,
-					convertedConfig.EventChannelID,
-					convertedConfig.LeaderboardChannelID,
-					convertedConfig.SignupMessageID,
-					convertedConfig.RegisteredRoleID,
-					convertedConfig.AdminRoleID,
-					convertedConfig.RoleMappings,
-				)
-			}
-			if h.GuildConfigResolver != nil {
-				h.GuildConfigResolver.HandleGuildConfigReceived(ctx, guildID, convertedConfig)
-			}
+	// Persist into in-memory runtime config (single-tenant / legacy handlers rely on this)
+	if h.Config != nil && convertedConfig != nil {
+		roleMappings := map[string]string{}
+		for k, v := range convertedConfig.RoleMappings {
+			roleMappings[k] = v
+		}
+		h.Config.UpdateGuildConfig(
+			convertedConfig.GuildID,
+			convertedConfig.SignupChannelID,
+			convertedConfig.EventChannelID,
+			convertedConfig.LeaderboardChannelID,
+			convertedConfig.SignupMessageID,
+			convertedConfig.RegisteredRoleID,
+			convertedConfig.AdminRoleID,
+			roleMappings,
+		)
+		h.Logger.InfoContext(ctx, "In-memory guild config updated",
+			attr.String("guild_id", guildID),
+			attr.String("event_channel_id", convertedConfig.EventChannelID),
+			attr.String("signup_channel_id", convertedConfig.SignupChannelID),
+		)
+	}
 
-			// Track channels for reaction handling to avoid unnecessary backend requests
-			if h.SignupManager != nil && convertedConfig != nil {
-				if convertedConfig.SignupChannelID != "" {
-					h.SignupManager.TrackChannelForReactions(convertedConfig.SignupChannelID)
-				}
-			}
+	// Persist into in-memory config so other handlers (e.g., round joins) can resolve channel IDs
+	if h.Config != nil && convertedConfig != nil {
+		h.Config.UpdateGuildConfig(
+			convertedConfig.GuildID,
+			convertedConfig.SignupChannelID,
+			convertedConfig.EventChannelID,
+			convertedConfig.LeaderboardChannelID,
+			convertedConfig.SignupMessageID,
+			convertedConfig.RegisteredRoleID,
+			convertedConfig.AdminRoleID,
+			convertedConfig.RoleMappings,
+		)
+	}
+	if h.GuildConfigResolver != nil {
+		h.GuildConfigResolver.HandleGuildConfigReceived(ctx, guildID, convertedConfig)
+	}
 
-			h.Logger.InfoContext(ctx, "Guild config retrieved and available from backend",
-				attr.String("guild_id", guildID),
-				attr.String("signup_channel_id", p.Config.SignupChannelID))
+	// Track channels for reaction handling to avoid unnecessary backend requests
+	if h.SignupManager != nil && convertedConfig != nil {
+		if convertedConfig.SignupChannelID != "" {
+			h.SignupManager.TrackChannelForReactions(convertedConfig.SignupChannelID)
+		}
+	}
 
-			return nil, nil
-		},
-	)(msg)
+	h.Logger.InfoContext(ctx, "Guild config retrieved and available from backend",
+		attr.String("guild_id", guildID),
+		attr.String("signup_channel_id", payload.Config.SignupChannelID))
+
+	return []handlerwrapper.Result{}, nil
 }
 
 // HandleGuildConfigRetrievalFailed handles failed guild config retrieval
-func (h *GuildHandlers) HandleGuildConfigRetrievalFailed(msg *message.Message) ([]*message.Message, error) {
-	return h.handlerWrapper(
-		"HandleGuildConfigRetrievalFailed",
-		&guildevents.GuildConfigRetrievalFailedPayloadV1{},
-		func(ctx context.Context, msg *message.Message, payload interface{}) ([]*message.Message, error) {
-			p := payload.(*guildevents.GuildConfigRetrievalFailedPayloadV1)
-			guildID := string(p.GuildID)
+func (h *GuildHandlers) HandleGuildConfigRetrievalFailed(ctx context.Context, payload *guildevents.GuildConfigRetrievalFailedPayloadV1) ([]handlerwrapper.Result, error) {
+	if payload == nil {
+		return nil, fmt.Errorf("payload cannot be nil")
+	}
 
-			h.Logger.ErrorContext(ctx, "Guild config retrieval failed",
-				attr.String("guild_id", guildID),
-				attr.String("reason", p.Reason))
+	guildID := string(payload.GuildID)
 
-			// The resolver will handle timeouts and retries automatically
-			// This is just an informational event
+	h.Logger.ErrorContext(ctx, "Guild config retrieval failed",
+		attr.String("guild_id", guildID),
+		attr.String("reason", payload.Reason))
 
-			return nil, nil
-		},
-	)(msg)
+	// The resolver will handle timeouts and retries automatically
+	// This is just an informational event
+
+	return []handlerwrapper.Result{}, nil
 }
 
 // convertGuildConfigFromShared converts a guildtypes.GuildConfig to a storage.GuildConfig

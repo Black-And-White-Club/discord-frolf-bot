@@ -74,6 +74,7 @@ func InitializeUserModule(
 		cfg,
 		helper,
 		tracer,
+		discordMetrics,
 	)
 	// Store the userDiscord instance for access to signup manager in other modules
 	userRouter.SetUserDiscord(userDiscord)

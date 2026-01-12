@@ -13,6 +13,7 @@ import (
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
+	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 	"github.com/ThreeDotsLabs/watermill/message"
 )
 
@@ -229,57 +230,65 @@ func (rh *RoundHandlers) ScorecardURLRequestedEvent(msg *message.Message) error 
 }
 
 // HandleScorecardUploaded handles scorecard uploaded events.
-func (rh *RoundHandlers) HandleScorecardUploaded(msg *message.Message) ([]*message.Message, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	err := rh.ScorecardUploadedEvent(msg)
-	if err != nil {
-		rh.Logger.ErrorContext(ctx, "Failed to handle scorecard uploaded event", attr.Error(err))
-		return nil, err
+func (rh *RoundHandlers) HandleScorecardUploaded(ctx context.Context, payload *roundevents.ScorecardUploadedPayloadV1) ([]handlerwrapper.Result, error) {
+	if len(payload.FileData) > maxScorecardPayloadBytes {
+		return nil, fmt.Errorf("payload too large: %d bytes", len(payload.FileData))
 	}
+
+	// Basic required-field validation to reject obviously bad payloads early.
+	if payload.ImportID == "" || payload.GuildID == "" || payload.RoundID.String() == "" {
+		return nil, fmt.Errorf("invalid payload: missing required identifiers")
+	}
+
+	// Basic extension check (applies when using URL-based upload).
+	if payload.UDiscURL != "" {
+		allowedExt := map[string]struct{}{".csv": {}, ".xlsx": {}}
+		if u, err := url.Parse(payload.UDiscURL); err == nil {
+			ext := strings.ToLower(filepath.Ext(u.Path))
+			if _, ok := allowedExt[ext]; ext != "" && !ok {
+				return nil, fmt.Errorf("unsupported scorecard extension: %s", ext)
+			}
+		}
+	}
+
+	if !allowGuildEvent(payload.GuildID) {
+		return nil, fmt.Errorf("rate limit exceeded for guild %s", payload.GuildID)
+	}
+
+	// TODO: Implement scorecard parsing and player matching
+	// This is handled by the frolf-bot backend service
 
 	return nil, nil
 }
 
 // HandleScorecardParseFailed handles scorecard parse failed events.
-func (rh *RoundHandlers) HandleScorecardParseFailed(msg *message.Message) ([]*message.Message, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	err := rh.ScorecardParseFailedEvent(msg)
-	if err != nil {
-		rh.Logger.ErrorContext(ctx, "Failed to handle scorecard parse failed event", attr.Error(err))
-		return nil, err
+func (rh *RoundHandlers) HandleScorecardParseFailed(ctx context.Context, payload *roundevents.ScorecardParseFailedPayloadV1) ([]handlerwrapper.Result, error) {
+	// Notify user in Discord about parsing failure
+	if payload.ChannelID != "" {
+		err := rh.RoundDiscord.GetScorecardUploadManager().SendUploadError(ctx, payload.ChannelID, payload.Error)
+		if err != nil {
+			return nil, fmt.Errorf("failed to notify user of parsing failure: %w", err)
+		}
 	}
 
 	return nil, nil
 }
 
 // HandleImportFailed handles import failed events.
-func (rh *RoundHandlers) HandleImportFailed(msg *message.Message) ([]*message.Message, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	err := rh.ImportFailedEvent(msg)
-	if err != nil {
-		rh.Logger.ErrorContext(ctx, "Failed to handle import failed event", attr.Error(err))
-		return nil, err
+func (rh *RoundHandlers) HandleImportFailed(ctx context.Context, payload *roundevents.ImportFailedPayloadV1) ([]handlerwrapper.Result, error) {
+	// Notify user in Discord about import failure
+	if payload.ChannelID != "" {
+		err := rh.RoundDiscord.GetScorecardUploadManager().SendUploadError(ctx, payload.ChannelID, payload.Error)
+		if err != nil {
+			return nil, fmt.Errorf("failed to notify user of import failure: %w", err)
+		}
 	}
 
 	return nil, nil
 }
 
 // HandleScorecardURLRequested handles scorecard URL requested events.
-func (rh *RoundHandlers) HandleScorecardURLRequested(msg *message.Message) ([]*message.Message, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	err := rh.ScorecardURLRequestedEvent(msg)
-	if err != nil {
-		rh.Logger.ErrorContext(ctx, "Failed to handle scorecard URL requested event", attr.Error(err))
-		return nil, err
-	}
-
+func (rh *RoundHandlers) HandleScorecardURLRequested(ctx context.Context, payload *roundevents.ScorecardURLRequestedPayloadV1) ([]handlerwrapper.Result, error) {
+	// TODO: Respond with scorecard URL in Discord
 	return nil, nil
 }

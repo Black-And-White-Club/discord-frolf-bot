@@ -10,9 +10,12 @@
 package mocks
 
 import (
+	context "context"
 	reflect "reflect"
 
-	message "github.com/ThreeDotsLabs/watermill/message"
+	user "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/user"
+	userevents "github.com/Black-And-White-Club/frolf-bot-shared/events/user"
+	handlerwrapper "github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -41,136 +44,136 @@ func (m *MockHandler) EXPECT() *MockHandlerMockRecorder {
 }
 
 // HandleAddRole mocks base method.
-func (m *MockHandler) HandleAddRole(msg *message.Message) ([]*message.Message, error) {
+func (m *MockHandler) HandleAddRole(ctx context.Context, payload *user.AddRolePayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HandleAddRole", msg)
-	ret0, _ := ret[0].([]*message.Message)
+	ret := m.ctrl.Call(m, "HandleAddRole", ctx, payload)
+	ret0, _ := ret[0].([]handlerwrapper.Result)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // HandleAddRole indicates an expected call of HandleAddRole.
-func (mr *MockHandlerMockRecorder) HandleAddRole(msg any) *gomock.Call {
+func (mr *MockHandlerMockRecorder) HandleAddRole(ctx, payload any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleAddRole", reflect.TypeOf((*MockHandler)(nil).HandleAddRole), msg)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleAddRole", reflect.TypeOf((*MockHandler)(nil).HandleAddRole), ctx, payload)
 }
 
 // HandleRoleAdded mocks base method.
-func (m *MockHandler) HandleRoleAdded(msg *message.Message) ([]*message.Message, error) {
+func (m *MockHandler) HandleRoleAdded(ctx context.Context, payload *user.RoleAddedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HandleRoleAdded", msg)
-	ret0, _ := ret[0].([]*message.Message)
+	ret := m.ctrl.Call(m, "HandleRoleAdded", ctx, payload)
+	ret0, _ := ret[0].([]handlerwrapper.Result)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // HandleRoleAdded indicates an expected call of HandleRoleAdded.
-func (mr *MockHandlerMockRecorder) HandleRoleAdded(msg any) *gomock.Call {
+func (mr *MockHandlerMockRecorder) HandleRoleAdded(ctx, payload any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleRoleAdded", reflect.TypeOf((*MockHandler)(nil).HandleRoleAdded), msg)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleRoleAdded", reflect.TypeOf((*MockHandler)(nil).HandleRoleAdded), ctx, payload)
 }
 
 // HandleRoleAdditionFailed mocks base method.
-func (m *MockHandler) HandleRoleAdditionFailed(msg *message.Message) ([]*message.Message, error) {
+func (m *MockHandler) HandleRoleAdditionFailed(ctx context.Context, payload *user.RoleAdditionFailedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HandleRoleAdditionFailed", msg)
-	ret0, _ := ret[0].([]*message.Message)
+	ret := m.ctrl.Call(m, "HandleRoleAdditionFailed", ctx, payload)
+	ret0, _ := ret[0].([]handlerwrapper.Result)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // HandleRoleAdditionFailed indicates an expected call of HandleRoleAdditionFailed.
-func (mr *MockHandlerMockRecorder) HandleRoleAdditionFailed(msg any) *gomock.Call {
+func (mr *MockHandlerMockRecorder) HandleRoleAdditionFailed(ctx, payload any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleRoleAdditionFailed", reflect.TypeOf((*MockHandler)(nil).HandleRoleAdditionFailed), msg)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleRoleAdditionFailed", reflect.TypeOf((*MockHandler)(nil).HandleRoleAdditionFailed), ctx, payload)
 }
 
 // HandleRoleUpdateButtonPress mocks base method.
-func (m *MockHandler) HandleRoleUpdateButtonPress(msg *message.Message) ([]*message.Message, error) {
+func (m *MockHandler) HandleRoleUpdateButtonPress(ctx context.Context, payload *user.RoleUpdateButtonPressPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HandleRoleUpdateButtonPress", msg)
-	ret0, _ := ret[0].([]*message.Message)
+	ret := m.ctrl.Call(m, "HandleRoleUpdateButtonPress", ctx, payload)
+	ret0, _ := ret[0].([]handlerwrapper.Result)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // HandleRoleUpdateButtonPress indicates an expected call of HandleRoleUpdateButtonPress.
-func (mr *MockHandlerMockRecorder) HandleRoleUpdateButtonPress(msg any) *gomock.Call {
+func (mr *MockHandlerMockRecorder) HandleRoleUpdateButtonPress(ctx, payload any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleRoleUpdateButtonPress", reflect.TypeOf((*MockHandler)(nil).HandleRoleUpdateButtonPress), msg)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleRoleUpdateButtonPress", reflect.TypeOf((*MockHandler)(nil).HandleRoleUpdateButtonPress), ctx, payload)
 }
 
 // HandleRoleUpdateCommand mocks base method.
-func (m *MockHandler) HandleRoleUpdateCommand(msg *message.Message) ([]*message.Message, error) {
+func (m *MockHandler) HandleRoleUpdateCommand(ctx context.Context, payload *user.RoleUpdateCommandPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HandleRoleUpdateCommand", msg)
-	ret0, _ := ret[0].([]*message.Message)
+	ret := m.ctrl.Call(m, "HandleRoleUpdateCommand", ctx, payload)
+	ret0, _ := ret[0].([]handlerwrapper.Result)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // HandleRoleUpdateCommand indicates an expected call of HandleRoleUpdateCommand.
-func (mr *MockHandlerMockRecorder) HandleRoleUpdateCommand(msg any) *gomock.Call {
+func (mr *MockHandlerMockRecorder) HandleRoleUpdateCommand(ctx, payload any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleRoleUpdateCommand", reflect.TypeOf((*MockHandler)(nil).HandleRoleUpdateCommand), msg)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleRoleUpdateCommand", reflect.TypeOf((*MockHandler)(nil).HandleRoleUpdateCommand), ctx, payload)
 }
 
 // HandleRoleUpdateFailed mocks base method.
-func (m *MockHandler) HandleRoleUpdateFailed(msg *message.Message) ([]*message.Message, error) {
+func (m *MockHandler) HandleRoleUpdateFailed(ctx context.Context, payload *userevents.UserRoleUpdateFailedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HandleRoleUpdateFailed", msg)
-	ret0, _ := ret[0].([]*message.Message)
+	ret := m.ctrl.Call(m, "HandleRoleUpdateFailed", ctx, payload)
+	ret0, _ := ret[0].([]handlerwrapper.Result)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // HandleRoleUpdateFailed indicates an expected call of HandleRoleUpdateFailed.
-func (mr *MockHandlerMockRecorder) HandleRoleUpdateFailed(msg any) *gomock.Call {
+func (mr *MockHandlerMockRecorder) HandleRoleUpdateFailed(ctx, payload any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleRoleUpdateFailed", reflect.TypeOf((*MockHandler)(nil).HandleRoleUpdateFailed), msg)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleRoleUpdateFailed", reflect.TypeOf((*MockHandler)(nil).HandleRoleUpdateFailed), ctx, payload)
 }
 
 // HandleRoleUpdated mocks base method.
-func (m *MockHandler) HandleRoleUpdated(msg *message.Message) ([]*message.Message, error) {
+func (m *MockHandler) HandleRoleUpdated(ctx context.Context, payload *userevents.UserRoleUpdatedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HandleRoleUpdated", msg)
-	ret0, _ := ret[0].([]*message.Message)
+	ret := m.ctrl.Call(m, "HandleRoleUpdated", ctx, payload)
+	ret0, _ := ret[0].([]handlerwrapper.Result)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // HandleRoleUpdated indicates an expected call of HandleRoleUpdated.
-func (mr *MockHandlerMockRecorder) HandleRoleUpdated(msg any) *gomock.Call {
+func (mr *MockHandlerMockRecorder) HandleRoleUpdated(ctx, payload any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleRoleUpdated", reflect.TypeOf((*MockHandler)(nil).HandleRoleUpdated), msg)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleRoleUpdated", reflect.TypeOf((*MockHandler)(nil).HandleRoleUpdated), ctx, payload)
 }
 
 // HandleUserCreated mocks base method.
-func (m *MockHandler) HandleUserCreated(msg *message.Message) ([]*message.Message, error) {
+func (m *MockHandler) HandleUserCreated(ctx context.Context, payload *userevents.UserCreatedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HandleUserCreated", msg)
-	ret0, _ := ret[0].([]*message.Message)
+	ret := m.ctrl.Call(m, "HandleUserCreated", ctx, payload)
+	ret0, _ := ret[0].([]handlerwrapper.Result)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // HandleUserCreated indicates an expected call of HandleUserCreated.
-func (mr *MockHandlerMockRecorder) HandleUserCreated(msg any) *gomock.Call {
+func (mr *MockHandlerMockRecorder) HandleUserCreated(ctx, payload any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleUserCreated", reflect.TypeOf((*MockHandler)(nil).HandleUserCreated), msg)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleUserCreated", reflect.TypeOf((*MockHandler)(nil).HandleUserCreated), ctx, payload)
 }
 
 // HandleUserCreationFailed mocks base method.
-func (m *MockHandler) HandleUserCreationFailed(msg *message.Message) ([]*message.Message, error) {
+func (m *MockHandler) HandleUserCreationFailed(ctx context.Context, payload *userevents.UserCreationFailedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HandleUserCreationFailed", msg)
-	ret0, _ := ret[0].([]*message.Message)
+	ret := m.ctrl.Call(m, "HandleUserCreationFailed", ctx, payload)
+	ret0, _ := ret[0].([]handlerwrapper.Result)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // HandleUserCreationFailed indicates an expected call of HandleUserCreationFailed.
-func (mr *MockHandlerMockRecorder) HandleUserCreationFailed(msg any) *gomock.Call {
+func (mr *MockHandlerMockRecorder) HandleUserCreationFailed(ctx, payload any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleUserCreationFailed", reflect.TypeOf((*MockHandler)(nil).HandleUserCreationFailed), msg)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleUserCreationFailed", reflect.TypeOf((*MockHandler)(nil).HandleUserCreationFailed), ctx, payload)
 }

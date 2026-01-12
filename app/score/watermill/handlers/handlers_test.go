@@ -13,6 +13,7 @@ import (
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/mocks"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
+	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
@@ -37,7 +38,7 @@ func TestNewScoreHandlers(t *testing.T) {
 			t.Fatalf("Expected non-nil ScoreHandlers")
 		}
 
-		sh := handlers.(*ScoreHandlers)
+		sh := handlers
 
 		if sh.Session != mockSession {
 			t.Errorf("Session not set correctly")
@@ -189,9 +190,18 @@ func Test_wrapHandler(t *testing.T) {
 			testArgs := tt.args(ctrl)
 			tt.setup(&testArgs, ctrl)
 
+			var factory func() interface{}
+			if testArgs.unmarshalTo != nil {
+				if fn, ok := testArgs.unmarshalTo.(func() interface{}); ok {
+					factory = fn
+				} else {
+					factory = func() interface{} { return utils.NewInstance(testArgs.unmarshalTo) }
+				}
+			}
+
 			wrapped := wrapHandler(
 				testArgs.handlerName,
-				testArgs.unmarshalTo,
+				factory,
 				testArgs.handlerFunc,
 				testArgs.logger,
 				testArgs.metrics,

@@ -10,8 +10,12 @@
 package mocks
 
 import (
+	context "context"
 	reflect "reflect"
 
+	score "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/score"
+	scoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/score"
+	handlerwrapper "github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 	message "github.com/ThreeDotsLabs/watermill/message"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -98,4 +102,73 @@ func (m *MockHandler) HandleScoreUpdateSuccess(msg *message.Message) ([]*message
 func (mr *MockHandlerMockRecorder) HandleScoreUpdateSuccess(msg any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleScoreUpdateSuccess", reflect.TypeOf((*MockHandler)(nil).HandleScoreUpdateSuccess), msg)
+}
+
+// MockHandlers is a mock of Handlers interface.
+type MockHandlers struct {
+	ctrl     *gomock.Controller
+	recorder *MockHandlersMockRecorder
+	isgomock struct{}
+}
+
+// MockHandlersMockRecorder is the mock recorder for MockHandlers.
+type MockHandlersMockRecorder struct {
+	mock *MockHandlers
+}
+
+// NewMockHandlers creates a new mock instance.
+func NewMockHandlers(ctrl *gomock.Controller) *MockHandlers {
+	mock := &MockHandlers{ctrl: ctrl}
+	mock.recorder = &MockHandlersMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockHandlers) EXPECT() *MockHandlersMockRecorder {
+	return m.recorder
+}
+
+// HandleScoreUpdateFailureTyped mocks base method.
+func (m *MockHandlers) HandleScoreUpdateFailureTyped(ctx context.Context, payload *scoreevents.ScoreUpdateFailedPayloadV1) ([]handlerwrapper.Result, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HandleScoreUpdateFailureTyped", ctx, payload)
+	ret0, _ := ret[0].([]handlerwrapper.Result)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// HandleScoreUpdateFailureTyped indicates an expected call of HandleScoreUpdateFailureTyped.
+func (mr *MockHandlersMockRecorder) HandleScoreUpdateFailureTyped(ctx, payload any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleScoreUpdateFailureTyped", reflect.TypeOf((*MockHandlers)(nil).HandleScoreUpdateFailureTyped), ctx, payload)
+}
+
+// HandleScoreUpdateRequestTyped mocks base method.
+func (m *MockHandlers) HandleScoreUpdateRequestTyped(ctx context.Context, payload *score.ScoreUpdateRequestDiscordPayloadV1) ([]handlerwrapper.Result, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HandleScoreUpdateRequestTyped", ctx, payload)
+	ret0, _ := ret[0].([]handlerwrapper.Result)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// HandleScoreUpdateRequestTyped indicates an expected call of HandleScoreUpdateRequestTyped.
+func (mr *MockHandlersMockRecorder) HandleScoreUpdateRequestTyped(ctx, payload any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleScoreUpdateRequestTyped", reflect.TypeOf((*MockHandlers)(nil).HandleScoreUpdateRequestTyped), ctx, payload)
+}
+
+// HandleScoreUpdateSuccessTyped mocks base method.
+func (m *MockHandlers) HandleScoreUpdateSuccessTyped(ctx context.Context, payload *scoreevents.ScoreUpdatedPayloadV1) ([]handlerwrapper.Result, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HandleScoreUpdateSuccessTyped", ctx, payload)
+	ret0, _ := ret[0].([]handlerwrapper.Result)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// HandleScoreUpdateSuccessTyped indicates an expected call of HandleScoreUpdateSuccessTyped.
+func (mr *MockHandlersMockRecorder) HandleScoreUpdateSuccessTyped(ctx, payload any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleScoreUpdateSuccessTyped", reflect.TypeOf((*MockHandlers)(nil).HandleScoreUpdateSuccessTyped), ctx, payload)
 }

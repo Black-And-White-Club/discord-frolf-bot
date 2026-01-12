@@ -14,6 +14,7 @@ import (
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	tracingfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/tracing"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
+	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/message/router/middleware"
 	"go.opentelemetry.io/otel/trace"
@@ -53,6 +54,42 @@ func NewRoundRouter(
 	}
 }
 
+// handlerDeps groups dependencies needed for handler registration
+type handlerDeps struct {
+	router     *message.Router
+	subscriber eventbus.EventBus
+	publisher  eventbus.EventBus
+	logger     *slog.Logger
+	tracer     trace.Tracer
+	helper     utils.Helpers
+	metrics    handlerwrapper.ReturningMetrics
+}
+
+// registerHandler registers a pure transformation-pattern handler with typed payload
+func registerHandler[T any](
+	deps handlerDeps,
+	topic string,
+	handler func(context.Context, *T) ([]handlerwrapper.Result, error),
+) {
+	handlerName := "discord-round." + topic
+
+	deps.router.AddHandler(
+		handlerName,
+		topic,
+		deps.subscriber,
+		"", // Watermill reads topic from message metadata when empty
+		deps.publisher,
+		handlerwrapper.WrapTransformingTyped(
+			handlerName,
+			deps.logger,
+			deps.tracer,
+			deps.helper,
+			deps.metrics,
+			handler,
+		),
+	)
+}
+
 // Configure sets up the router.
 func (r *RoundRouter) Configure(ctx context.Context, handlers roundhandlers.Handlers) error {
 	r.logger.InfoContext(ctx, "RoundRouter.Configure called")
@@ -74,102 +111,77 @@ func (r *RoundRouter) Configure(ctx context.Context, handlers roundhandlers.Hand
 	return nil
 }
 
-// RegisterHandlers registers event handlers.
+// RegisterHandlers registers all event handlers using the pure transformation pattern.
 func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandlers.Handlers) error {
 	r.logger.InfoContext(ctx, "RoundRouter.RegisterHandlers called")
 
-	eventsToHandlers := map[string]message.HandlerFunc{
-		// Creation flow
-		sharedroundevents.RoundCreateModalSubmittedV1: handlers.HandleRoundCreateRequested,
-		roundevents.RoundCreatedV1:                    handlers.HandleRoundCreated,
-		roundevents.RoundCreationFailedV1:             handlers.HandleRoundCreationFailed,
-		roundevents.RoundValidationFailedV1:           handlers.HandleRoundValidationFailed,
+	var metrics handlerwrapper.ReturningMetrics // reserved for Phase 6
 
-		// Update flow
-		sharedroundevents.RoundUpdateModalSubmittedV1: handlers.HandleRoundUpdateRequested,
-		roundevents.RoundUpdatedV1:                    handlers.HandleRoundUpdated,
-		roundevents.RoundUpdateErrorV1:                handlers.HandleRoundUpdateFailed,
-
-		// Participation
-		sharedroundevents.RoundParticipantJoinRequestDiscordV1: handlers.HandleRoundParticipantJoinRequest,
-		roundevents.RoundParticipantRemovedV1:                  handlers.HandleRoundParticipantRemoved,
-
-		// Scoring
-		roundevents.RoundParticipantScoreUpdatedV1: handlers.HandleParticipantScoreUpdated,
-		roundevents.RoundScoreUpdateErrorV1:        handlers.HandleScoreUpdateError,
-
-		// Score override bridging (CorrectScore service)
-		scoreevents.ScoreUpdatedV1: handlers.HandleScoreOverrideSuccess,
-		// NOTE: We intentionally do NOT map ScoreBulkUpdateSuccess to per-user handler.
-		// The per-user success events (score.update.success) are expected to be emitted individually
-		// for each updated participant. The aggregate bulk success event lacks a specific user/score
-		// and was causing empty participant payloads & failed embed updates when bridged.
-
-		// Scorecard import flow
-		roundevents.ScorecardUploadedV1:     handlers.HandleScorecardUploaded,
-		roundevents.ScorecardParseFailedV1:  handlers.HandleScorecardParseFailed,
-		roundevents.ImportFailedV1:          handlers.HandleImportFailed,
-		roundevents.ScorecardURLRequestedV1: handlers.HandleScorecardURLRequested,
-
-		// Deletion flow
-		sharedroundevents.RoundDeleteRequestDiscordV1: handlers.HandleRoundDeleteRequested,
-
-		// Lifecycle
-		roundevents.RoundDeletedV1:          handlers.HandleRoundDeleted,
-		roundevents.RoundFinalizedDiscordV1: handlers.HandleRoundFinalized,
-		roundevents.RoundStartedV1:          handlers.HandleRoundStarted,
-
-		// Tag handling
-		roundevents.RoundParticipantJoinedV1: handlers.HandleRoundParticipantJoined,
-
-		// Reminders
-		roundevents.RoundReminderSentV1: handlers.HandleRoundReminder,
-
-		roundevents.TagsUpdatedForScheduledRoundsV1: handlers.HandleTagsUpdatedForScheduledRounds,
+	deps := handlerDeps{
+		router:     r.Router,
+		subscriber: r.subscriber,
+		publisher:  r.publisher,
+		logger:     r.logger,
+		tracer:     r.tracer,
+		helper:     r.helper,
+		metrics:    metrics,
 	}
 
-	for topic, handlerFunc := range eventsToHandlers {
-		handlerName := fmt.Sprintf("discord-round.%s", topic)
-		r.logger.InfoContext(ctx, "Registering handler for topic", attr.String("topic", topic), attr.String("handler", handlerName))
-		r.Router.AddHandler(
-			handlerName,
-			topic,
-			r.subscriber,
-			"",
-			nil,
-			func(msg *message.Message) ([]*message.Message, error) {
-				// Use message context, not captured registration context
-				msgCtx := msg.Context()
+	// Creation flow
+	registerHandler(deps, sharedroundevents.RoundCreateModalSubmittedV1, handlers.HandleRoundCreateRequested)
+	registerHandler(deps, roundevents.RoundCreatedV1, handlers.HandleRoundCreated)
+	registerHandler(deps, roundevents.RoundCreationFailedV1, handlers.HandleRoundCreationFailed)
+	registerHandler(deps, roundevents.RoundValidationFailedV1, handlers.HandleRoundValidationFailed)
 
-				messages, err := handlerFunc(msg)
-				if err != nil {
-					r.logger.ErrorContext(msgCtx, "Error processing message",
-						attr.String("message_id", msg.UUID),
-						attr.Error(err),
-					)
-					return nil, err
-				}
+	// Update flow
+	registerHandler(deps, sharedroundevents.RoundUpdateModalSubmittedV1, handlers.HandleRoundUpdateRequested)
+	registerHandler(deps, roundevents.RoundUpdatedV1, handlers.HandleRoundUpdated)
+	registerHandler(deps, roundevents.RoundUpdateErrorV1, handlers.HandleRoundUpdateFailed)
 
-				for _, m := range messages {
-					publishTopic := m.Metadata.Get("topic")
-					if publishTopic != "" {
-						r.logger.InfoContext(msgCtx, "Publishing message",
-							attr.String("message_id", m.UUID),
-							attr.String("topic", publishTopic),
-						)
-						if err := r.publisher.Publish(publishTopic, m); err != nil {
-							return nil, fmt.Errorf("failed to publish to %s: %w", publishTopic, err)
-						}
-					} else {
-						r.logger.WarnContext(msgCtx, "Message missing topic metadata",
-							attr.String("message_id", m.UUID),
-						)
-					}
-				}
-				return nil, nil
-			},
-		)
-	}
+	// Participation
+	registerHandler(deps, sharedroundevents.RoundParticipantJoinRequestDiscordV1, handlers.HandleRoundParticipantJoinRequest)
+	registerHandler(deps, roundevents.RoundParticipantRemovedV1, handlers.HandleRoundParticipantRemoved)
+
+	// Scoring
+	registerHandler(deps, roundevents.RoundParticipantScoreUpdatedV1, handlers.HandleParticipantScoreUpdated)
+	registerHandler(deps, roundevents.RoundScoreUpdateErrorV1, handlers.HandleScoreUpdateError)
+
+	// Score override bridging (CorrectScore service)
+	registerHandler(deps, scoreevents.ScoreUpdatedV1, handlers.HandleScoreOverrideSuccess)
+	// NOTE: We intentionally do NOT map ScoreBulkUpdateSuccess to per-user handler.
+	// The per-user success events (score.update.success) are expected to be emitted individually
+	// for each updated participant. The aggregate bulk success event lacks a specific user/score
+	// and was causing empty participant payloads & failed embed updates when bridged.
+
+	// Scorecard import flow
+	registerHandler(deps, roundevents.ScorecardUploadedV1, handlers.HandleScorecardUploaded)
+	registerHandler(deps, roundevents.ScorecardParseFailedV1, handlers.HandleScorecardParseFailed)
+	registerHandler(deps, roundevents.ImportFailedV1, handlers.HandleImportFailed)
+	registerHandler(deps, roundevents.ScorecardURLRequestedV1, handlers.HandleScorecardURLRequested)
+
+	// Deletion flow
+	registerHandler(deps, sharedroundevents.RoundDeleteRequestDiscordV1, handlers.HandleRoundDeleteRequested)
+
+	// Lifecycle
+	registerHandler(deps, roundevents.RoundDeletedV1, handlers.HandleRoundDeleted)
+	registerHandler(deps, roundevents.RoundFinalizedDiscordV1, handlers.HandleRoundFinalized)
+	registerHandler(deps, roundevents.RoundStartedV1, handlers.HandleRoundStarted)
+
+	// Tag handling
+	registerHandler(deps, roundevents.RoundParticipantJoinedV1, handlers.HandleRoundParticipantJoined)
+
+	// Reminders
+	registerHandler(deps, roundevents.RoundReminderSentV1, handlers.HandleRoundReminder)
+	registerHandler(deps, roundevents.TagsUpdatedForScheduledRoundsV1, handlers.HandleTagsUpdatedForScheduledRounds)
+
+	// NOTE: Several backend-only failure topics are intentionally NOT mapped to
+	// Discord-side handlers. These topics are published by the `frolf-bot` backend
+	// for observability/monitoring and do not require user-facing Discord actions.
+	// Examples: `round.schedule.failed.v1`, `round.start.failed.v1`,
+	// `round.finalization.error.v1`.
+	// If an operational alert is needed in the future, add a dedicated handler
+	// under `app/round/watermill/handlers/round_failures.go` and register it here.
+
 	r.logger.InfoContext(ctx, "RoundRouter.RegisterHandlers completed successfully")
 	return nil
 }
