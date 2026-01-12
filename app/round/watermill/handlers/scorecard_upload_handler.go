@@ -76,7 +76,7 @@ func (rh *RoundHandlers) ScorecardUploadedEvent(msg *message.Message) error {
 	if err != nil {
 		rh.Logger.ErrorContext(ctx, "Failed to unmarshal scorecard uploaded event",
 			attr.Error(err),
-			attr.String("discord_message_id", msg.UUID),
+			attr.String("message_id", msg.UUID),
 		)
 		span.RecordError(err)
 		return err
@@ -144,7 +144,7 @@ func (rh *RoundHandlers) ScorecardParseFailedEvent(msg *message.Message) error {
 	if err != nil {
 		rh.Logger.ErrorContext(ctx, "Failed to unmarshal scorecard parse failed event",
 			attr.Error(err),
-			attr.String("discord_message_id", msg.UUID),
+			attr.String("message_id", msg.UUID),
 		)
 		span.RecordError(err)
 		return err
@@ -178,7 +178,7 @@ func (rh *RoundHandlers) ImportFailedEvent(msg *message.Message) error {
 	if err != nil {
 		rh.Logger.ErrorContext(ctx, "Failed to unmarshal import failed event",
 			attr.Error(err),
-			attr.String("discord_message_id", msg.UUID),
+			attr.String("message_id", msg.UUID),
 		)
 		span.RecordError(err)
 		return err
@@ -212,7 +212,7 @@ func (rh *RoundHandlers) ScorecardURLRequestedEvent(msg *message.Message) error 
 	if err != nil {
 		rh.Logger.ErrorContext(ctx, "Failed to unmarshal scorecard URL requested event",
 			attr.Error(err),
-			attr.String("discord_message_id", msg.UUID),
+			attr.String("message_id", msg.UUID),
 		)
 		span.RecordError(err)
 		return err

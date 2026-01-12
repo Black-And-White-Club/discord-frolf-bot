@@ -9,8 +9,8 @@ import (
 	sharedleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
-	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 )
 
 // HandleTagAssignRequest translates a Discord tag assignment request directly to a batch assignment.
@@ -69,7 +69,7 @@ func (h *LeaderboardHandlers) HandleTagAssignRequest(ctx context.Context,
 				"user_id":    string(discordPayload.TargetUserID),
 				"requestor_id": string(discordPayload.RequestorID),
 				"channel_id": discordPayload.ChannelID,
-				"discord_message_id": discordPayload.MessageID,
+				"message_id": discordPayload.MessageID,
 				"guild_id":   discordPayload.GuildID,
 				"source":     "discord_claim",
 			},

@@ -48,7 +48,7 @@ func (tum *tagUpdateManager) UpdateTagsInEmbed(ctx context.Context, channelID, m
 				tum.logger.ErrorContext(ctx, "Failed to fetch message for tag update",
 					attr.Error(err),
 					attr.String("channel_id", resolvedChannelID),
-					attr.String("discord_message_id", messageID),
+					attr.String("message_id", messageID),
 				)
 			}
 			return TagUpdateOperationResult{Error: err}, fmt.Errorf("failed to fetch message for tag update: %w", err)
@@ -58,7 +58,7 @@ func (tum *tagUpdateManager) UpdateTagsInEmbed(ctx context.Context, channelID, m
 			if tum.logger != nil {
 				tum.logger.WarnContext(ctx, "No embeds found in message for tag update",
 					attr.String("channel_id", resolvedChannelID),
-					attr.String("discord_message_id", messageID),
+					attr.String("message_id", messageID),
 				)
 			}
 			return TagUpdateOperationResult{Success: "No embeds found to update"}, nil
@@ -88,7 +88,7 @@ func (tum *tagUpdateManager) UpdateTagsInEmbed(ctx context.Context, channelID, m
 		if len(participantFields) == 0 {
 			tum.logger.WarnContext(ctx, "No participant fields found in embed for tag update",
 				attr.String("channel_id", resolvedChannelID),
-				attr.String("discord_message_id", messageID),
+				attr.String("message_id", messageID),
 			)
 			return TagUpdateOperationResult{Success: "No participant fields found"}, nil
 		}
@@ -136,7 +136,7 @@ func (tum *tagUpdateManager) UpdateTagsInEmbed(ctx context.Context, channelID, m
 						tum.logger.WarnContext(ctx, "Failed to parse participant line in UpdateTagsInEmbed",
 							attr.String("line", line),
 							attr.String("field_name", field.Name),
-							attr.String("discord_message_id", messageID),
+							attr.String("message_id", messageID),
 						)
 					}
 					newLines = append(newLines, line)
@@ -202,7 +202,7 @@ func (tum *tagUpdateManager) UpdateTagsInEmbed(ctx context.Context, channelID, m
 			if tum.logger != nil {
 				tum.logger.WarnContext(ctx, "None of the target users were found in embed fields for tag update",
 					attr.String("channel_id", resolvedChannelID),
-					attr.String("discord_message_id", messageID),
+					attr.String("message_id", messageID),
 				)
 			}
 			return TagUpdateOperationResult{Success: "No target users found in embed fields"}, nil
@@ -228,7 +228,7 @@ func (tum *tagUpdateManager) UpdateTagsInEmbed(ctx context.Context, channelID, m
 				tum.logger.ErrorContext(ctx, "Failed to update message with new tags",
 					attr.Error(err),
 					attr.String("channel_id", resolvedChannelID),
-					attr.String("discord_message_id", messageID),
+					attr.String("message_id", messageID),
 				)
 			}
 			return TagUpdateOperationResult{Error: err}, fmt.Errorf("failed to edit message for tag update: %w", err)
@@ -237,7 +237,7 @@ func (tum *tagUpdateManager) UpdateTagsInEmbed(ctx context.Context, channelID, m
 		if tum.logger != nil {
 			tum.logger.InfoContext(ctx, "Successfully updated user tags in embed",
 				attr.String("channel_id", resolvedChannelID),
-				attr.String("discord_message_id", messageID),
+				attr.String("message_id", messageID),
 				attr.Int("users_updated", len(usersFoundAndUpdated)),
 			)
 		}

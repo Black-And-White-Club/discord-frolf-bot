@@ -216,7 +216,7 @@ func (s *setupManager) createSignupMessage(guildID, channelID, content, emojiNam
 				"error", err,
 				"emoji", emojiName,
 				"channel_id", channelID,
-				"discord_message_id", message.ID)
+				"message_id", message.ID)
 		}
 		// Don't fail the setup, but make sure we log the error properly
 	} else {
@@ -224,7 +224,7 @@ func (s *setupManager) createSignupMessage(guildID, channelID, content, emojiNam
 			s.logger.InfoContext(context.Background(), "Successfully added reaction to signup message",
 				"emoji", emojiName,
 				"channel_id", channelID,
-				"discord_message_id", message.ID)
+				"message_id", message.ID)
 		}
 	}
 
@@ -232,7 +232,7 @@ func (s *setupManager) createSignupMessage(guildID, channelID, content, emojiNam
 		s.logger.InfoContext(context.Background(), "Created signup message",
 			"guild_id", guildID,
 			"channel_id", channelID,
-			"discord_message_id", message.ID,
+			"message_id", message.ID,
 			"content", content,
 			"emoji", emojiName)
 	}
