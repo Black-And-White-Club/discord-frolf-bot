@@ -133,7 +133,7 @@ func (srm *scoreRoundManager) handleBulkScoreSubmission(ctx context.Context, i *
 		msg.Metadata.Set("user_id", userIDFromModal)
 		if i.Message != nil {
 			msg.Metadata.Set("discord_message_id", i.Message.ID)
-			msg.Metadata.Set("message_id", i.Message.ID)
+			msg.Metadata.Set("discord_message_id", i.Message.ID)
 		}
 		if i.ChannelID != "" {
 			msg.Metadata.Set("channel_id", i.ChannelID)

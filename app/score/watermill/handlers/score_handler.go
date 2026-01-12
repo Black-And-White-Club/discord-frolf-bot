@@ -35,7 +35,7 @@ func (h *ScoreHandlers) HandleScoreUpdateRequestTyped(ctx context.Context, paylo
 	md := map[string]string{
 		"user_id":    string(payload.UserID),
 		"channel_id": payload.ChannelID,
-		"message_id": payload.MessageID,
+		"discord_message_id": payload.MessageID,
 	}
 
 	return []handlerwrapper.Result{{
@@ -55,7 +55,7 @@ func (h *ScoreHandlers) HandleScoreUpdateSuccessTyped(ctx context.Context, paylo
 		"type":       "score_update_success",
 		"round_id":   payload.RoundID,
 		"score":      payload.Score,
-		"message_id": "", // populated by metadata propagation in wrapper
+		"discord_message_id": "", // populated by metadata propagation in wrapper
 	}
 
 	return []handlerwrapper.Result{{
@@ -83,7 +83,7 @@ func (h *ScoreHandlers) HandleScoreUpdateFailureTyped(ctx context.Context, paylo
 		"type":       "score_update_failure",
 		"round_id":   payload.RoundID,
 		"error":      payload.Reason,
-		"message_id": "",
+		"discord_message_id": "",
 	}
 
 	return []handlerwrapper.Result{{

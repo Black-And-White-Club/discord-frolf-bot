@@ -36,7 +36,7 @@ func (m *startRoundManager) UpdateRoundToScorecard(ctx context.Context, channelI
 		existingMsg, err := m.session.ChannelMessage(resolvedChannelID, messageID)
 		if err != nil {
 			m.logger.ErrorContext(ctx, "Failed to fetch existing message for UpdateRoundToScorecard",
-				attr.Error(err), attr.String("message_id", messageID))
+				attr.Error(err), attr.String("discord_message_id", messageID))
 			return StartRoundOperationResult{Error: fmt.Errorf("failed to fetch existing message: %w", err)}, nil
 		}
 
@@ -74,12 +74,12 @@ func (m *startRoundManager) UpdateRoundToScorecard(ctx context.Context, channelI
 		})
 		if err != nil {
 			m.logger.ErrorContext(ctx, "Failed to update round embed to scorecard",
-				attr.Error(err), attr.String("message_id", messageID))
+				attr.Error(err), attr.String("discord_message_id", messageID))
 			return StartRoundOperationResult{Error: fmt.Errorf("failed to update round embed: %w", err)}, nil
 		}
 
 		m.logger.InfoContext(ctx, "Successfully updated round embed to scorecard",
-			attr.String("message_id", messageID),
+			attr.String("discord_message_id", messageID),
 			attr.String("channel_id", resolvedChannelID))
 
 		return StartRoundOperationResult{Success: true}, nil

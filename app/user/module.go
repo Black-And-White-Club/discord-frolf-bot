@@ -91,7 +91,7 @@ func InitializeUserModule(
 			logger.ErrorContext(ctx, "Error handling reaction add",
 				attr.Error(err),
 				attr.String("user_id", r.UserID),
-				attr.String("message_id", r.MessageID),
+				attr.String("discord_message_id", r.MessageID),
 				attr.String("guild_id", r.GuildID),
 			)
 		}

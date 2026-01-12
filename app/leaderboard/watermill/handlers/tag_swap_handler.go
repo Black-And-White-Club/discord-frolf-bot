@@ -7,8 +7,8 @@ import (
 
 	sharedleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
-	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
+	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 )
 
 // -- Tag Swap --
@@ -49,7 +49,7 @@ func (h *LeaderboardHandlers) HandleTagSwapRequest(ctx context.Context,
 			Metadata: map[string]string{
 				"user_id":    string(requestorID),
 				"channel_id": channelID,
-				"message_id": messageID,
+				"discord_message_id": messageID,
 			},
 		},
 	}, nil

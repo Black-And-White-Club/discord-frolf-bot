@@ -69,7 +69,7 @@ func (urm *updateRoundManager) SendUpdateRoundModal(ctx context.Context, i *disc
 		}
 
 		urm.logger.InfoContext(ctx, "Including message ID in modal CustomID",
-			attr.String("message_id", messageID),
+			attr.String("discord_message_id", messageID),
 			attr.RoundID("round_id", roundID))
 
 		// ✅ Include only roundID and messageID in CustomID (keep under 100 chars)
@@ -243,7 +243,7 @@ func (urm *updateRoundManager) HandleUpdateRoundModalSubmit(ctx context.Context,
 		urm.logger.InfoContext(ctx, "DEBUG: Parsed roundID and messageID",
 			attr.RoundID("round_id", roundID),
 			attr.String("round_id_string", roundID.String()),
-			attr.String("message_id", messageID))
+			attr.String("discord_message_id", messageID))
 
 		// Extract form data
 		title := roundtypes.Title(strings.TrimSpace(data.Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value))
