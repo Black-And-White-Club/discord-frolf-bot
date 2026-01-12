@@ -41,7 +41,7 @@ func (h *RoundHandlers) HandleRoundDeleted(ctx context.Context, payload *roundev
 		return nil, fmt.Errorf("error calling delete round embed service: %w", err)
 	}
 
-	success, ok := result.Success.(bool)
+	_, ok = result.Success.(bool)
 	if !ok {
 		return nil, fmt.Errorf("unexpected type for result.Success in DeleteRoundEventEmbed result for round %s", payload.RoundID.String())
 	}
