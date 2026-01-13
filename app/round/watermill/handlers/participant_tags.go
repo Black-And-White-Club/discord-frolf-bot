@@ -24,7 +24,7 @@ func (h *RoundHandlers) HandleTagsUpdatedForScheduledRounds(ctx context.Context,
 		}
 	}
 
-	// Use the tag update manager to update Discord embeds (works for both RSVP and scorecard embeds)
+	// Use the tag update manager to update Discord embeds
 	result, err := h.RoundDiscord.GetTagUpdateManager().UpdateDiscordEmbedsWithTagChanges(ctx, *payload, tagUpdates)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update Discord embeds: %w", err)
