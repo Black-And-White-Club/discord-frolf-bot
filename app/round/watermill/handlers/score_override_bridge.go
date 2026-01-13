@@ -29,7 +29,7 @@ func (h *RoundHandlers) HandleScoreOverrideSuccess(ctx context.Context, payload 
 	participantPayload := &roundevents.ParticipantScoreUpdatedPayloadV1{
 		GuildID:        payload.GuildID,
 		RoundID:        payload.RoundID,
-		Participant:    payload.UserID,
+		UserID:         payload.UserID,
 		Score:          payload.Score,
 		ChannelID:      channelID,
 		EventMessageID: messageID,

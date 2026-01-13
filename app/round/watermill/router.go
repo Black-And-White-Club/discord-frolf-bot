@@ -143,6 +143,10 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 	registerHandler(deps, roundevents.RoundParticipantRemovedV1, handlers.HandleRoundParticipantRemoved)
 
 	// Scoring
+	// Discord->Round bridge: translate discord-scoped round score submissions
+	// into the canonical round domain topic so the round handlers can process
+	// first-time submissions and participant creation.
+	registerHandler(deps, sharedroundevents.RoundScoreUpdateRequestDiscordV1, handlers.HandleDiscordRoundScoreUpdate)
 	registerHandler(deps, roundevents.RoundParticipantScoreUpdatedV1, handlers.HandleParticipantScoreUpdated)
 	registerHandler(deps, roundevents.RoundScoreUpdateErrorV1, handlers.HandleScoreUpdateError)
 
