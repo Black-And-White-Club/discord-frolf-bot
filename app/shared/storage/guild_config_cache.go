@@ -118,32 +118,32 @@ type GuildConfigCacheInterface interface {
 // GuildConfigCache manages long-lived guild configurations with memory optimization
 // Uses LRU eviction with O(1) operations via doubly-linked list + map
 type GuildConfigCache struct {
-	store           sync.Map
+	store           map[string]*list.Element // Direct map to list elements
 	lruList         *list.List               // Doubly-linked list for O(1) LRU operations
-	lruMap          map[string]*list.Element // Map guildID -> list element for O(1) access
-	mu              sync.RWMutex
-	maxSize         int           // Maximum number of cached configs
-	cacheTTL        time.Duration // How long configs stay cached (hard expiry)
-	refreshTTL      time.Duration // How long before background refresh is triggered
+	mu              sync.RWMutex             // Protects both store and lruList
+	maxSize         int                      // Maximum number of cached configs
+	cacheTTL        time.Duration            // How long configs stay cached (hard expiry)
+	refreshTTL      time.Duration            // How long before background refresh is triggered
 	metrics         CacheMetrics
 	refreshCallback func(guildID string) // Callback for triggering background refresh
 }
 
 // lruEntry represents an entry in the LRU list
+// The actual Config data lives here inside the list element
 type lruEntry struct {
-	guildID   string
-	timestamp time.Time
+	guildID string
+	config  *GuildConfig
 }
 
-// NewGuildConfigCache creates a new optimized guild config cache with LRU eviction and background refresh
+// NewGuildConfigCache creates a new optimized guild config cache
 func NewGuildConfigCache(ctx context.Context, maxSize int, cacheTTL, refreshTTL time.Duration) GuildConfigCacheInterface {
 	cache := &GuildConfigCache{
+		store:      make(map[string]*list.Element),
+		lruList:    list.New(),
 		maxSize:    maxSize,
 		cacheTTL:   cacheTTL,
 		refreshTTL: refreshTTL,
 		metrics:    NewCacheMetrics(),
-		lruList:    list.New(),
-		lruMap:     make(map[string]*list.Element),
 	}
 
 	// Start cleanup goroutine for expired entries
@@ -154,46 +154,42 @@ func NewGuildConfigCache(ctx context.Context, maxSize int, cacheTTL, refreshTTL 
 
 // Get retrieves a guild config from cache and updates LRU order
 func (gc *GuildConfigCache) Get(guildID string) (*GuildConfig, bool) {
-	value, exists := gc.store.Load(guildID)
+	// We need a Write Lock because we are modifying the LRU list order
+	gc.mu.Lock()
+	defer gc.mu.Unlock()
+
+	element, exists := gc.store[guildID]
 	if !exists {
 		gc.metrics.RecordMiss()
 		return nil, false
 	}
 
-	config := value.(*GuildConfig)
+	entry := element.Value.(*lruEntry)
+	config := entry.config
 
 	// Hard expiry: remove from cache if cacheTTL exceeded
 	if time.Since(config.CachedAt) > gc.cacheTTL {
-		slog.Debug("Guild config cache expired, removing",
-			attr.String("guild_id", guildID))
-		gc.Delete(guildID) // Use Delete method to properly clean up LRU tracking
+		slog.Debug("Guild config cache expired, removing", attr.String("guild_id", guildID))
+
+		// Inline eviction logic for efficiency
+		gc.lruList.Remove(element)
+		delete(gc.store, guildID)
+
 		gc.metrics.RecordMiss()
 		return nil, false
 	}
 
-	// Background refresh trigger: if refreshTTL exceeded, atomically mark as pending
-	if time.Since(config.RefreshedAt) > gc.refreshTTL {
-		slog.Debug("Guild config is stale — attempting to trigger background refresh",
-			attr.String("guild_id", guildID))
-
-		go func() {
-			if gc.MarkRequestPending(guildID) {
-				// Trigger refresh using callback if available
-				gc.mu.RLock()
-				callback := gc.refreshCallback
-				gc.mu.RUnlock()
-
-				if callback != nil {
-					callback(guildID)
-				} else {
-					slog.Info("Triggering async config refresh", attr.String("guild_id", guildID))
-				}
-			}
-		}()
-	}
-
 	// Update LRU order: move to front (most recently used)
-	gc.updateLRUOrder(guildID)
+	gc.lruList.MoveToFront(element)
+
+	// Background refresh trigger: if refreshTTL exceeded, check pending flag
+	if time.Since(config.RefreshedAt) > gc.refreshTTL && !config.IsRequestPending {
+		slog.Debug("Guild config is stale — attempting to trigger background refresh", attr.String("guild_id", guildID))
+
+		// We trigger the refresh logic in a separate goroutine to avoid blocking the Get return.
+		// We pass the guildID to a helper function.
+		go gc.triggerAsyncRefresh(guildID)
+	}
 
 	gc.metrics.RecordHit()
 	slog.Debug("Guild config cache hit", attr.String("guild_id", guildID))
@@ -206,88 +202,89 @@ func (gc *GuildConfigCache) Set(guildID string, config *GuildConfig) error {
 		return errors.New("config cannot be nil")
 	}
 
-	// Set cache and refresh timestamps
+	gc.mu.Lock()
+	defer gc.mu.Unlock()
+
 	now := time.Now()
 	config.CachedAt = now
 	config.RefreshedAt = now
 
-	// Check if we need to evict entries before adding new one
-	if gc.Size() >= gc.maxSize {
+	// Check if update existing
+	if element, exists := gc.store[guildID]; exists {
+		entry := element.Value.(*lruEntry)
+		entry.config = config
+		gc.lruList.MoveToFront(element)
+		return nil
+	}
+
+	// Check capacity for new entry
+	if gc.lruList.Len() >= gc.maxSize {
 		gc.evictOldestEntry()
 	}
 
-	// Store the config
-	gc.store.Store(guildID, config)
-
-	// Update LRU order: move to front (most recently used)
-	gc.updateLRUOrder(guildID)
+	// Add new entry
+	newEntry := &lruEntry{
+		guildID: guildID,
+		config:  config,
+	}
+	element := gc.lruList.PushFront(newEntry)
+	gc.store[guildID] = element
 
 	slog.Debug("Guild config cached",
 		attr.String("guild_id", guildID),
-		attr.Int("cache_size", gc.Size()))
+		attr.Int("cache_size", gc.lruList.Len()))
 
 	return nil
 }
 
 // Delete removes a guild config from cache and LRU tracking
 func (gc *GuildConfigCache) Delete(guildID string) {
-	gc.store.Delete(guildID)
-
-	// Remove from LRU tracking
 	gc.mu.Lock()
-	if element, exists := gc.lruMap[guildID]; exists {
-		gc.lruList.Remove(element)
-		delete(gc.lruMap, guildID)
-	}
-	gc.mu.Unlock()
+	defer gc.mu.Unlock()
 
-	slog.Debug("Guild config removed from cache", attr.String("guild_id", guildID))
+	if element, exists := gc.store[guildID]; exists {
+		gc.lruList.Remove(element)
+		delete(gc.store, guildID)
+		slog.Debug("Guild config removed from cache", attr.String("guild_id", guildID))
+	}
 }
 
 // Size returns the current number of cached configs
 func (gc *GuildConfigCache) Size() int {
-	count := 0
-	gc.store.Range(func(_, _ interface{}) bool {
-		count++
-		return true
-	})
-	return count
+	gc.mu.RLock()
+	defer gc.mu.RUnlock()
+	return len(gc.store)
 }
 
 // Clear removes all cached configs
 func (gc *GuildConfigCache) Clear() {
-	gc.store.Range(func(key, _ interface{}) bool {
-		gc.store.Delete(key)
-		return true
-	})
-	slog.Info("Guild config cache cleared")
-}
-
-// evictOldestEntry removes the least recently used entry in O(1) time
-func (gc *GuildConfigCache) evictOldestEntry() {
 	gc.mu.Lock()
 	defer gc.mu.Unlock()
 
-	// Get the least recently used item (tail of list)
+	gc.store = make(map[string]*list.Element)
+	gc.lruList.Init() // Clears the list
+	slog.Info("Guild config cache cleared")
+}
+
+// evictOldestEntry removes the least recently used entry
+// Caller must hold the lock
+func (gc *GuildConfigCache) evictOldestEntry() {
 	oldest := gc.lruList.Back()
 	if oldest == nil {
-		return // Empty list
+		return
 	}
 
-	// Remove from both the LRU list and the cache
 	entry := oldest.Value.(*lruEntry)
 	gc.lruList.Remove(oldest)
-	delete(gc.lruMap, entry.guildID)
-	gc.store.Delete(entry.guildID)
+	delete(gc.store, entry.guildID)
 
 	gc.metrics.RecordEviction()
-	slog.Debug("Evicted least recently used guild config from cache",
-		attr.String("guild_id", entry.guildID))
+	slog.Debug("Evicted least recently used guild config from cache", attr.String("guild_id", entry.guildID))
 }
 
 // cleanupExpiredEntries runs periodically to remove expired entries
 func (gc *GuildConfigCache) cleanupExpiredEntries(ctx context.Context) {
-	ticker := time.NewTicker(gc.cacheTTL / 4) // Cleanup 4x more frequently than TTL
+	ticker := time.NewTicker(gc.cacheTTL / 4)
 	defer ticker.Stop()
 
 	for {
@@ -296,43 +293,47 @@ func (gc *GuildConfigCache) cleanupExpiredEntries(ctx context.Context) {
 			slog.Info("🧹 Cache cleanup stopped")
 			return
 		case <-ticker.C:
-			now := time.Now()
-			var keysToDelete []interface{}
-
-			// Collect expired keys
-			gc.store.Range(func(key, value interface{}) bool {
-				config := value.(*GuildConfig)
-				if now.Sub(config.CachedAt) > gc.cacheTTL {
-					keysToDelete = append(keysToDelete, key)
-				}
-				return true
-			})
-
-			// Delete expired entries
-			for _, key := range keysToDelete {
-				gc.Delete(key.(string)) // Use Delete method to properly clean up LRU tracking
-				slog.Debug("Cleaned up expired guild config",
-					attr.String("guild_id", key.(string)))
-			}
-
-			if len(keysToDelete) > 0 {
-				slog.Debug("Cleaned up expired guild configs",
-					attr.Int("removed_count", len(keysToDelete)),
-					attr.Int("remaining_count", gc.Size()))
-			}
+			gc.performCleanup()
 		}
 	}
 }
 
+// performCleanup handles the locking and deletion of expired keys
+func (gc *GuildConfigCache) performCleanup() {
+	gc.mu.Lock()
+	defer gc.mu.Unlock()
+
+	now := time.Now()
+	var expiredElements []*list.Element
+
+	// Iterate through the store to find expired items
+	// Note: We scan the map because LRU order != Time order necessarily
+	for _, element := range gc.store {
+		entry := element.Value.(*lruEntry)
+		if now.Sub(entry.config.CachedAt) > gc.cacheTTL {
+			expiredElements = append(expiredElements, element)
+		}
+	}
+
+	for _, element := range expiredElements {
+		entry := element.Value.(*lruEntry)
+		gc.lruList.Remove(element)
+		delete(gc.store, entry.guildID)
+		slog.Debug("Cleaned up expired guild config", attr.String("guild_id", entry.guildID))
+	}
+
+	if len(expiredElements) > 0 {
+		slog.Debug("Cleaned up expired guild configs",
+			attr.Int("removed_count", len(expiredElements)),
+			attr.Int("remaining_count", len(gc.store)))
+	}
+}
+
 // IsConfigured returns true if this guild config represents a fully configured guild
-// A guild is considered configured if it has essential channels and roles set up
 func (gc *GuildConfig) IsConfigured() bool {
-	// If this is a placeholder config, it means the guild is marked as configured
 	if gc.IsPlaceholder {
 		return true
 	}
-
-	// Normal validation for real configs
 	return gc.GuildID != "" &&
 		gc.SignupChannelID != "" &&
 		gc.EventChannelID != "" &&
@@ -341,31 +342,13 @@ func (gc *GuildConfig) IsConfigured() bool {
 }
 
 // MarkRequestPending marks a guild as having a pending config request
-// Returns true if the request was marked as pending, false if already pending
-// Uses atomic CAS operations with retry loop to prevent race conditions
 func (gc *GuildConfigCache) MarkRequestPending(guildID string) bool {
-	// Retry loop for CAS operations to avoid stack overflow under high contention
-	for range 10 {
-		if value, found := gc.store.Load(guildID); found {
-			config := value.(*GuildConfig)
+	gc.mu.Lock()
+	defer gc.mu.Unlock()
 
-			if config.IsRequestPending {
-				return false // Already pending
-			}
-
-			// Create new config with pending flag set
-			newConfig := *config // Copy struct
-			newConfig.IsRequestPending = true
-
-			// Atomic compare-and-swap: only store if value hasn't changed
-			if gc.store.CompareAndSwap(guildID, value, &newConfig) {
-				gc.metrics.RecordPendingRequest()
-				return true // Successfully marked as pending
-			}
-			// If CAS failed, another goroutine modified it, retry
-			continue
-		}
-
+	// Check if exists
+	element, exists := gc.store[guildID]
+	if !exists {
 		// Create a placeholder with pending request
 		now := time.Now()
 		pendingConfig := &GuildConfig{
@@ -376,50 +359,63 @@ func (gc *GuildConfigCache) MarkRequestPending(guildID string) bool {
 			IsRequestPending: true,
 		}
 
-		// Use LoadOrStore for atomic "create if not exists"
-		_, loaded := gc.store.LoadOrStore(guildID, pendingConfig)
-		if !loaded {
-			// We successfully created the pending entry
-			gc.metrics.RecordPendingRequest()
-			return true
+		entry := &lruEntry{guildID: guildID, config: pendingConfig}
+		// Check capacity before adding placeholder
+		if gc.lruList.Len() >= gc.maxSize {
+			gc.evictOldestEntry()
 		}
-		// Another goroutine created it first, retry to check if pending
+
+		newElem := gc.lruList.PushFront(entry)
+		gc.store[guildID] = newElem
+		gc.metrics.RecordPendingRequest()
+		return true
 	}
 
-	slog.Debug("Failed to mark request as pending after retries",
-		attr.String("guild_id", guildID))
-	return false
+	// Update existing
+	entry := element.Value.(*lruEntry)
+	if entry.config.IsRequestPending {
+		return false // Already pending
+	}
+
+	entry.config.IsRequestPending = true
+	gc.metrics.RecordPendingRequest()
+	return true
 }
 
 // ClearRequestPending clears the pending request flag for a guild
-// Uses atomic CAS operations with retry loop to prevent race conditions
 func (gc *GuildConfigCache) ClearRequestPending(guildID string) {
-	// Retry loop for CAS operations to avoid stack overflow under high contention
-	for range 10 {
-		value, found := gc.store.Load(guildID)
-		if !found {
-			return // Entry doesn't exist
-		}
+	gc.mu.Lock()
+	defer gc.mu.Unlock()
 
-		config := value.(*GuildConfig)
-		if !config.IsRequestPending {
-			return // Already not pending
-		}
-
-		// Create new config with pending flag cleared
-		newConfig := *config // Copy struct
-		newConfig.IsRequestPending = false
-
-		// Atomic compare-and-swap: only store if value hasn't changed
-		if gc.store.CompareAndSwap(guildID, value, &newConfig) {
-			gc.metrics.RecordPendingCleared()
-			return // Successfully cleared pending flag
-		}
-		// If CAS failed, another goroutine modified it, retry
+	element, exists := gc.store[guildID]
+	if !exists {
+		return
 	}
 
-	slog.Debug("Failed to clear pending request after retries",
-		attr.String("guild_id", guildID))
+	entry := element.Value.(*lruEntry)
+	if entry.config.IsRequestPending {
+		entry.config.IsRequestPending = false
+		gc.metrics.RecordPendingCleared()
+	}
+}
+
+// triggerAsyncRefresh handles the locking needed to call the callback safely
+func (gc *GuildConfigCache) triggerAsyncRefresh(guildID string) {
+	// Attempt to mark as pending. This handles the concurrency check.
+	// If another routine beat us to it, MarkRequestPending returns false.
+	if gc.MarkRequestPending(guildID) {
+
+		// Retrieve callback safely
+		gc.mu.RLock()
+		callback := gc.refreshCallback
+		gc.mu.RUnlock()
+
+		if callback != nil {
+			callback(guildID)
+		} else {
+			slog.Info("Triggering async config refresh (no callback set)", attr.String("guild_id", guildID))
+		}
+	}
 }
 
 // GetMetrics returns cache performance statistics
@@ -432,28 +428,4 @@ func (gc *GuildConfigCache) SetRefreshCallback(callback func(guildID string)) {
 	gc.mu.Lock()
 	defer gc.mu.Unlock()
 	gc.refreshCallback = callback
-}
-
-// updateLRUOrder moves the specified guildID to the front of the LRU list (most recently used)
-func (gc *GuildConfigCache) updateLRUOrder(guildID string) {
-	gc.mu.Lock()
-	defer gc.mu.Unlock()
-
-	now := time.Now()
-
-	// Check if already in LRU tracking
-	if element, exists := gc.lruMap[guildID]; exists {
-		// Move to front (most recently used)
-		entry := element.Value.(*lruEntry)
-		entry.timestamp = now
-		gc.lruList.MoveToFront(element)
-	} else {
-		// Add new entry to front
-		entry := &lruEntry{
-			guildID:   guildID,
-			timestamp: now,
-		}
-		element := gc.lruList.PushFront(entry)
-		gc.lruMap[guildID] = element
-	}
 }
