@@ -25,7 +25,7 @@ func (h *RoundHandlers) HandleParticipantScoreUpdated(ctx context.Context, paylo
 		ctx,
 		channelID,              // Pass channel ID
 		payload.EventMessageID, // Pass message ID of the scorecard
-		payload.Participant,    // Pass the UserID of the updated participant
+		payload.UserID,         // Pass the UserID of the updated participant
 		&payload.Score,         // Pass a pointer to the updated score
 	)
 	if err != nil {
@@ -45,7 +45,7 @@ func (h *RoundHandlers) HandleScoreUpdateError(ctx context.Context, payload *rou
 		return nil, fmt.Errorf("received empty error message in HandleScoreUpdateError")
 	}
 
-	_, err := h.RoundDiscord.GetScoreRoundManager().SendScoreUpdateError(ctx, payload.ScoreUpdateRequest.Participant, payload.Error)
+	_, err := h.RoundDiscord.GetScoreRoundManager().SendScoreUpdateError(ctx, payload.ScoreUpdateRequest.UserID, payload.Error)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send score update error notification: %w", err)
 	}

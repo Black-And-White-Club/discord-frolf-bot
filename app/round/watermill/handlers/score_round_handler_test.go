@@ -26,19 +26,19 @@ func TestRoundHandlers_HandleParticipantScoreUpdated(t *testing.T) {
 	testEventMessageID := "event-msg-123"
 
 	tests := []struct {
-		name       string
-		payload    *roundevents.ParticipantScoreUpdatedPayloadV1
-		ctx        context.Context
-		wantErr    bool
-		wantLen    int
-		setup      func(*gomock.Controller, *mocks.MockRoundDiscordInterface, *mocks.MockScoreRoundManager)
+		name    string
+		payload *roundevents.ParticipantScoreUpdatedPayloadV1
+		ctx     context.Context
+		wantErr bool
+		wantLen int
+		setup   func(*gomock.Controller, *mocks.MockRoundDiscordInterface, *mocks.MockScoreRoundManager)
 	}{
 		{
 			name: "successful_score_update",
 			payload: &roundevents.ParticipantScoreUpdatedPayloadV1{
 				RoundID:        testRoundID,
 				ChannelID:      testChannelID,
-				Participant:    testParticipant,
+				UserID:         testParticipant,
 				Score:          testScore,
 				EventMessageID: testEventMessageID,
 			},
@@ -66,7 +66,7 @@ func TestRoundHandlers_HandleParticipantScoreUpdated(t *testing.T) {
 			payload: &roundevents.ParticipantScoreUpdatedPayloadV1{
 				RoundID:        testRoundID,
 				ChannelID:      testChannelID,
-				Participant:    testParticipant,
+				UserID:         testParticipant,
 				Score:          testScore,
 				EventMessageID: testEventMessageID,
 			},
@@ -126,27 +126,32 @@ func TestRoundHandlers_HandleScoreUpdateError(t *testing.T) {
 	testRoundID := sharedtypes.RoundID(uuid.New())
 	testParticipant := sharedtypes.DiscordID("user123")
 	testError := "database connection failed"
+	scoreZero := sharedtypes.Score(0)
 
 	tests := []struct {
-		name       string
-		payload    *roundevents.RoundScoreUpdateErrorPayloadV1
-		ctx        context.Context
-		wantErr    bool
-		wantLen    int
-		setup      func(*gomock.Controller, *mocks.MockRoundDiscordInterface, *mocks.MockScoreRoundManager)
+		name    string
+		payload *roundevents.RoundScoreUpdateErrorPayloadV1
+		ctx     context.Context
+		wantErr bool
+		wantLen int
+		setup   func(*gomock.Controller, *mocks.MockRoundDiscordInterface, *mocks.MockScoreRoundManager)
 	}{
 		{
 			name: "successful_error_handling",
 			payload: &roundevents.RoundScoreUpdateErrorPayloadV1{
 				ScoreUpdateRequest: &roundevents.ScoreUpdateRequestPayloadV1{
-					RoundID:     testRoundID,
-					Participant: testParticipant,
+					GuildID:   sharedtypes.GuildID("test-guild"),
+					RoundID:   testRoundID,
+					UserID:    testParticipant,
+					Score:     &scoreZero,
+					ChannelID: "test-channel",
+					MessageID: "test-message",
 				},
 				Error: testError,
 			},
 			ctx:     context.Background(),
 			wantErr: false,
- 			wantLen: 0,
+			wantLen: 0,
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockScoreManager *mocks.MockScoreRoundManager) {
 				mockRoundDiscord.EXPECT().
 					GetScoreRoundManager().
@@ -160,7 +165,7 @@ func TestRoundHandlers_HandleScoreUpdateError(t *testing.T) {
 			},
 		},
 		{
-			name: "invalid_payload_type",
+			name:    "invalid_payload_type",
 			payload: &roundevents.RoundScoreUpdateErrorPayloadV1{},
 			ctx:     context.Background(),
 			wantErr: true,
@@ -173,8 +178,12 @@ func TestRoundHandlers_HandleScoreUpdateError(t *testing.T) {
 			name: "empty_error_message",
 			payload: &roundevents.RoundScoreUpdateErrorPayloadV1{
 				ScoreUpdateRequest: &roundevents.ScoreUpdateRequestPayloadV1{
-					RoundID:     testRoundID,
-					Participant: testParticipant,
+					GuildID:   sharedtypes.GuildID("test-guild"),
+					RoundID:   testRoundID,
+					UserID:    testParticipant,
+					Score:     &scoreZero,
+					ChannelID: "test-channel",
+					MessageID: "test-message",
 				},
 				Error: "",
 			},
@@ -189,8 +198,12 @@ func TestRoundHandlers_HandleScoreUpdateError(t *testing.T) {
 			name: "send_error_fails",
 			payload: &roundevents.RoundScoreUpdateErrorPayloadV1{
 				ScoreUpdateRequest: &roundevents.ScoreUpdateRequestPayloadV1{
-					RoundID:     testRoundID,
-					Participant: testParticipant,
+					GuildID:   sharedtypes.GuildID("test-guild"),
+					RoundID:   testRoundID,
+					UserID:    testParticipant,
+					Score:     &scoreZero,
+					ChannelID: "test-channel",
+					MessageID: "test-message",
 				},
 				Error: testError,
 			},

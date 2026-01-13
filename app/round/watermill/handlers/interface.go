@@ -28,6 +28,7 @@ type Handlers interface {
 	HandleRoundParticipantRemoved(ctx context.Context, payload *roundevents.ParticipantRemovedPayloadV1) ([]handlerwrapper.Result, error)
 
 	// Scoring
+	HandleDiscordRoundScoreUpdate(ctx context.Context, payload *sharedroundevents.RoundScoreUpdateRequestDiscordPayloadV1) ([]handlerwrapper.Result, error)
 	HandleParticipantScoreUpdated(ctx context.Context, payload *roundevents.ParticipantScoreUpdatedPayloadV1) ([]handlerwrapper.Result, error)
 	HandleScoreUpdateError(ctx context.Context, payload *roundevents.RoundScoreUpdateErrorPayloadV1) ([]handlerwrapper.Result, error)
 

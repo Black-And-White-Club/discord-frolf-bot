@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	sharedscoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/score"
+	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
@@ -143,15 +143,16 @@ func (srm *scoreRoundManager) HandleScoreSubmission(ctx context.Context, i *disc
 			return ScoreRoundOperationResult{Error: fmt.Errorf("score out of range")}, nil
 		}
 
-		// Build and publish the Discord score update request that the score module expects.
-		// This includes channel & message IDs so downstream score handlers and bridges
-		// can propagate those values for embed updates.
+		// Build and publish the canonical round domain score update request.
+		// The Discord code acts as a transport adapter: validate/auth has already
+		// happened, so we publish the domain event directly and preserve transport
+		// IDs in metadata for idempotency and embed updates.
 		scoreValue := sharedtypes.Score(scoreVal)
-		scorePayload := &sharedscoreevents.ScoreUpdateRequestDiscordPayloadV1{
+		scorePayload := &roundevents.ScoreUpdateRequestPayloadV1{
 			GuildID:   sharedtypes.GuildID(i.GuildID),
 			RoundID:   sharedtypes.RoundID(roundID),
 			UserID:    sharedtypes.DiscordID(participantID),
-			Score:     scoreValue,
+			Score:     &scoreValue,
 			ChannelID: i.ChannelID,
 			MessageID: "",
 		}
@@ -163,20 +164,25 @@ func (srm *scoreRoundManager) HandleScoreSubmission(ctx context.Context, i *disc
 		if scoreMsg.Metadata == nil {
 			scoreMsg.Metadata = message.Metadata{}
 		}
-		scoreMsg.Metadata.Set("topic", sharedscoreevents.ScoreUpdateRequestDiscordV1)
+		// Publish the canonical domain topic so round handlers receive it directly
+		scoreMsg.Metadata.Set("topic", roundevents.RoundScoreUpdateRequestedV1)
 		if i.GuildID != "" {
 			scoreMsg.Metadata.Set("guild_id", i.GuildID)
 		}
 		if i.Message != nil {
 			scoreMsg.Metadata.Set("discord_message_id", i.Message.ID)
+			scoreMsg.Metadata.Set("message_id", i.Message.ID)
+		}
+		if i.ChannelID != "" {
+			scoreMsg.Metadata.Set("channel_id", i.ChannelID)
 		}
 
-		resultScoreMsg, err := srm.helper.CreateResultMessage(scoreMsg, scorePayload, sharedscoreevents.ScoreUpdateRequestDiscordV1)
+		resultScoreMsg, err := srm.helper.CreateResultMessage(scoreMsg, scorePayload, roundevents.RoundScoreUpdateRequestedV1)
 		if err != nil {
 			_, _ = srm.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{Content: "Something went wrong while submitting your score. Please try again later.", Flags: discordgo.MessageFlagsEphemeral})
 			return ScoreRoundOperationResult{Error: fmt.Errorf("failed to create result message")}, nil
 		}
-		if err = srm.publisher.Publish(sharedscoreevents.ScoreUpdateRequestDiscordV1, resultScoreMsg); err != nil {
+		if err = srm.publisher.Publish(roundevents.RoundScoreUpdateRequestedV1, resultScoreMsg); err != nil {
 			_, _ = srm.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{Content: "Failed to submit your score. Please try again later.", Flags: discordgo.MessageFlagsEphemeral})
 			return ScoreRoundOperationResult{Error: fmt.Errorf("failed to publish message")}, nil
 		}
