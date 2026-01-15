@@ -27,6 +27,7 @@ func (h *RoundHandlers) HandleRoundUpdateRequested(ctx context.Context, payload 
 		Title:       payload.Title,
 		Description: payload.Description,
 		StartTime:   startTimeStr,
+		Timezone:    payload.Timezone,
 		Location:    payload.Location,
 	}
 
