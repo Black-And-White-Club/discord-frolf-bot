@@ -13,7 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	guild "github.com/Black-And-White-Club/frolf-bot-shared/types/guild"
+	guildtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/guild"
 	discordgo "github.com/bwmarrin/discordgo"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -43,10 +43,10 @@ func (m *MockResetManager) EXPECT() *MockResetManagerMockRecorder {
 }
 
 // DeleteResources mocks base method.
-func (m *MockResetManager) DeleteResources(ctx context.Context, guildID string, state guild.ResourceState) (map[string]guild.DeletionResult, error) {
+func (m *MockResetManager) DeleteResources(ctx context.Context, guildID string, state guildtypes.ResourceState) (map[string]guildtypes.DeletionResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteResources", ctx, guildID, state)
-	ret0, _ := ret[0].(map[string]guild.DeletionResult)
+	ret0, _ := ret[0].(map[string]guildtypes.DeletionResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

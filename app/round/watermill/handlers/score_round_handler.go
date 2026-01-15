@@ -39,6 +39,31 @@ func (h *RoundHandlers) HandleParticipantScoreUpdated(ctx context.Context, paylo
 	return nil, nil
 }
 
+// HandleScoresBulkUpdated updates the scorecard for bulk score overrides.
+func (h *RoundHandlers) HandleScoresBulkUpdated(ctx context.Context, payload *roundevents.RoundScoresBulkUpdatedPayloadV1) ([]handlerwrapper.Result, error) {
+	// Use ChannelID from config if payload ChannelID is empty (as a fallback)
+	channelID := payload.ChannelID
+	if channelID == "" && h.Config != nil && h.Config.GetEventChannelID() != "" {
+		channelID = h.Config.GetEventChannelID()
+	}
+
+	scoreRoundManager := h.RoundDiscord.GetScoreRoundManager()
+	updateResult, err := scoreRoundManager.UpdateScoreEmbedBulk(
+		ctx,
+		channelID,
+		payload.EventMessageID,
+		payload.Participants,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call UpdateScoreEmbedBulk: %w", err)
+	}
+	if updateResult.Error != nil {
+		return nil, fmt.Errorf("bulk scorecard update failed: %w", updateResult.Error)
+	}
+
+	return nil, nil
+}
+
 // HandleScoreUpdateError processes a failed score update event.
 func (h *RoundHandlers) HandleScoreUpdateError(ctx context.Context, payload *roundevents.RoundScoreUpdateErrorPayloadV1) ([]handlerwrapper.Result, error) {
 	if payload.Error == "" {

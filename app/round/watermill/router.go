@@ -148,6 +148,7 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 	// first-time submissions and participant creation.
 	registerHandler(deps, discordroundevents.RoundScoreUpdateRequestDiscordV1, handlers.HandleDiscordRoundScoreUpdate)
 	registerHandler(deps, roundevents.RoundParticipantScoreUpdatedV1, handlers.HandleParticipantScoreUpdated)
+	registerHandler(deps, roundevents.RoundScoresBulkUpdatedV1, handlers.HandleScoresBulkUpdated)
 	registerHandler(deps, roundevents.RoundScoreUpdateErrorV1, handlers.HandleScoreUpdateError)
 
 	// Score override bridging (CorrectScore service)

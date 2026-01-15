@@ -30,6 +30,7 @@ type Handlers interface {
 	// Scoring
 	HandleDiscordRoundScoreUpdate(ctx context.Context, payload *discordroundevents.RoundScoreUpdateRequestDiscordPayloadV1) ([]handlerwrapper.Result, error)
 	HandleParticipantScoreUpdated(ctx context.Context, payload *roundevents.ParticipantScoreUpdatedPayloadV1) ([]handlerwrapper.Result, error)
+	HandleScoresBulkUpdated(ctx context.Context, payload *roundevents.RoundScoresBulkUpdatedPayloadV1) ([]handlerwrapper.Result, error)
 	HandleScoreUpdateError(ctx context.Context, payload *roundevents.RoundScoreUpdateErrorPayloadV1) ([]handlerwrapper.Result, error)
 
 	// Score override bridging (CorrectScore service)
