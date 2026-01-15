@@ -13,7 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	guild "github.com/Black-And-White-Club/frolf-bot-shared/events/guild"
+	guildevents "github.com/Black-And-White-Club/frolf-bot-shared/events/guild"
 	handlerwrapper "github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -43,7 +43,7 @@ func (m *MockHandlers) EXPECT() *MockHandlersMockRecorder {
 }
 
 // HandleGuildConfigCreated mocks base method.
-func (m *MockHandlers) HandleGuildConfigCreated(ctx context.Context, payload *guild.GuildConfigCreatedPayloadV1) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleGuildConfigCreated(ctx context.Context, payload *guildevents.GuildConfigCreatedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleGuildConfigCreated", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -58,7 +58,7 @@ func (mr *MockHandlersMockRecorder) HandleGuildConfigCreated(ctx, payload any) *
 }
 
 // HandleGuildConfigCreationFailed mocks base method.
-func (m *MockHandlers) HandleGuildConfigCreationFailed(ctx context.Context, payload *guild.GuildConfigCreationFailedPayloadV1) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleGuildConfigCreationFailed(ctx context.Context, payload *guildevents.GuildConfigCreationFailedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleGuildConfigCreationFailed", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -73,7 +73,7 @@ func (mr *MockHandlersMockRecorder) HandleGuildConfigCreationFailed(ctx, payload
 }
 
 // HandleGuildConfigDeleted mocks base method.
-func (m *MockHandlers) HandleGuildConfigDeleted(ctx context.Context, payload *guild.GuildConfigDeletedPayloadV1) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleGuildConfigDeleted(ctx context.Context, payload *guildevents.GuildConfigDeletedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleGuildConfigDeleted", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -88,7 +88,7 @@ func (mr *MockHandlersMockRecorder) HandleGuildConfigDeleted(ctx, payload any) *
 }
 
 // HandleGuildConfigDeletionFailed mocks base method.
-func (m *MockHandlers) HandleGuildConfigDeletionFailed(ctx context.Context, payload *guild.GuildConfigDeletionFailedPayloadV1) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleGuildConfigDeletionFailed(ctx context.Context, payload *guildevents.GuildConfigDeletionFailedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleGuildConfigDeletionFailed", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -103,7 +103,7 @@ func (mr *MockHandlersMockRecorder) HandleGuildConfigDeletionFailed(ctx, payload
 }
 
 // HandleGuildConfigRetrievalFailed mocks base method.
-func (m *MockHandlers) HandleGuildConfigRetrievalFailed(ctx context.Context, payload *guild.GuildConfigRetrievalFailedPayloadV1) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleGuildConfigRetrievalFailed(ctx context.Context, payload *guildevents.GuildConfigRetrievalFailedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleGuildConfigRetrievalFailed", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -118,7 +118,7 @@ func (mr *MockHandlersMockRecorder) HandleGuildConfigRetrievalFailed(ctx, payloa
 }
 
 // HandleGuildConfigRetrieved mocks base method.
-func (m *MockHandlers) HandleGuildConfigRetrieved(ctx context.Context, payload *guild.GuildConfigRetrievedPayloadV1) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleGuildConfigRetrieved(ctx context.Context, payload *guildevents.GuildConfigRetrievedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleGuildConfigRetrieved", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -133,7 +133,7 @@ func (mr *MockHandlersMockRecorder) HandleGuildConfigRetrieved(ctx, payload any)
 }
 
 // HandleGuildConfigUpdateFailed mocks base method.
-func (m *MockHandlers) HandleGuildConfigUpdateFailed(ctx context.Context, payload *guild.GuildConfigUpdateFailedPayloadV1) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleGuildConfigUpdateFailed(ctx context.Context, payload *guildevents.GuildConfigUpdateFailedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleGuildConfigUpdateFailed", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -148,7 +148,7 @@ func (mr *MockHandlersMockRecorder) HandleGuildConfigUpdateFailed(ctx, payload a
 }
 
 // HandleGuildConfigUpdated mocks base method.
-func (m *MockHandlers) HandleGuildConfigUpdated(ctx context.Context, payload *guild.GuildConfigUpdatedPayloadV1) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleGuildConfigUpdated(ctx context.Context, payload *guildevents.GuildConfigUpdatedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleGuildConfigUpdated", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)

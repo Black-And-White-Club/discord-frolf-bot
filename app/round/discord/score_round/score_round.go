@@ -30,6 +30,7 @@ type ScoreRoundManager interface {
 	SendScoreUpdateConfirmation(ctx context.Context, channelID string, userID sharedtypes.DiscordID, score *sharedtypes.Score) (ScoreRoundOperationResult, error)
 	SendScoreUpdateError(ctx context.Context, userID sharedtypes.DiscordID, errorMsg string) (ScoreRoundOperationResult, error)
 	UpdateScoreEmbed(ctx context.Context, channelID, messageID string, userID sharedtypes.DiscordID, score *sharedtypes.Score) (ScoreRoundOperationResult, error)
+	UpdateScoreEmbedBulk(ctx context.Context, channelID, messageID string, participants []roundtypes.Participant) (ScoreRoundOperationResult, error)
 	AddLateParticipantToScorecard(ctx context.Context, channelID, messageID string, participants []roundtypes.Participant) (ScoreRoundOperationResult, error)
 }
 

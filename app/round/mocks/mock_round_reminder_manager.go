@@ -13,8 +13,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	round_reminder "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/round_reminder"
-	round "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
+	roundreminder "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/round_reminder"
+	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -43,10 +43,10 @@ func (m *MockRoundReminderManager) EXPECT() *MockRoundReminderManagerMockRecorde
 }
 
 // SendRoundReminder mocks base method.
-func (m *MockRoundReminderManager) SendRoundReminder(ctx context.Context, payload *round.DiscordReminderPayloadV1) (round_reminder.RoundReminderOperationResult, error) {
+func (m *MockRoundReminderManager) SendRoundReminder(ctx context.Context, payload *roundevents.DiscordReminderPayloadV1) (roundreminder.RoundReminderOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SendRoundReminder", ctx, payload)
-	ret0, _ := ret[0].(round_reminder.RoundReminderOperationResult)
+	ret0, _ := ret[0].(roundreminder.RoundReminderOperationResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

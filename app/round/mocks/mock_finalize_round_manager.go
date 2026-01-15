@@ -13,8 +13,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	finalize_round "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/finalize_round"
-	round "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
+	finalizeround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/finalize_round"
+	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	discordgo "github.com/bwmarrin/discordgo"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -44,10 +44,10 @@ func (m *MockFinalizeRoundManager) EXPECT() *MockFinalizeRoundManagerMockRecorde
 }
 
 // FinalizeScorecardEmbed mocks base method.
-func (m *MockFinalizeRoundManager) FinalizeScorecardEmbed(ctx context.Context, eventMessageID, channelID string, embedPayload round.RoundFinalizedEmbedUpdatePayloadV1) (finalize_round.FinalizeRoundOperationResult, error) {
+func (m *MockFinalizeRoundManager) FinalizeScorecardEmbed(ctx context.Context, eventMessageID, channelID string, embedPayload roundevents.RoundFinalizedEmbedUpdatePayloadV1) (finalizeround.FinalizeRoundOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FinalizeScorecardEmbed", ctx, eventMessageID, channelID, embedPayload)
-	ret0, _ := ret[0].(finalize_round.FinalizeRoundOperationResult)
+	ret0, _ := ret[0].(finalizeround.FinalizeRoundOperationResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -59,7 +59,7 @@ func (mr *MockFinalizeRoundManagerMockRecorder) FinalizeScorecardEmbed(ctx, even
 }
 
 // TransformRoundToFinalizedScorecard mocks base method.
-func (m *MockFinalizeRoundManager) TransformRoundToFinalizedScorecard(payload round.RoundFinalizedEmbedUpdatePayloadV1) (*discordgo.MessageEmbed, []discordgo.MessageComponent, error) {
+func (m *MockFinalizeRoundManager) TransformRoundToFinalizedScorecard(payload roundevents.RoundFinalizedEmbedUpdatePayloadV1) (*discordgo.MessageEmbed, []discordgo.MessageComponent, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "TransformRoundToFinalizedScorecard", payload)
 	ret0, _ := ret[0].(*discordgo.MessageEmbed)

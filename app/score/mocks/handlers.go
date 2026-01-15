@@ -13,8 +13,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	score "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/score"
-	shared "github.com/Black-And-White-Club/frolf-bot-shared/events/shared"
+	discordscoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/score"
+	sharedevents "github.com/Black-And-White-Club/frolf-bot-shared/events/shared"
 	handlerwrapper "github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -44,7 +44,7 @@ func (m *MockHandlers) EXPECT() *MockHandlersMockRecorder {
 }
 
 // HandleProcessRoundScoresFailedTyped mocks base method.
-func (m *MockHandlers) HandleProcessRoundScoresFailedTyped(ctx context.Context, payload *shared.ProcessRoundScoresFailedPayloadV1) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleProcessRoundScoresFailedTyped(ctx context.Context, payload *sharedevents.ProcessRoundScoresFailedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleProcessRoundScoresFailedTyped", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -59,7 +59,7 @@ func (mr *MockHandlersMockRecorder) HandleProcessRoundScoresFailedTyped(ctx, pay
 }
 
 // HandleScoreUpdateFailureTyped mocks base method.
-func (m *MockHandlers) HandleScoreUpdateFailureTyped(ctx context.Context, payload *shared.ScoreUpdateFailedPayloadV1) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleScoreUpdateFailureTyped(ctx context.Context, payload *sharedevents.ScoreUpdateFailedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleScoreUpdateFailureTyped", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -74,7 +74,7 @@ func (mr *MockHandlersMockRecorder) HandleScoreUpdateFailureTyped(ctx, payload a
 }
 
 // HandleScoreUpdateRequestTyped mocks base method.
-func (m *MockHandlers) HandleScoreUpdateRequestTyped(ctx context.Context, payload *score.ScoreUpdateRequestDiscordPayloadV1) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleScoreUpdateRequestTyped(ctx context.Context, payload *discordscoreevents.ScoreUpdateRequestDiscordPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleScoreUpdateRequestTyped", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -89,7 +89,7 @@ func (mr *MockHandlersMockRecorder) HandleScoreUpdateRequestTyped(ctx, payload a
 }
 
 // HandleScoreUpdateSuccessTyped mocks base method.
-func (m *MockHandlers) HandleScoreUpdateSuccessTyped(ctx context.Context, payload *shared.ScoreUpdatedPayloadV1) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleScoreUpdateSuccessTyped(ctx context.Context, payload *sharedevents.ScoreUpdatedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleScoreUpdateSuccessTyped", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
