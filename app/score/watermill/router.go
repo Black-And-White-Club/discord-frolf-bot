@@ -8,8 +8,8 @@ import (
 	scorehandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/score/watermill/handlers"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
-	sharedscoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/score"
-	scoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/score"
+	discordscoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/score"
+	sharedevents "github.com/Black-And-White-Club/frolf-bot-shared/events/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	tracingfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/tracing"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
@@ -127,11 +127,11 @@ func (r *ScoreRouter) RegisterHandlers(ctx context.Context, handlers scorehandle
 	}
 
 	// Register typed handlers
-	registerHandler(deps, sharedscoreevents.ScoreUpdateRequestDiscordV1, handlers.HandleScoreUpdateRequestTyped)
-	registerHandler(deps, scoreevents.ScoreUpdatedV1, handlers.HandleScoreUpdateSuccessTyped)
-	registerHandler(deps, scoreevents.ScoreUpdateFailedV1, handlers.HandleScoreUpdateFailureTyped)
+	registerHandler(deps, discordscoreevents.ScoreUpdateRequestDiscordV1, handlers.HandleScoreUpdateRequestTyped)
+	registerHandler(deps, sharedevents.ScoreUpdatedV1, handlers.HandleScoreUpdateSuccessTyped)
+	registerHandler(deps, sharedevents.ScoreUpdateFailedV1, handlers.HandleScoreUpdateFailureTyped)
 	// Optional: map backend score processing failures for observability (no downstream messages)
-	registerHandler(deps, scoreevents.ProcessRoundScoresFailedV1, handlers.HandleProcessRoundScoresFailedTyped)
+	registerHandler(deps, sharedevents.ProcessRoundScoresFailedV1, handlers.HandleProcessRoundScoresFailedTyped)
 
 	r.logger.InfoContext(ctx, "ScoreRouter.RegisterHandlers completed successfully")
 	return nil

@@ -39,7 +39,7 @@ func TestNewSignupManager(t *testing.T) {
 				logger := slog.New(testHandler)
 				mockHelper := utilsmocks.NewMockHelpers(ctrl)
 				mockConfig := &config.Config{}
-				mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+				mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
 				mockMetrics := discordmetrics.NewMockDiscordMetrics(ctrl)
 				tracer := noop.NewTracerProvider().Tracer("test")
 
@@ -47,7 +47,7 @@ func TestNewSignupManager(t *testing.T) {
 				mockGuildConfigResolver := guildconfigmock.NewMockGuildConfigResolver(ctrl)
 
 				// Call the function being tested
-				manager, err := NewSignupManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockGuildConfigResolver, mockInteractionStore, tracer, mockMetrics)
+				manager, err := NewSignupManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockGuildConfigResolver, mockInteractionStore, nil, tracer, mockMetrics)
 				// Ensure manager is correctly created
 				if err != nil {
 					t.Fatalf("NewSignupManager returned error: %v", err)
@@ -98,7 +98,7 @@ func TestNewSignupManager(t *testing.T) {
 			name: "Handles nil dependencies",
 			test: func(t *testing.T) {
 				// Call with nil dependencies
-				manager, err := NewSignupManager(nil, nil, nil, nil, nil, nil, nil, nil, nil)
+				manager, err := NewSignupManager(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 				// Ensure manager is correctly created
 				if err != nil {
 					t.Fatalf("NewSignupManager returned error: %v", err)
@@ -309,7 +309,7 @@ func Test_signupManager_createEvent(t *testing.T) {
 	mockConfig := &config.Config{}
 	mockConfig.Discord.GuildID = "test-guild-id"
 
-	mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+	mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
 	mockMetrics := discordmetrics.NewMockDiscordMetrics(ctrl)
 	tracer := noop.NewTracerProvider().Tracer("test")
 

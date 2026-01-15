@@ -1,6 +1,10 @@
+// interactions/message_registry.go
 package interactions
 
 import (
+	"context"
+	"log/slog"
+
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/bwmarrin/discordgo"
 )
@@ -9,30 +13,60 @@ type discordgoAdder interface {
 	AddHandler(handler interface{}) func()
 }
 
+// MessageHandlerCreate defines the signature for message creation handlers with context
+type MessageHandlerCreate func(ctx context.Context, s discord.Session, m *discordgo.MessageCreate)
+
 // MessageRegistry manages message event handlers
 type MessageRegistry struct {
-	messageCreateHandlers []func(s discord.Session, m *discordgo.MessageCreate)
+	messageCreateHandlers []MessageHandlerCreate
+	logger                *slog.Logger
 }
 
 // NewMessageRegistry creates a new MessageRegistry
-func NewMessageRegistry() *MessageRegistry {
+func NewMessageRegistry(logger *slog.Logger) *MessageRegistry {
 	return &MessageRegistry{
-		messageCreateHandlers: make([]func(s discord.Session, m *discordgo.MessageCreate), 0),
+		messageCreateHandlers: make([]MessageHandlerCreate, 0),
+		logger:                logger,
 	}
 }
 
 // RegisterMessageCreateHandler registers a handler for MessageCreate events
-func (r *MessageRegistry) RegisterMessageCreateHandler(handler func(s discord.Session, m *discordgo.MessageCreate)) {
+func (r *MessageRegistry) RegisterMessageCreateHandler(handler MessageHandlerCreate) {
 	r.messageCreateHandlers = append(r.messageCreateHandlers, handler)
 }
 
 // RegisterWithSession registers all handlers with the Discord session
-
 func (r *MessageRegistry) RegisterWithSession(session discordgoAdder, wrapperSession discord.Session) {
 	// Register MessageCreate handler
 	session.AddHandler(func(s *discordgo.Session, e *discordgo.MessageCreate) {
+		// 1. Safety Check: Ignore messages sent by the bot itself to prevent recursion
+		var authorID string
+		if e.Author != nil {
+			authorID = e.Author.ID
+		}
+
+		var sessionUserID string
+		if s != nil && s.State != nil && s.State.User != nil {
+			sessionUserID = s.State.User.ID
+		}
+
+		if authorID != "" && sessionUserID != "" && authorID == sessionUserID {
+			return
+		}
+
+		// 2. Context Initialization: Create a base context for this message event chain
+		ctx := context.Background()
+
+		if r.logger != nil {
+			r.logger.Info("Processing MessageCreate handlers",
+				slog.String("author_id", authorID),
+				slog.String("channel_id", e.ChannelID),
+				slog.String("message_id", e.ID))
+		}
+
+		// 3. Execution: Distribute the message to all registered handlers
 		for _, handler := range r.messageCreateHandlers {
-			handler(wrapperSession, e)
+			handler(ctx, wrapperSession, e)
 		}
 	})
 }

@@ -300,7 +300,7 @@ func TestCreateSignupMessage_DefaultsAndReactionError(t *testing.T) {
 	ms.EXPECT().MessageReactionAdd("ch1", "m1", gomock.Any()).Return(fmt.Errorf("react fail")).AnyTimes()
 
 	m := &setupManager{session: ms, logger: discardLogger()}
-	mid, err := m.createSignupMessage("g1", "ch1", "", "")
+	mid, err := m.createSignupMessage(context.Background(), "g1", "ch1", "", "")
 	if err != nil {
 		t.Fatalf("createSignupMessage unexpected error: %v", err)
 	}
@@ -315,7 +315,7 @@ func TestCreateSignupMessage_SendError(t *testing.T) {
 	ms := discordmocks.NewMockSession(ctrl)
 	ms.EXPECT().ChannelMessageSend("ch1", gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("send fail"))
 	m := &setupManager{session: ms, logger: discardLogger()}
-	if _, err := m.createSignupMessage("g1", "ch1", "m", "🥏"); err == nil {
+	if _, err := m.createSignupMessage(context.Background(), "g1", "ch1", "m", "🥏"); err == nil {
 		t.Fatalf("expected error when ChannelMessageSend fails")
 	}
 }

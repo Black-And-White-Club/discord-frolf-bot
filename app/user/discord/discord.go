@@ -39,21 +39,22 @@ func NewUserDiscord(
 	helper utils.Helpers,
 	config *config.Config,
 	guildConfigResolver guildconfig.GuildConfigResolver,
-	interactionStore storage.ISInterface,
+	interactionStore storage.ISInterface[any],
+	guildConfigCache storage.ISInterface[storage.GuildConfig],
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
 ) (UserDiscordInterface, error) {
-	roleManager, err := role.NewRoleManager(session, publisher, logger, helper, config, guildConfigResolver, interactionStore, tracer, metrics)
+	roleManager, err := role.NewRoleManager(session, publisher, logger, helper, config, guildConfigResolver, interactionStore, guildConfigCache, tracer, metrics)
 	if err != nil {
 		return nil, err
 	}
 
-	signupManager, err := signup.NewSignupManager(session, publisher, logger, helper, config, guildConfigResolver, interactionStore, tracer, metrics)
+	signupManager, err := signup.NewSignupManager(session, publisher, logger, helper, config, guildConfigResolver, interactionStore, guildConfigCache, tracer, metrics)
 	if err != nil {
 		return nil, err
 	}
 
-	udiscManager := udisc.NewUDiscManager(session, publisher, logger, config, tracer, metrics)
+	udiscManager := udisc.NewUDiscManager(session, publisher, logger, config, interactionStore, guildConfigCache, tracer, metrics)
 
 	return &UserDiscord{
 		RoleManager:   roleManager,

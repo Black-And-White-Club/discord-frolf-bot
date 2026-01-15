@@ -11,6 +11,7 @@ import (
 
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
 	guildconfigmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
 	"github.com/Black-And-White-Club/frolf-bot-shared/mocks"
@@ -35,7 +36,9 @@ func TestNewRoundReminderManager(t *testing.T) {
 	mockMetrics := discordmetricsmocks.NewMockDiscordMetrics(ctrl)
 	mockGuildConfigResolver := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
 
-	manager := NewRoundReminderManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockTracer, mockMetrics, mockGuildConfigResolver)
+	var nilStoreAny storage.ISInterface[any] = nil
+	var nilStoreGuild storage.ISInterface[storage.GuildConfig] = nil
+	manager := NewRoundReminderManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, nilStoreAny, nilStoreGuild, mockTracer, mockMetrics, mockGuildConfigResolver)
 	impl, ok := manager.(*roundReminderManager)
 	if !ok {
 		t.Fatalf("Expected *roundReminderManager, got %T", manager)
@@ -80,7 +83,9 @@ func TestNewRoundReminderManager_WithNilLogger(t *testing.T) {
 	mockGuildConfigResolver := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
 
 	// Test with nil logger
-	manager := NewRoundReminderManager(mockSession, mockEventBus, nil, mockHelper, mockConfig, mockTracer, mockMetrics, mockGuildConfigResolver)
+	var nilStoreAny storage.ISInterface[any] = nil
+	var nilStoreGuild storage.ISInterface[storage.GuildConfig] = nil
+	manager := NewRoundReminderManager(mockSession, mockEventBus, nil, mockHelper, mockConfig, nilStoreAny, nilStoreGuild, mockTracer, mockMetrics, mockGuildConfigResolver)
 	if manager == nil {
 		t.Fatal("Expected manager to be created even with nil logger")
 	}

@@ -13,6 +13,9 @@ import (
 	context "context"
 	reflect "reflect"
 
+	discordleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
+	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
+	sharedevents "github.com/Black-And-White-Club/frolf-bot-shared/events/shared"
 	handlerwrapper "github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -42,7 +45,7 @@ func (m *MockHandlers) EXPECT() *MockHandlersMockRecorder {
 }
 
 // HandleBatchTagAssigned mocks base method.
-func (m *MockHandlers) HandleBatchTagAssigned(ctx context.Context, payload any) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleBatchTagAssigned(ctx context.Context, payload *leaderboardevents.LeaderboardBatchTagAssignedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleBatchTagAssigned", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -57,7 +60,7 @@ func (mr *MockHandlersMockRecorder) HandleBatchTagAssigned(ctx, payload any) *go
 }
 
 // HandleGetTagByDiscordID mocks base method.
-func (m *MockHandlers) HandleGetTagByDiscordID(ctx context.Context, payload any) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleGetTagByDiscordID(ctx context.Context, payload *discordleaderboardevents.LeaderboardTagAvailabilityRequestPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleGetTagByDiscordID", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -72,7 +75,7 @@ func (mr *MockHandlersMockRecorder) HandleGetTagByDiscordID(ctx, payload any) *g
 }
 
 // HandleGetTagByDiscordIDFailed mocks base method.
-func (m *MockHandlers) HandleGetTagByDiscordIDFailed(ctx context.Context, payload any) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleGetTagByDiscordIDFailed(ctx context.Context, payload *sharedevents.GetTagNumberFailedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleGetTagByDiscordIDFailed", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -87,7 +90,7 @@ func (mr *MockHandlersMockRecorder) HandleGetTagByDiscordIDFailed(ctx, payload a
 }
 
 // HandleGetTagByDiscordIDResponse mocks base method.
-func (m *MockHandlers) HandleGetTagByDiscordIDResponse(ctx context.Context, payload any) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleGetTagByDiscordIDResponse(ctx context.Context, payload *sharedevents.GetTagNumberResponsePayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleGetTagByDiscordIDResponse", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -102,7 +105,7 @@ func (mr *MockHandlersMockRecorder) HandleGetTagByDiscordIDResponse(ctx, payload
 }
 
 // HandleLeaderboardResponse mocks base method.
-func (m *MockHandlers) HandleLeaderboardResponse(ctx context.Context, payload any) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleLeaderboardResponse(ctx context.Context, payload *leaderboardevents.GetLeaderboardResponsePayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleLeaderboardResponse", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -117,7 +120,7 @@ func (mr *MockHandlersMockRecorder) HandleLeaderboardResponse(ctx, payload any) 
 }
 
 // HandleLeaderboardRetrievalFailed mocks base method.
-func (m *MockHandlers) HandleLeaderboardRetrievalFailed(ctx context.Context, payload any) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleLeaderboardRetrievalFailed(ctx context.Context, payload *leaderboardevents.GetLeaderboardFailedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleLeaderboardRetrievalFailed", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -132,7 +135,7 @@ func (mr *MockHandlersMockRecorder) HandleLeaderboardRetrievalFailed(ctx, payloa
 }
 
 // HandleLeaderboardRetrieveRequest mocks base method.
-func (m *MockHandlers) HandleLeaderboardRetrieveRequest(ctx context.Context, payload any) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleLeaderboardRetrieveRequest(ctx context.Context, payload *discordleaderboardevents.LeaderboardRetrieveRequestPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleLeaderboardRetrieveRequest", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -147,7 +150,7 @@ func (mr *MockHandlersMockRecorder) HandleLeaderboardRetrieveRequest(ctx, payloa
 }
 
 // HandleLeaderboardUpdateFailed mocks base method.
-func (m *MockHandlers) HandleLeaderboardUpdateFailed(ctx context.Context, payload any) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleLeaderboardUpdateFailed(ctx context.Context, payload *leaderboardevents.LeaderboardUpdateFailedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleLeaderboardUpdateFailed", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -162,7 +165,7 @@ func (mr *MockHandlersMockRecorder) HandleLeaderboardUpdateFailed(ctx, payload a
 }
 
 // HandleLeaderboardUpdatedNotification mocks base method.
-func (m *MockHandlers) HandleLeaderboardUpdatedNotification(ctx context.Context, payload any) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleLeaderboardUpdatedNotification(ctx context.Context, payload *leaderboardevents.LeaderboardUpdatedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleLeaderboardUpdatedNotification", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -177,7 +180,7 @@ func (mr *MockHandlersMockRecorder) HandleLeaderboardUpdatedNotification(ctx, pa
 }
 
 // HandleTagAssignFailedResponse mocks base method.
-func (m *MockHandlers) HandleTagAssignFailedResponse(ctx context.Context, payload any) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleTagAssignFailedResponse(ctx context.Context, payload *leaderboardevents.LeaderboardTagAssignmentFailedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleTagAssignFailedResponse", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -192,7 +195,7 @@ func (mr *MockHandlersMockRecorder) HandleTagAssignFailedResponse(ctx, payload a
 }
 
 // HandleTagAssignRequest mocks base method.
-func (m *MockHandlers) HandleTagAssignRequest(ctx context.Context, payload any) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleTagAssignRequest(ctx context.Context, payload *discordleaderboardevents.LeaderboardTagAssignRequestPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleTagAssignRequest", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -207,7 +210,7 @@ func (mr *MockHandlersMockRecorder) HandleTagAssignRequest(ctx, payload any) *go
 }
 
 // HandleTagAssignedResponse mocks base method.
-func (m *MockHandlers) HandleTagAssignedResponse(ctx context.Context, payload any) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleTagAssignedResponse(ctx context.Context, payload *leaderboardevents.LeaderboardTagAssignedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleTagAssignedResponse", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -222,7 +225,7 @@ func (mr *MockHandlersMockRecorder) HandleTagAssignedResponse(ctx, payload any) 
 }
 
 // HandleTagSwapFailedResponse mocks base method.
-func (m *MockHandlers) HandleTagSwapFailedResponse(ctx context.Context, payload any) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleTagSwapFailedResponse(ctx context.Context, payload *leaderboardevents.TagSwapFailedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleTagSwapFailedResponse", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -237,7 +240,7 @@ func (mr *MockHandlersMockRecorder) HandleTagSwapFailedResponse(ctx, payload any
 }
 
 // HandleTagSwapRequest mocks base method.
-func (m *MockHandlers) HandleTagSwapRequest(ctx context.Context, payload any) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleTagSwapRequest(ctx context.Context, payload *discordleaderboardevents.LeaderboardTagSwapRequestPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleTagSwapRequest", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -252,7 +255,7 @@ func (mr *MockHandlersMockRecorder) HandleTagSwapRequest(ctx, payload any) *gomo
 }
 
 // HandleTagSwappedResponse mocks base method.
-func (m *MockHandlers) HandleTagSwappedResponse(ctx context.Context, payload any) ([]handlerwrapper.Result, error) {
+func (m *MockHandlers) HandleTagSwappedResponse(ctx context.Context, payload *leaderboardevents.TagSwapProcessedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleTagSwappedResponse", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)

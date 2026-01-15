@@ -37,14 +37,15 @@ func InitializeUserModule(
 	logger *slog.Logger,
 	cfg *config.Config,
 	helper utils.Helpers,
-	interactionStore storage.ISInterface,
+	interactionStore storage.ISInterface[any],
+	guildConfigCache storage.ISInterface[storage.GuildConfig],
 	discordMetrics discordmetrics.DiscordMetrics,
-	guildConfigResolver guildconfig.GuildConfigResolver, // <-- Add this parameter
+	guildConfigResolver guildconfig.GuildConfigResolver,
 ) (*userrouter.UserRouter, error) {
 	tracer := otel.Tracer("user-module")
 
 	// Initialize Discord services
-	userDiscord, err := userdiscord.NewUserDiscord(ctx, session, eventBus, logger, helper, cfg, guildConfigResolver, interactionStore, tracer, discordMetrics)
+	userDiscord, err := userdiscord.NewUserDiscord(ctx, session, eventBus, logger, helper, cfg, guildConfigResolver, interactionStore, guildConfigCache, tracer, discordMetrics)
 	if err != nil {
 		logger.ErrorContext(ctx, "Failed to initialize user Discord services", attr.Error(err))
 		return nil, err
@@ -61,6 +62,8 @@ func InitializeUserModule(
 		cfg,
 		helper,
 		userDiscord,
+		interactionStore,
+		guildConfigCache,
 		tracer,
 		discordMetrics,
 	)
@@ -85,7 +88,7 @@ func InitializeUserModule(
 	}
 
 	// Register reaction handlers
-	reactionRegistry.RegisterMessageReactionAddHandler(func(s discord.Session, r *discordgo.MessageReactionAdd) {
+	reactionRegistry.RegisterMessageReactionAddHandler(func(ctx context.Context, s discord.Session, r *discordgo.MessageReactionAdd) {
 		// Silently delegate to signup manager - it handles filtering internally
 		if _, err := userDiscord.GetSignupManager().MessageReactionAdd(s, r); err != nil {
 			logger.ErrorContext(ctx, "Error handling reaction add",

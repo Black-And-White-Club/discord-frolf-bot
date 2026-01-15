@@ -1,6 +1,8 @@
 package interactions
 
 import (
+	"context"
+	"log/slog"
 	"testing"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
@@ -28,10 +30,10 @@ func TestMessageRegistry_RegisterWithSession_fansOutToHandlers(t *testing.T) {
 
 	wrapperSession := discordmocks.NewMockSession(ctrl)
 	wrapper := discord.Session(wrapperSession)
-	reg := NewMessageRegistry()
+	reg := NewMessageRegistry(slog.Default())
 
 	var called []string
-	reg.RegisterMessageCreateHandler(func(s discord.Session, m *discordgo.MessageCreate) {
+	reg.RegisterMessageCreateHandler(func(ctx context.Context, s discord.Session, m *discordgo.MessageCreate) {
 		if s != wrapper {
 			t.Fatalf("expected wrapper session to be passed through")
 		}
@@ -40,7 +42,7 @@ func TestMessageRegistry_RegisterWithSession_fansOutToHandlers(t *testing.T) {
 		}
 		called = append(called, "h1")
 	})
-	reg.RegisterMessageCreateHandler(func(s discord.Session, m *discordgo.MessageCreate) {
+	reg.RegisterMessageCreateHandler(func(ctx context.Context, s discord.Session, m *discordgo.MessageCreate) {
 		if s != wrapper {
 			t.Fatalf("expected wrapper session to be passed through")
 		}

@@ -33,7 +33,8 @@ type claimTagManager struct {
 	helper              utils.Helpers
 	config              *config.Config
 	guildConfigResolver guildconfig.GuildConfigResolver
-	interactionStore    storage.ISInterface
+	interactionStore    storage.ISInterface[any]
+	guildConfigCache    storage.ISInterface[storage.GuildConfig]
 	tracer              trace.Tracer
 	metrics             discordmetrics.DiscordMetrics
 	operationWrapper    func(ctx context.Context, opName string, fn func(ctx context.Context) (ClaimTagOperationResult, error)) (ClaimTagOperationResult, error)
@@ -52,7 +53,8 @@ func NewClaimTagManager(
 	helper utils.Helpers,
 	config *config.Config,
 	guildConfigResolver guildconfig.GuildConfigResolver,
-	interactionStore storage.ISInterface,
+	interactionStore storage.ISInterface[any],
+	guildConfigCache storage.ISInterface[storage.GuildConfig],
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
 ) ClaimTagManager {
@@ -67,6 +69,7 @@ func NewClaimTagManager(
 		config:              config,
 		guildConfigResolver: guildConfigResolver,
 		interactionStore:    interactionStore,
+		guildConfigCache:    guildConfigCache,
 		tracer:              tracer,
 		metrics:             metrics,
 		operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (ClaimTagOperationResult, error)) (ClaimTagOperationResult, error) {

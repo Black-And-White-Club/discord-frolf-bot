@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	sharedroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
+	discordroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
@@ -13,7 +13,7 @@ import (
 )
 
 // HandleRoundParticipantJoinRequest handles the request for a participant to join a round.
-func (h *RoundHandlers) HandleRoundParticipantJoinRequest(ctx context.Context, payload *sharedroundevents.RoundParticipantJoinRequestDiscordPayloadV1) ([]handlerwrapper.Result, error) {
+func (h *RoundHandlers) HandleRoundParticipantJoinRequest(ctx context.Context, payload *discordroundevents.RoundParticipantJoinRequestDiscordPayloadV1) ([]handlerwrapper.Result, error) {
 	// Extract and normalize response from context metadata. Support multiple token styles
 	// so Discord side can just send the enum value from shared types.
 	rawResponse, ok := ctx.Value("response").(string)

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	messagecreator "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/utils"
 	discorduserevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/user"
@@ -312,7 +311,7 @@ func (rm *roleManager) HandleRoleButtonPress(ctx context.Context, i *discordgo.I
 		correlationID := uuid.New().String()
 		rm.logger.InfoContext(ctx, "Storing interaction reference in cache", attr.String("correlation_id", correlationID))
 
-		if err := rm.interactionStore.Set(correlationID, i.Interaction, 10*time.Minute); err != nil {
+		if err := rm.interactionStore.Set(ctx, correlationID, i.Interaction); err != nil {
 			rm.logger.ErrorContext(ctx, "Failed to store interaction reference in cache", attr.Error(err))
 			return RoleOperationResult{Error: err}, nil
 		}
@@ -392,7 +391,7 @@ func (rm *roleManager) HandleRoleCancelButton(ctx context.Context, i *discordgo.
 		}
 
 		// Delete the interaction from the store
-		rm.interactionStore.Delete(i.Interaction.ID)
+		rm.interactionStore.Delete(ctx, i.Interaction.ID)
 
 		err := rm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseUpdateMessage,

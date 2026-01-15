@@ -121,6 +121,19 @@ func (s *setupManager) HandleSetupModalSubmit(ctx context.Context, i *discordgo.
 	return s.operationWrapper(ctx, "handle_setup_modal_submit", func(ctx context.Context) error {
 		s.logger.InfoContext(ctx, "Handling guild setup modal submission", "guild_id", i.GuildID)
 
+		// Store the interaction so asynchronous backend processing can update the original UI
+		if s.interactionStore != nil {
+			if err := s.interactionStore.Set(ctx, i.GuildID, i.Interaction); err != nil {
+				s.logger.ErrorContext(ctx, "Failed to store interaction for setup modal submission",
+					"guild_id", i.GuildID,
+					"error", err)
+				// Non-fatal: continue processing so user still receives acknowledgement
+			} else {
+				s.logger.DebugContext(ctx, "Stored interaction for setup modal submission",
+					"guild_id", i.GuildID)
+			}
+		}
+
 		// Extract form data
 		data := i.ModalSubmitData()
 
@@ -268,7 +281,7 @@ func (s *setupManager) HandleSetupModalSubmit(ctx context.Context, i *discordgo.
 		}
 
 		// Perform the actual setup - always create channels, roles, and signup message
-		result, err := s.performCustomSetup(i.GuildID, SetupConfig{
+		result, err := s.performCustomSetup(ctx, i.GuildID, SetupConfig{
 			GuildName:       guildName,
 			ChannelPrefix:   channelPrefix,
 			UserRoleName:    userRoleName,

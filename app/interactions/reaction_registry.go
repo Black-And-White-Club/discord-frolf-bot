@@ -2,31 +2,42 @@
 package interactions
 
 import (
+	"context"
+	"log/slog"
+
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/bwmarrin/discordgo"
 )
 
+// ReactionHandlerAdd defines the signature for reaction addition handlers with context
+type ReactionHandlerAdd func(ctx context.Context, s discord.Session, r *discordgo.MessageReactionAdd)
+
+// ReactionHandlerRemove defines the signature for reaction removal handlers with context
+type ReactionHandlerRemove func(ctx context.Context, s discord.Session, r *discordgo.MessageReactionRemove)
+
 // ReactionRegistry manages reaction event handlers
 type ReactionRegistry struct {
-	messageReactionAddHandlers    []func(s discord.Session, r *discordgo.MessageReactionAdd)
-	messageReactionRemoveHandlers []func(s discord.Session, r *discordgo.MessageReactionRemove)
+	messageReactionAddHandlers    []ReactionHandlerAdd
+	messageReactionRemoveHandlers []ReactionHandlerRemove
+	logger                        *slog.Logger
 }
 
 // NewReactionRegistry creates a new ReactionRegistry
-func NewReactionRegistry() *ReactionRegistry {
+func NewReactionRegistry(logger *slog.Logger) *ReactionRegistry {
 	return &ReactionRegistry{
-		messageReactionAddHandlers:    make([]func(s discord.Session, r *discordgo.MessageReactionAdd), 0),
-		messageReactionRemoveHandlers: make([]func(s discord.Session, r *discordgo.MessageReactionRemove), 0),
+		messageReactionAddHandlers:    make([]ReactionHandlerAdd, 0),
+		messageReactionRemoveHandlers: make([]ReactionHandlerRemove, 0),
+		logger:                        logger,
 	}
 }
 
 // RegisterMessageReactionAddHandler registers a handler for MessageReactionAdd events
-func (r *ReactionRegistry) RegisterMessageReactionAddHandler(handler func(s discord.Session, r *discordgo.MessageReactionAdd)) {
+func (r *ReactionRegistry) RegisterMessageReactionAddHandler(handler ReactionHandlerAdd) {
 	r.messageReactionAddHandlers = append(r.messageReactionAddHandlers, handler)
 }
 
 // RegisterMessageReactionRemoveHandler registers a handler for MessageReactionRemove events
-func (r *ReactionRegistry) RegisterMessageReactionRemoveHandler(handler func(s discord.Session, r *discordgo.MessageReactionRemove)) {
+func (r *ReactionRegistry) RegisterMessageReactionRemoveHandler(handler ReactionHandlerRemove) {
 	r.messageReactionRemoveHandlers = append(r.messageReactionRemoveHandlers, handler)
 }
 
@@ -34,15 +45,40 @@ func (r *ReactionRegistry) RegisterMessageReactionRemoveHandler(handler func(s d
 func (r *ReactionRegistry) RegisterWithSession(session *discordgo.Session, wrapperSession discord.Session) {
 	// Register MessageReactionAdd handler
 	session.AddHandler(func(s *discordgo.Session, e *discordgo.MessageReactionAdd) {
+		// Ignore bot reactions to avoid loops
+		if e.UserID == s.State.User.ID {
+			return
+		}
+
+		ctx := context.Background() // Base context for the reaction event chain
+
+		if r.logger != nil {
+			r.logger.Info("Processing ReactionAdd handlers",
+				slog.String("emoji", e.Emoji.Name),
+				slog.String("message_id", e.MessageID))
+		}
+
 		for _, handler := range r.messageReactionAddHandlers {
-			handler(wrapperSession, e)
+			handler(ctx, wrapperSession, e)
 		}
 	})
 
 	// Register MessageReactionRemove handler
 	session.AddHandler(func(s *discordgo.Session, e *discordgo.MessageReactionRemove) {
+		if e.UserID == s.State.User.ID {
+			return
+		}
+
+		ctx := context.Background()
+
+		if r.logger != nil {
+			r.logger.Info("Processing ReactionRemove handlers",
+				slog.String("emoji", e.Emoji.Name),
+				slog.String("message_id", e.MessageID))
+		}
+
 		for _, handler := range r.messageReactionRemoveHandlers {
-			handler(wrapperSession, e)
+			handler(ctx, wrapperSession, e)
 		}
 	})
 }

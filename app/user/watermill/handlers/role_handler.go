@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	shareduserevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/user"
+	discorduserevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/user"
 	userevents "github.com/Black-And-White-Club/frolf-bot-shared/events/user"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
@@ -14,7 +14,7 @@ import (
 // HandleRoleUpdateCommand handles the /rolerequest command.
 func (h *UserHandlers) HandleRoleUpdateCommand(
 	ctx context.Context,
-	payload *shareduserevents.RoleUpdateCommandPayloadV1,
+	payload *discorduserevents.RoleUpdateCommandPayloadV1,
 ) ([]handlerwrapper.Result, error) {
 	// Respond to the role request with an ephemeral message
 	// Note: interaction metadata would need to be passed in payload or context
@@ -26,7 +26,7 @@ func (h *UserHandlers) HandleRoleUpdateCommand(
 // HandleRoleUpdateButtonPress handles button interactions.
 func (h *UserHandlers) HandleRoleUpdateButtonPress(
 	ctx context.Context,
-	payload *shareduserevents.RoleUpdateButtonPressPayloadV1,
+	payload *discorduserevents.RoleUpdateButtonPressPayloadV1,
 ) ([]handlerwrapper.Result, error) {
 	// Extract the selected role from the button's custom ID
 	roleStr := strings.TrimPrefix(payload.InteractionCustomID, "role_button_")
@@ -79,29 +79,29 @@ func (h *UserHandlers) HandleRoleUpdateFailed(
 // HandleAddRole handles the AddRole event (currently from the signup flow)
 func (h *UserHandlers) HandleAddRole(
 	ctx context.Context,
-	payload *shareduserevents.AddRolePayloadV1,
+	payload *discorduserevents.AddRolePayloadV1,
 ) ([]handlerwrapper.Result, error) {
 	// Attempt to add the role
 	_, err := h.userDiscord.GetRoleManager().AddRoleToUser(ctx, h.config.GetGuildID(), payload.UserID, payload.RoleID)
 	if err != nil {
 		// Create a failure result
-		failurePayload := shareduserevents.RoleAdditionFailedPayloadV1{
+		failurePayload := discorduserevents.RoleAdditionFailedPayloadV1{
 			UserID:  payload.UserID,
 			Reason:  err.Error(),
 			GuildID: payload.GuildID,
 		}
 		return []handlerwrapper.Result{
-			{Topic: shareduserevents.SignupRoleAdditionFailedV1, Payload: &failurePayload},
+			{Topic: discorduserevents.SignupRoleAdditionFailedV1, Payload: &failurePayload},
 		}, nil
 	}
 
 	// If successful, create a success result
-	successPayload := shareduserevents.RoleAddedPayloadV1{
+	successPayload := discorduserevents.RoleAddedPayloadV1{
 		UserID:  payload.UserID,
 		GuildID: payload.GuildID,
 	}
 
 	return []handlerwrapper.Result{
-		{Topic: shareduserevents.SignupRoleAddedV1, Payload: &successPayload},
+		{Topic: discorduserevents.SignupRoleAddedV1, Payload: &successPayload},
 	}, nil
 }

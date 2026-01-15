@@ -15,6 +15,20 @@ func (s *setupManager) HandleSetupCommand(ctx context.Context, i *discordgo.Inte
 		if i == nil || i.Interaction == nil {
 			return fmt.Errorf("nil interaction provided")
 		}
+		// Store the interaction so the subsequent modal flow can be updated by async events
+		if s.interactionStore != nil {
+			if err := s.interactionStore.Set(ctx, i.GuildID, i.Interaction); err != nil {
+				// Log but do not fail the command handling
+				// Use InfoContext/ ErrorContext based on logger availability
+				// Attempt to log with available logger if present
+				// s.operationWrapper will include tracing context
+				if s.logger != nil {
+					s.logger.ErrorContext(ctx, "Failed to store interaction for setup command", "guild_id", i.GuildID, "error", err)
+				}
+			} else if s.logger != nil {
+				s.logger.DebugContext(ctx, "Stored interaction for setup command", "guild_id", i.GuildID)
+			}
+		}
 		return s.SendSetupModal(ctx, i)
 	})
 }

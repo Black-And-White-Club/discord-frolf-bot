@@ -26,7 +26,7 @@ func TestNewLeaderboardHandlers(t *testing.T) {
 		tracer := noop.NewTracerProvider().Tracer("test")
 		cfg := &config.Config{}
 
-		handlers := NewLeaderboardHandlers(logger, cfg, mockHelpersFn, mockLeaderboardDiscord, mockGuildConfigResolver, tracer, mockMetrics)
+		handlers := NewLeaderboardHandlers(logger, cfg, mockHelpersFn, mockLeaderboardDiscord, mockGuildConfigResolver, nil, nil, tracer, mockMetrics)
 
 		if handlers == nil {
 			t.Fatalf("Expected non-nil LeaderboardHandlers")

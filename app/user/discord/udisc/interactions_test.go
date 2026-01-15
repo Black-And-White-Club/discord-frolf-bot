@@ -101,9 +101,9 @@ func Test_udiscManager_HandleSetUDiscNameCommand_PublishesAndConfirms_UsesConfig
 	}}
 
 	mockPublisher.EXPECT().
-		Publish(gomock.Eq(userevents.UpdateUDiscIdentityRequest), gomock.Any()).
+		Publish(gomock.Eq(userevents.UpdateUDiscIdentityRequestedV1), gomock.Any()).
 		DoAndReturn(func(_ string, msg *message.Message) error {
-			var payload userevents.UpdateUDiscIdentityRequestPayload
+			var payload userevents.UpdateUDiscIdentityRequestedPayloadV1
 			if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 				t.Fatalf("failed to unmarshal payload: %v", err)
 			}

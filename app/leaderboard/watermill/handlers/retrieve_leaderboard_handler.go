@@ -3,20 +3,20 @@ package leaderboardhandlers
 import (
 	"context"
 
-	sharedleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
+	discordleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
-	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 	leaderboardtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/leaderboard"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
+	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 )
 
 // HandleLeaderboardRetrieveRequest handles a leaderboard retrieve request event from Discord.
 func (h *LeaderboardHandlers) HandleLeaderboardRetrieveRequest(ctx context.Context,
-	payload interface{}) ([]handlerwrapper.Result, error) {
+	payload *discordleaderboardevents.LeaderboardRetrieveRequestPayloadV1) ([]handlerwrapper.Result, error) {
 	h.Logger.InfoContext(ctx, "Handling leaderboard retrieve request")
 
-	discordPayload := payload.(*sharedleaderboardevents.LeaderboardRetrieveRequestPayloadV1)
+	discordPayload := payload
 
 	// Convert to backend payload
 	backendPayload := leaderboardevents.GetLeaderboardRequestedPayloadV1{
@@ -36,10 +36,10 @@ func (h *LeaderboardHandlers) HandleLeaderboardRetrieveRequest(ctx context.Conte
 
 // HandleLeaderboardUpdatedNotification handles backend.leaderboard.updated and re-requests full leaderboard.
 func (h *LeaderboardHandlers) HandleLeaderboardUpdatedNotification(ctx context.Context,
-	payload interface{}) ([]handlerwrapper.Result, error) {
+	payload *leaderboardevents.LeaderboardUpdatedPayloadV1) ([]handlerwrapper.Result, error) {
 	h.Logger.InfoContext(ctx, "Handling leaderboard updated notification")
 
-	updatePayload := payload.(*leaderboardevents.LeaderboardUpdatedPayloadV1)
+	updatePayload := payload
 
 	backendPayload := leaderboardevents.GetLeaderboardRequestedPayloadV1{
 		GuildID: updatePayload.GuildID,
@@ -58,10 +58,10 @@ func (h *LeaderboardHandlers) HandleLeaderboardUpdatedNotification(ctx context.C
 
 // HandleLeaderboardResponse handles backend.leaderboard.get.response and translates to Discord response.
 func (h *LeaderboardHandlers) HandleLeaderboardResponse(ctx context.Context,
-	payload interface{}) ([]handlerwrapper.Result, error) {
+	payload *leaderboardevents.GetLeaderboardResponsePayloadV1) ([]handlerwrapper.Result, error) {
 	h.Logger.InfoContext(ctx, "Handling leaderboard response")
 
-	payloadData := payload.(*leaderboardevents.GetLeaderboardResponsePayloadV1)
+	payloadData := payload
 
 	leaderboardData := make([]leaderboardtypes.LeaderboardEntry, len(payloadData.Leaderboard))
 	for i, entry := range payloadData.Leaderboard {
@@ -71,7 +71,7 @@ func (h *LeaderboardHandlers) HandleLeaderboardResponse(ctx context.Context,
 		}
 	}
 
-	discordPayload := sharedleaderboardevents.LeaderboardRetrievedPayloadV1{
+	discordPayload := discordleaderboardevents.LeaderboardRetrievedPayloadV1{
 		Leaderboard: leaderboardData,
 		GuildID:     string(payloadData.GuildID),
 	}
@@ -82,7 +82,7 @@ func (h *LeaderboardHandlers) HandleLeaderboardResponse(ctx context.Context,
 
 	return []handlerwrapper.Result{
 		{
-			Topic:   sharedleaderboardevents.LeaderboardRetrievedV1,
+			Topic:   discordleaderboardevents.LeaderboardRetrievedV1,
 			Payload: discordPayload,
 		},
 	}, nil

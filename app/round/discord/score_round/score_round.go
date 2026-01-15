@@ -9,6 +9,7 @@ import (
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
@@ -39,6 +40,8 @@ type scoreRoundManager struct {
 	logger              *slog.Logger
 	helper              utils.Helpers
 	config              *config.Config
+		interactionStore    storage.ISInterface[any]
+		guildConfigCache    storage.ISInterface[storage.GuildConfig]
 	tracer              trace.Tracer
 	metrics             discordmetrics.DiscordMetrics
 	operationWrapper    func(ctx context.Context, opName string, fn func(ctx context.Context) (ScoreRoundOperationResult, error)) (ScoreRoundOperationResult, error)
@@ -52,6 +55,8 @@ func NewScoreRoundManager(
 	logger *slog.Logger,
 	helper utils.Helpers,
 	config *config.Config,
+	interactionStore storage.ISInterface[any],
+	guildConfigCache storage.ISInterface[storage.GuildConfig],
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
 	guildConfigResolver guildconfig.GuildConfigResolver,
@@ -69,6 +74,8 @@ func NewScoreRoundManager(
 		logger:    logger,
 		helper:    helper,
 		config:    config,
+		interactionStore: interactionStore,
+		guildConfigCache: guildConfigCache,
 		tracer:    tracer,
 		metrics:   metrics,
 		operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (ScoreRoundOperationResult, error)) (ScoreRoundOperationResult, error) {

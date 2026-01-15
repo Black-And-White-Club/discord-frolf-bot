@@ -7,6 +7,7 @@ import (
 	"time"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
@@ -40,6 +41,8 @@ type scorecardUploadManager struct {
 	publisher        eventbus.EventBus
 	logger           *slog.Logger
 	config           *config.Config
+	interactionStore storage.ISInterface[any]
+	guildConfigCache storage.ISInterface[storage.GuildConfig]
 	tracer           trace.Tracer
 	metrics          discordmetrics.DiscordMetrics
 	operationWrapper func(ctx context.Context, opName string, fn func(ctx context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error)
@@ -54,6 +57,8 @@ func NewScorecardUploadManager(
 	publisher eventbus.EventBus,
 	logger *slog.Logger,
 	cfg *config.Config,
+	interactionStore storage.ISInterface[any],
+	guildConfigCache storage.ISInterface[storage.GuildConfig],
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
 ) ScorecardUploadManager {
@@ -66,6 +71,8 @@ func NewScorecardUploadManager(
 		publisher:      publisher,
 		logger:         logger,
 		config:         cfg,
+		interactionStore: interactionStore,
+		guildConfigCache: guildConfigCache,
 		tracer:         tracer,
 		metrics:        metrics,
 		pendingUploads: make(map[string]*pendingUpload),

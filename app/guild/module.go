@@ -25,6 +25,8 @@ import (
 	guildconfig "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 )
 
+// ... imports ...
+
 // InitializeGuildModule initializes the Guild domain module.
 func InitializeGuildModule(
 	ctx context.Context,
@@ -35,10 +37,10 @@ func InitializeGuildModule(
 	logger *slog.Logger,
 	cfg *config.Config,
 	helper utils.Helpers,
-	interactionStore storage.ISInterface,
+	interactionStore storage.ISInterface[any], // <--- Updated to use Generic [any]
 	discordMetrics discordmetrics.DiscordMetrics,
 	guildConfigResolver guildconfig.GuildConfigResolver,
-	signupManager signup.SignupManager, // For tracking signup channels when configs are set up
+	signupManager signup.SignupManager,
 ) (*guildwatermill.GuildRouter, error) {
 	tracer := otel.Tracer("guild-module")
 
@@ -50,7 +52,7 @@ func InitializeGuildModule(
 		logger,
 		helper,
 		cfg,
-		interactionStore,
+		interactionStore, // This is passed to managers like Setup/Reset
 		tracer,
 		discordMetrics,
 		guildConfigResolver,
@@ -71,7 +73,7 @@ func InitializeGuildModule(
 		helper,
 		guildDiscord,
 		guildConfigResolver,
-		interactionStore,
+		interactionStore, // This is passed to Watermill event handlers
 		session,
 		tracer,
 		discordMetrics,

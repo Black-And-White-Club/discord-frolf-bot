@@ -30,7 +30,7 @@ func Test_signupManager_MessageReactionAdd(t *testing.T) {
 
 	mockSession := discordmocks.NewMockSession(ctrl)
 	mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
-	mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+	mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
 	logger := loggerfrolfbot.NoOpLogger
 	tracerProvider := noop.NewTracerProvider()
 	tracer := tracerProvider.Tracer("test")
@@ -392,7 +392,7 @@ func Test_signupManager_HandleSignupReactionAdd(t *testing.T) {
 
 			mockSession := discordmocks.NewMockSession(ctrl)
 			mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
-			mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+			mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
 			logger := loggerfrolfbot.NoOpLogger
 			tracerProvider := noop.NewTracerProvider()
 			tracer := tracerProvider.Tracer("test")
@@ -453,7 +453,7 @@ func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
 		setup func(
 			mockSession *discordmocks.MockSession,
 			mockPublisher *eventbusmocks.MockEventBus,
-			mockInteractionStore *storagemocks.MockISInterface,
+			mockInteractionStore *storagemocks.MockISInterface[any],
 		)
 		ctx           context.Context
 		args          *discordgo.InteractionCreate
@@ -466,7 +466,7 @@ func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
 			setup: func(
 				mockSession *discordmocks.MockSession,
 				mockPublisher *eventbusmocks.MockEventBus,
-				mockInteractionStore *storagemocks.MockISInterface,
+				mockInteractionStore *storagemocks.MockISInterface[any],
 			) {
 				// Expect the interaction to be stored first
 				mockInteractionStore.EXPECT().
@@ -501,7 +501,7 @@ func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
 		},
 		{
 			name: "nil interaction",
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				// No mock expectations since validation fails early
 			},
 			ctx:           context.Background(),
@@ -512,7 +512,7 @@ func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
 		},
 		{
 			name: "nil interaction.Interaction",
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				// No mock expectations since validation fails early
 			},
 			ctx: context.Background(),
@@ -525,7 +525,7 @@ func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
 		},
 		{
 			name: "nil member",
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				// Expect interaction store call since validation passes initial checks
 				mockInteractionStore.EXPECT().
 					Set(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -555,7 +555,7 @@ func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
 		},
 		{
 			name: "nil user",
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				// No expectations since this fails early in validation
 			},
 			ctx: context.Background(),
@@ -576,7 +576,7 @@ func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
 		},
 		{
 			name: "context cancelled before operation",
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				// No expectations since context is cancelled
 			},
 			ctx: func() context.Context {
@@ -599,7 +599,7 @@ func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
 		},
 		{
 			name: "unsupported interaction type",
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				// Expect interaction store call since validation passes initial checks
 				mockInteractionStore.EXPECT().
 					Set(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -628,7 +628,7 @@ func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
 		},
 		{
 			name: "unsupported button custom id",
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				// Expect interaction store call since validation passes initial checks
 				mockInteractionStore.EXPECT().
 					Set(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -660,7 +660,7 @@ func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
 			setup: func(
 				mockSession *discordmocks.MockSession,
 				mockPublisher *eventbusmocks.MockEventBus,
-				mockInteractionStore *storagemocks.MockISInterface,
+				mockInteractionStore *storagemocks.MockISInterface[any],
 			) {
 				// Expect interaction store call first
 				mockInteractionStore.EXPECT().
@@ -698,7 +698,7 @@ func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
 			setup: func(
 				mockSession *discordmocks.MockSession,
 				mockPublisher *eventbusmocks.MockEventBus,
-				mockInteractionStore *storagemocks.MockISInterface,
+				mockInteractionStore *storagemocks.MockISInterface[any],
 			) {
 				// Expect interaction store call to fail
 				mockInteractionStore.EXPECT().
@@ -736,7 +736,7 @@ func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
 
 			mockSession := discordmocks.NewMockSession(ctrl)
 			mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
-			mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+			mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
 			logger := loggerfrolfbot.NoOpLogger
 			tracerProvider := noop.NewTracerProvider()
 			tracer := tracerProvider.Tracer("test")

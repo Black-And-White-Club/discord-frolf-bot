@@ -81,7 +81,7 @@ func (m *udiscManager) HandleSetUDiscNameCommand(ctx context.Context, i *discord
 			namePtr = &name
 		}
 
-		payload := userevents.UpdateUDiscIdentityRequestPayload{
+		payload := userevents.UpdateUDiscIdentityRequestedPayloadV1{
 			GuildID:  sharedtypes.GuildID(guildID),
 			UserID:   sharedtypes.DiscordID(userID),
 			Username: usernamePtr,
@@ -100,7 +100,7 @@ func (m *udiscManager) HandleSetUDiscNameCommand(ctx context.Context, i *discord
 		msg.Metadata.Set("user_id", userID)
 		msg.Metadata.Set("guild_id", guildID)
 
-		if err := m.publisher.Publish(userevents.UpdateUDiscIdentityRequest, msg); err != nil {
+		if err := m.publisher.Publish(userevents.UpdateUDiscIdentityRequestedV1, msg); err != nil {
 			m.logger.ErrorContext(ctx, "Failed to publish UDisc update event",
 				attr.Error(err),
 			)

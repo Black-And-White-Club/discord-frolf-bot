@@ -30,7 +30,8 @@ func InitializeScoreModule(
 	logger *slog.Logger,
 	cfg *config.Config,
 	helper utils.Helpers,
-	interactionStore storage.ISInterface,
+	interactionStore storage.ISInterface[any],
+	guildConfigCache storage.ISInterface[storage.GuildConfig],
 	discordMetrics discordmetrics.DiscordMetrics,
 ) (*scorerouter.ScoreRouter, error) {
 	tracer := otel.Tracer("score-module")
@@ -41,6 +42,8 @@ func InitializeScoreModule(
 		cfg,
 		session,
 		helper,
+		interactionStore,
+		guildConfigCache,
 		tracer,
 		discordMetrics,
 	)

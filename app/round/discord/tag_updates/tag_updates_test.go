@@ -8,6 +8,7 @@ import (
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
 	gc_mocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
+	storagemocks "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
@@ -32,7 +33,10 @@ func TestNewTagUpdateManager_Constructs(t *testing.T) {
 	metrics := discordmetricsmocks.NewMockDiscordMetrics(ctrl)
 	resolver := gc_mocks.NewMockGuildConfigResolver(ctrl)
 
-	mgr := NewTagUpdateManager(sess, bus, logger, helper, cfg, tracer, metrics, resolver)
+	mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
+	mockGuildConfigCache := storagemocks.NewMockISInterface[storage.GuildConfig](ctrl)
+
+	mgr := NewTagUpdateManager(sess, bus, logger, helper, cfg, mockInteractionStore, mockGuildConfigCache, tracer, metrics, resolver)
 	if mgr == nil {
 		t.Fatalf("expected non-nil manager")
 	}

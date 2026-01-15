@@ -11,7 +11,7 @@ import (
 	updateround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/update_round"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/round/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
-	sharedroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
+	discordroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
@@ -29,7 +29,7 @@ func TestRoundHandlers_HandleRoundUpdateRequested(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		payload    *sharedroundevents.RoundUpdateModalSubmittedPayloadV1
+		payload    *discordroundevents.RoundUpdateModalSubmittedPayloadV1
 		ctx        context.Context
 		want       []handlerwrapper.Result
 		wantErr    bool
@@ -37,7 +37,7 @@ func TestRoundHandlers_HandleRoundUpdateRequested(t *testing.T) {
 	}{
 		{
 			name: "successful_update_request",
-			payload: &sharedroundevents.RoundUpdateModalSubmittedPayloadV1{
+			payload: &discordroundevents.RoundUpdateModalSubmittedPayloadV1{
 				GuildID:     "123456789",
 				RoundID:     testRoundID,
 				Title:       &testTitle,
@@ -53,7 +53,7 @@ func TestRoundHandlers_HandleRoundUpdateRequested(t *testing.T) {
 		},
 		{
 			name: "create_result_message_error",
-			payload: &sharedroundevents.RoundUpdateModalSubmittedPayloadV1{
+			payload: &discordroundevents.RoundUpdateModalSubmittedPayloadV1{
 				GuildID:   "123456789",
 				RoundID:   testRoundID,
 				Title:     &testTitle,

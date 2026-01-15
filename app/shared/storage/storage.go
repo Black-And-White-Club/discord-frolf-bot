@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"sync"
@@ -9,108 +10,123 @@ import (
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 )
 
-// ISInterface defines the behavior for the interaction store
-type ISInterface interface {
-	Set(correlationID string, interaction interface{}, ttl time.Duration) error
-	Delete(correlationID string)
-	Get(correlationID string) (interface{}, bool)
+// ISInterface defines the behavior for the interaction store using Generics [T]
+type ISInterface[T any] interface {
+	Set(ctx context.Context, correlationID string, interaction T) error // Removed TTL from here if you prefer a fixed default, or keep it if you want dynamic
+	Delete(ctx context.Context, correlationID string)
+	Get(ctx context.Context, correlationID string) (T, error)
 }
 
-// interactionItem holds the data and the active timer for a specific key
-type interactionItem struct {
-	value interface{}
-	timer *time.Timer
+// interactionItem holds the data and the expiration timestamp
+type interactionItem[T any] struct {
+	value      T
+	expiryTime int64 // UnixNano for high-performance comparison
 }
 
 // InteractionStore manages short-lived interaction tokens
-type InteractionStore struct {
-	store map[string]*interactionItem
-	mu    sync.RWMutex // Protects the store map
+type InteractionStore[T any] struct {
+	store map[string]interactionItem[T]
+	mu    sync.RWMutex
+	ttl   time.Duration // Added a default TTL for this store instance
 }
 
-// NewInteractionStore initializes a new InteractionStore
-func NewInteractionStore() ISInterface {
-	return &InteractionStore{
-		store: make(map[string]*interactionItem),
+// Stores hub remains the same
+type Stores struct {
+	InteractionStore ISInterface[any]
+	GuildConfigCache ISInterface[GuildConfig]
+}
+
+func NewStores(ctx context.Context) *Stores {
+	return &Stores{
+		InteractionStore: NewInteractionStore[any](ctx, 1*time.Hour),
+		GuildConfigCache: NewInteractionStore[GuildConfig](ctx, 24*time.Hour),
 	}
 }
 
-// Set stores an interaction token with an auto-expiring timer
-func (ts *InteractionStore) Set(correlationID string, interaction interface{}, ttl time.Duration) error {
-	slog.Info("InteractionStore: Storing interaction", attr.String("correlation_id", correlationID))
+func NewInteractionStore[T any](ctx context.Context, ttl time.Duration) ISInterface[T] {
+	is := &InteractionStore[T]{
+		store: make(map[string]interactionItem[T]),
+		ttl:   ttl,
+	}
+	// The cleanup interval can be a fraction of the TTL or a fixed 1m
+	go is.startJanitor(ctx, 1*time.Minute)
+	return is
+}
+
+// Set now matches the interface with context
+func (ts *InteractionStore[T]) Set(ctx context.Context, correlationID string, interaction T) error {
 	if correlationID == "" {
 		return errors.New("correlation ID is empty")
 	}
-	if interaction == nil {
-		return errors.New("interaction is nil")
-	}
-	if ttl <= 0 {
-		return errors.New("TTL must be greater than 0")
-	}
 
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 
-	// 1. If an entry already exists, stop its old timer to prevent leaks
-	if existing, exists := ts.store[correlationID]; exists {
-		if existing.timer != nil {
-			existing.timer.Stop()
-		}
+	ts.store[correlationID] = interactionItem[T]{
+		value:      interaction,
+		expiryTime: time.Now().Add(ts.ttl).UnixNano(),
 	}
 
-	// 2. Define the cleanup function
-	// We wrap the cleanup logic so it acquires its own lock later
-	cleanupAction := func() {
-		ts.mu.Lock()
-		defer ts.mu.Unlock()
-
-		// Verify the item still exists and hasn't been replaced
-		// (Though simpler here because we replaced the timer above, extra safety doesn't hurt)
-		if _, exists := ts.store[correlationID]; exists {
-			delete(ts.store, correlationID)
-			slog.Info("InteractionStore: Interaction deleted due to TTL expiration", attr.String("correlation_id", correlationID))
-		}
-	}
-
-	// 3. Create the new item with a new timer
-	ts.store[correlationID] = &interactionItem{
-		value: interaction,
-		timer: time.AfterFunc(ttl, cleanupAction),
-	}
-
+	slog.DebugContext(ctx, "InteractionStore: Stored item", attr.String("correlation_id", correlationID))
 	return nil
 }
 
-// Delete removes the token associated with the given correlation ID.
-func (ts *InteractionStore) Delete(correlationID string) {
+// Get now returns (T, error) and accepts context
+func (ts *InteractionStore[T]) Get(ctx context.Context, correlationID string) (T, error) {
+	ts.mu.RLock()
+	defer ts.mu.RUnlock()
+
+	item, exists := ts.store[correlationID]
+	if !exists || time.Now().UnixNano() > item.expiryTime {
+		var zero T
+		return zero, errors.New("item not found or expired")
+	}
+
+	return item.value, nil
+}
+
+// Delete now accepts context
+func (ts *InteractionStore[T]) Delete(ctx context.Context, correlationID string) {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
+	delete(ts.store, correlationID)
+}
 
-	slog.Info("InteractionStore: Deleting interaction", attr.String("correlation_id", correlationID))
+// startJanitor runs in the background and removes expired keys at a fixed interval
+func (ts *InteractionStore[T]) startJanitor(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
 
-	if item, exists := ts.store[correlationID]; exists {
-		// Stop the timer immediately so it doesn't fire later
-		if item.timer != nil {
-			item.timer.Stop()
+	slog.Info("🧹 InteractionStore janitor started", attr.Duration("interval", interval))
+
+	for {
+		select {
+		case <-ctx.Done():
+			slog.Info("🧹 InteractionStore janitor stopping")
+			return
+		case <-ticker.C:
+			ts.performCleanup()
 		}
-		delete(ts.store, correlationID)
-		slog.Info("InteractionStore: Interaction deleted successfully", attr.String("correlation_id", correlationID))
-	} else {
-		slog.Info("InteractionStore: Interaction not found", attr.String("correlation_id", correlationID))
 	}
 }
 
-// Get retrieves the token
-func (ts *InteractionStore) Get(correlationID string) (interface{}, bool) {
-	ts.mu.RLock() // Use Read Lock for concurrent access
-	defer ts.mu.RUnlock()
+func (ts *InteractionStore[T]) performCleanup() {
+	now := time.Now().UnixNano()
 
-	slog.Info("InteractionStore: Retrieving interaction", attr.String("correlation_id", correlationID))
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
 
-	item, exists := ts.store[correlationID]
-	if !exists {
-		slog.Info("InteractionStore: Interaction not found", attr.String("correlation_id", correlationID))
-		return nil, false
+	initialSize := len(ts.store)
+	for id, item := range ts.store {
+		if now > item.expiryTime {
+			delete(ts.store, id)
+		}
 	}
-	return item.value, true
+
+	removed := initialSize - len(ts.store)
+	if removed > 0 {
+		slog.Debug("InteractionStore: Cleanup complete",
+			attr.Int("removed_count", removed),
+			attr.Int("remaining_count", len(ts.store)))
+	}
 }

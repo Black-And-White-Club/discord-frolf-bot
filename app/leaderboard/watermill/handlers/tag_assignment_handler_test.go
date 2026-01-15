@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"testing"
 
-	sharedleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
+	discordleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"go.opentelemetry.io/otel/trace/noop"
@@ -15,12 +15,12 @@ import (
 func TestHandleTagAssignRequest(t *testing.T) {
 	tests := []struct {
 		name    string
-		payload interface{}
+		payload *discordleaderboardevents.LeaderboardTagAssignRequestPayloadV1
 		wantErr bool
 	}{
 		{
 			name: "successful_tag_assign_request",
-			payload: &sharedleaderboardevents.LeaderboardTagAssignRequestPayloadV1{
+			payload: &discordleaderboardevents.LeaderboardTagAssignRequestPayloadV1{
 				GuildID:      "guild123",
 				TargetUserID: sharedtypes.DiscordID("target"),
 				RequestorID:  sharedtypes.DiscordID("requestor"),
@@ -32,7 +32,7 @@ func TestHandleTagAssignRequest(t *testing.T) {
 		},
 		{
 			name: "invalid_payload_missing_target_user_id",
-			payload: &sharedleaderboardevents.LeaderboardTagAssignRequestPayloadV1{
+			payload: &discordleaderboardevents.LeaderboardTagAssignRequestPayloadV1{
 				TargetUserID: "",
 				RequestorID:  sharedtypes.DiscordID("requestor"),
 				TagNumber:    5,
@@ -43,7 +43,7 @@ func TestHandleTagAssignRequest(t *testing.T) {
 		},
 		{
 			name: "invalid_payload_invalid_message_id",
-			payload: &sharedleaderboardevents.LeaderboardTagAssignRequestPayloadV1{
+			payload: &discordleaderboardevents.LeaderboardTagAssignRequestPayloadV1{
 				TargetUserID: sharedtypes.DiscordID("target"),
 				RequestorID:  sharedtypes.DiscordID("requestor"),
 				TagNumber:    5,
@@ -82,7 +82,7 @@ func TestHandleTagAssignRequest(t *testing.T) {
 func TestHandleTagAssignedResponse(t *testing.T) {
 	tests := []struct {
 		name    string
-		payload interface{}
+		payload *leaderboardevents.LeaderboardTagAssignedPayloadV1
 		wantErr bool
 	}{
 		{
@@ -127,7 +127,7 @@ func TestHandleTagAssignedResponse(t *testing.T) {
 func TestHandleTagAssignFailedResponse(t *testing.T) {
 	tests := []struct {
 		name    string
-		payload interface{}
+		payload *leaderboardevents.LeaderboardTagAssignmentFailedPayloadV1
 		wantErr bool
 	}{
 		{

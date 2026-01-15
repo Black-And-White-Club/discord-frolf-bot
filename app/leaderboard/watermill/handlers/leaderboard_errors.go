@@ -10,8 +10,8 @@ import (
 
 // HandleLeaderboardUpdateFailed handles leaderboard update failure events.
 func (h *LeaderboardHandlers) HandleLeaderboardUpdateFailed(ctx context.Context,
-	payload interface{}) ([]handlerwrapper.Result, error) {
-	p := payload.(*leaderboardevents.LeaderboardUpdateFailedPayloadV1)
+	payload *leaderboardevents.LeaderboardUpdateFailedPayloadV1) ([]handlerwrapper.Result, error) {
+	p := payload
 
 	h.Logger.WarnContext(ctx, "Leaderboard update failed",
 		attr.String("guild_id", string(p.GuildID)),
@@ -28,8 +28,8 @@ func (h *LeaderboardHandlers) HandleLeaderboardUpdateFailed(ctx context.Context,
 
 // HandleLeaderboardRetrievalFailed handles leaderboard retrieval failure events.
 func (h *LeaderboardHandlers) HandleLeaderboardRetrievalFailed(ctx context.Context,
-	payload interface{}) ([]handlerwrapper.Result, error) {
-	p := payload.(*leaderboardevents.GetLeaderboardFailedPayloadV1)
+	payload *leaderboardevents.GetLeaderboardFailedPayloadV1) ([]handlerwrapper.Result, error) {
+	p := payload
 
 	h.Logger.WarnContext(ctx, "Leaderboard retrieval failed",
 		attr.String("guild_id", string(p.GuildID)),

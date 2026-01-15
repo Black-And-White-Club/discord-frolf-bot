@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
+	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 )
@@ -32,6 +33,43 @@ func (h *RoundHandlers) HandleTagsUpdatedForScheduledRounds(ctx context.Context,
 
 	if result.Error != nil {
 		return nil, fmt.Errorf("discord embed update failed: %w", result.Error)
+	}
+
+	return nil, nil // No further messages to publish
+}
+
+// HandleRoundParticipantsUpdated processes round participant updates and updates Discord embeds
+func (h *RoundHandlers) HandleRoundParticipantsUpdated(ctx context.Context, payload *roundevents.RoundParticipantsUpdatedPayloadV1) ([]handlerwrapper.Result, error) {
+	// Get guild config to find the event channel ID
+	guildConfig, err := h.GuildConfigResolver.GetGuildConfigWithContext(ctx, string(payload.GuildID))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get guild config for guild %s: %w", payload.GuildID, err)
+	}
+
+	// Categorize participants by response
+	accepted := []roundtypes.Participant{}
+	declined := []roundtypes.Participant{}
+	tentative := []roundtypes.Participant{}
+
+	for _, participant := range payload.Round.Participants {
+		switch participant.Response {
+		case roundtypes.ResponseAccept:
+			accepted = append(accepted, participant)
+		case roundtypes.ResponseDecline:
+			declined = append(declined, participant)
+		case roundtypes.ResponseTentative:
+			tentative = append(tentative, participant)
+		}
+	}
+
+	// Update the Discord embed using the RoundRsvpManager
+	result, err := h.RoundDiscord.GetRoundRsvpManager().UpdateRoundEventEmbed(ctx, guildConfig.EventChannelID, payload.Round.EventMessageID, accepted, declined, tentative)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update Discord embed for round %s: %w", payload.RoundID, err)
+	}
+
+	if result.Error != nil {
+		return nil, fmt.Errorf("discord embed update failed for round %s: %w", payload.RoundID, result.Error)
 	}
 
 	return nil, nil // No further messages to publish

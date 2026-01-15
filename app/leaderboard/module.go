@@ -33,7 +33,8 @@ func InitializeLeaderboardModule(
 	cfg *config.Config,
 	helper utils.Helpers,
 	guildConfigResolver guildconfig.GuildConfigResolver,
-	interactionStore storage.ISInterface,
+	interactionStore storage.ISInterface[any],
+	guildConfigCache storage.ISInterface[storage.GuildConfig],
 	discordMetricsService discordmetrics.DiscordMetrics,
 ) (*leaderboardrouter.LeaderboardRouter, error) {
 	// Initialize Tracer
@@ -47,6 +48,7 @@ func InitializeLeaderboardModule(
 		cfg,
 		guildConfigResolver,
 		interactionStore,
+		guildConfigCache,
 		tracer,
 		discordMetricsService,
 	)
@@ -66,6 +68,8 @@ func InitializeLeaderboardModule(
 		helper,
 		leaderboardDiscord,
 		guildConfigResolver,
+		interactionStore,
+		guildConfigCache,
 		tracer,
 		discordMetricsService,
 	)

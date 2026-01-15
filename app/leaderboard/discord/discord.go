@@ -38,13 +38,14 @@ func NewLeaderboardDiscord(
 	helper utils.Helpers,
 	config *config.Config,
 	guildConfigResolver guildconfig.GuildConfigResolver,
-	interactionStore storage.ISInterface,
+	interactionStore storage.ISInterface[any],
+	guildConfigCache storage.ISInterface[storage.GuildConfig],
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
 ) (LeaderboardDiscordInterface, error) {
-	leaderboardUpdateManager := leaderboardupdated.NewLeaderboardUpdateManager(session, publisher, logger, helper, config, guildConfigResolver, interactionStore, tracer, metrics)
+	leaderboardUpdateManager := leaderboardupdated.NewLeaderboardUpdateManager(session, publisher, logger, helper, config, guildConfigResolver, interactionStore, guildConfigCache, tracer, metrics)
 
-	claimTagManager := claimtag.NewClaimTagManager(session, publisher, logger, helper, config, guildConfigResolver, interactionStore, tracer, metrics)
+	claimTagManager := claimtag.NewClaimTagManager(session, publisher, logger, helper, config, guildConfigResolver, interactionStore, guildConfigCache, tracer, metrics)
 
 	return &LeaderboardDiscord{
 		LeaderboardUpdateManager: leaderboardUpdateManager,

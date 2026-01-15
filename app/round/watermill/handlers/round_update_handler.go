@@ -4,14 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	sharedroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
+	discordroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 )
 
-func (h *RoundHandlers) HandleRoundUpdateRequested(ctx context.Context, payload *sharedroundevents.RoundUpdateModalSubmittedPayloadV1) ([]handlerwrapper.Result, error) {
+func (h *RoundHandlers) HandleRoundUpdateRequested(ctx context.Context, payload *discordroundevents.RoundUpdateModalSubmittedPayloadV1) ([]handlerwrapper.Result, error) {
 	// Convert to backend payload and set GuildID
 	var startTimeStr *string
 	if payload.StartTime != nil {

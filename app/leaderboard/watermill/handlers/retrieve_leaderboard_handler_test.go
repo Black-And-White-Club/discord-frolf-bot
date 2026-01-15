@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"testing"
 
-	sharedleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
+	discordleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	leaderboardtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/leaderboard"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
@@ -16,12 +16,12 @@ import (
 func TestHandleLeaderboardRetrieveRequest(t *testing.T) {
 	tests := []struct {
 		name    string
-		payload interface{}
+		payload *discordleaderboardevents.LeaderboardRetrieveRequestPayloadV1
 		wantErr bool
 	}{
 		{
 			name: "successful_retrieve_request",
-			payload: &sharedleaderboardevents.LeaderboardRetrieveRequestPayloadV1{
+			payload: &discordleaderboardevents.LeaderboardRetrieveRequestPayloadV1{
 				GuildID: "guild123",
 			},
 			wantErr: false,
@@ -56,7 +56,7 @@ func TestHandleLeaderboardRetrieveRequest(t *testing.T) {
 func TestHandleLeaderboardUpdatedNotification(t *testing.T) {
 	tests := []struct {
 		name    string
-		payload interface{}
+		payload *leaderboardevents.LeaderboardUpdatedPayloadV1
 		wantErr bool
 	}{
 		{
@@ -96,7 +96,7 @@ func TestHandleLeaderboardUpdatedNotification(t *testing.T) {
 func TestHandleLeaderboardResponse(t *testing.T) {
 	tests := []struct {
 		name    string
-		payload interface{}
+		payload *leaderboardevents.GetLeaderboardResponsePayloadV1
 		wantErr bool
 	}{
 		{

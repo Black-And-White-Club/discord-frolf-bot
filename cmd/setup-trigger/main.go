@@ -81,6 +81,11 @@ func main() {
 
 	logger := obs.Provider.Logger
 
+	// --- Storage Hub Initialization ---
+	// We initialize the full storage hub here so the bot has access to both
+	// the interaction store and the guild config cache during the setup flow.
+	appStores := storage.NewStores(ctx)
+
 	fmt.Printf("🚀 Starting modern guild setup for guild: %s\n", *guildID)
 	fmt.Println("⚠️  NOTE: This tool now uses the modern event-driven /frolf-setup system")
 	fmt.Println("📌 The setup will use the same flow as the /frolf-setup Discord command")
@@ -91,7 +96,7 @@ func main() {
 		nil, // Session will be created internally
 		cfg,
 		logger,
-		storage.NewInteractionStore(),
+		appStores, // Pass the consolidated storage hub
 		obs.Registry.DiscordMetrics,
 		obs.Registry.EventBusMetrics,
 		obs.Provider.TracerProvider.Tracer("setup"),
@@ -122,8 +127,8 @@ func main() {
 	fmt.Println("3. Fill out the setup modal with your preferences")
 	fmt.Println("4. The modern event-driven system will handle the rest!")
 	fmt.Println()
-	fmt.Println("� Or you can programmatically trigger setup by sending the setup event")
-	fmt.Println("� The setup will create:")
+	fmt.Println("💡 Or you can programmatically trigger setup by sending the setup event")
+	fmt.Println("🛠️ The setup will create:")
 	fmt.Println("   - Channels (with configurable prefix)")
 	fmt.Println("   - Roles (with configurable names)")
 	fmt.Println("   - Signup message with reactions")

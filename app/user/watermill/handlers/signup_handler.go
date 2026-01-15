@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	shareduserevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/user"
+	discorduserevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/user"
 	userevents "github.com/Black-And-White-Club/frolf-bot-shared/events/user"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 )
@@ -14,14 +14,14 @@ func (h *UserHandlers) HandleUserCreated(
 	ctx context.Context,
 	payload *userevents.UserCreatedPayloadV1,
 ) ([]handlerwrapper.Result, error) {
-	rolePayload := shareduserevents.AddRolePayloadV1{
+	rolePayload := discorduserevents.AddRolePayloadV1{
 		UserID:  payload.UserID,
 		RoleID:  h.config.GetRegisteredRoleID(),
 		GuildID: string(payload.GuildID),
 	}
 
 	return []handlerwrapper.Result{
-		{Topic: shareduserevents.SignupAddRoleV1, Payload: &rolePayload},
+		{Topic: discorduserevents.SignupAddRoleV1, Payload: &rolePayload},
 	}, nil
 }
 
@@ -48,7 +48,7 @@ func (h *UserHandlers) HandleUserCreationFailed(
 // HandleRoleAdded handles the RoleAdded event.
 func (h *UserHandlers) HandleRoleAdded(
 	ctx context.Context,
-	payload *shareduserevents.RoleAddedPayloadV1,
+	payload *discorduserevents.RoleAddedPayloadV1,
 ) ([]handlerwrapper.Result, error) {
 	// Extract correlation ID from context if available
 	correlationID := ""
@@ -67,7 +67,7 @@ func (h *UserHandlers) HandleRoleAdded(
 // HandleRoleAdditionFailed handles the RoleAdditionFailed event.
 func (h *UserHandlers) HandleRoleAdditionFailed(
 	ctx context.Context,
-	payload *shareduserevents.RoleAdditionFailedPayloadV1,
+	payload *discorduserevents.RoleAdditionFailedPayloadV1,
 ) ([]handlerwrapper.Result, error) {
 	// Extract correlation ID from context if available
 	correlationID := ""

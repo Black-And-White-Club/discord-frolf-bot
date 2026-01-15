@@ -23,9 +23,11 @@ func TestNewUDiscManager_defaultsTracerWhenNil(t *testing.T) {
 		discordmocks.NewMockSession(ctrl),
 		eventbusmocks.NewMockEventBus(ctrl),
 		logger,
-		nil,
-		nil,
-		nil,
+		nil, // cfg
+		nil, // interactionStore
+		nil, // guildConfigCache
+		nil, // tracer
+		nil, // metrics
 	)
 
 	impl, ok := mgr.(*udiscManager)

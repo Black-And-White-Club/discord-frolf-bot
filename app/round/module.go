@@ -39,7 +39,8 @@ func InitializeRoundModule(
 	logger *slog.Logger,
 	cfg *config.Config,
 	helper utils.Helpers,
-	interactionStore storage.ISInterface,
+	interactionStore storage.ISInterface[any],
+	guildConfigCache storage.ISInterface[storage.GuildConfig],
 	discordMetrics discordmetrics.DiscordMetrics,
 	guildConfig guildconfig.GuildConfigResolver,
 ) (*roundrouter.RoundRouter, error) {
@@ -54,9 +55,10 @@ func InitializeRoundModule(
 		helper,
 		cfg,
 		interactionStore,
+		guildConfigCache,
+		guildConfig,
 		tracer,
 		discordMetrics,
-		guildConfig,
 	)
 	if err != nil {
 		logger.ErrorContext(ctx, "Failed to initialize round discord", attr.Error(err))
@@ -79,6 +81,7 @@ func InitializeRoundModule(
 		roundDiscord,
 		tracer,
 		discordMetrics,
+		guildConfig,
 	)
 
 	// Setup Watermill router

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	sharedscoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/score"
-	scoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/score"
+	discordscoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/score"
+	sharedevents "github.com/Black-And-White-Club/frolf-bot-shared/events/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
@@ -15,7 +15,7 @@ import (
 
 // Typed handlers for router-driven pure transformations.
 // These return []handlerwrapper.Result and contain only domain logic.
-func (h *ScoreHandlers) HandleScoreUpdateRequestTyped(ctx context.Context, payload *sharedscoreevents.ScoreUpdateRequestDiscordPayloadV1) ([]handlerwrapper.Result, error) {
+func (h *ScoreHandlers) HandleScoreUpdateRequestTyped(ctx context.Context, payload *discordscoreevents.ScoreUpdateRequestDiscordPayloadV1) ([]handlerwrapper.Result, error) {
 	if payload == nil {
 		return nil, fmt.Errorf("payload is nil")
 	}
@@ -24,7 +24,7 @@ func (h *ScoreHandlers) HandleScoreUpdateRequestTyped(ctx context.Context, paylo
 		return nil, fmt.Errorf("invalid payload: missing round_id, user_id, or score")
 	}
 
-	backendPayload := scoreevents.ScoreUpdateRequestedPayloadV1{
+	backendPayload := sharedevents.ScoreUpdateRequestedPayloadV1{
 		GuildID:   payload.GuildID,
 		RoundID:   payload.RoundID,
 		UserID:    payload.UserID,
@@ -39,13 +39,13 @@ func (h *ScoreHandlers) HandleScoreUpdateRequestTyped(ctx context.Context, paylo
 	}
 
 	return []handlerwrapper.Result{{
-		Topic:    scoreevents.ScoreUpdateRequestedV1,
+		Topic:    sharedevents.ScoreUpdateRequestedV1,
 		Payload:  backendPayload,
 		Metadata: md,
 	}}, nil
 }
 
-func (h *ScoreHandlers) HandleScoreUpdateSuccessTyped(ctx context.Context, payload *scoreevents.ScoreUpdatedPayloadV1) ([]handlerwrapper.Result, error) {
+func (h *ScoreHandlers) HandleScoreUpdateSuccessTyped(ctx context.Context, payload *sharedevents.ScoreUpdatedPayloadV1) ([]handlerwrapper.Result, error) {
 	if payload == nil {
 		return nil, fmt.Errorf("payload is nil")
 	}
@@ -59,12 +59,12 @@ func (h *ScoreHandlers) HandleScoreUpdateSuccessTyped(ctx context.Context, paylo
 	}
 
 	return []handlerwrapper.Result{{
-		Topic:   sharedscoreevents.ScoreUpdateResponseDiscordV1,
+		Topic:   discordscoreevents.ScoreUpdateResponseDiscordV1,
 		Payload: resp,
 	}}, nil
 }
 
-func (h *ScoreHandlers) HandleScoreUpdateFailureTyped(ctx context.Context, payload *scoreevents.ScoreUpdateFailedPayloadV1) ([]handlerwrapper.Result, error) {
+func (h *ScoreHandlers) HandleScoreUpdateFailureTyped(ctx context.Context, payload *sharedevents.ScoreUpdateFailedPayloadV1) ([]handlerwrapper.Result, error) {
 	if payload == nil {
 		return nil, fmt.Errorf("payload is nil")
 	}
@@ -87,7 +87,7 @@ func (h *ScoreHandlers) HandleScoreUpdateFailureTyped(ctx context.Context, paylo
 	}
 
 	return []handlerwrapper.Result{{
-		Topic:   sharedscoreevents.ScoreUpdateFailedDiscordV1,
+		Topic:   discordscoreevents.ScoreUpdateFailedDiscordV1,
 		Payload: resp,
 	}}, nil
 }

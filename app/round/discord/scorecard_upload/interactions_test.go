@@ -132,7 +132,7 @@ func Test_scorecardUploadManager_HandleScorecardUploadModalSubmit_URLFlow_Publis
 	}}
 
 	mockPublisher.EXPECT().
-		Publish(gomock.Eq(roundevents.ScorecardURLRequestedTopic), gomock.Any()).
+		Publish(gomock.Eq(roundevents.ScorecardURLRequestedV1), gomock.Any()).
 		Return(fmt.Errorf("publish failed")).
 		Times(1)
 
@@ -260,9 +260,9 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_PendingExists_Publishes
 	}
 
 	mockPublisher.EXPECT().
-		Publish(gomock.Eq(roundevents.ScorecardUploadedTopic), gomock.Any()).
+		Publish(gomock.Eq(roundevents.ScorecardUploadedV1), gomock.Any()).
 		DoAndReturn(func(_ string, msg *message.Message) error {
-			var payload roundevents.ScorecardUploadedPayload
+			var payload roundevents.ScorecardUploadedPayloadV1
 			if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 				t.Fatalf("failed to unmarshal payload: %v", err)
 			}
@@ -440,7 +440,7 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_PublishError_SendsError
 	}}
 
 	mockPublisher.EXPECT().
-		Publish(gomock.Eq(roundevents.ScorecardUploadedTopic), gomock.Any()).
+		Publish(gomock.Eq(roundevents.ScorecardUploadedV1), gomock.Any()).
 		Return(fmt.Errorf("publish failed")).
 		Times(1)
 
@@ -689,9 +689,9 @@ func Test_scorecardUploadManager_HandleScorecardUploadModalSubmit_URLFlow_Publis
 	}}
 
 	mockPublisher.EXPECT().
-		Publish(gomock.Eq(roundevents.ScorecardURLRequestedTopic), gomock.Any()).
+		Publish(gomock.Eq(roundevents.ScorecardURLRequestedV1), gomock.Any()).
 		DoAndReturn(func(_ string, msg *message.Message) error {
-			var payload roundevents.ScorecardURLRequestedPayload
+			var payload roundevents.ScorecardURLRequestedPayloadV1
 			if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 				t.Fatalf("failed to unmarshal payload: %v", err)
 			}

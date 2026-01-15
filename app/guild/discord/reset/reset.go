@@ -33,7 +33,7 @@ type resetManager struct {
 	logger           *slog.Logger
 	helper           utils.Helpers
 	config           *config.Config
-	interactionStore storage.ISInterface
+	interactionStore storage.ISInterface[any]
 	tracer           trace.Tracer
 	metrics          discordmetrics.DiscordMetrics
 	operationWrapper func(ctx context.Context, operationName string, fn func(context.Context) error) error
@@ -46,7 +46,7 @@ func NewResetManager(
 	logger *slog.Logger,
 	helper utils.Helpers,
 	config *config.Config,
-	interactionStore storage.ISInterface,
+	interactionStore storage.ISInterface[any],
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
 ) (ResetManager, error) {

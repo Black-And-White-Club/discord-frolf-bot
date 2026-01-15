@@ -24,9 +24,11 @@ import (
 	userrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/user/watermill"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
+	guildevents "github.com/Black-And-White-Club/frolf-bot-shared/events/guild"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	eventbusmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/eventbus"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
@@ -37,14 +39,14 @@ import (
 )
 
 type DiscordBot struct {
-	Session          discord.Session
-	Logger           *slog.Logger
-	Config           *config.Config
-	EventBus         eventbus.EventBus
-	InteractionStore storage.ISInterface
-	Metrics          discordmetrics.DiscordMetrics
-	Helper           utils.Helpers
-	Tracer           trace.Tracer
+	Session  discord.Session
+	Logger   *slog.Logger
+	Config   *config.Config
+	EventBus eventbus.EventBus
+	Storage  *storage.Stores
+	Metrics  discordmetrics.DiscordMetrics
+	Helper   utils.Helpers
+	Tracer   trace.Tracer
 
 	// Multi-tenant config resolver for per-guild config
 	GuildConfigResolver guildconfig.GuildConfigResolver
@@ -100,7 +102,7 @@ func NewDiscordBot(
 	session discord.Session,
 	cfg *config.Config,
 	logger *slog.Logger,
-	interactionStore storage.ISInterface,
+	appStores *storage.Stores, // This hub contains our new generic caches
 	discordMetrics discordmetrics.DiscordMetrics,
 	eventBusMetrics eventbusmetrics.EventBusMetrics,
 	tracer trace.Tracer,
@@ -108,8 +110,10 @@ func NewDiscordBot(
 ) (*DiscordBot, error) {
 	logger.Info("Creating DiscordBot instance")
 
+	ctx := context.Background()
+
 	eventBus, err := eventbus.NewEventBus(
-		context.Background(),
+		ctx,
 		cfg.NATS.URL,
 		logger,
 		"discord",
@@ -120,10 +124,13 @@ func NewDiscordBot(
 		return nil, fmt.Errorf("failed to create event bus: %w", err)
 	}
 
-	// Create guild config resolver for multi-tenant configuration management
-	guildConfigResolver := guildconfig.NewResolverWithDefaults(
-		context.Background(),
+	// UPDATED: Pass the specific GuildConfigCache into the resolver.
+	// This enables the "Short-Circuit" logic we just wrote in the resolver.
+	guildConfigResolver := guildconfig.NewResolver(
+		ctx,
 		eventBus,
+		appStores.GuildConfigCache,
+		guildconfig.DefaultResolverConfig(),
 	)
 
 	// Create separate router instances for each domain
@@ -157,7 +164,7 @@ func NewDiscordBot(
 		Logger:                     logger,
 		Config:                     cfg,
 		EventBus:                   eventBus,
-		InteractionStore:           interactionStore,
+		Storage:                    appStores, // InteractionStore is available here as ISInterface[any]
 		Metrics:                    discordMetrics,
 		Helper:                     helper,
 		Tracer:                     tracer,
@@ -183,10 +190,12 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 	registry.SetGuildConfigResolver(bot.GuildConfigResolver)
 	registry.SetLogger(bot.Logger)
 
-	reactionRegistry := interactions.NewReactionRegistry()
+	// Initialize Reaction Registry with the bot's logger
+	reactionRegistry := interactions.NewReactionRegistry(bot.Logger)
 	reactionRegistry.RegisterWithSession(discordgoSession, bot.Session)
 
-	messageRegistry := interactions.NewMessageRegistry()
+	// Initialize Message Registry with the bot's logger
+	messageRegistry := interactions.NewMessageRegistry(bot.Logger)
 	messageRegistry.RegisterWithSession(discordgoSession, bot.Session)
 
 	// Initialize modules
@@ -201,7 +210,8 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 		bot.Logger,
 		bot.Config,
 		bot.Helper,
-		bot.InteractionStore,
+		bot.Storage.InteractionStore,
+		bot.Storage.GuildConfigCache,
 		bot.Metrics,
 		bot.GuildConfigResolver,
 	)
@@ -220,7 +230,8 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 		bot.Logger,
 		bot.Config,
 		bot.Helper,
-		bot.InteractionStore,
+		bot.Storage.InteractionStore,
+		bot.Storage.GuildConfigCache,
 		bot.Metrics,
 		bot.GuildConfigResolver,
 	)
@@ -238,7 +249,8 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 		bot.Logger,
 		bot.Config,
 		bot.Helper,
-		bot.InteractionStore,
+		bot.Storage.InteractionStore,
+		bot.Storage.GuildConfigCache,
 		bot.Metrics,
 	)
 	if err != nil {
@@ -255,7 +267,8 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 		bot.Config,
 		bot.Helper,
 		bot.GuildConfigResolver,
-		bot.InteractionStore,
+		bot.Storage.InteractionStore,
+		bot.Storage.GuildConfigCache,
 		bot.Metrics,
 	)
 	if err != nil {
@@ -271,7 +284,7 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 		bot.Logger,
 		bot.Config,
 		bot.Helper,
-		bot.InteractionStore,
+		bot.Storage.InteractionStore,
 		bot.Metrics,
 		bot.GuildConfigResolver,
 		bot.UserRouter.GetSignupManager(),
@@ -591,12 +604,12 @@ func (bot *DiscordBot) Shutdown(ctx context.Context) error {
 // requestGuildConfiguration requests configuration for a guild from the backend
 func (bot *DiscordBot) requestGuildConfiguration(ctx context.Context, guildID, guildName string) error {
 	// Create guild config retrieval request payload (best practice: only guild_id)
-	payload := map[string]interface{}{
-		"guild_id": guildID,
+	payload := &guildevents.GuildConfigRetrievalRequestedPayloadV1{
+		GuildID: sharedtypes.GuildID(guildID),
 	}
 
 	// Create message for the correct event topic
-	msg, err := bot.Helper.CreateNewMessage(payload, "guild.config.retrieval_requested")
+	msg, err := bot.Helper.CreateNewMessage(payload, guildevents.GuildConfigRetrievalRequestedV1)
 	if err != nil {
 		return fmt.Errorf("failed to create guild config retrieval request message: %w", err)
 	}
@@ -604,7 +617,7 @@ func (bot *DiscordBot) requestGuildConfiguration(ctx context.Context, guildID, g
 	msg.Metadata.Set("guild_id", guildID)
 
 	// Publish guild config retrieval request event to backend
-	if err := bot.EventBus.Publish("guild.config.retrieval_requested", msg); err != nil {
+	if err := bot.EventBus.Publish(guildevents.GuildConfigRetrievalRequestedV1, msg); err != nil {
 		return fmt.Errorf("failed to publish guild config retrieval request: %w", err)
 	}
 
@@ -618,12 +631,12 @@ func (bot *DiscordBot) requestGuildConfiguration(ctx context.Context, guildID, g
 // publishGuildRemovedEvent publishes a guild removal event to the backend
 func (bot *DiscordBot) publishGuildRemovedEvent(ctx context.Context, guildID string) error {
 	// Create guild removal payload
-	payload := map[string]interface{}{
-		"guild_id": guildID,
+	payload := &guildevents.GuildConfigDeletionRequestedPayloadV1{
+		GuildID: sharedtypes.GuildID(guildID),
 	}
 
 	// Create message
-	msg, err := bot.Helper.CreateNewMessage(payload, "guild.removed")
+	msg, err := bot.Helper.CreateNewMessage(payload, guildevents.GuildConfigDeletionRequestedV1)
 	if err != nil {
 		return fmt.Errorf("failed to create guild removal message: %w", err)
 	}
@@ -631,7 +644,7 @@ func (bot *DiscordBot) publishGuildRemovedEvent(ctx context.Context, guildID str
 	msg.Metadata.Set("guild_id", guildID)
 
 	// Publish guild removal event to backend for cleanup
-	if err := bot.EventBus.Publish("guild.removed", msg); err != nil {
+	if err := bot.EventBus.Publish(guildevents.GuildConfigDeletionRequestedV1, msg); err != nil {
 		return fmt.Errorf("failed to publish guild removal event: %w", err)
 	}
 

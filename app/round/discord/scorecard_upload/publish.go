@@ -18,7 +18,7 @@ import (
 func (m *scorecardUploadManager) publishScorecardURLEvent(ctx context.Context, guildID sharedtypes.GuildID, roundID sharedtypes.RoundID, userID sharedtypes.DiscordID, channelID, messageID, uDiscURL, notes string) (string, error) {
 	importID := uuid.New().String()
 
-	payload := roundevents.ScorecardURLRequestedPayload{
+	payload := roundevents.ScorecardURLRequestedPayloadV1{
 		ImportID:  importID,
 		GuildID:   guildID,
 		RoundID:   roundID,
@@ -37,12 +37,12 @@ func (m *scorecardUploadManager) publishScorecardURLEvent(ctx context.Context, g
 	}
 
 	msg := message.NewMessage(watermill.NewUUID(), payloadBytes)
-	msg.Metadata.Set("event_name", roundevents.ScorecardURLRequestedTopic)
+	msg.Metadata.Set("event_name", roundevents.ScorecardURLRequestedV1)
 	msg.Metadata.Set("domain", "scorecard")
 	msg.Metadata.Set("guild_id", string(guildID))
 	msg.Metadata.Set("import_id", importID)
 
-	err = m.publisher.Publish(roundevents.ScorecardURLRequestedTopic, msg)
+	err = m.publisher.Publish(roundevents.ScorecardURLRequestedV1, msg)
 	if err != nil {
 		m.logger.ErrorContext(ctx, "Failed to publish scorecard URL requested event", attr.Error(err))
 		return "", fmt.Errorf("failed to publish event: %w", err)
@@ -62,7 +62,7 @@ func (m *scorecardUploadManager) publishScorecardURLEvent(ctx context.Context, g
 func (m *scorecardUploadManager) publishScorecardUploadEvent(ctx context.Context, guildID sharedtypes.GuildID, roundID sharedtypes.RoundID, userID sharedtypes.DiscordID, channelID, messageID string, fileData []byte, fileURL, fileName, notes string) (string, error) {
 	importID := uuid.New().String()
 
-	payload := roundevents.ScorecardUploadedPayload{
+	payload := roundevents.ScorecardUploadedPayloadV1{
 		ImportID:  importID,
 		GuildID:   guildID,
 		RoundID:   roundID,
@@ -83,12 +83,12 @@ func (m *scorecardUploadManager) publishScorecardUploadEvent(ctx context.Context
 	}
 
 	msg := message.NewMessage(watermill.NewUUID(), payloadBytes)
-	msg.Metadata.Set("event_name", roundevents.ScorecardUploadedTopic)
+	msg.Metadata.Set("event_name", roundevents.ScorecardUploadedV1)
 	msg.Metadata.Set("domain", "scorecard")
 	msg.Metadata.Set("guild_id", string(guildID))
 	msg.Metadata.Set("import_id", importID)
 
-	err = m.publisher.Publish(roundevents.ScorecardUploadedTopic, msg)
+	err = m.publisher.Publish(roundevents.ScorecardUploadedV1, msg)
 	if err != nil {
 		m.logger.ErrorContext(ctx, "Failed to publish scorecard uploaded event", attr.Error(err))
 		return "", fmt.Errorf("failed to publish event: %w", err)

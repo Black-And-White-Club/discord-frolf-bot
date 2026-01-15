@@ -9,8 +9,8 @@ import (
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord/signup"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
-	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
+	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -20,10 +20,10 @@ type GuildHandlers struct {
 	Config              *config.Config
 	Helpers             utils.Helpers
 	GuildDiscord        guilddiscord.GuildDiscordInterface
-	GuildConfigResolver guildconfig.GuildConfigResolver // Use interface for better testability
-	SignupManager       signup.SignupManager            // Optional: for tracking signup channels
-	InteractionStore    storage.ISInterface             // For async interaction responses
-	Session             discordgocommands.Session       // For sending Discord messages
+	GuildConfigResolver guildconfig.GuildConfigResolver
+	SignupManager       signup.SignupManager
+	InteractionStore    storage.ISInterface[any]
+	Session             discordgocommands.Session
 	Tracer              trace.Tracer
 	Metrics             discordmetrics.DiscordMetrics
 }
@@ -34,12 +34,12 @@ func NewGuildHandlers(
 	config *config.Config,
 	helpers utils.Helpers,
 	guildDiscord guilddiscord.GuildDiscordInterface,
-	guildConfigResolver guildconfig.GuildConfigResolver, // Use interface for better testability
-	interactionStore storage.ISInterface,
+	guildConfigResolver guildconfig.GuildConfigResolver,
+	interactionStore storage.ISInterface[any],
 	session discordgocommands.Session,
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
-	signupManager signup.SignupManager, // Optional: for tracking signup channels when guild config is set up
+	signupManager signup.SignupManager,
 ) Handlers {
 	return &GuildHandlers{
 		Logger:              logger,

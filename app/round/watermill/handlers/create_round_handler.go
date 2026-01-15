@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	sharedroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
+	discordroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
@@ -14,7 +14,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-func (h *RoundHandlers) HandleRoundCreateRequested(ctx context.Context, payload *sharedroundevents.CreateRoundModalPayloadV1) ([]handlerwrapper.Result, error) {
+func (h *RoundHandlers) HandleRoundCreateRequested(ctx context.Context, payload *discordroundevents.CreateRoundModalPayloadV1) ([]handlerwrapper.Result, error) {
 	// Convert to backend payload and set GuildID
 	backendPayload := roundevents.CreateRoundRequestedPayloadV1{
 		GuildID:     sharedtypes.GuildID(payload.GuildID),

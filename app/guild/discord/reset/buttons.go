@@ -3,7 +3,6 @@ package reset
 import (
 	"context"
 	"fmt"
-	"time"
 
 	guildevents "github.com/Black-And-White-Club/frolf-bot-shared/events/guild"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
@@ -48,7 +47,7 @@ func (rm *resetManager) HandleResetConfirmButton(ctx context.Context, i *discord
 
 		// Store the interaction so watermill handlers can send the final response
 		if rm.interactionStore != nil {
-			err := rm.interactionStore.Set(i.GuildID, i.Interaction, 15*time.Minute)
+			err := rm.interactionStore.Set(ctx, i.GuildID, i.Interaction)
 			if err != nil {
 				rm.logger.ErrorContext(ctx, "Failed to store interaction",
 					attr.String("guild_id", i.GuildID),

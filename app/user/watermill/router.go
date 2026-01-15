@@ -10,9 +10,8 @@ import (
 	userhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/user/watermill/handlers"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
-	shareduserevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/user"
+	discorduserevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/user"
 	userevents "github.com/Black-And-White-Club/frolf-bot-shared/events/user"
-	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	tracingfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/tracing"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
@@ -115,58 +114,6 @@ func (r *UserRouter) Configure(ctx context.Context, handlers userhandlers.Handle
 	return nil
 }
 
-// getPublishTopic resolves the topic to publish for a given handler's returned message.
-// This centralizes routing logic in the router (not in handlers or helpers).
-func (r *UserRouter) getPublishTopic(handlerName string, msg *message.Message) string {
-	// Extract base topic from handlerName format: "discord-user.{topic}"
-	// Map handler input topic → output topic(s)
-
-	switch {
-	case handlerName == "discord-user."+userevents.UserCreatedV1:
-		// HandleUserCreated always returns SignupAddRoleV1
-		return shareduserevents.SignupAddRoleV1
-
-	case handlerName == "discord-user."+shareduserevents.SignupAddRoleV1:
-		// HandleAddRole returns either SignupRoleAddedV1 or SignupRoleAdditionFailedV1
-		// Check metadata for result (fallback to metadata temporarily for complex case)
-		return msg.Metadata.Get("topic")
-
-	case handlerName == "discord-user."+shareduserevents.SignupRoleAddedV1:
-		// HandleRoleAdded doesn't return messages (nil)
-		return ""
-
-	case handlerName == "discord-user."+shareduserevents.SignupRoleAdditionFailedV1:
-		// HandleRoleAdditionFailed doesn't return messages (nil)
-		return ""
-
-	case handlerName == "discord-user."+userevents.UserCreationFailedV1:
-		// HandleUserCreationFailed doesn't return messages (nil)
-		return ""
-
-	case handlerName == "discord-user."+userevents.UserRoleUpdatedV1:
-		// HandleRoleUpdated doesn't return messages (nil)
-		return ""
-
-	case handlerName == "discord-user."+userevents.UserRoleUpdateFailedV1:
-		// HandleRoleUpdateFailed doesn't return messages (nil)
-		return ""
-
-	case handlerName == "discord-user."+shareduserevents.RoleUpdateCommandV1:
-		// HandleRoleUpdateCommand doesn't return messages (nil)
-		return ""
-
-	case handlerName == "discord-user."+shareduserevents.RoleUpdateButtonPressV1:
-		// HandleRoleUpdateButtonPress always returns UserRoleUpdateRequestedV1
-		return userevents.UserRoleUpdateRequestedV1
-
-	default:
-		r.logger.Warn("unknown handler in topic resolution - no metadata fallback in Phase 2",
-			attr.String("handler", handlerName),
-		)
-		return ""
-	}
-}
-
 // registerHandlers registers all user module handlers using the generic pattern
 func (r *UserRouter) registerHandlers(handlers userhandlers.Handler) error {
 	var metrics handlerwrapper.ReturningMetrics // reserved for metrics integration
@@ -184,11 +131,11 @@ func (r *UserRouter) registerHandlers(handlers userhandlers.Handler) error {
 	// Register all user module handlers
 	registerHandler(deps, userevents.UserCreatedV1, handlers.HandleUserCreated)
 	registerHandler(deps, userevents.UserCreationFailedV1, handlers.HandleUserCreationFailed)
-	registerHandler(deps, shareduserevents.SignupAddRoleV1, handlers.HandleAddRole)
-	registerHandler(deps, shareduserevents.SignupRoleAddedV1, handlers.HandleRoleAdded)
-	registerHandler(deps, shareduserevents.SignupRoleAdditionFailedV1, handlers.HandleRoleAdditionFailed)
-	registerHandler(deps, shareduserevents.RoleUpdateCommandV1, handlers.HandleRoleUpdateCommand)
-	registerHandler(deps, shareduserevents.RoleUpdateButtonPressV1, handlers.HandleRoleUpdateButtonPress)
+	registerHandler(deps, discorduserevents.SignupAddRoleV1, handlers.HandleAddRole)
+	registerHandler(deps, discorduserevents.SignupRoleAddedV1, handlers.HandleRoleAdded)
+	registerHandler(deps, discorduserevents.SignupRoleAdditionFailedV1, handlers.HandleRoleAdditionFailed)
+	registerHandler(deps, discorduserevents.RoleUpdateCommandV1, handlers.HandleRoleUpdateCommand)
+	registerHandler(deps, discorduserevents.RoleUpdateButtonPressV1, handlers.HandleRoleUpdateButtonPress)
 	registerHandler(deps, userevents.UserRoleUpdatedV1, handlers.HandleRoleUpdated)
 	registerHandler(deps, userevents.UserRoleUpdateFailedV1, handlers.HandleRoleUpdateFailed)
 

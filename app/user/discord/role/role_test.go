@@ -38,13 +38,14 @@ func TestNewRoleManager(t *testing.T) {
 				logger := slog.New(testHandler)
 				mockHelper := utilsmocks.NewMockHelpers(ctrl)
 				mockConfig := &config.Config{}
-				mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+				mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
 				mockMetrics := discordmetrics.NewMockDiscordMetrics(ctrl)
 				tracer := noop.NewTracerProvider().Tracer("test")
 				mockGuildConfig := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
 
 				// Call the function being tested
-				manager, err := NewRoleManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockGuildConfig, mockInteractionStore, tracer, mockMetrics)
+				// Note: NewRoleManager now accepts a guildConfigCache param before tracer; pass nil for the cache in tests
+				manager, err := NewRoleManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockGuildConfig, mockInteractionStore, nil, tracer, mockMetrics)
 				// Ensure manager is correctly created
 				if err != nil {
 					t.Fatalf("NewRoleManager returned error: %v", err)
@@ -78,6 +79,9 @@ func TestNewRoleManager(t *testing.T) {
 				if roleManagerImpl.interactionStore != mockInteractionStore {
 					t.Errorf("InteractionStore not correctly assigned")
 				}
+				if roleManagerImpl.guildConfigCache != nil {
+					t.Errorf("GuildConfigCache should be nil in this test")
+				}
 				if roleManagerImpl.tracer != tracer {
 					t.Errorf("Tracer not correctly assigned")
 				}
@@ -95,7 +99,8 @@ func TestNewRoleManager(t *testing.T) {
 			name: "Handles nil dependencies",
 			test: func(t *testing.T) {
 				// Call with nil dependencies
-				manager, err := NewRoleManager(nil, nil, nil, nil, nil, nil, nil, nil, nil)
+				// pass nil for the added guildConfigCache param as well
+				manager, err := NewRoleManager(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 				// Ensure manager is correctly created
 				if err != nil {
 					t.Fatalf("NewRoleManager returned error: %v", err)

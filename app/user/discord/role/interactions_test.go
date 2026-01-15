@@ -28,7 +28,6 @@ var testOperationWrapper = func(ctx context.Context, operationName string, opera
 
 func Test_roleManager_RespondToRoleRequest(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	mockSession := discordmocks.NewMockSession(ctrl)
 	mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
@@ -41,7 +40,7 @@ func Test_roleManager_RespondToRoleRequest(t *testing.T) {
 			},
 		},
 	}
-	mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+	mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
 	mockHelper := util_mocks.NewMockHelpers(ctrl)
 	tracerProvider := noop.NewTracerProvider()
 	tracer := tracerProvider.Tracer("test")
@@ -183,7 +182,7 @@ func Test_roleManager_RespondToRoleButtonPress(t *testing.T) {
 			},
 		},
 	}
-	mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+	mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
 	mockHelper := util_mocks.NewMockHelpers(ctrl)
 	tracerProvider := noop.NewTracerProvider()
 	tracer := tracerProvider.Tracer("test")
@@ -332,7 +331,7 @@ func Test_roleManager_HandleRoleRequestCommand(t *testing.T) {
 			},
 		},
 	}
-	mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+	mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
 	mockHelper := util_mocks.NewMockHelpers(ctrl)
 	metrics := &discordmetrics.NoOpMetrics{}
 
@@ -446,7 +445,7 @@ func Test_roleManager_HandleRoleButtonPress(t *testing.T) {
 			},
 		},
 	}
-	mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+	mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
 	mockHelper := util_mocks.NewMockHelpers(ctrl)
 	metrics := &discordmetrics.NoOpMetrics{}
 	tracerProvider := noop.NewTracerProvider()
@@ -737,7 +736,7 @@ func Test_roleManager_HandleRoleCancelButton(t *testing.T) {
 	mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
 	logger := loggerfrolfbot.NoOpLogger
 	mockConfig := &config.Config{}
-	mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+	mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
 	mockHelper := util_mocks.NewMockHelpers(ctrl)
 	tracerProvider := noop.NewTracerProvider()
 	tracer := tracerProvider.Tracer("test")
@@ -759,7 +758,7 @@ func Test_roleManager_HandleRoleCancelButton(t *testing.T) {
 					Return(nil).
 					Times(1)
 				mockInteractionStore.EXPECT().
-					Delete(gomock.Any()).
+					Delete(gomock.Any(), gomock.Any()).
 					Times(1)
 			},
 			ctx:              context.Background(),
@@ -775,7 +774,7 @@ func Test_roleManager_HandleRoleCancelButton(t *testing.T) {
 					Return(errors.New("respond to interaction error")).
 					Times(1)
 				mockInteractionStore.EXPECT().
-					Delete(gomock.Any()).
+					Delete(gomock.Any(), gomock.Any()).
 					Times(1)
 			},
 			ctx:              context.Background(),
@@ -791,7 +790,7 @@ func Test_roleManager_HandleRoleCancelButton(t *testing.T) {
 					Return(nil).
 					Times(1)
 				mockInteractionStore.EXPECT().
-					Delete(gomock.Any()).
+					Delete(gomock.Any(), gomock.Any()).
 					Times(1)
 			},
 			ctx:              context.Background(),
@@ -817,7 +816,7 @@ func Test_roleManager_HandleRoleCancelButton(t *testing.T) {
 					Return(nil).
 					Times(0)
 				mockInteractionStore.EXPECT().
-					Delete(gomock.Any()).
+					Delete(gomock.Any(), gomock.Any()).
 					Times(0)
 			},
 			ctx:              context.Background(),
@@ -833,7 +832,7 @@ func Test_roleManager_HandleRoleCancelButton(t *testing.T) {
 					Return(nil).
 					Times(0) // No response should be sent
 				mockInteractionStore.EXPECT().
-					Delete(gomock.Any()).
+					Delete(gomock.Any(), gomock.Any()).
 					Times(0) // No deletion should occur
 			},
 			ctx: func() context.Context {
