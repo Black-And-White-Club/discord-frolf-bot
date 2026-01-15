@@ -5,10 +5,11 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/discordutils"
 	guildevents "github.com/Black-And-White-Club/frolf-bot-shared/events/guild"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
-	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 	guildtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/guild"
+	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -119,24 +120,24 @@ func (h *GuildHandlers) HandleGuildConfigDeletionFailed(ctx context.Context, pay
 		return []handlerwrapper.Result{}, nil
 	}
 
-	if interactionData, ok := h.InteractionStore.Get(guildID); ok {
-		h.InteractionStore.Delete(guildID)
+	// UPDATED: Use the bridge utility with context
+	if interaction, err := discordutils.GetInteraction(ctx, h.InteractionStore, guildID); err == nil {
+		// Clean up immediately
+		h.InteractionStore.Delete(ctx, guildID)
 
-		if interaction, ok := interactionData.(*discordgo.Interaction); ok {
-			content := fmt.Sprintf(
-				"❌ Failed to reset server configuration.\n\n**Reason:** %s\n\nPlease try again.",
-				payload.Reason,
-			)
+		content := fmt.Sprintf(
+			"❌ Failed to reset server configuration.\n\n**Reason:** %s\n\nPlease try again.",
+			payload.Reason,
+		)
 
-			_, err := h.Session.InteractionResponseEdit(interaction, &discordgo.WebhookEdit{
-				Content:    &content,
-				Components: &[]discordgo.MessageComponent{},
-			})
-			if err != nil {
-				h.Logger.ErrorContext(ctx, "Failed to send deletion failure response",
-					attr.String("guild_id", guildID),
-					attr.Error(err))
-			}
+		_, err := h.Session.InteractionResponseEdit(interaction, &discordgo.WebhookEdit{
+			Content:    &content,
+			Components: &[]discordgo.MessageComponent{},
+		})
+		if err != nil {
+			h.Logger.ErrorContext(ctx, "Failed to send deletion failure response",
+				attr.String("guild_id", guildID),
+				attr.Error(err))
 		}
 	}
 
@@ -156,16 +157,15 @@ func (h *GuildHandlers) sendDeletionSummary(
 		return
 	}
 
-	interactionData, ok := h.InteractionStore.Get(guildID)
-	if !ok {
+	// UPDATED: Use the bridge utility to replace manual Get + Assertion
+	interaction, err := discordutils.GetInteraction(ctx, h.InteractionStore, guildID)
+	if err != nil {
+		// If it's not in the store, we can't send a summary, just exit
 		return
 	}
-	h.InteractionStore.Delete(guildID)
 
-	interaction, ok := interactionData.(*discordgo.Interaction)
-	if !ok {
-		return
-	}
+	// Clean up the cache now that we've retrieved it
+	h.InteractionStore.Delete(ctx, guildID)
 
 	summary := "✅ Server configuration reset completed.\n\n"
 	summary += "Bot commands have been unregistered. Run `/frolf-setup` when you're ready.\n\n"
@@ -181,7 +181,7 @@ func (h *GuildHandlers) sendDeletionSummary(
 		}
 	}
 
-	_, err := h.Session.InteractionResponseEdit(interaction, &discordgo.WebhookEdit{
+	_, err = h.Session.InteractionResponseEdit(interaction, &discordgo.WebhookEdit{
 		Content:    &summary,
 		Components: &[]discordgo.MessageComponent{},
 	})

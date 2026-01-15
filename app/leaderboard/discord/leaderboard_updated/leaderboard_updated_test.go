@@ -29,12 +29,12 @@ func TestNewLeaderboardUpdateManager(t *testing.T) {
 	logger := slog.New(testHandler)
 	mockHelper := utilsmocks.NewMockHelpers(ctrl)
 	mockConfig := &config.Config{}
-	mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+	mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
 	mockMetrics := discordmetricsmocks.NewMockDiscordMetrics(ctrl)
 	tracer := noop.NewTracerProvider().Tracer("test")
 	mockGuildConfig := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
 
-	manager := NewLeaderboardUpdateManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockGuildConfig, mockInteractionStore, tracer, mockMetrics)
+	manager := NewLeaderboardUpdateManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockGuildConfig, mockInteractionStore, nil, tracer, mockMetrics)
 	impl, ok := manager.(*leaderboardUpdateManager)
 	if !ok {
 		t.Fatalf("Expected *leaderboardUpdateManager, got %T", manager)

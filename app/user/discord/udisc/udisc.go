@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
@@ -25,6 +26,8 @@ type udiscManager struct {
 	publisher        eventbus.EventBus
 	logger           *slog.Logger
 	config           *config.Config
+	interactionStore storage.ISInterface[any]
+	guildConfigCache storage.ISInterface[storage.GuildConfig]
 	tracer           trace.Tracer
 	metrics          discordmetrics.DiscordMetrics
 	operationWrapper func(ctx context.Context, opName string, fn func(ctx context.Context) (UDiscOperationResult, error)) (UDiscOperationResult, error)
@@ -36,6 +39,8 @@ func NewUDiscManager(
 	publisher eventbus.EventBus,
 	logger *slog.Logger,
 	cfg *config.Config,
+	interactionStore storage.ISInterface[any],
+	guildConfigCache storage.ISInterface[storage.GuildConfig],
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
 ) UDiscManager {
@@ -44,12 +49,14 @@ func NewUDiscManager(
 	}
 
 	return &udiscManager{
-		session:   session,
-		publisher: publisher,
-		logger:    logger,
-		config:    cfg,
-		tracer:    tracer,
-		metrics:   metrics,
+		session:          session,
+		publisher:        publisher,
+		logger:           logger,
+		config:           cfg,
+		interactionStore: interactionStore,
+		guildConfigCache: guildConfigCache,
+		tracer:           tracer,
+		metrics:          metrics,
 		operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (UDiscOperationResult, error)) (UDiscOperationResult, error) {
 			return operationWrapper(ctx, opName, fn, logger, tracer)
 		},

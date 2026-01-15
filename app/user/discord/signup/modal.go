@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	userevents "github.com/Black-And-White-Club/frolf-bot-shared/events/user"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
@@ -36,9 +35,8 @@ func (sm *signupManager) SendSignupModal(ctx context.Context, i *discordgo.Inter
 			return SignupOperationResult{Error: errors.New("user is nil in interaction")}, errors.New("user is nil in interaction")
 		}
 
-		// Store the interaction AFTER validation checks
-		err := sm.interactionStore.Set(i.Interaction.ID, i.Interaction, 10*time.Minute)
-		if err != nil {
+		// Store the interaction AFTER validation checks (context-aware)
+		if err := sm.interactionStore.Set(ctx, i.Interaction.ID, i.Interaction); err != nil {
 			return SignupOperationResult{}, fmt.Errorf("failed to store interaction: %w", err)
 		}
 
@@ -65,7 +63,7 @@ func (sm *signupManager) SendSignupModal(ctx context.Context, i *discordgo.Inter
 		// Send the modal with your existing components
 		// Include guild ID in the custom ID so it's available on modal submit
 		customID := fmt.Sprintf("signup_modal|guild_id=%s", guildID)
-		err = sm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		err := sm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseModal,
 			Data: &discordgo.InteractionResponseData{
 				CustomID: customID,
@@ -210,7 +208,10 @@ func (sm *signupManager) HandleSignupModalSubmit(ctx context.Context, i *discord
 		}
 
 		correlationID := uuid.New().String()
-		sm.interactionStore.Set(correlationID, i.Interaction, 10*time.Minute)
+		if err := sm.interactionStore.Set(ctx, correlationID, i.Interaction); err != nil {
+			sm.logger.ErrorContext(ctx, "failed to store interaction correlation", attr.Error(err))
+			return SignupOperationResult{Error: err}, err
+		}
 
 		msg, err := BuildUserSignupRequestMessage(ctx, payload, i)
 		if err != nil {

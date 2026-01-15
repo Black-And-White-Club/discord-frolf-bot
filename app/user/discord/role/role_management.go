@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/discordutils"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
@@ -22,27 +23,23 @@ func (rm *roleManager) EditRoleUpdateResponse(ctx context.Context, correlationID
 			return RoleOperationResult{Error: ctx.Err()}, nil
 		}
 
-		interaction, found := rm.interactionStore.Get(correlationID)
-		if !found {
-			err := fmt.Errorf("interaction not found for correlation ID: %s", correlationID)
-			rm.logger.ErrorContext(ctx, err.Error(), attr.String("correlation_id", correlationID))
+		interactionObj, err := discordutils.GetInteraction(ctx, rm.interactionStore, correlationID)
+		if err != nil {
+			// Preserve underlying GetInteraction error (could be a type mismatch) so tests can assert on it
+			rm.logger.ErrorContext(ctx, "failed to retrieve interaction", attr.String("correlation_id", correlationID), attr.Error(err))
 			return RoleOperationResult{Error: err}, nil
 		}
 
-		interactionObj, ok := interaction.(*discordgo.Interaction)
-		if !ok {
-			err := fmt.Errorf("interaction is not of the expected type")
-			rm.logger.ErrorContext(ctx, err.Error(), attr.String("correlation_id", correlationID))
-			return RoleOperationResult{Error: err}, nil
-		}
-
-		_, err := rm.session.InteractionResponseEdit(interactionObj, &discordgo.WebhookEdit{
+		_, err = rm.session.InteractionResponseEdit(interactionObj, &discordgo.WebhookEdit{
 			Content: &content,
 		})
 		if err != nil {
 			rm.logger.ErrorContext(ctx, "Failed to send result", attr.Error(err))
 			return RoleOperationResult{Error: fmt.Errorf("failed to send result: %w", err)}, nil
 		}
+
+		// Clean up stored interaction after sending the follow-up
+		rm.interactionStore.Delete(ctx, correlationID)
 
 		rm.logger.InfoContext(ctx, "Successfully edited interaction response")
 		return RoleOperationResult{Success: "response updated"}, nil

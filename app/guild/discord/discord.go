@@ -42,11 +42,14 @@ func NewGuildDiscord(
 	logger *slog.Logger,
 	helper utils.Helpers,
 	config *config.Config,
-	interactionStore storage.ISInterface,
+	interactionStore storage.ISInterface[any], // <--- Updated to use Generic [any]
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
 	guildConfigResolver guildconfig.GuildConfigResolver,
-) (GuildDiscordInterface, error) { // Use wrapped session directly; it implements required interface
+) (GuildDiscordInterface, error) {
+
+	// SetupManager and ResetManager constructors will also need
+	// their signatures updated to match this storage.ISInterface[any]
 	setupManager, err := setup.NewSetupManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics, guildConfigResolver)
 	if err != nil {
 		return nil, err

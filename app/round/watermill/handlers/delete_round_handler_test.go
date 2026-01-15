@@ -10,7 +10,7 @@ import (
 	deleteround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/delete_round"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/round/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
-	sharedroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
+	discordroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
@@ -24,7 +24,7 @@ func TestRoundHandlers_HandleRoundDeleteRequested(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		payload    *sharedroundevents.RoundDeleteRequestDiscordPayloadV1
+		payload    *discordroundevents.RoundDeleteRequestDiscordPayloadV1
 		ctx        context.Context
 		wantErr    bool
 		wantLen    int
@@ -32,7 +32,7 @@ func TestRoundHandlers_HandleRoundDeleteRequested(t *testing.T) {
 	}{
 		{
 			name: "successful_delete_request",
-			payload: &sharedroundevents.RoundDeleteRequestDiscordPayloadV1{
+			payload: &discordroundevents.RoundDeleteRequestDiscordPayloadV1{
 				RoundID: testRoundID,
 			},
 			ctx:     context.Background(),

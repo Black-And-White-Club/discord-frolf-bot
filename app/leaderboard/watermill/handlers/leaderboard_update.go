@@ -13,10 +13,10 @@ import (
 
 // HandleBatchTagAssigned handles batch tag assignment completions and sends leaderboard embed
 func (h *LeaderboardHandlers) HandleBatchTagAssigned(ctx context.Context,
-	payload interface{}) ([]handlerwrapper.Result, error) {
+	payload *leaderboardevents.LeaderboardBatchTagAssignedPayloadV1) ([]handlerwrapper.Result, error) {
 	h.Logger.InfoContext(ctx, "Handling batch tag assigned event")
 
-	batchPayload := payload.(*leaderboardevents.LeaderboardBatchTagAssignedPayloadV1)
+	batchPayload := payload
 
 	guildID := string(batchPayload.GuildID)
 
@@ -67,7 +67,7 @@ func (h *LeaderboardHandlers) HandleBatchTagAssigned(ctx context.Context,
 
 		return []handlerwrapper.Result{
 			{
-				Topic:   leaderboardevents.LeaderboardTraceEvent,
+				Topic:   leaderboardevents.LeaderboardTraceEventV1,
 				Payload: tracePayload,
 				Metadata: map[string]string{
 					"guild_id": guildID,

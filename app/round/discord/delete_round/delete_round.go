@@ -33,7 +33,8 @@ type deleteRoundManager struct {
 	logger              *slog.Logger
 	helper              utils.Helpers
 	config              *config.Config
-	interactionStore    storage.ISInterface
+	interactionStore    storage.ISInterface[any]
+	guildConfigCache    storage.ISInterface[storage.GuildConfig]
 	tracer              trace.Tracer
 	metrics             discordmetrics.DiscordMetrics
 	operationWrapper    func(ctx context.Context, opName string, fn func(ctx context.Context) (DeleteRoundOperationResult, error)) (DeleteRoundOperationResult, error)
@@ -47,7 +48,8 @@ func NewDeleteRoundManager(
 	logger *slog.Logger,
 	helper utils.Helpers,
 	config *config.Config,
-	interactionStore storage.ISInterface,
+	interactionStore storage.ISInterface[any],
+	guildConfigCache storage.ISInterface[storage.GuildConfig],
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
 	guildConfigResolver guildconfig.GuildConfigResolver,
@@ -62,6 +64,7 @@ func NewDeleteRoundManager(
 		helper:           helper,
 		config:           config,
 		interactionStore: interactionStore,
+		guildConfigCache: guildConfigCache,
 		tracer:           tracer,
 		metrics:          metrics,
 		operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (DeleteRoundOperationResult, error)) (DeleteRoundOperationResult, error) {

@@ -11,6 +11,7 @@ import (
 	createround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/create_round"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/round/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
+	discordroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	sharedroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
@@ -26,7 +27,7 @@ import (
 func TestRoundHandlers_HandleRoundCreateRequested(t *testing.T) {
 	tests := []struct {
 		name    string
-		payload *sharedroundevents.CreateRoundModalPayloadV1
+		payload *discordroundevents.CreateRoundModalPayloadV1
 		ctx     context.Context
 		want    []handlerwrapper.Result
 		wantErr bool

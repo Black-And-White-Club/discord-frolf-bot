@@ -4,7 +4,7 @@ import (
 	"context"
 
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
-	scoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/score"
+	sharedevents "github.com/Black-And-White-Club/frolf-bot-shared/events/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 )
 
@@ -15,7 +15,7 @@ const (
 
 // HandleScoreOverrideSuccess bridges CorrectScore success events into the round Discord update flow
 // by publishing a RoundParticipantScoreUpdated event so the embed refresh logic is reused.
-func (h *RoundHandlers) HandleScoreOverrideSuccess(ctx context.Context, payload *scoreevents.ScoreUpdatedPayloadV1) ([]handlerwrapper.Result, error) {
+func (h *RoundHandlers) HandleScoreOverrideSuccess(ctx context.Context, payload *sharedevents.ScoreUpdatedPayloadV1) ([]handlerwrapper.Result, error) {
 	// Pull discord message id & channel id (if any) from context. Channel may be absent.
 	messageID, ok := ctx.Value(metaDiscordMessageID).(string)
 	if !ok {

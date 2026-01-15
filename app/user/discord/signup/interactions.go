@@ -247,7 +247,9 @@ func (sm *signupManager) HandleSignupButtonPress(ctx context.Context, i *discord
 	return sm.operationWrapper(ctx, "handle_signup_button_press", func(ctx context.Context) (SignupOperationResult, error) {
 		// Only store minimal context if we have a token and guildID; avoid extra writes that tests don't expect
 		if i != nil && i.Interaction != nil && guildID != "" && i.Interaction.Token != "" {
-			_ = sm.interactionStore.Set(i.Interaction.Token+":guild_id", guildID, 10*60) // 10 min expiry
+			if err := sm.interactionStore.Set(ctx, i.Interaction.Token+":guild_id", guildID); err != nil {
+				sm.logger.WarnContext(ctx, "Failed to store signup token->guild mapping", attr.String("token", i.Interaction.Token), attr.Error(err))
+			}
 		}
 		result, err := sm.SendSignupModal(ctx, i)
 		if err != nil {

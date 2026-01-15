@@ -29,12 +29,12 @@ func TestNewCreateRoundManager(t *testing.T) {
 	logger := slog.New(testHandler)
 	mockHelper := utilsmocks.NewMockHelpers(ctrl)
 	mockConfig := &config.Config{}
-	mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+	mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
 	mockMetrics := discordmetricsmocks.NewMockDiscordMetrics(ctrl)
 	tracer := noop.NewTracerProvider().Tracer("test")
 	mockGuildConfigResolver := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
 
-	manager := NewCreateRoundManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockInteractionStore, tracer, mockMetrics, mockGuildConfigResolver)
+	manager := NewCreateRoundManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockInteractionStore, nil, tracer, mockMetrics, mockGuildConfigResolver)
 	impl, ok := manager.(*createRoundManager)
 	if !ok {
 		t.Fatalf("Expected *createRoundManager, got %T", manager)

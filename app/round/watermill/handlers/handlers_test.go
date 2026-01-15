@@ -24,7 +24,7 @@ func TestNewRoundHandlers(t *testing.T) {
 		tracer := noop.NewTracerProvider().Tracer("test")
 		cfg := &config.Config{}
 
-		handlers := NewRoundHandlers(logger, cfg, mockHelpers, mockRoundDiscord, tracer, mockMetrics)
+		handlers := NewRoundHandlers(logger, cfg, mockHelpers, mockRoundDiscord, tracer, mockMetrics, nil)
 
 		if handlers == nil {
 			t.Fatalf("Expected non-nil RoundHandlers")

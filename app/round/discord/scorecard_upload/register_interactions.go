@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/interactions"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	"github.com/bwmarrin/discordgo"
@@ -29,6 +30,9 @@ func RegisterHandlers(registry *interactions.Registry, messageRegistry *interact
 		manager.HandleScorecardUploadModalSubmit(ctx, i)
 	})
 
-	// File upload message listener
-	messageRegistry.RegisterMessageCreateHandler(manager.HandleFileUploadMessage)
+	// File upload message listener - adapter to provide context to legacy handler
+	messageRegistry.RegisterMessageCreateHandler(func(ctx context.Context, s discord.Session, m *discordgo.MessageCreate) {
+		// manager.HandleFileUploadMessage expects (discord.Session, *discordgo.MessageCreate)
+		manager.HandleFileUploadMessage(s, m)
+	})
 }

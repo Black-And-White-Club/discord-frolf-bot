@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"testing"
 
-	sharedleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
+	discordleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"go.opentelemetry.io/otel/trace/noop"
@@ -15,13 +15,13 @@ import (
 func TestHandleTagSwapRequest(t *testing.T) {
 	tests := []struct {
 		name    string
-		payload interface{}
+		payload *discordleaderboardevents.LeaderboardTagSwapRequestPayloadV1
 		wantErr bool
 		check   func(*testing.T, interface{}, error)
 	}{
 		{
 			name: "successful_tag_swap_request",
-			payload: &sharedleaderboardevents.LeaderboardTagSwapRequestPayloadV1{
+			payload: &discordleaderboardevents.LeaderboardTagSwapRequestPayloadV1{
 				GuildID:     "guild123",
 				User1ID:     sharedtypes.DiscordID("user1"),
 				User2ID:     sharedtypes.DiscordID("user2"),
@@ -43,7 +43,7 @@ func TestHandleTagSwapRequest(t *testing.T) {
 		},
 		{
 			name: "invalid_payload_missing_user1",
-			payload: &sharedleaderboardevents.LeaderboardTagSwapRequestPayloadV1{
+			payload: &discordleaderboardevents.LeaderboardTagSwapRequestPayloadV1{
 				User1ID:     "",
 				User2ID:     sharedtypes.DiscordID("user2"),
 				RequestorID: sharedtypes.DiscordID("requestor"),
@@ -82,7 +82,7 @@ func TestHandleTagSwapRequest(t *testing.T) {
 func TestHandleTagSwappedResponse(t *testing.T) {
 	tests := []struct {
 		name    string
-		payload interface{}
+		payload *leaderboardevents.TagSwapProcessedPayloadV1
 		wantErr bool
 	}{
 		{
@@ -126,7 +126,7 @@ func TestHandleTagSwappedResponse(t *testing.T) {
 func TestHandleTagSwapFailedResponse(t *testing.T) {
 	tests := []struct {
 		name    string
-		payload interface{}
+		payload *leaderboardevents.TagSwapFailedPayloadV1
 		wantErr bool
 	}{
 		{

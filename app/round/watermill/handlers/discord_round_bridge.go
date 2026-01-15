@@ -3,7 +3,7 @@ package roundhandlers
 import (
 	"context"
 
-	sharedroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
+	discordroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
@@ -13,7 +13,7 @@ import (
 // Discord-scoped round score updates into the canonical round domain event.
 func (h *RoundHandlers) HandleDiscordRoundScoreUpdate(
 	ctx context.Context,
-	payload *sharedroundevents.RoundScoreUpdateRequestDiscordPayloadV1,
+	payload *discordroundevents.RoundScoreUpdateRequestDiscordPayloadV1,
 ) ([]handlerwrapper.Result, error) {
 	if payload == nil {
 		return nil, nil

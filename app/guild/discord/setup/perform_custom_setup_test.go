@@ -1,6 +1,7 @@
 package setup
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -99,7 +100,7 @@ func Test_performCustomSetup(t *testing.T) {
 				tt.setup(ms)
 			}
 			m := &setupManager{session: ms}
-			res, err := m.performCustomSetup("g1", tt.cfg)
+			res, err := m.performCustomSetup(context.Background(), "g1", tt.cfg)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("expected error, got nil")

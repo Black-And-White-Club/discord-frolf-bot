@@ -9,6 +9,7 @@ import (
 
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
 	guildconfigmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	storagemocks "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
@@ -29,12 +30,13 @@ func TestNewRoundRsvpManager(t *testing.T) {
 	logger := slog.New(testHandler)
 	mockHelper := utilsmocks.NewMockHelpers(ctrl)
 	mockConfig := &config.Config{}
-	mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+	mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
+	mockGuildConfigCache := storagemocks.NewMockISInterface[storage.GuildConfig](ctrl)
 	mockMetrics := discordmetricsmocks.NewMockDiscordMetrics(ctrl)
 	tracer := noop.NewTracerProvider().Tracer("test")
 	mockGuildConfigResolver := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
 
-	manager := NewRoundRsvpManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockInteractionStore, tracer, mockMetrics, mockGuildConfigResolver)
+	manager := NewRoundRsvpManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockInteractionStore, mockGuildConfigCache, tracer, mockMetrics, mockGuildConfigResolver)
 	impl, ok := manager.(*roundRsvpManager)
 	if !ok {
 		t.Fatalf("Expected *roundRsvpManager, got %T", manager)

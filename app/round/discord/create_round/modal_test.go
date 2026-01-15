@@ -10,7 +10,7 @@ import (
 	storagemocks "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
-	sharedroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
+	discordroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	utilsmocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
@@ -22,7 +22,7 @@ import (
 func Test_createRoundManager_SendCreateRoundModal(t *testing.T) {
 	tests := []struct {
 		name        string
-		setup       func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface)
+		setup       func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any])
 		ctx         context.Context
 		args        *discordgo.InteractionCreate
 		wantSuccess string
@@ -31,7 +31,7 @@ func Test_createRoundManager_SendCreateRoundModal(t *testing.T) {
 	}{
 		{
 			name: "successful send",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				mockSession.EXPECT().
 					InteractionRespond(gomock.Any(), gomock.Any()).
 					DoAndReturn(func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...interface{}) error {
@@ -68,7 +68,7 @@ func Test_createRoundManager_SendCreateRoundModal(t *testing.T) {
 		},
 		{
 			name: "failed to send modal",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				mockSession.EXPECT().
 					InteractionRespond(gomock.Any(), gomock.Any()).
 					Return(errors.New("failed to send modal")).
@@ -91,7 +91,7 @@ func Test_createRoundManager_SendCreateRoundModal(t *testing.T) {
 		},
 		{
 			name: "nil interaction",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				// No interaction with mocks expected
 			},
 			ctx:         context.Background(),
@@ -102,7 +102,7 @@ func Test_createRoundManager_SendCreateRoundModal(t *testing.T) {
 		},
 		{
 			name: "nil user in interaction",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				// No interaction with mocks expected
 			},
 			ctx: context.Background(),
@@ -119,7 +119,7 @@ func Test_createRoundManager_SendCreateRoundModal(t *testing.T) {
 		},
 		{
 			name: "nil member and user in interaction",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				// No interaction with mocks expected
 			},
 			ctx: context.Background(),
@@ -137,7 +137,7 @@ func Test_createRoundManager_SendCreateRoundModal(t *testing.T) {
 		},
 		{
 			name: "context cancelled before operation",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				// No interaction with mocks expected due to early context cancel
 			},
 			ctx: func() context.Context {
@@ -167,7 +167,7 @@ func Test_createRoundManager_SendCreateRoundModal(t *testing.T) {
 
 			mockSession := discordmocks.NewMockSession(ctrl)
 			mockLogger := loggerfrolfbot.NoOpLogger
-			mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+			mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
 			tracerProvider := noop.NewTracerProvider()
 			tracer := tracerProvider.Tracer("test")
 			metrics := &discordmetrics.NoOpMetrics{}
@@ -223,7 +223,7 @@ func Test_createRoundManager_HandleCreateRoundModalSubmit(t *testing.T) {
 		name        string
 		interaction *discordgo.InteractionCreate
 		ctx         context.Context
-		setup       func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface)
+		setup       func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any])
 		wantSuccess string
 		wantErrMsg  string
 		wantErrIs   error
@@ -231,7 +231,7 @@ func Test_createRoundManager_HandleCreateRoundModalSubmit(t *testing.T) {
 		{
 			name:        "successful submission",
 			interaction: createTestInteraction("Test Round", "Fun round description", "2025-04-01 14:00", "America/Chicago", "Disc Golf Park"),
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				mockSession.EXPECT().
 					InteractionRespond(gomock.Any(), gomock.Any()).
 					Return(nil).
@@ -241,7 +241,7 @@ func Test_createRoundManager_HandleCreateRoundModalSubmit(t *testing.T) {
 					Return(nil).
 					Times(1)
 				mockPublisher.EXPECT().
-					Publish(gomock.Eq(sharedroundevents.RoundCreateModalSubmittedV1), gomock.Any()).
+					Publish(gomock.Eq(discordroundevents.RoundCreateModalSubmittedV1), gomock.Any()).
 					Return(nil).
 					Times(1)
 			},
@@ -252,7 +252,7 @@ func Test_createRoundManager_HandleCreateRoundModalSubmit(t *testing.T) {
 		{
 			name:        "missing required fields",
 			interaction: createTestInteraction("", "", "", "", ""),
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				mockSession.EXPECT().
 					InteractionRespond(gomock.Any(), gomock.Any()).
 					Return(nil).
@@ -265,7 +265,7 @@ func Test_createRoundManager_HandleCreateRoundModalSubmit(t *testing.T) {
 		{
 			name:        "default timezone",
 			interaction: createTestInteraction("Test Round", "Description", "2025-04-01 14:00", "", "Location"),
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				mockSession.EXPECT().
 					InteractionRespond(gomock.Any(), gomock.Any()).
 					Return(nil).
@@ -275,7 +275,7 @@ func Test_createRoundManager_HandleCreateRoundModalSubmit(t *testing.T) {
 					Return(nil).
 					Times(1)
 				mockPublisher.EXPECT().
-					Publish(gomock.Eq(sharedroundevents.RoundCreateModalSubmittedV1), gomock.Any()).
+					Publish(gomock.Eq(discordroundevents.RoundCreateModalSubmittedV1), gomock.Any()).
 					Return(nil).
 					Times(1)
 			},
@@ -286,7 +286,7 @@ func Test_createRoundManager_HandleCreateRoundModalSubmit(t *testing.T) {
 		{
 			name:        "field too long",
 			interaction: createTestInteraction(strings.Repeat("A", 101), "Description", "2025-04-01 14:00", "UTC", "Location"),
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				mockSession.EXPECT().
 					InteractionRespond(gomock.Any(), gomock.Any()).
 					Return(nil).
@@ -299,7 +299,7 @@ func Test_createRoundManager_HandleCreateRoundModalSubmit(t *testing.T) {
 		{
 			name:        "failed to acknowledge submission",
 			interaction: createTestInteraction("Test Round", "Description", "2025-04-01 14:00", "UTC", "Location"),
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				mockSession.EXPECT().
 					InteractionRespond(gomock.Any(), gomock.Any()).
 					Return(errors.New("failed to acknowledge")).
@@ -312,7 +312,7 @@ func Test_createRoundManager_HandleCreateRoundModalSubmit(t *testing.T) {
 		{
 			name:        "failed to store interaction",
 			interaction: createTestInteraction("Test Round", "Description", "2025-04-01 14:00", "UTC", "Location"),
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				mockSession.EXPECT().
 					InteractionRespond(gomock.Any(), gomock.Any()).
 					Return(nil).
@@ -329,7 +329,7 @@ func Test_createRoundManager_HandleCreateRoundModalSubmit(t *testing.T) {
 		{
 			name:        "failed to publish event",
 			interaction: createTestInteraction("Test Round", "Description", "2025-04-01 14:00", "UTC", "Location"),
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				mockSession.EXPECT().
 					InteractionRespond(gomock.Any(), gomock.Any()).
 					Return(nil).
@@ -339,7 +339,7 @@ func Test_createRoundManager_HandleCreateRoundModalSubmit(t *testing.T) {
 					Return(nil).
 					Times(1)
 				mockPublisher.EXPECT().
-					Publish(gomock.Eq(sharedroundevents.RoundCreateModalSubmittedV1), gomock.Any()).
+					Publish(gomock.Eq(discordroundevents.RoundCreateModalSubmittedV1), gomock.Any()).
 					Return(errors.New("failed to publish")).
 					Times(1)
 			},
@@ -350,7 +350,7 @@ func Test_createRoundManager_HandleCreateRoundModalSubmit(t *testing.T) {
 		{
 			name:        "nil interaction",
 			interaction: nil,
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any]) {
 			},
 			wantSuccess: "",
 			wantErrMsg:  "interaction is nil or incomplete",
@@ -359,7 +359,7 @@ func Test_createRoundManager_HandleCreateRoundModalSubmit(t *testing.T) {
 		{
 			name:        "missing user info",
 			interaction: &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{Type: discordgo.InteractionModalSubmit, Data: discordgo.ModalSubmitInteractionData{CustomID: "create_round_modal"}}},
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any]) {
 			},
 			wantSuccess: "",
 			wantErrMsg:  "user ID is missing",
@@ -368,7 +368,7 @@ func Test_createRoundManager_HandleCreateRoundModalSubmit(t *testing.T) {
 		{
 			name:        "context cancelled before operation",
 			interaction: createTestInteraction("Test Round", "Description", "2025-04-01 14:00", "UTC", "Location"),
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any]) {
 			},
 			ctx: func() context.Context {
 				ctx, cancel := context.WithCancel(context.Background())
@@ -388,7 +388,7 @@ func Test_createRoundManager_HandleCreateRoundModalSubmit(t *testing.T) {
 
 			mockSession := discordmocks.NewMockSession(ctrl)
 			mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
-			mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+			mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
 			mockLogger := loggerfrolfbot.NoOpLogger
 			mockHelper := utilsmocks.NewMockHelpers(ctrl)
 
@@ -528,7 +528,7 @@ func createTestInteraction(title, description, startTime, timezone, location str
 func Test_createRoundManager_HandleCreateRoundModalCancel(t *testing.T) {
 	tests := []struct {
 		name        string
-		setup       func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface)
+		setup       func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any])
 		args        *discordgo.InteractionCreate
 		wantSuccess string
 		wantErrMsg  string
@@ -537,9 +537,9 @@ func Test_createRoundManager_HandleCreateRoundModalCancel(t *testing.T) {
 	}{
 		{
 			name: "successful_cancel",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				mockInteractionStore.EXPECT().
-					Delete("interaction-id").
+					Delete(gomock.Any(), "interaction-id").
 					Times(1)
 
 				mockSession.EXPECT().
@@ -564,9 +564,9 @@ func Test_createRoundManager_HandleCreateRoundModalCancel(t *testing.T) {
 		},
 		{
 			name: "error deleting interaction",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				mockInteractionStore.EXPECT().
-					Delete("interaction-id").
+					Delete(gomock.Any(), "interaction-id").
 					Times(1)
 
 				mockSession.EXPECT().
@@ -591,10 +591,10 @@ func Test_createRoundManager_HandleCreateRoundModalCancel(t *testing.T) {
 		},
 		{
 			name: "error sending response",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				// Expect interaction store to be called
 				mockInteractionStore.EXPECT().
-					Delete("interaction-id").
+					Delete(gomock.Any(), "interaction-id").
 					Times(1)
 
 				// Expect error when sending response
@@ -620,7 +620,7 @@ func Test_createRoundManager_HandleCreateRoundModalCancel(t *testing.T) {
 		},
 		{
 			name: "nil interaction",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				// No expectations as the function should return early
 			},
 			args:        nil,
@@ -631,7 +631,7 @@ func Test_createRoundManager_HandleCreateRoundModalCancel(t *testing.T) {
 		},
 		{
 			name: "context cancelled",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				//  The function should not call delete or respond in this case.
 			},
 			args: &discordgo.InteractionCreate{
@@ -656,7 +656,7 @@ func Test_createRoundManager_HandleCreateRoundModalCancel(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockSession := discordmocks.NewMockSession(ctrl)
-			mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+			mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
 
 			// Setup test expectations
 			if tt.setup != nil {

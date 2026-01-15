@@ -10,6 +10,8 @@ import (
 
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
 	guildconfigmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
+	storagemocks "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
 	utilsmocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
@@ -34,8 +36,10 @@ func TestNewScoreRoundManager(t *testing.T) {
 	mockTracer := noop.NewTracerProvider().Tracer("test")
 	mockMetrics := discordmetricsmocks.NewMockDiscordMetrics(ctrl)
 	mockGuildConfigResolver := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
+	mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
+	mockGuildConfigCache := storagemocks.NewMockISInterface[storage.GuildConfig](ctrl)
 
-	manager := NewScoreRoundManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockTracer, mockMetrics, mockGuildConfigResolver)
+	manager := NewScoreRoundManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockInteractionStore, mockGuildConfigCache, mockTracer, mockMetrics, mockGuildConfigResolver)
 	impl, ok := manager.(*scoreRoundManager)
 	if !ok {
 		t.Fatalf("Expected *scoreRoundManager, got %T", manager)
@@ -64,6 +68,12 @@ func TestNewScoreRoundManager(t *testing.T) {
 	}
 	if impl.operationWrapper == nil {
 		t.Error("Expected operationWrapper to be set")
+	}
+	if impl.interactionStore != mockInteractionStore {
+		t.Error("Expected interactionStore to be assigned")
+	}
+	if impl.guildConfigCache != mockGuildConfigCache {
+		t.Error("Expected guildConfigCache to be assigned")
 	}
 }
 
@@ -182,10 +192,12 @@ func Test_HandleScoreButton(t *testing.T) {
 	mockHelper := utilsmocks.NewMockHelpers(ctrl)
 	mockConfig := &config.Config{}
 	tracer := noop.NewTracerProvider().Tracer("test")
+	mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
+	mockGuildConfigCache := storagemocks.NewMockISInterface[storage.GuildConfig](ctrl)
 	mockGuildCfg := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
 
 	// Pass nil metrics so wrapper doesn't record metrics during tests
-	manager := NewScoreRoundManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, tracer, nil, mockGuildCfg)
+	manager := NewScoreRoundManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockInteractionStore, mockGuildConfigCache, tracer, nil, mockGuildCfg)
 	srm := manager.(*scoreRoundManager)
 	// Allow optional guild config lookup without strict expectations
 	mockGuildCfg.EXPECT().GetGuildConfigWithContext(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
@@ -285,10 +297,13 @@ func Test_HandleScoreSubmission_Single(t *testing.T) {
 	mockHelper := utilsmocks.NewMockHelpers(ctrl)
 	mockConfig := &config.Config{}
 	tracer := noop.NewTracerProvider().Tracer("test")
+	mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
+	mockGuildConfigCache := storagemocks.NewMockISInterface[storage.GuildConfig](ctrl)
 	mockGuildCfg := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
 
 	// Pass nil metrics so wrapper doesn't record metrics during tests
-	manager := NewScoreRoundManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, tracer, nil, mockGuildCfg)
+	manager := NewScoreRoundManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockInteractionStore, mockGuildConfigCache, tracer, nil, mockGuildCfg)
+
 	srm := manager.(*scoreRoundManager)
 	mockGuildCfg.EXPECT().GetGuildConfigWithContext(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 
@@ -390,10 +405,13 @@ func Test_HandleScoreSubmission_Bulk(t *testing.T) {
 	mockHelper := utilsmocks.NewMockHelpers(ctrl)
 	mockConfig := &config.Config{}
 	tracer := noop.NewTracerProvider().Tracer("test")
+	mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
+	mockGuildConfigCache := storagemocks.NewMockISInterface[storage.GuildConfig](ctrl)
 	mockGuildCfg := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
 
 	// Pass nil metrics so wrapper doesn't record metrics during tests
-	manager := NewScoreRoundManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, tracer, nil, mockGuildCfg)
+	manager := NewScoreRoundManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockInteractionStore, mockGuildConfigCache, tracer, nil, mockGuildCfg)
+
 	srm := manager.(*scoreRoundManager)
 	// Allow guild config lookups
 	mockGuildCfg.EXPECT().GetGuildConfigWithContext(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()

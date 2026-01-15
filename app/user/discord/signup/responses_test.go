@@ -21,7 +21,7 @@ func Test_signupManager_SendSignupResult(t *testing.T) {
 	tests := []struct {
 		name        string
 		args        args
-		setup       func(mockStore *storagemocks.MockISInterface, mockDiscord *discordmocks.MockSession)
+		setup       func(mockStore *storagemocks.MockISInterface[any], mockDiscord *discordmocks.MockSession)
 		wantSuccess string
 		wantErr     bool
 		wantErrMsg  string
@@ -32,10 +32,12 @@ func Test_signupManager_SendSignupResult(t *testing.T) {
 				correlationID: "valid_id",
 				success:       true,
 			},
-			setup: func(mockStore *storagemocks.MockISInterface, mockDiscord *discordmocks.MockSession) {
+			setup: func(mockStore *storagemocks.MockISInterface[any], mockDiscord *discordmocks.MockSession) {
 				interaction := &discordgo.Interaction{}
-				mockStore.EXPECT().Get("valid_id").Return(interaction, true)
+				mockStore.EXPECT().Get(gomock.Any(), "valid_id").Return(interaction, nil)
 				mockDiscord.EXPECT().InteractionResponseEdit(gomock.Any(), gomock.Any()).Return(&discordgo.Message{}, nil)
+					// Expect stored interaction to be deleted after sending the follow-up
+					mockStore.EXPECT().Delete(gomock.Any(), "valid_id").Times(1)
 			},
 			wantSuccess: "🎉 Signup successful! Welcome!",
 			wantErr:     false,
@@ -47,10 +49,12 @@ func Test_signupManager_SendSignupResult(t *testing.T) {
 				correlationID: "valid_id",
 				success:       false,
 			},
-			setup: func(mockStore *storagemocks.MockISInterface, mockDiscord *discordmocks.MockSession) {
+			setup: func(mockStore *storagemocks.MockISInterface[any], mockDiscord *discordmocks.MockSession) {
 				interaction := &discordgo.Interaction{}
-				mockStore.EXPECT().Get("valid_id").Return(interaction, true)
+				mockStore.EXPECT().Get(gomock.Any(), "valid_id").Return(interaction, nil)
 				mockDiscord.EXPECT().InteractionResponseEdit(gomock.Any(), gomock.Any()).Return(&discordgo.Message{}, nil)
+					// Expect stored interaction to be deleted after sending the follow-up
+					mockStore.EXPECT().Delete(gomock.Any(), "valid_id").Times(1)
 			},
 			wantSuccess: "❌ Signup failed. Please try again.",
 			wantErr:     false,
@@ -62,8 +66,8 @@ func Test_signupManager_SendSignupResult(t *testing.T) {
 				correlationID: "invalid_id",
 				success:       true,
 			},
-			setup: func(mockStore *storagemocks.MockISInterface, mockDiscord *discordmocks.MockSession) {
-				mockStore.EXPECT().Get("invalid_id").Return(nil, false)
+			setup: func(mockStore *storagemocks.MockISInterface[any], mockDiscord *discordmocks.MockSession) {
+				mockStore.EXPECT().Get(gomock.Any(), "invalid_id").Return(nil, errors.New("item not found or expired"))
 			},
 			wantSuccess: "",
 			wantErr:     false,
@@ -75,8 +79,8 @@ func Test_signupManager_SendSignupResult(t *testing.T) {
 				correlationID: "invalid_type_id",
 				success:       true,
 			},
-			setup: func(mockStore *storagemocks.MockISInterface, mockDiscord *discordmocks.MockSession) {
-				mockStore.EXPECT().Get("invalid_type_id").Return("not_an_interaction", true)
+			setup: func(mockStore *storagemocks.MockISInterface[any], mockDiscord *discordmocks.MockSession) {
+				mockStore.EXPECT().Get(gomock.Any(), "invalid_type_id").Return("not_an_interaction", nil)
 			},
 			wantSuccess: "",
 			wantErr:     false,
@@ -88,9 +92,9 @@ func Test_signupManager_SendSignupResult(t *testing.T) {
 				correlationID: "edit_error_id",
 				success:       true,
 			},
-			setup: func(mockStore *storagemocks.MockISInterface, mockDiscord *discordmocks.MockSession) {
+			setup: func(mockStore *storagemocks.MockISInterface[any], mockDiscord *discordmocks.MockSession) {
 				interaction := &discordgo.Interaction{}
-				mockStore.EXPECT().Get("edit_error_id").Return(interaction, true)
+				mockStore.EXPECT().Get(gomock.Any(), "edit_error_id").Return(interaction, nil)
 				mockDiscord.EXPECT().InteractionResponseEdit(gomock.Any(), gomock.Any()).Return(nil, errors.New("edit error"))
 			},
 			wantSuccess: "",
@@ -105,7 +109,7 @@ func Test_signupManager_SendSignupResult(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 			mockSession := discordmocks.NewMockSession(ctrl)
-			mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+			mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
 			logger := loggerfrolfbot.NoOpLogger
 
 			sm := &signupManager{

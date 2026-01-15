@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	sharedroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
+	discordroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
@@ -328,7 +328,7 @@ func (urm *updateRoundManager) HandleUpdateRoundModalSubmit(ctx context.Context,
 
 		// Build Discord payload for internal bus; backend handler will convert to backend payload
 		tz := roundtypes.Timezone(timezone)
-		payload := sharedroundevents.RoundUpdateModalSubmittedPayloadV1{
+		payload := discordroundevents.RoundUpdateModalSubmittedPayloadV1{
 			GuildID:     sharedtypes.GuildID(i.GuildID),
 			RoundID:     roundID,
 			UserID:      sharedtypes.DiscordID(userID),
@@ -348,13 +348,12 @@ func (urm *updateRoundManager) HandleUpdateRoundModalSubmit(ctx context.Context,
 			attr.String("payload_message_id", messageID))
 
 		correlationID := uuid.New().String()
-		err = urm.interactionStore.Set(correlationID, i.Interaction, 15*time.Minute)
-		if err != nil {
+		if err := urm.interactionStore.Set(ctx, correlationID, i.Interaction); err != nil {
 			storeErr := fmt.Errorf("failed to store interaction: %w", err)
 			return UpdateRoundOperationResult{Error: storeErr}, storeErr
 		}
 
-		msg, err := urm.createEvent(ctx, sharedroundevents.RoundUpdateModalSubmittedV1, payload, i)
+		msg, err := urm.createEvent(ctx, discordroundevents.RoundUpdateModalSubmittedV1, payload, i)
 		if err != nil {
 			updateErr := fmt.Errorf("failed to update event: %w", err)
 			return UpdateRoundOperationResult{Error: updateErr}, updateErr
@@ -367,7 +366,7 @@ func (urm *updateRoundManager) HandleUpdateRoundModalSubmit(ctx context.Context,
 		msg.Metadata.Set("user_timezone", string(timezone))
 		msg.Metadata.Set("raw_start_time", startTimeStr)
 
-		if err := urm.publisher.Publish(sharedroundevents.RoundUpdateModalSubmittedV1, msg); err != nil {
+		if err := urm.publisher.Publish(discordroundevents.RoundUpdateModalSubmittedV1, msg); err != nil {
 			publishErr := fmt.Errorf("failed to publish event: %w", err)
 			return UpdateRoundOperationResult{Error: publishErr}, publishErr
 		}
@@ -402,7 +401,7 @@ func (urm *updateRoundManager) HandleUpdateRoundModalCancel(ctx context.Context,
 		urm.logger.InfoContext(ctx, "Handling update round modal cancel", attr.String("interaction_id", i.ID))
 
 		// Remove the token from the store
-		urm.interactionStore.Delete(i.Interaction.ID)
+		urm.interactionStore.Delete(ctx, i.Interaction.ID)
 
 		err := urm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,

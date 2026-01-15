@@ -22,7 +22,7 @@ func Test_roleManager_EditRoleUpdateResponse(t *testing.T) {
 	// Test cases updated to match implementation
 	tests := []struct {
 		name           string
-		setup          func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface)
+		setup          func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any])
 		ctx            context.Context
 		correlationID  string
 		content        string
@@ -31,10 +31,10 @@ func Test_roleManager_EditRoleUpdateResponse(t *testing.T) {
 	}{
 		{
 			name: "successful role update response edit",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				mockInteractionStore.EXPECT().
-					Get("correlation-id").
-					Return(&discordgo.Interaction{ID: "interaction-id", Token: "test-token"}, true).
+					Get(gomock.Any(), "correlation-id").
+					Return(&discordgo.Interaction{ID: "interaction-id", Token: "test-token"}, nil).
 					Times(1)
 				mockSession.EXPECT().
 					InteractionResponseEdit(gomock.Any(), gomock.Any()).
@@ -48,6 +48,10 @@ func Test_roleManager_EditRoleUpdateResponse(t *testing.T) {
 						return &discordgo.Message{}, nil
 					}).
 					Times(1)
+				// Expect the stored interaction to be deleted after successful edit
+				mockInteractionStore.EXPECT().
+					Delete(gomock.Any(), "correlation-id").
+					Times(1)
 			},
 			ctx:            context.Background(),
 			correlationID:  "correlation-id",
@@ -57,10 +61,10 @@ func Test_roleManager_EditRoleUpdateResponse(t *testing.T) {
 		},
 		{
 			name: "failed to get interaction from store",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				mockInteractionStore.EXPECT().
-					Get("correlation-id-not-found").
-					Return(nil, false).
+					Get(gomock.Any(), "correlation-id-not-found").
+					Return((*discordgo.Interaction)(nil), errors.New("item not found or expired")).
 					Times(1)
 				// No call to InteractionResponseEdit expected
 				mockSession.EXPECT().InteractionResponseEdit(gomock.Any(), gomock.Any()).Times(0)
@@ -73,10 +77,10 @@ func Test_roleManager_EditRoleUpdateResponse(t *testing.T) {
 		},
 		{
 			name: "stored interaction is not of the expected type",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				mockInteractionStore.EXPECT().
-					Get("correlation-id-wrong-type").
-					Return("not an interaction object", true).
+					Get(gomock.Any(), "correlation-id-wrong-type").
+					Return("not an interaction object", nil).
 					Times(1)
 				// No call to InteractionResponseEdit expected
 				mockSession.EXPECT().InteractionResponseEdit(gomock.Any(), gomock.Any()).Times(0)
@@ -89,10 +93,10 @@ func Test_roleManager_EditRoleUpdateResponse(t *testing.T) {
 		},
 		{
 			name: "failed to edit interaction response",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				mockInteractionStore.EXPECT().
-					Get("correlation-id-fail-edit").
-					Return(&discordgo.Interaction{ID: "interaction-id-fail", Token: "test-token"}, true).
+					Get(gomock.Any(), "correlation-id-fail-edit").
+					Return(&discordgo.Interaction{ID: "interaction-id-fail", Token: "test-token"}, nil).
 					Times(1)
 				mockSession.EXPECT().
 					InteractionResponseEdit(gomock.Any(), gomock.Any()).
@@ -107,9 +111,9 @@ func Test_roleManager_EditRoleUpdateResponse(t *testing.T) {
 		},
 		{
 			name: "cancelled_context",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				// No mocks expected as the context cancellation should prevent further calls
-				mockInteractionStore.EXPECT().Get(gomock.Any()).Times(0)
+				mockInteractionStore.EXPECT().Get(gomock.Any(), gomock.Any()).Times(0)
 				mockSession.EXPECT().InteractionResponseEdit(gomock.Any(), gomock.Any()).Times(0)
 			},
 			ctx: func() context.Context {
@@ -135,7 +139,7 @@ func Test_roleManager_EditRoleUpdateResponse(t *testing.T) {
 			mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
 			mockLogger := loggerfrolfbot.NoOpLogger
 			mockConfig := &config.Config{}
-			mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+			mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
 			mockHelper := util_mocks.NewMockHelpers(ctrl)
 			tracerProvider := noop.NewTracerProvider()
 			tracer := tracerProvider.Tracer("test-tracer")
@@ -282,7 +286,7 @@ func Test_roleManager_AddRoleToUser(t *testing.T) {
 			mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
 			mockLogger := loggerfrolfbot.NoOpLogger
 			mockConfig := &config.Config{}
-			mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+			mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
 			mockHelper := util_mocks.NewMockHelpers(ctrl)
 			tracerProvider := noop.NewTracerProvider()
 			tracer := tracerProvider.Tracer("test-tracer")

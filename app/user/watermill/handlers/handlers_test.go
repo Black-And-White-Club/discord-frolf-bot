@@ -23,7 +23,7 @@ func TestNewUserHandlers(t *testing.T) {
 	cfg := &config.Config{}
 
 	// Call the function being tested
-	handlers := NewUserHandlers(logger, cfg, helpers, mockUserDiscord, tracer, nil)
+	handlers := NewUserHandlers(logger, cfg, helpers, mockUserDiscord, nil, nil, tracer, nil)
 
 	// Ensure handlers are correctly created
 	if handlers == nil {
@@ -53,15 +53,11 @@ func TestNewUserHandlers(t *testing.T) {
 
 func TestNewUserHandlersWithNilDependencies(t *testing.T) {
 	// Call with nil dependencies
-	handlers := NewUserHandlers(nil, nil, nil, nil, nil, nil)
+	handlers := NewUserHandlers(nil, nil, nil, nil, nil, nil, nil, nil)
 
 	// Ensure handlers are correctly created
 	if handlers == nil {
 		t.Fatalf("NewUserHandlers returned nil")
 	}
 
-	// Check that it returns a Handler interface
-	if _, ok := handlers.(Handler); !ok {
-		t.Errorf("handlers does not implement Handler interface")
-	}
 }

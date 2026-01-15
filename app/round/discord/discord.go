@@ -40,6 +40,7 @@ type RoundDiscordInterface interface {
 
 // RoundDiscord encapsulates all Round Discord services.
 type RoundDiscord struct {
+	session                discordgo.Session
 	CreateRoundManager     createround.CreateRoundManager
 	RoundRsvpManager       roundrsvp.RoundRsvpManager
 	RoundReminderManager   roundreminder.RoundReminderManager
@@ -61,24 +62,26 @@ func NewRoundDiscord(
 	logger *slog.Logger,
 	helper utils.Helpers,
 	config *config.Config,
-	interactionStore storage.ISInterface,
+	interactionStore storage.ISInterface[any],
+	guildConfigCache storage.ISInterface[storage.GuildConfig],
+	guildConfigResolver guildconfig.GuildConfigResolver,
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
-	guildConfigResolver guildconfig.GuildConfigResolver,
 ) (RoundDiscordInterface, error) {
 	// Pass the new dependencies to the manager constructors
-	createRoundManager := createround.NewCreateRoundManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics, guildConfigResolver)
-	roundRsvpManager := roundrsvp.NewRoundRsvpManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics, guildConfigResolver)
-	roundReminderManager := roundreminder.NewRoundReminderManager(session, publisher, logger, helper, config, tracer, metrics, guildConfigResolver)
-	startRoundManager := startround.NewStartRoundManager(session, publisher, logger, helper, config, tracer, metrics, guildConfigResolver)
-	scoreRoundManager := scoreround.NewScoreRoundManager(session, publisher, logger, helper, config, tracer, metrics, guildConfigResolver)
-	finalizeRoundManager := finalizeround.NewFinalizeRoundManager(session, publisher, logger, helper, config, tracer, metrics, guildConfigResolver)
-	deleteRoundManager := deleteround.NewDeleteRoundManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics, guildConfigResolver)
-	updateRoundManager := updateround.NewUpdateRoundManager(session, publisher, logger, helper, config, interactionStore, tracer, metrics, guildConfigResolver)
-	tagUpdateManager := tagupdates.NewTagUpdateManager(session, publisher, logger, helper, config, tracer, metrics, guildConfigResolver)
-	scorecardUploadManager := scorecardupload.NewScorecardUploadManager(ctx, session, publisher, logger, config, tracer, metrics)
+	createRoundManager := createround.NewCreateRoundManager(session, publisher, logger, helper, config, interactionStore, guildConfigCache, tracer, metrics, guildConfigResolver)
+	roundRsvpManager := roundrsvp.NewRoundRsvpManager(session, publisher, logger, helper, config, interactionStore, guildConfigCache, tracer, metrics, guildConfigResolver)
+	roundReminderManager := roundreminder.NewRoundReminderManager(session, publisher, logger, helper, config, interactionStore, guildConfigCache, tracer, metrics, guildConfigResolver)
+	startRoundManager := startround.NewStartRoundManager(session, publisher, logger, helper, config, interactionStore, guildConfigCache, tracer, metrics, guildConfigResolver)
+	scoreRoundManager := scoreround.NewScoreRoundManager(session, publisher, logger, helper, config, interactionStore, guildConfigCache, tracer, metrics, guildConfigResolver)
+	finalizeRoundManager := finalizeround.NewFinalizeRoundManager(session, publisher, logger, helper, config, interactionStore, guildConfigCache, tracer, metrics, guildConfigResolver)
+	deleteRoundManager := deleteround.NewDeleteRoundManager(session, publisher, logger, helper, config, interactionStore, guildConfigCache, tracer, metrics, guildConfigResolver)
+	updateRoundManager := updateround.NewUpdateRoundManager(session, publisher, logger, helper, config, interactionStore, guildConfigCache, tracer, metrics, guildConfigResolver)
+	tagUpdateManager := tagupdates.NewTagUpdateManager(session, publisher, logger, helper, config, interactionStore, guildConfigCache, tracer, metrics, guildConfigResolver)
+	scorecardUploadManager := scorecardupload.NewScorecardUploadManager(ctx, session, publisher, logger, config, interactionStore, guildConfigCache, tracer, metrics)
 
 	return &RoundDiscord{
+		session:                session,
 		CreateRoundManager:     createRoundManager,
 		RoundRsvpManager:       roundRsvpManager,
 		RoundReminderManager:   roundReminderManager,

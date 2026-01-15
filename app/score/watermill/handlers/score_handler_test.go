@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	sharedscoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/score"
-	scoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/score"
+	discordscoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/score"
+	sharedevents "github.com/Black-And-White-Club/frolf-bot-shared/events/shared"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/google/uuid"
@@ -16,13 +16,13 @@ func TestHandleScoreUpdateRequestTyped(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		payload *sharedscoreevents.ScoreUpdateRequestDiscordPayloadV1
+		payload *discordscoreevents.ScoreUpdateRequestDiscordPayloadV1
 		wantErr bool
 		wantLen int
 	}{
 		{
 			name: "valid_payload_produces_backend_request",
-			payload: &sharedscoreevents.ScoreUpdateRequestDiscordPayloadV1{
+			payload: &discordscoreevents.ScoreUpdateRequestDiscordPayloadV1{
 				GuildID:   "guild-1",
 				RoundID:   sharedtypes.RoundID(uuid.New()),
 				UserID:    sharedtypes.DiscordID("user-1"),
@@ -59,10 +59,10 @@ func TestHandleScoreUpdateRequestTyped(t *testing.T) {
 			// Additional checks for the valid case
 			if tt.wantLen > 0 {
 				res := got[0]
-				if res.Topic != scoreevents.ScoreUpdateRequestedV1 {
+				if res.Topic != sharedevents.ScoreUpdateRequestedV1 {
 					t.Fatalf("unexpected topic: %s", res.Topic)
 				}
-				p, ok := res.Payload.(scoreevents.ScoreUpdateRequestedPayloadV1)
+				p, ok := res.Payload.(sharedevents.ScoreUpdateRequestedPayloadV1)
 				if !ok {
 					t.Fatalf("unexpected payload type: %T", res.Payload)
 				}
@@ -80,13 +80,13 @@ func TestHandleScoreUpdateRequestTyped(t *testing.T) {
 func TestHandleScoreUpdateSuccessTyped(t *testing.T) {
 	tests := []struct {
 		name    string
-		payload *scoreevents.ScoreUpdatedPayloadV1
+		payload *sharedevents.ScoreUpdatedPayloadV1
 		wantErr bool
 		wantLen int
 	}{
 		{
 			name: "success_produces_discord_response",
-			payload: &scoreevents.ScoreUpdatedPayloadV1{
+			payload: &sharedevents.ScoreUpdatedPayloadV1{
 				RoundID: sharedtypes.RoundID(uuid.New()),
 				Score:   sharedtypes.Score(2),
 			},
@@ -117,7 +117,7 @@ func TestHandleScoreUpdateSuccessTyped(t *testing.T) {
 
 			if tt.wantLen > 0 {
 				res := got[0]
-				if res.Topic != sharedscoreevents.ScoreUpdateResponseDiscordV1 {
+				if res.Topic != discordscoreevents.ScoreUpdateResponseDiscordV1 {
 					t.Fatalf("unexpected topic: %s", res.Topic)
 				}
 				m, ok := res.Payload.(map[string]interface{})
@@ -135,13 +135,13 @@ func TestHandleScoreUpdateSuccessTyped(t *testing.T) {
 func TestHandleScoreUpdateFailureTyped(t *testing.T) {
 	tests := []struct {
 		name    string
-		payload *scoreevents.ScoreUpdateFailedPayloadV1
+		payload *sharedevents.ScoreUpdateFailedPayloadV1
 		wantErr bool
 		wantLen int
 	}{
 		{
 			name: "suppressed_known_business_failure",
-			payload: &scoreevents.ScoreUpdateFailedPayloadV1{
+			payload: &sharedevents.ScoreUpdateFailedPayloadV1{
 				Reason:  "score record not found for aggregate",
 				RoundID: sharedtypes.RoundID(uuid.New()),
 				GuildID: "guild-1",
@@ -152,7 +152,7 @@ func TestHandleScoreUpdateFailureTyped(t *testing.T) {
 		},
 		{
 			name: "other_failure_produces_discord_error",
-			payload: &scoreevents.ScoreUpdateFailedPayloadV1{
+			payload: &sharedevents.ScoreUpdateFailedPayloadV1{
 				Reason:  "database timeout",
 				RoundID: sharedtypes.RoundID(uuid.New()),
 			},
@@ -190,7 +190,7 @@ func TestHandleScoreUpdateFailureTyped(t *testing.T) {
 			}
 
 			res := got[0]
-			if res.Topic != sharedscoreevents.ScoreUpdateFailedDiscordV1 {
+			if res.Topic != discordscoreevents.ScoreUpdateFailedDiscordV1 {
 				t.Fatalf("unexpected topic: %s", res.Topic)
 			}
 			m, ok := res.Payload.(map[string]interface{})

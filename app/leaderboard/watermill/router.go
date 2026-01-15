@@ -8,10 +8,11 @@ import (
 	leaderboardhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/watermill/handlers"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
-	sharedleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
+	discordleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
-	tracingfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/tracing"
+	sharedevents "github.com/Black-And-White-Club/frolf-bot-shared/events/shared"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
+	tracingfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/tracing"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 	"github.com/ThreeDotsLabs/watermill/message"
@@ -28,7 +29,6 @@ type LeaderboardRouter struct {
 	config           *config.Config
 	helper           utils.Helpers
 	tracer           trace.Tracer
-	metrics          discordmetrics.DiscordMetrics
 	middlewareHelper utils.MiddlewareHelpers
 }
 
@@ -51,267 +51,109 @@ func NewLeaderboardRouter(
 		config:           config,
 		helper:           helper,
 		tracer:           tracer,
-		metrics:          metrics,
 		middlewareHelper: utils.NewMiddlewareHelper(),
 	}
 }
 
 // Configure sets up the router.
 func (r *LeaderboardRouter) Configure(ctx context.Context, handlers leaderboardhandlers.Handlers) error {
-	// Add middleware
+	r.logger.InfoContext(ctx, "LeaderboardRouter.Configure called")
 	r.Router.AddMiddleware(
 		middleware.CorrelationID,
 		r.middlewareHelper.CommonMetadataMiddleware("discord-leaderboard"),
 		r.middlewareHelper.DiscordMetadataMiddleware(),
 		r.middlewareHelper.RoutingMetadataMiddleware(),
 		middleware.Recoverer,
-		middleware.Retry{MaxRetries: 3}.Middleware,
 		tracingfrolfbot.TraceHandler(r.tracer),
 	)
 
 	if err := r.RegisterHandlers(ctx, handlers); err != nil {
-		return fmt.Errorf("failed to register handlers: %w", err)
+		return fmt.Errorf("failed to register leaderboard handlers: %w", err)
 	}
+	r.logger.InfoContext(ctx, "LeaderboardRouter.Configure completed successfully")
 	return nil
 }
 
-// createTypedHandler is a helper function to create a typed handler wrapper.
-// It cannot be a method because Go doesn't support type parameters on methods.
-func createTypedHandler[T any](
-	logger *slog.Logger,
-	tracer trace.Tracer,
-	helper utils.Helpers,
-	handlerName string,
+// handlerDeps groups dependencies needed for handler registration.
+type handlerDeps struct {
+	router     *message.Router
+	subscriber eventbus.EventBus
+	publisher  eventbus.EventBus
+	logger     *slog.Logger
+	tracer     trace.Tracer
+	helper     utils.Helpers
+	metrics    handlerwrapper.ReturningMetrics
+}
+
+// registerHandler registers a pure transformation-pattern handler with typed payload.
+func registerHandler[T any](
+	deps handlerDeps,
+	topic string,
 	handler func(context.Context, *T) ([]handlerwrapper.Result, error),
-) message.HandlerFunc {
-	return handlerwrapper.WrapTransformingTyped[T](
+) {
+	handlerName := "discord-leaderboard." + topic
+
+	deps.router.AddHandler(
 		handlerName,
-		logger,
-		tracer,
-		helper,
-		nil,
-		handler,
+		topic,
+		deps.subscriber,
+		"", // Watermill reads topic from message metadata when empty
+		deps.publisher,
+		handlerwrapper.WrapTransformingTyped(
+			handlerName,
+			deps.logger,
+			deps.tracer,
+			deps.helper,
+			deps.metrics,
+			handler,
+		),
 	)
 }
 
 // RegisterHandlers registers event handlers with type-safe payload handling.
 func (r *LeaderboardRouter) RegisterHandlers(ctx context.Context, handlers leaderboardhandlers.Handlers) error {
-	// Map of topic → (payload type, handler function)
-	type handlerRegistration struct {
-		topic   string
-		handler message.HandlerFunc
+	r.logger.InfoContext(ctx, "LeaderboardRouter.RegisterHandlers called")
+
+	var metrics handlerwrapper.ReturningMetrics // reserved for Phase 6
+
+	deps := handlerDeps{
+		router:     r.Router,
+		subscriber: r.subscriber,
+		publisher:  r.publisher,
+		logger:     r.logger,
+		tracer:     r.tracer,
+		helper:     r.helper,
+		metrics:    metrics,
 	}
 
-	handlerRegistrations := []handlerRegistration{
-		// Tag Assignment
-		{
-			topic: sharedleaderboardevents.LeaderboardTagAssignRequestV1,
-			handler: createTypedHandler[sharedleaderboardevents.LeaderboardTagAssignRequestPayloadV1](
-				r.logger,
-				r.tracer,
-				r.helper,
-				"discord-leaderboard.HandleTagAssignRequest",
-				func(ctx context.Context, payload *sharedleaderboardevents.LeaderboardTagAssignRequestPayloadV1) ([]handlerwrapper.Result, error) {
-					return handlers.HandleTagAssignRequest(ctx, payload)
-				},
-			),
-		},
-		{
-			topic: leaderboardevents.LeaderboardTagAssignedV1,
-			handler: createTypedHandler[leaderboardevents.LeaderboardTagAssignedPayloadV1](
-				r.logger,
-				r.tracer,
-				r.helper,
-				"discord-leaderboard.HandleTagAssignedResponse",
-				func(ctx context.Context, payload *leaderboardevents.LeaderboardTagAssignedPayloadV1) ([]handlerwrapper.Result, error) {
-					return handlers.HandleTagAssignedResponse(ctx, payload)
-				},
-			),
-		},
-		{
-			topic: leaderboardevents.LeaderboardTagAssignmentFailedV1,
-			handler: createTypedHandler[leaderboardevents.LeaderboardTagAssignmentFailedPayloadV1](
-				r.logger,
-				r.tracer,
-				r.helper,
-				"discord-leaderboard.HandleTagAssignFailedResponse",
-				func(ctx context.Context, payload *leaderboardevents.LeaderboardTagAssignmentFailedPayloadV1) ([]handlerwrapper.Result, error) {
-					return handlers.HandleTagAssignFailedResponse(ctx, payload)
-				},
-			),
-		},
+	// Tag Assignment
+	registerHandler(deps, discordleaderboardevents.LeaderboardTagAssignRequestV1, handlers.HandleTagAssignRequest)
+	registerHandler(deps, leaderboardevents.LeaderboardTagAssignedV1, handlers.HandleTagAssignedResponse)
+	registerHandler(deps, leaderboardevents.LeaderboardTagAssignmentFailedV1, handlers.HandleTagAssignFailedResponse)
 
-		// Tag Swap
-		{
-			topic: sharedleaderboardevents.LeaderboardTagSwapRequestV1,
-			handler: createTypedHandler[sharedleaderboardevents.LeaderboardTagSwapRequestPayloadV1](
-				r.logger,
-				r.tracer,
-				r.helper,
-				"discord-leaderboard.HandleTagSwapRequest",
-				func(ctx context.Context, payload *sharedleaderboardevents.LeaderboardTagSwapRequestPayloadV1) ([]handlerwrapper.Result, error) {
-					return handlers.HandleTagSwapRequest(ctx, payload)
-				},
-			),
-		},
-		{
-			topic: leaderboardevents.TagSwapProcessedV1,
-			handler: createTypedHandler[leaderboardevents.TagSwapProcessedPayloadV1](
-				r.logger,
-				r.tracer,
-				r.helper,
-				"discord-leaderboard.HandleTagSwappedResponse",
-				func(ctx context.Context, payload *leaderboardevents.TagSwapProcessedPayloadV1) ([]handlerwrapper.Result, error) {
-					return handlers.HandleTagSwappedResponse(ctx, payload)
-				},
-			),
-		},
-		{
-			topic: leaderboardevents.TagSwapFailedV1,
-			handler: createTypedHandler[leaderboardevents.TagSwapFailedPayloadV1](
-				r.logger,
-				r.tracer,
-				r.helper,
-				"discord-leaderboard.HandleTagSwapFailedResponse",
-				func(ctx context.Context, payload *leaderboardevents.TagSwapFailedPayloadV1) ([]handlerwrapper.Result, error) {
-					return handlers.HandleTagSwapFailedResponse(ctx, payload)
-				},
-			),
-		},
+	// Tag Swap
+	registerHandler(deps, discordleaderboardevents.LeaderboardTagSwapRequestV1, handlers.HandleTagSwapRequest)
+	registerHandler(deps, leaderboardevents.TagSwapProcessedV1, handlers.HandleTagSwappedResponse)
+	registerHandler(deps, leaderboardevents.TagSwapFailedV1, handlers.HandleTagSwapFailedResponse)
 
-		// Tag Lookup
-		{
-			topic: sharedleaderboardevents.LeaderboardTagAvailabilityRequestV1,
-			handler: createTypedHandler[sharedleaderboardevents.LeaderboardTagAvailabilityRequestPayloadV1](
-				r.logger,
-				r.tracer,
-				r.helper,
-				"discord-leaderboard.HandleGetTagByDiscordID",
-				func(ctx context.Context, payload *sharedleaderboardevents.LeaderboardTagAvailabilityRequestPayloadV1) ([]handlerwrapper.Result, error) {
-					return handlers.HandleGetTagByDiscordID(ctx, payload)
-				},
-			),
-		},
-		{
-			topic: leaderboardevents.GetTagNumberResponseV1,
-			handler: createTypedHandler[leaderboardevents.GetTagNumberResponsePayloadV1](
-				r.logger,
-				r.tracer,
-				r.helper,
-				"discord-leaderboard.HandleGetTagByDiscordIDResponse",
-				func(ctx context.Context, payload *leaderboardevents.GetTagNumberResponsePayloadV1) ([]handlerwrapper.Result, error) {
-					return handlers.HandleGetTagByDiscordIDResponse(ctx, payload)
-				},
-			),
-		},
-		{
-			topic: leaderboardevents.GetTagNumberFailedV1,
-			handler: createTypedHandler[leaderboardevents.GetTagNumberFailedPayloadV1](
-				r.logger,
-				r.tracer,
-				r.helper,
-				"discord-leaderboard.HandleGetTagByDiscordIDFailed",
-				func(ctx context.Context, payload *leaderboardevents.GetTagNumberFailedPayloadV1) ([]handlerwrapper.Result, error) {
-					return handlers.HandleGetTagByDiscordIDFailed(ctx, payload)
-				},
-			),
-		},
+	// Tag Lookup
+	registerHandler(deps, discordleaderboardevents.LeaderboardTagAvailabilityRequestV1, handlers.HandleGetTagByDiscordID)
+	registerHandler(deps, sharedevents.GetTagNumberResponseV1, handlers.HandleGetTagByDiscordIDResponse)
+	registerHandler(deps, sharedevents.GetTagNumberFailedV1, handlers.HandleGetTagByDiscordIDFailed)
 
-		// Leaderboard Retrieval
-		{
-			topic: sharedleaderboardevents.LeaderboardRetrieveRequestV1,
-			handler: createTypedHandler[sharedleaderboardevents.LeaderboardRetrieveRequestPayloadV1](
-				r.logger,
-				r.tracer,
-				r.helper,
-				"discord-leaderboard.HandleLeaderboardRetrieveRequest",
-				func(ctx context.Context, payload *sharedleaderboardevents.LeaderboardRetrieveRequestPayloadV1) ([]handlerwrapper.Result, error) {
-					return handlers.HandleLeaderboardRetrieveRequest(ctx, payload)
-				},
-			),
-		},
-		{
-			topic: leaderboardevents.LeaderboardUpdatedV1,
-			handler: createTypedHandler[leaderboardevents.LeaderboardUpdatedPayloadV1](
-				r.logger,
-				r.tracer,
-				r.helper,
-				"discord-leaderboard.HandleLeaderboardUpdatedNotification",
-				func(ctx context.Context, payload *leaderboardevents.LeaderboardUpdatedPayloadV1) ([]handlerwrapper.Result, error) {
-					return handlers.HandleLeaderboardUpdatedNotification(ctx, payload)
-				},
-			),
-		},
-		{
-			topic: leaderboardevents.GetLeaderboardResponseV1,
-			handler: createTypedHandler[leaderboardevents.GetLeaderboardResponsePayloadV1](
-				r.logger,
-				r.tracer,
-				r.helper,
-				"discord-leaderboard.HandleLeaderboardResponse",
-				func(ctx context.Context, payload *leaderboardevents.GetLeaderboardResponsePayloadV1) ([]handlerwrapper.Result, error) {
-					return handlers.HandleLeaderboardResponse(ctx, payload)
-				},
-			),
-		},
+	// Leaderboard Retrieval
+	registerHandler(deps, discordleaderboardevents.LeaderboardRetrieveRequestV1, handlers.HandleLeaderboardRetrieveRequest)
+	registerHandler(deps, leaderboardevents.LeaderboardUpdatedV1, handlers.HandleLeaderboardUpdatedNotification)
+	registerHandler(deps, leaderboardevents.GetLeaderboardResponseV1, handlers.HandleLeaderboardResponse)
 
-		// Leaderboard Updates
-		{
-			topic: leaderboardevents.LeaderboardBatchTagAssignedV1,
-			handler: createTypedHandler[leaderboardevents.LeaderboardBatchTagAssignedPayloadV1](
-				r.logger,
-				r.tracer,
-				r.helper,
-				"discord-leaderboard.HandleBatchTagAssigned",
-				func(ctx context.Context, payload *leaderboardevents.LeaderboardBatchTagAssignedPayloadV1) ([]handlerwrapper.Result, error) {
-					return handlers.HandleBatchTagAssigned(ctx, payload)
-				},
-			),
-		},
+	// Leaderboard Updates
+	registerHandler(deps, leaderboardevents.LeaderboardBatchTagAssignedV1, handlers.HandleBatchTagAssigned)
 
-		// Leaderboard Errors
-		{
-			topic: leaderboardevents.LeaderboardUpdateFailedV1,
-			handler: createTypedHandler[leaderboardevents.LeaderboardUpdateFailedPayloadV1](
-				r.logger,
-				r.tracer,
-				r.helper,
-				"discord-leaderboard.HandleLeaderboardUpdateFailed",
-				func(ctx context.Context, payload *leaderboardevents.LeaderboardUpdateFailedPayloadV1) ([]handlerwrapper.Result, error) {
-					return handlers.HandleLeaderboardUpdateFailed(ctx, payload)
-				},
-			),
-		},
-		{
-			topic: leaderboardevents.GetLeaderboardFailedV1,
-			handler: createTypedHandler[leaderboardevents.GetLeaderboardFailedPayloadV1](
-				r.logger,
-				r.tracer,
-				r.helper,
-				"discord-leaderboard.HandleLeaderboardRetrievalFailed",
-				func(ctx context.Context, payload *leaderboardevents.GetLeaderboardFailedPayloadV1) ([]handlerwrapper.Result, error) {
-					return handlers.HandleLeaderboardRetrievalFailed(ctx, payload)
-				},
-			),
-		},
-	}
+	// Leaderboard Errors
+	registerHandler(deps, leaderboardevents.LeaderboardUpdateFailedV1, handlers.HandleLeaderboardUpdateFailed)
+	registerHandler(deps, leaderboardevents.GetLeaderboardFailedV1, handlers.HandleLeaderboardRetrievalFailed)
 
-	for _, reg := range handlerRegistrations {
-		handlerName := fmt.Sprintf("discord-leaderboard.%s", reg.topic)
-
-		// Use environment-specific queue groups for multi-tenant scalability
-		queueGroup := fmt.Sprintf("leaderboard-handlers-%s", r.config.Observability.Environment)
-
-		r.Router.AddHandler(
-			handlerName,
-			reg.topic,
-			r.subscriber,
-			queueGroup,
-			nil,
-			reg.handler,
-		)
-	}
-
+	r.logger.InfoContext(ctx, "LeaderboardRouter.RegisterHandlers completed successfully")
 	return nil
 }
 

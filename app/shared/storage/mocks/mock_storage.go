@@ -10,73 +10,73 @@
 package storagemocks
 
 import (
+	context "context"
 	reflect "reflect"
-	time "time"
 
 	gomock "go.uber.org/mock/gomock"
 )
 
 // MockISInterface is a mock of ISInterface interface.
-type MockISInterface struct {
+type MockISInterface[T any] struct {
 	ctrl     *gomock.Controller
-	recorder *MockISInterfaceMockRecorder
+	recorder *MockISInterfaceMockRecorder[T]
 	isgomock struct{}
 }
 
 // MockISInterfaceMockRecorder is the mock recorder for MockISInterface.
-type MockISInterfaceMockRecorder struct {
-	mock *MockISInterface
+type MockISInterfaceMockRecorder[T any] struct {
+	mock *MockISInterface[T]
 }
 
 // NewMockISInterface creates a new mock instance.
-func NewMockISInterface(ctrl *gomock.Controller) *MockISInterface {
-	mock := &MockISInterface{ctrl: ctrl}
-	mock.recorder = &MockISInterfaceMockRecorder{mock}
+func NewMockISInterface[T any](ctrl *gomock.Controller) *MockISInterface[T] {
+	mock := &MockISInterface[T]{ctrl: ctrl}
+	mock.recorder = &MockISInterfaceMockRecorder[T]{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockISInterface) EXPECT() *MockISInterfaceMockRecorder {
+func (m *MockISInterface[T]) EXPECT() *MockISInterfaceMockRecorder[T] {
 	return m.recorder
 }
 
 // Delete mocks base method.
-func (m *MockISInterface) Delete(correlationID string) {
+func (m *MockISInterface[T]) Delete(ctx context.Context, correlationID string) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Delete", correlationID)
+	m.ctrl.Call(m, "Delete", ctx, correlationID)
 }
 
 // Delete indicates an expected call of Delete.
-func (mr *MockISInterfaceMockRecorder) Delete(correlationID any) *gomock.Call {
+func (mr *MockISInterfaceMockRecorder[T]) Delete(ctx, correlationID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockISInterface)(nil).Delete), correlationID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockISInterface[T])(nil).Delete), ctx, correlationID)
 }
 
 // Get mocks base method.
-func (m *MockISInterface) Get(correlationID string) (any, bool) {
+func (m *MockISInterface[T]) Get(ctx context.Context, correlationID string) (T, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get", correlationID)
-	ret0, _ := ret[0].(any)
-	ret1, _ := ret[1].(bool)
+	ret := m.ctrl.Call(m, "Get", ctx, correlationID)
+	ret0, _ := ret[0].(T)
+	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Get indicates an expected call of Get.
-func (mr *MockISInterfaceMockRecorder) Get(correlationID any) *gomock.Call {
+func (mr *MockISInterfaceMockRecorder[T]) Get(ctx, correlationID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockISInterface)(nil).Get), correlationID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockISInterface[T])(nil).Get), ctx, correlationID)
 }
 
 // Set mocks base method.
-func (m *MockISInterface) Set(correlationID string, interaction any, ttl time.Duration) error {
+func (m *MockISInterface[T]) Set(ctx context.Context, correlationID string, interaction T) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Set", correlationID, interaction, ttl)
+	ret := m.ctrl.Call(m, "Set", ctx, correlationID, interaction)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Set indicates an expected call of Set.
-func (mr *MockISInterfaceMockRecorder) Set(correlationID, interaction, ttl any) *gomock.Call {
+func (mr *MockISInterfaceMockRecorder[T]) Set(ctx, correlationID, interaction any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Set", reflect.TypeOf((*MockISInterface)(nil).Set), correlationID, interaction, ttl)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Set", reflect.TypeOf((*MockISInterface[T])(nil).Set), ctx, correlationID, interaction)
 }

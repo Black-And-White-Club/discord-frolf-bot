@@ -1,6 +1,7 @@
 package guildconfig
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -14,10 +15,10 @@ func (e *ConfigLoadingError) Error() string {
 	return fmt.Sprintf("guild config is being loaded for guild %s", e.GuildID)
 }
 
-// IsConfigLoading checks if an error indicates config loading
+// IsConfigLoading checks if an error indicates config loading using errors.As
 func IsConfigLoading(err error) bool {
-	_, ok := err.(*ConfigLoadingError)
-	return ok
+	var target *ConfigLoadingError
+	return errors.As(err, &target)
 }
 
 // ConfigNotFoundError indicates that a guild config doesn't exist (permanent failure)
@@ -30,10 +31,10 @@ func (e *ConfigNotFoundError) Error() string {
 	return fmt.Sprintf("guild config not found for guild %s: %s", e.GuildID, e.Reason)
 }
 
-// IsConfigNotFound checks if an error indicates a permanent config absence
+// IsConfigNotFound checks if an error indicates a permanent config absence using errors.As
 func IsConfigNotFound(err error) bool {
-	_, ok := err.(*ConfigNotFoundError)
-	return ok
+	var target *ConfigNotFoundError
+	return errors.As(err, &target)
 }
 
 // ConfigTemporaryError indicates a temporary failure that might succeed on retry
@@ -54,13 +55,15 @@ func (e *ConfigTemporaryError) Unwrap() error {
 	return e.Cause
 }
 
-// IsConfigTemporaryError checks if an error indicates a temporary failure
+// IsConfigTemporaryError checks if an error indicates a temporary failure using errors.As
 func IsConfigTemporaryError(err error) bool {
-	_, ok := err.(*ConfigTemporaryError)
-	return ok
+	var target *ConfigTemporaryError
+	return errors.As(err, &target)
 }
 
-// Helper functions for creating error instances
+/*
+  Helper functions for creating error instances
+*/
 
 // NewConfigNotFoundError creates a ConfigNotFoundError for permanent failures
 func NewConfigNotFoundError(guildID, reason string) *ConfigNotFoundError {
@@ -87,27 +90,23 @@ func NewConfigLoadingError(guildID string) *ConfigLoadingError {
 }
 
 // ClassifyBackendError helps backend services classify errors appropriately
-// This function can be used by backend event handlers to determine if an error is permanent or temporary
 func ClassifyBackendError(err error, guildID string) (isPermanent bool, reason string) {
 	if err == nil {
 		return false, ""
 	}
 
+	// If it's already one of our typed errors, respect its existing classification
+	if IsConfigNotFound(err) {
+		return true, err.Error()
+	}
+
 	errMsg := err.Error()
 	lowerMsg := strings.ToLower(errMsg)
 
-	// Permanent errors - configuration or logical issues
+	// Permanent patterns
 	permanentPatterns := []string{
-		"guild not found",
-		"guild does not exist",
-		"guild not configured",
-		"not configured",
-		"invalid guild",
-		"unauthorized",
-		"forbidden",
-		"permission denied",
-		"guild setup incomplete",
-		"setup required",
+		"guild not found", "guild does not exist", "not configured",
+		"invalid guild", "unauthorized", "forbidden", "setup required",
 	}
 
 	for _, pattern := range permanentPatterns {
@@ -116,22 +115,10 @@ func ClassifyBackendError(err error, guildID string) (isPermanent bool, reason s
 		}
 	}
 
-	// Temporary errors - infrastructure or network issues
+	// Temporary patterns
 	temporaryPatterns := []string{
-		"timeout",
-		"connection",
-		"network",
-		"unavailable",
-		"busy",
-		"rate limit",
-		"database",
-		"redis",
-		"context deadline",
-		"context canceled",
-		"service unavailable",
-		"internal server error",
-		"bad gateway",
-		"gateway timeout",
+		"timeout", "connection", "network", "unavailable", "busy",
+		"database", "redis", "context deadline", "context canceled",
 	}
 
 	for _, pattern := range temporaryPatterns {
@@ -140,7 +127,5 @@ func ClassifyBackendError(err error, guildID string) (isPermanent bool, reason s
 		}
 	}
 
-	// Default to temporary for unknown errors to be safe
-	// This prevents permanent caching of potentially recoverable issues
 	return false, fmt.Sprintf("unknown error (treated as temporary): %s", errMsg)
 }

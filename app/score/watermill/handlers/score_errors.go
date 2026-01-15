@@ -3,13 +3,13 @@ package scorehandlers
 import (
 	"context"
 
-	scoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/score"
+	sharedevents "github.com/Black-And-White-Club/frolf-bot-shared/events/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 )
 
 // HandleProcessRoundScoresFailed handles failed score processing events from the backend.
-func (h *ScoreHandlers) HandleProcessRoundScoresFailedTyped(ctx context.Context, payload *scoreevents.ProcessRoundScoresFailedPayloadV1) ([]handlerwrapper.Result, error) {
+func (h *ScoreHandlers) HandleProcessRoundScoresFailedTyped(ctx context.Context, payload *sharedevents.ProcessRoundScoresFailedPayloadV1) ([]handlerwrapper.Result, error) {
 	if payload == nil {
 		return nil, nil
 	}

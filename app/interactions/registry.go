@@ -66,6 +66,8 @@ func (r *Registry) RegisterHandlerWithPermissions(id string, handler func(ctx co
 }
 
 func (r *Registry) HandleInteraction(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	// Initialize context. In a production environment, you might extract
+	// trace headers from the interaction if provided by a proxy.
 	ctx := context.Background()
 	var id string
 
@@ -96,7 +98,6 @@ func (r *Registry) HandleInteraction(s *discordgo.Session, i *discordgo.Interact
 			r.logger.Info("🔘 Message component", slog.String("custom_id", id))
 		}
 	case discordgo.InteractionModalSubmit:
-		// Extract modal submission data
 		modalData := i.ModalSubmitData()
 		if modalData.CustomID == "" {
 			if r.logger != nil {
@@ -110,7 +111,6 @@ func (r *Registry) HandleInteraction(s *discordgo.Session, i *discordgo.Interact
 		}
 	}
 
-	// Find the handler
 	var config HandlerConfig
 	var found bool
 
@@ -118,7 +118,6 @@ func (r *Registry) HandleInteraction(s *discordgo.Session, i *discordgo.Interact
 		config = handlerConfig
 		found = true
 	} else {
-		// Try prefix matching for dynamic IDs
 		for key, handlerConfig := range r.handlers {
 			if strings.HasPrefix(id, key) {
 				config = handlerConfig
@@ -135,162 +134,118 @@ func (r *Registry) HandleInteraction(s *discordgo.Session, i *discordgo.Interact
 		return
 	}
 
-	if r.logger != nil {
-		r.logger.Info("✅ Handler found, checking permissions",
-			slog.String("id", id),
-			slog.Bool("requires_setup", config.RequiresSetup),
-			slog.Int("required_permission", int(config.RequiredPermission)))
-	}
-
-	// Check permissions before executing handler
+	// Check permissions and server setup status
 	if !r.checkPermissions(ctx, s, i, config) {
-		if r.logger != nil {
-			r.logger.Warn("❌ Permission check failed", slog.String("id", id))
-		}
 		return
 	}
 
-	if r.logger != nil {
-		r.logger.Info("✅ Permission check passed, executing handler", slog.String("id", id))
-	}
-
-	// Execute the handler
+	// Execute the handler with context
 	config.Handler(ctx, i)
 }
 
 func (r *Registry) checkPermissions(ctx context.Context, s *discordgo.Session, i *discordgo.InteractionCreate, config HandlerConfig) bool {
-	if r.logger != nil {
-		r.logger.Info("🔍 Starting permission check",
-			slog.String("guild_id", i.GuildID),
-			slog.Bool("requires_setup", config.RequiresSetup),
-			slog.Int("required_permission", int(config.RequiredPermission)))
-	}
-
-	// Allow frolf-setup command without permission checking (it has Discord admin perms)
+	// 1. bypass: Allow frolf-setup command (uses Discord built-in Admin perms usually)
 	if i.Type == discordgo.InteractionApplicationCommand && i.ApplicationCommandData().Name == "frolf-setup" {
-		if r.logger != nil {
-			r.logger.Info("✅ Allowing frolf-setup command")
-		}
 		return true
 	}
 
-	// If no guild ID, allow (DM interactions)
+	// 2. bypass: DM interactions (no guild context)
 	if i.GuildID == "" {
-		if r.logger != nil {
-			r.logger.Info("✅ Allowing DM interaction")
-		}
 		return true
 	}
 
-	// Check if setup is required and guild is configured
+	// 3. Setup Check: If command requires setup, verify via resolver
 	if config.RequiresSetup && r.guildConfigResolver != nil {
 		isSetup := r.guildConfigResolver.IsGuildSetupComplete(i.GuildID)
-		if r.logger != nil {
-			r.logger.Info("🏗️ Setup check",
-				slog.String("guild_id", i.GuildID),
-				slog.Bool("is_setup_complete", isSetup))
-		}
 		if !isSetup {
 			r.sendErrorResponse(s, i, "❌ This server hasn't been set up yet. An admin must run `/frolf-setup` first.")
 			return false
 		}
 	}
 
-	// If no permission required, allow
+	// 4. Permission Check: If level is NoPermissionRequired, we are done
 	if config.RequiredPermission == NoPermissionRequired {
 		return true
 	}
 
-	// Get guild config for permission checking
 	if r.guildConfigResolver == nil {
-		if r.logger != nil {
-			r.logger.Error("Cannot check permissions: guild config resolver not set")
-		}
 		r.sendErrorResponse(s, i, "❌ Permission system not available.")
 		return false
 	}
 
+	// Fetch guild config using the context-aware method
 	guildConfig, err := r.guildConfigResolver.GetGuildConfigWithContext(ctx, i.GuildID)
 	if err != nil {
 		if r.logger != nil {
-			r.logger.Error("Failed to get guild config for permission check", slog.String("guild_id", i.GuildID), slog.Any("error", err))
+			r.logger.Error("Failed to get guild config for permission check",
+				slog.String("guild_id", i.GuildID),
+				slog.Any("error", err))
 		}
-		r.sendErrorResponse(s, i, "❌ Unable to verify permissions. Please try again.")
+
+		// Handle specific loading state for better UX
+		if guildconfig.IsConfigLoading(err) {
+			r.sendErrorResponse(s, i, "⏳ Server configuration is still loading from the database. Please try again in a few seconds.")
+			return false
+		}
+
+		r.sendErrorResponse(s, i, "❌ Unable to verify your permissions at this time.")
 		return false
 	}
 
-	// Check permissions using inline permission checking to avoid import cycles
+	// 5. Evaluate Roles
 	if !r.checkGuildPermission(i.Member, guildConfig, config.RequiredPermission) {
-		var roleRequired string
+		roleName := "Player"
 		switch config.RequiredPermission {
-		case PlayerRequired:
-			roleRequired = "Player"
 		case EditorRequired:
-			roleRequired = "Editor"
+			roleName = "Editor"
 		case AdminRequired:
-			roleRequired = "Admin"
+			roleName = "Admin"
 		}
-		r.sendErrorResponse(s, i, "❌ You need the **"+roleRequired+"** role or higher to use this command.")
+		r.sendErrorResponse(s, i, "❌ You need the **"+roleName+"** role or higher to use this.")
 		return false
 	}
 
 	return true
 }
 
-// checkGuildPermission checks if a member has the required permission level
-// This is a simplified version to avoid import cycles
 func (r *Registry) checkGuildPermission(member *discordgo.Member, guildConfig *storage.GuildConfig, required PermissionLevel) bool {
 	if member == nil || guildConfig == nil {
 		return false
 	}
 
-	// Check for Discord admin permissions first
+	// Discord Administrators bypass all bot-level role checks
 	if member.Permissions&discordgo.PermissionAdministrator != 0 {
 		return true
 	}
 
-	// Get required role ID based on permission level
-	var requiredRoleID string
-	switch required {
-	case PlayerRequired:
-		requiredRoleID = guildConfig.RegisteredRoleID
-	case EditorRequired:
-		requiredRoleID = guildConfig.EditorRoleID
-	case AdminRequired:
-		requiredRoleID = guildConfig.AdminRoleID
-	default:
-		return true // No permission required
-	}
-
-	if requiredRoleID == "" {
-		return false // Role not configured
-	}
-
-	// Check if user has the required role or higher
 	hasRole := func(roleID string) bool {
-		for _, memberRoleID := range member.Roles {
-			if memberRoleID == roleID {
+		if roleID == "" {
+			return false
+		}
+		for _, mRoleID := range member.Roles {
+			if mRoleID == roleID {
 				return true
 			}
 		}
 		return false
 	}
 
-	// Check for Admin role (highest)
-	if guildConfig.AdminRoleID != "" && hasRole(guildConfig.AdminRoleID) {
+	// Hierarchy check:
+	// Admin role satisfies all levels
+	if hasRole(guildConfig.AdminRoleID) {
 		return true
 	}
 
-	// For Editor permission, also allow Editor role
-	if required == EditorRequired && guildConfig.EditorRoleID != "" && hasRole(guildConfig.EditorRoleID) {
-		return true
+	// Editor role satisfies Editor and Player levels
+	if required == EditorRequired || required == PlayerRequired {
+		if hasRole(guildConfig.EditorRoleID) {
+			return true
+		}
 	}
 
-	// For Player permission, allow Player, Editor, or Admin role
+	// Registered role satisfies Player level
 	if required == PlayerRequired {
-		if (guildConfig.RegisteredRoleID != "" && hasRole(guildConfig.RegisteredRoleID)) ||
-			(guildConfig.EditorRoleID != "" && hasRole(guildConfig.EditorRoleID)) ||
-			(guildConfig.AdminRoleID != "" && hasRole(guildConfig.AdminRoleID)) {
+		if hasRole(guildConfig.RegisteredRoleID) {
 			return true
 		}
 	}
@@ -300,19 +255,13 @@ func (r *Registry) checkGuildPermission(member *discordgo.Member, guildConfig *s
 
 func (r *Registry) sendErrorResponse(s *discordgo.Session, i *discordgo.InteractionCreate, message string) {
 	if s == nil || i == nil || i.Interaction == nil {
-		if r.logger != nil {
-			r.logger.Error("Cannot send error response: session or interaction is nil")
-		}
 		return
 	}
-	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+	_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
 			Content: message,
 			Flags:   discordgo.MessageFlagsEphemeral,
 		},
 	})
-	if err != nil && r.logger != nil {
-		r.logger.Error("Failed to send error response", slog.Any("error", err))
-	}
 }

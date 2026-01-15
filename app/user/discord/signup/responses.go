@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/discordutils"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	"github.com/bwmarrin/discordgo"
@@ -21,24 +22,14 @@ func (sm *signupManager) SendSignupResult(ctx context.Context, correlationID str
 	return sm.operationWrapper(ctx, "send_signup_result", func(ctx context.Context) (SignupOperationResult, error) {
 		sm.logger.InfoContext(ctx, "Processing signup result", attr.String("correlation_id", correlationID))
 
-		interaction, found := sm.interactionStore.Get(correlationID)
-		if !found {
-			err := fmt.Errorf("interaction not found for correlation ID: %s", correlationID)
-			sm.logger.ErrorContext(ctx, err.Error(), attr.String("correlation_id", correlationID))
-			return SignupOperationResult{Error: err}, nil
-		}
-
-		interactionObj, ok := interaction.(*discordgo.Interaction)
-		if !ok {
-			err := fmt.Errorf("interaction is not of the expected type")
-			sm.logger.ErrorContext(ctx, err.Error(), attr.String("correlation_id", correlationID))
-			return SignupOperationResult{Error: err}, nil
-		}
-
-		// Add nil check for interactionObj before accessing its fields
-		if interactionObj == nil {
-			err := fmt.Errorf("retrieved interaction object is nil for correlation ID: %s", correlationID)
-			sm.logger.ErrorContext(ctx, err.Error(), attr.String("correlation_id", correlationID))
+		// Retrieve typed interaction via the shared bridge
+		interactionObj, err := discordutils.GetInteraction(ctx, sm.interactionStore, correlationID)
+		if err != nil {
+			sm.logger.ErrorContext(ctx, "interaction not found or invalid",
+				attr.String("correlation_id", correlationID),
+				attr.Error(err),
+			)
+			// Return underlying error so tests can assert on type-mismatch messages coming from GetInteraction
 			return SignupOperationResult{Error: err}, nil
 		}
 
@@ -50,13 +41,15 @@ func (sm *signupManager) SendSignupResult(ctx context.Context, correlationID str
 			content = fmt.Sprintf("❌ Signup failed: %s", failureReason[0])
 		}
 
-		_, err := sm.session.InteractionResponseEdit(interactionObj, &discordgo.WebhookEdit{
+		_, err = sm.session.InteractionResponseEdit(interactionObj, &discordgo.WebhookEdit{
 			Content: stringPtr(content),
 		})
 		if err != nil {
 			sm.logger.ErrorContext(ctx, "Failed to send result", attr.Error(err))
 			return SignupOperationResult{Error: fmt.Errorf("failed to send result: %w", err)}, err
 		}
+		// Clean up stored interaction after sending the follow-up
+		sm.interactionStore.Delete(ctx, correlationID)
 
 		sm.logger.InfoContext(ctx, "Successfully sent signup result response")
 		return SignupOperationResult{Success: content}, nil

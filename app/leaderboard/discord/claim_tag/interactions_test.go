@@ -6,7 +6,6 @@ import (
 	"io"
 	"log/slog"
 	"testing"
-	"time"
 
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
 	gc_mocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
@@ -25,7 +24,8 @@ import (
 // simple in-memory ISInterface stub
 type memStore struct{ m map[string]interface{} }
 
-func (s *memStore) Set(id string, v interface{}, _ time.Duration) error {
+// Implement the new storage.ISInterface[T] signatures (context-aware, (T, error) returns)
+func (s *memStore) Set(_ context.Context, id string, v interface{}) error {
 	if s.m == nil {
 		s.m = map[string]interface{}{}
 	}
@@ -33,18 +33,21 @@ func (s *memStore) Set(id string, v interface{}, _ time.Duration) error {
 	return nil
 }
 
-func (s *memStore) Delete(id string) {
+func (s *memStore) Delete(_ context.Context, id string) {
 	if s.m != nil {
 		delete(s.m, id)
 	}
 }
 
-func (s *memStore) Get(id string) (interface{}, bool) {
+func (s *memStore) Get(_ context.Context, id string) (interface{}, error) {
 	if s.m == nil {
-		return nil, false
+		return nil, errors.New("not found")
 	}
 	v, ok := s.m[id]
-	return v, ok
+	if !ok {
+		return nil, errors.New("not found")
+	}
+	return v, nil
 }
 
 // fake eventbus capturing publish
@@ -109,7 +112,7 @@ func TestHandleClaimTagCommand_Variants(t *testing.T) {
 		eb := &fakeEventBus{}
 		store := &memStore{}
 
-		mgr := NewClaimTagManager(sess, eb, logger, helper, cfg, resolver, store, tracer, metrics)
+		mgr := NewClaimTagManager(sess, eb, logger, helper, cfg, resolver, store, nil, tracer, metrics)
 		// valid tag option 5
 		opt := &discordgo.ApplicationCommandInteractionDataOption{Type: discordgo.ApplicationCommandOptionInteger, Value: float64(5)}
 		res, err := mgr.HandleClaimTagCommand(ctx, base([]*discordgo.ApplicationCommandInteractionDataOption{opt}))
@@ -128,7 +131,7 @@ func TestHandleClaimTagCommand_Variants(t *testing.T) {
 		helper := util_mocks.NewMockHelpers(ctrl)
 		resolver := gc_mocks.NewMockGuildConfigResolver(ctrl)
 		resolver.EXPECT().GetGuildConfigWithContext(gomock.Any(), "g1").Return(nil, errors.New("boom"))
-		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, &memStore{}, tracer, metrics)
+		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, &memStore{}, nil, tracer, metrics)
 		res, err := mgr.HandleClaimTagCommand(ctx, base(nil))
 		if err == nil || res.Error == nil {
 			t.Fatalf("expected resolver error path")
@@ -142,7 +145,7 @@ func TestHandleClaimTagCommand_Variants(t *testing.T) {
 		helper := util_mocks.NewMockHelpers(ctrl)
 		resolver := gc_mocks.NewMockGuildConfigResolver(ctrl)
 		resolver.EXPECT().GetGuildConfigWithContext(gomock.Any(), "g1").Return(&storage.GuildConfig{}, nil)
-		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, &memStore{}, tracer, metrics)
+		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, &memStore{}, nil, tracer, metrics)
 		res, err := mgr.HandleClaimTagCommand(ctx, base(nil))
 		if err != nil || res.Error == nil {
 			t.Fatalf("expected validation error for missing option")
@@ -156,7 +159,7 @@ func TestHandleClaimTagCommand_Variants(t *testing.T) {
 		helper := util_mocks.NewMockHelpers(ctrl)
 		resolver := gc_mocks.NewMockGuildConfigResolver(ctrl)
 		resolver.EXPECT().GetGuildConfigWithContext(gomock.Any(), "g1").Return(&storage.GuildConfig{}, nil)
-		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, &memStore{}, tracer, metrics)
+		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, &memStore{}, nil, tracer, metrics)
 		opt := &discordgo.ApplicationCommandInteractionDataOption{Type: discordgo.ApplicationCommandOptionInteger, Value: float64(0)}
 		res, err := mgr.HandleClaimTagCommand(ctx, base([]*discordgo.ApplicationCommandInteractionDataOption{opt}))
 		if err != nil || res.Error == nil {
@@ -172,7 +175,7 @@ func TestHandleClaimTagCommand_Variants(t *testing.T) {
 		helper := util_mocks.NewMockHelpers(ctrl)
 		resolver := gc_mocks.NewMockGuildConfigResolver(ctrl)
 		resolver.EXPECT().GetGuildConfigWithContext(gomock.Any(), "g1").Return(&storage.GuildConfig{}, nil)
-		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, &memStore{}, tracer, metrics)
+		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, &memStore{}, nil, tracer, metrics)
 		opt := &discordgo.ApplicationCommandInteractionDataOption{Type: discordgo.ApplicationCommandOptionInteger, Value: float64(5)}
 		res, err := mgr.HandleClaimTagCommand(ctx, base([]*discordgo.ApplicationCommandInteractionDataOption{opt}))
 		if err == nil || res.Error == nil {
@@ -190,7 +193,7 @@ func TestHandleClaimTagCommand_Variants(t *testing.T) {
 		resolver := gc_mocks.NewMockGuildConfigResolver(ctrl)
 		resolver.EXPECT().GetGuildConfigWithContext(gomock.Any(), "g1").Return(&storage.GuildConfig{}, nil)
 		store := &errStore{}
-		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, store, tracer, metrics)
+		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, store, nil, tracer, metrics)
 		opt := &discordgo.ApplicationCommandInteractionDataOption{Type: discordgo.ApplicationCommandOptionInteger, Value: float64(5)}
 		res, err := mgr.HandleClaimTagCommand(ctx, base([]*discordgo.ApplicationCommandInteractionDataOption{opt}))
 		if err == nil || res.Error == nil {
@@ -207,7 +210,7 @@ func TestHandleClaimTagCommand_Variants(t *testing.T) {
 		helper.EXPECT().CreateNewMessage(gomock.Any(), gomock.Any()).Return(nil, errors.New("create err"))
 		resolver := gc_mocks.NewMockGuildConfigResolver(ctrl)
 		resolver.EXPECT().GetGuildConfigWithContext(gomock.Any(), "g1").Return(&storage.GuildConfig{}, nil)
-		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, &memStore{}, tracer, metrics)
+		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, &memStore{}, nil, tracer, metrics)
 		opt := &discordgo.ApplicationCommandInteractionDataOption{Type: discordgo.ApplicationCommandOptionInteger, Value: float64(5)}
 		res, err := mgr.HandleClaimTagCommand(ctx, base([]*discordgo.ApplicationCommandInteractionDataOption{opt}))
 		if err == nil || res.Error == nil {
@@ -225,7 +228,7 @@ func TestHandleClaimTagCommand_Variants(t *testing.T) {
 		resolver := gc_mocks.NewMockGuildConfigResolver(ctrl)
 		resolver.EXPECT().GetGuildConfigWithContext(gomock.Any(), "g1").Return(&storage.GuildConfig{}, nil)
 		eb := &fakeEventBus{err: errors.New("pub err")}
-		mgr := NewClaimTagManager(sess, eb, logger, helper, cfg, resolver, &memStore{}, tracer, metrics)
+		mgr := NewClaimTagManager(sess, eb, logger, helper, cfg, resolver, &memStore{}, nil, tracer, metrics)
 		opt := &discordgo.ApplicationCommandInteractionDataOption{Type: discordgo.ApplicationCommandOptionInteger, Value: float64(5)}
 		res, err := mgr.HandleClaimTagCommand(ctx, base([]*discordgo.ApplicationCommandInteractionDataOption{opt}))
 		if err == nil || res.Error == nil {
@@ -242,7 +245,7 @@ func TestUpdateInteractionResponse_Variants(t *testing.T) {
 	cfg := &config.Config{}
 
 	t.Run("not found", func(t *testing.T) {
-		mgr := NewClaimTagManager(nil, &fakeEventBus{}, logger, nil, cfg, nil, &memStore{}, tracer, metrics)
+		mgr := NewClaimTagManager(nil, &fakeEventBus{}, logger, nil, cfg, nil, &memStore{}, nil, tracer, metrics)
 		res, err := mgr.UpdateInteractionResponse(ctx, "missing", "msg")
 		if err != nil || res.Error == nil {
 			t.Fatalf("expected error for missing correlation id")
@@ -251,7 +254,7 @@ func TestUpdateInteractionResponse_Variants(t *testing.T) {
 
 	t.Run("bad stored type", func(t *testing.T) {
 		store := &memStore{m: map[string]interface{}{"cid": 42}}
-		mgr := NewClaimTagManager(nil, &fakeEventBus{}, logger, nil, cfg, nil, store, tracer, metrics)
+		mgr := NewClaimTagManager(nil, &fakeEventBus{}, logger, nil, cfg, nil, store, nil, tracer, metrics)
 		res, err := mgr.UpdateInteractionResponse(ctx, "cid", "msg")
 		if err != nil || res.Error == nil {
 			t.Fatalf("expected error for wrong stored type")
@@ -264,7 +267,7 @@ func TestUpdateInteractionResponse_Variants(t *testing.T) {
 		sess := discordmocks.NewMockSession(ctrl)
 		sess.EXPECT().InteractionResponseEdit(gomock.Any(), gomock.Any()).Return(nil, errors.New("edit err"))
 		store := &memStore{m: map[string]interface{}{"cid": &discordgo.Interaction{}}}
-		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, nil, cfg, nil, store, tracer, metrics)
+		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, nil, cfg, nil, store, nil, tracer, metrics)
 		res, err := mgr.UpdateInteractionResponse(ctx, "cid", "done")
 		if err != nil || res.Error == nil {
 			t.Fatalf("expected error from InteractionResponseEdit")
@@ -277,12 +280,12 @@ func TestUpdateInteractionResponse_Variants(t *testing.T) {
 		sess := discordmocks.NewMockSession(ctrl)
 		sess.EXPECT().InteractionResponseEdit(gomock.Any(), gomock.Any()).Return(&discordgo.Message{}, nil)
 		store := &memStore{m: map[string]interface{}{"cid": &discordgo.Interaction{}}}
-		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, nil, cfg, nil, store, tracer, metrics)
+		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, nil, cfg, nil, store, nil, tracer, metrics)
 		res, err := mgr.UpdateInteractionResponse(ctx, "cid", "updated")
 		if err != nil || res.Error != nil || res.Success == nil {
 			t.Fatalf("expected success, got res=%v err=%v", res, err)
 		}
-		if _, ok := store.Get("cid"); ok {
+		if _, err := store.Get(ctx, "cid"); err == nil {
 			t.Fatalf("expected store to delete correlation id after success")
 		}
 	})
@@ -291,6 +294,6 @@ func TestUpdateInteractionResponse_Variants(t *testing.T) {
 // errStore forces Set error
 type errStore struct{ memStore }
 
-func (e *errStore) Set(id string, v interface{}, ttl time.Duration) error {
+func (e *errStore) Set(_ context.Context, id string, v interface{}) error {
 	return errors.New("set err")
 }

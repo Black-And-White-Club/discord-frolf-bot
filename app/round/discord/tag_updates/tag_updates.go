@@ -9,6 +9,7 @@ import (
 
 	discordgo "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
@@ -40,6 +41,8 @@ type tagUpdateManager struct {
 	logger              *slog.Logger
 	helper              utils.Helpers
 	config              *config.Config
+	interactionStore    storage.ISInterface[any]
+	guildConfigCache    storage.ISInterface[storage.GuildConfig]
 	tracer              trace.Tracer
 	metrics             discordmetrics.DiscordMetrics
 	operationWrapper    func(ctx context.Context, opName string, fn func(ctx context.Context) (TagUpdateOperationResult, error)) (TagUpdateOperationResult, error)
@@ -53,6 +56,8 @@ func NewTagUpdateManager(
 	logger *slog.Logger,
 	helper utils.Helpers,
 	config *config.Config,
+	interactionStore storage.ISInterface[any],
+	guildConfigCache storage.ISInterface[storage.GuildConfig],
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
 	guildConfigResolver guildconfig.GuildConfigResolver,
@@ -72,6 +77,8 @@ func NewTagUpdateManager(
 			return wrapTagUpdateOperation(ctx, opName, fn, logger, tracer, metrics)
 		},
 		guildConfigResolver: guildConfigResolver,
+		guildConfigCache:    guildConfigCache,
+		interactionStore:    interactionStore,
 	}
 }
 

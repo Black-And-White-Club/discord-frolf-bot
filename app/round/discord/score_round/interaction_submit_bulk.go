@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	scoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/score"
+	sharedevents "github.com/Black-And-White-Club/frolf-bot-shared/events/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
@@ -112,16 +112,16 @@ func (srm *scoreRoundManager) handleBulkScoreSubmission(ctx context.Context, i *
 	summary := summarizeBulk(updates, unchanged, skipped, unresolved, diagnostics, resolvedMappings)
 
 	if len(updates) > 0 {
-		bulkUpdates := make([]scoreevents.ScoreUpdateRequestPayload, 0, len(updates))
+		bulkUpdates := make([]sharedevents.ScoreUpdateRequestedPayloadV1, 0, len(updates))
 		for _, u := range updates {
-			bulkUpdates = append(bulkUpdates, scoreevents.ScoreUpdateRequestPayload{
+			bulkUpdates = append(bulkUpdates, sharedevents.ScoreUpdateRequestedPayloadV1{
 				GuildID: sharedtypes.GuildID(i.GuildID),
 				RoundID: sharedtypes.RoundID(roundUUID),
 				UserID:  sharedtypes.DiscordID(u.UserID),
 				Score:   sharedtypes.Score(u.Score),
 			})
 		}
-		bulkPayload := scoreevents.ScoreBulkUpdateRequestPayload{GuildID: sharedtypes.GuildID(i.GuildID), RoundID: sharedtypes.RoundID(roundUUID), Updates: bulkUpdates}
+		bulkPayload := sharedevents.ScoreBulkUpdateRequestedPayloadV1{GuildID: sharedtypes.GuildID(i.GuildID), RoundID: sharedtypes.RoundID(roundUUID), Updates: bulkUpdates}
 		msg := message.NewMessage(watermill.NewUUID(), nil)
 		if msg.Metadata == nil {
 			msg.Metadata = message.Metadata{}
@@ -129,7 +129,7 @@ func (srm *scoreRoundManager) handleBulkScoreSubmission(ctx context.Context, i *
 		msg.Metadata.Set("guild_id", i.GuildID)
 		msg.Metadata.Set("override", "true")
 		msg.Metadata.Set("override_mode", "bulk")
-		msg.Metadata.Set("topic", scoreevents.ScoreBulkUpdateRequest)
+		msg.Metadata.Set("topic", sharedevents.ScoreBulkUpdateRequestedV1)
 		msg.Metadata.Set("user_id", userIDFromModal)
 		if i.Message != nil {
 			msg.Metadata.Set("discord_message_id", i.Message.ID)
@@ -138,9 +138,9 @@ func (srm *scoreRoundManager) handleBulkScoreSubmission(ctx context.Context, i *
 		if i.ChannelID != "" {
 			msg.Metadata.Set("channel_id", i.ChannelID)
 		}
-		resultMsg, errCreate := srm.helper.CreateResultMessage(msg, bulkPayload, scoreevents.ScoreBulkUpdateRequest)
+		resultMsg, errCreate := srm.helper.CreateResultMessage(msg, bulkPayload, sharedevents.ScoreBulkUpdateRequestedV1)
 		if errCreate == nil {
-			if errPub := srm.publisher.Publish(scoreevents.ScoreBulkUpdateRequest, resultMsg); errPub != nil {
+			if errPub := srm.publisher.Publish(sharedevents.ScoreBulkUpdateRequestedV1, resultMsg); errPub != nil {
 				summary = "Bulk override failed to publish: " + errPub.Error()
 			}
 		} else {

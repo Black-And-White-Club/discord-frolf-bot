@@ -9,6 +9,7 @@ import (
 
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
 	guildconfigmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
+	storage "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	storagemocks "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
@@ -29,12 +30,13 @@ func TestNewUpdateRoundManager(t *testing.T) {
 	logger := slog.New(testHandler)
 	mockHelper := utilsmocks.NewMockHelpers(ctrl)
 	mockConfig := &config.Config{}
-	mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+	mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
+	mockGuildConfigCache := storagemocks.NewMockISInterface[storage.GuildConfig](ctrl)
 	mockMetrics := discordmetricsmocks.NewMockDiscordMetrics(ctrl)
 	tracer := noop.NewTracerProvider().Tracer("test")
 	mockGuildConfig := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
 
-	manager := NewUpdateRoundManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockInteractionStore, tracer, mockMetrics, mockGuildConfig)
+	manager := NewUpdateRoundManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockInteractionStore, mockGuildConfigCache, tracer, mockMetrics, mockGuildConfig)
 	impl, ok := manager.(*updateRoundManager)
 	if !ok {
 		t.Fatalf("Expected *updateRoundManager, got %T", manager)

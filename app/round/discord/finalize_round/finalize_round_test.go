@@ -11,6 +11,8 @@ import (
 
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
 	guildconfigmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
+	storagemocks "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
 	"github.com/Black-And-White-Club/frolf-bot-shared/mocks"
@@ -33,8 +35,10 @@ func TestNewFinalizeRoundManager(t *testing.T) {
 	mockTracer := noop.NewTracerProvider().Tracer("test")
 	mockMetrics := discordmetricsmocks.NewMockDiscordMetrics(ctrl)
 	mockGuildConfigResolver := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
+	mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
+	mockGuildConfigCache := storagemocks.NewMockISInterface[storage.GuildConfig](ctrl)
 
-	manager := NewFinalizeRoundManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockTracer, mockMetrics, mockGuildConfigResolver)
+	manager := NewFinalizeRoundManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockInteractionStore, mockGuildConfigCache, mockTracer, mockMetrics, mockGuildConfigResolver)
 	impl, ok := manager.(*finalizeRoundManager)
 	if !ok {
 		t.Fatalf("Expected *finalizeRoundManager, got %T", manager)
@@ -63,6 +67,12 @@ func TestNewFinalizeRoundManager(t *testing.T) {
 	}
 	if impl.operationWrapper == nil {
 		t.Error("Expected operationWrapper to be set")
+	}
+	if impl.interactionStore != mockInteractionStore {
+		t.Error("Expected interactionStore to be assigned")
+	}
+	if impl.guildConfigCache != mockGuildConfigCache {
+		t.Error("Expected guildConfigCache to be assigned")
 	}
 }
 

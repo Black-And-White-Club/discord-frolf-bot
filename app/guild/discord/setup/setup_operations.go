@@ -11,7 +11,7 @@ import (
 )
 
 // performCustomSetup performs guild setup with custom configuration
-func (s *setupManager) performCustomSetup(guildID string, config SetupConfig) (*SetupResult, error) {
+func (s *setupManager) performCustomSetup(ctx context.Context, guildID string, config SetupConfig) (*SetupResult, error) {
 	result := &SetupResult{
 		RoleMappings: make(map[string]string),
 	}
@@ -73,7 +73,7 @@ func (s *setupManager) performCustomSetup(guildID string, config SetupConfig) (*
 
 	// Create signup message if requested and signup channel exists
 	if config.CreateSignupMsg && result.SignupChannelID != "" {
-		messageID, err := s.createSignupMessage(guildID, result.SignupChannelID, config.SignupMessage, config.SignupEmoji)
+		messageID, err := s.createSignupMessage(ctx, guildID, result.SignupChannelID, config.SignupMessage, config.SignupEmoji)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create signup message: %w", err)
 		}
@@ -195,7 +195,7 @@ func (s *setupManager) createOrFindRole(guild *discordgo.Guild, roleName string,
 }
 
 // createSignupMessage creates a signup message with custom content and emoji
-func (s *setupManager) createSignupMessage(guildID, channelID, content, emojiName string) (string, error) {
+func (s *setupManager) createSignupMessage(ctx context.Context, guildID, channelID, content, emojiName string) (string, error) {
 	if content == "" {
 		content = "React with 🥏 to sign up for frolf events!"
 	}
@@ -212,7 +212,7 @@ func (s *setupManager) createSignupMessage(guildID, channelID, content, emojiNam
 	err = s.session.MessageReactionAdd(channelID, message.ID, emojiName)
 	if err != nil {
 		if s.logger != nil {
-			s.logger.ErrorContext(context.Background(), "Failed to add reaction to signup message",
+			s.logger.ErrorContext(ctx, "Failed to add reaction to signup message",
 				"error", err,
 				"emoji", emojiName,
 				"channel_id", channelID,
@@ -221,7 +221,7 @@ func (s *setupManager) createSignupMessage(guildID, channelID, content, emojiNam
 		// Don't fail the setup, but make sure we log the error properly
 	} else {
 		if s.logger != nil {
-			s.logger.InfoContext(context.Background(), "Successfully added reaction to signup message",
+			s.logger.InfoContext(ctx, "Successfully added reaction to signup message",
 				"emoji", emojiName,
 				"channel_id", channelID,
 				"message_id", message.ID)
@@ -229,7 +229,7 @@ func (s *setupManager) createSignupMessage(guildID, channelID, content, emojiNam
 	}
 
 	if s.logger != nil {
-		s.logger.InfoContext(context.Background(), "Created signup message",
+		s.logger.InfoContext(ctx, "Created signup message",
 			"guild_id", guildID,
 			"channel_id", channelID,
 			"message_id", message.ID,

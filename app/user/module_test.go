@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 	"testing"
-	"time"
 
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
 	guildconfigmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
@@ -39,9 +38,9 @@ func TestInitializeUserModule_Succeeds(t *testing.T) {
 	}
 
 	ireg := interactions.NewRegistry()
-	rreg := interactions.NewReactionRegistry()
+	rreg := interactions.NewReactionRegistry(logger)
 
-	userRouter, initErr := InitializeUserModule(ctx, session, router, ireg, rreg, publisher, logger, cfg, helper, interactionStore, metrics, guildCfg)
+	userRouter, initErr := InitializeUserModule(ctx, session, router, ireg, rreg, publisher, logger, cfg, helper, interactionStore, nil, metrics, guildCfg)
 	if initErr != nil {
 		t.Fatalf("InitializeUserModule returned error: %v", initErr)
 	}
@@ -57,6 +56,10 @@ func TestInitializeUserModule_Succeeds(t *testing.T) {
 // minimal mock for storage.ISInterface to avoid pulling concrete store with timers
 type mockInteractionStore struct{}
 
-func (m *mockInteractionStore) Set(string, interface{}, time.Duration) error { return nil }
-func (m *mockInteractionStore) Delete(string)                                {}
-func (m *mockInteractionStore) Get(string) (interface{}, bool)               { return nil, false }
+func (m *mockInteractionStore) Set(ctx context.Context, correlationID string, interaction any) error {
+	return nil
+}
+func (m *mockInteractionStore) Delete(ctx context.Context, correlationID string) {}
+func (m *mockInteractionStore) Get(ctx context.Context, correlationID string) (any, error) {
+	return nil, nil
+}

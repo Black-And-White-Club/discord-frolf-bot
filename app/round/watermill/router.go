@@ -8,9 +8,9 @@ import (
 	roundhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/round/watermill/handlers"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
-	sharedroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
+	discordroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
-	scoreevents "github.com/Black-And-White-Club/frolf-bot-shared/events/score"
+	sharedevents "github.com/Black-And-White-Club/frolf-bot-shared/events/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	tracingfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/tracing"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
@@ -128,30 +128,30 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 	}
 
 	// Creation flow
-	registerHandler(deps, sharedroundevents.RoundCreateModalSubmittedV1, handlers.HandleRoundCreateRequested)
+	registerHandler(deps, discordroundevents.RoundCreateModalSubmittedV1, handlers.HandleRoundCreateRequested)
 	registerHandler(deps, roundevents.RoundCreatedV1, handlers.HandleRoundCreated)
 	registerHandler(deps, roundevents.RoundCreationFailedV1, handlers.HandleRoundCreationFailed)
 	registerHandler(deps, roundevents.RoundValidationFailedV1, handlers.HandleRoundValidationFailed)
 
 	// Update flow
-	registerHandler(deps, sharedroundevents.RoundUpdateModalSubmittedV1, handlers.HandleRoundUpdateRequested)
+	registerHandler(deps, discordroundevents.RoundUpdateModalSubmittedV1, handlers.HandleRoundUpdateRequested)
 	registerHandler(deps, roundevents.RoundUpdatedV1, handlers.HandleRoundUpdated)
 	registerHandler(deps, roundevents.RoundUpdateErrorV1, handlers.HandleRoundUpdateFailed)
 
 	// Participation
-	registerHandler(deps, sharedroundevents.RoundParticipantJoinRequestDiscordV1, handlers.HandleRoundParticipantJoinRequest)
+	registerHandler(deps, discordroundevents.RoundParticipantJoinRequestDiscordV1, handlers.HandleRoundParticipantJoinRequest)
 	registerHandler(deps, roundevents.RoundParticipantRemovedV1, handlers.HandleRoundParticipantRemoved)
 
 	// Scoring
 	// Discord->Round bridge: translate discord-scoped round score submissions
 	// into the canonical round domain topic so the round handlers can process
 	// first-time submissions and participant creation.
-	registerHandler(deps, sharedroundevents.RoundScoreUpdateRequestDiscordV1, handlers.HandleDiscordRoundScoreUpdate)
+	registerHandler(deps, discordroundevents.RoundScoreUpdateRequestDiscordV1, handlers.HandleDiscordRoundScoreUpdate)
 	registerHandler(deps, roundevents.RoundParticipantScoreUpdatedV1, handlers.HandleParticipantScoreUpdated)
 	registerHandler(deps, roundevents.RoundScoreUpdateErrorV1, handlers.HandleScoreUpdateError)
 
 	// Score override bridging (CorrectScore service)
-	registerHandler(deps, scoreevents.ScoreUpdatedV1, handlers.HandleScoreOverrideSuccess)
+	registerHandler(deps, sharedevents.ScoreUpdatedV1, handlers.HandleScoreOverrideSuccess)
 	// NOTE: We intentionally do NOT map ScoreBulkUpdateSuccess to per-user handler.
 	// The per-user success events (score.update.success) are expected to be emitted individually
 	// for each updated participant. The aggregate bulk success event lacks a specific user/score
@@ -164,7 +164,7 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 	registerHandler(deps, roundevents.ScorecardURLRequestedV1, handlers.HandleScorecardURLRequested)
 
 	// Deletion flow
-	registerHandler(deps, sharedroundevents.RoundDeleteRequestDiscordV1, handlers.HandleRoundDeleteRequested)
+	registerHandler(deps, discordroundevents.RoundDeleteRequestDiscordV1, handlers.HandleRoundDeleteRequested)
 
 	// Lifecycle
 	registerHandler(deps, roundevents.RoundDeletedV1, handlers.HandleRoundDeleted)
@@ -173,6 +173,7 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 
 	// Tag handling
 	registerHandler(deps, roundevents.RoundParticipantJoinedV1, handlers.HandleRoundParticipantJoined)
+	registerHandler(deps, roundevents.RoundParticipantsUpdatedV1, handlers.HandleRoundParticipantsUpdated)
 
 	// Reminders
 	registerHandler(deps, roundevents.RoundReminderSentV1, handlers.HandleRoundReminder)

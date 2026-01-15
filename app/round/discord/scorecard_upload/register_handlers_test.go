@@ -2,11 +2,13 @@ package scorecardupload
 
 import (
 	"context"
+	"log/slog"
 	"testing"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/interactions"
+	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
 	"github.com/bwmarrin/discordgo"
 	"go.uber.org/mock/gomock"
 )
@@ -58,7 +60,9 @@ func TestRegisterHandlers_wiresButtonModalAndMessageHandlers(t *testing.T) {
 	t.Cleanup(ctrl.Finish)
 
 	registry := interactions.NewRegistry()
-	messageRegistry := interactions.NewMessageRegistry()
+	testHandler := loggerfrolfbot.NewTestHandler()
+	logger := slog.New(testHandler)
+	messageRegistry := interactions.NewMessageRegistry(logger)
 	mgr := &fakeScorecardUploadManager{}
 
 	RegisterHandlers(registry, messageRegistry, mgr)

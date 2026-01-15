@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	sharedroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
+	discordroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
@@ -12,7 +12,7 @@ import (
 
 // HandleRoundDeleteRequested handles the RoundDeleteRequestDiscordV1 event
 // and publishes the domain event RoundDeleteRequestedV1.
-func (h *RoundHandlers) HandleRoundDeleteRequested(ctx context.Context, payload *sharedroundevents.RoundDeleteRequestDiscordPayloadV1) ([]handlerwrapper.Result, error) {
+func (h *RoundHandlers) HandleRoundDeleteRequested(ctx context.Context, payload *discordroundevents.RoundDeleteRequestDiscordPayloadV1) ([]handlerwrapper.Result, error) {
 	// Map to domain payload
 	domainPayload := roundevents.RoundDeleteRequestPayloadV1{
 		GuildID:              sharedtypes.GuildID(payload.GuildID),

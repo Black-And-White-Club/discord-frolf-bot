@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	sharedroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
+	discordroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
@@ -134,7 +134,7 @@ func (drm *deleteRoundManager) HandleDeleteRoundButton(ctx context.Context, i *d
 // sendDeleteRequest publishes the delete request to the backend.
 func (drm *deleteRoundManager) sendDeleteRequest(ctx context.Context, roundID sharedtypes.RoundID, userID sharedtypes.DiscordID, interactionID string, discordMessageID string, guildID string, channelID string) error {
 	// Prepare the payload for the backend - use backend payload type
-	payload := sharedroundevents.RoundDeleteRequestDiscordPayloadV1{
+	payload := discordroundevents.RoundDeleteRequestDiscordPayloadV1{
 		RoundID:   roundID,
 		UserID:    userID,
 		ChannelID: channelID,
@@ -143,7 +143,7 @@ func (drm *deleteRoundManager) sendDeleteRequest(ctx context.Context, roundID sh
 	}
 
 	// Create the message struct with metadata including the discord_message_id
-	msg, err := drm.helper.CreateResultMessage(nil, payload, sharedroundevents.RoundDeleteRequestDiscordV1)
+	msg, err := drm.helper.CreateResultMessage(nil, payload, discordroundevents.RoundDeleteRequestDiscordV1)
 	if err != nil {
 		return fmt.Errorf("failed to create result message: %w", err)
 	}
@@ -159,7 +159,7 @@ func (drm *deleteRoundManager) sendDeleteRequest(ctx context.Context, roundID sh
 	msg.Metadata.Set("channel_id", channelID)
 
 	// Publish directly to backend round stream
-	err = drm.publisher.Publish(sharedroundevents.RoundDeleteRequestDiscordV1, msg)
+	err = drm.publisher.Publish(discordroundevents.RoundDeleteRequestDiscordV1, msg)
 	if err != nil {
 		return fmt.Errorf("failed to publish delete request: %w", err)
 	}
@@ -167,7 +167,7 @@ func (drm *deleteRoundManager) sendDeleteRequest(ctx context.Context, roundID sh
 	drm.logger.InfoContext(ctx, "Successfully published delete request",
 		attr.String("round_id", roundID.String()),
 		attr.String("user_id", string(userID)),
-		attr.String("topic", sharedroundevents.RoundDeleteRequestDiscordV1))
+		attr.String("topic", discordroundevents.RoundDeleteRequestDiscordV1))
 
 	return nil
 }

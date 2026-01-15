@@ -5,19 +5,19 @@ import (
 	"fmt"
 	"log/slog"
 
-	sharedleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
+	discordleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
-	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
+	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 )
 
 // -- Tag Swap --
 // HandleTagSwapRequest translates a Discord tag swap request to a backend request.
 func (h *LeaderboardHandlers) HandleTagSwapRequest(ctx context.Context,
-	payload interface{}) ([]handlerwrapper.Result, error) {
+	payload *discordleaderboardevents.LeaderboardTagSwapRequestPayloadV1) ([]handlerwrapper.Result, error) {
 	h.Logger.InfoContext(ctx, "Handling TagSwapRequest")
 
-	discordPayload := payload.(*sharedleaderboardevents.LeaderboardTagSwapRequestPayloadV1)
+	discordPayload := payload
 
 	user1ID := sharedtypes.DiscordID(discordPayload.User1ID)
 	user2ID := sharedtypes.DiscordID(discordPayload.User2ID)
@@ -57,12 +57,12 @@ func (h *LeaderboardHandlers) HandleTagSwapRequest(ctx context.Context,
 
 // HandleTagSwappedResponse translates a backend TagSwapProcessed event to a Discord response.
 func (h *LeaderboardHandlers) HandleTagSwappedResponse(ctx context.Context,
-	payload interface{}) ([]handlerwrapper.Result, error) {
+	payload *leaderboardevents.TagSwapProcessedPayloadV1) ([]handlerwrapper.Result, error) {
 	h.Logger.InfoContext(ctx, "Handling TagSwappedResponse")
 
-	backendPayload := payload.(*leaderboardevents.TagSwapProcessedPayloadV1)
+	backendPayload := payload
 
-	discordPayload := sharedleaderboardevents.LeaderboardTagSwappedPayloadV1{
+	discordPayload := discordleaderboardevents.LeaderboardTagSwappedPayloadV1{
 		User1ID: backendPayload.RequestorID,
 		User2ID: backendPayload.TargetID,
 		GuildID: string(backendPayload.GuildID),
@@ -75,7 +75,7 @@ func (h *LeaderboardHandlers) HandleTagSwappedResponse(ctx context.Context,
 
 	return []handlerwrapper.Result{
 		{
-			Topic:   sharedleaderboardevents.LeaderboardTagSwappedV1,
+			Topic:   discordleaderboardevents.LeaderboardTagSwappedV1,
 			Payload: discordPayload,
 		},
 	}, nil
@@ -83,12 +83,12 @@ func (h *LeaderboardHandlers) HandleTagSwappedResponse(ctx context.Context,
 
 // HandleTagSwapFailedResponse translates a backend TagSwapFailed to a Discord response.
 func (h *LeaderboardHandlers) HandleTagSwapFailedResponse(ctx context.Context,
-	payload interface{}) ([]handlerwrapper.Result, error) {
+	payload *leaderboardevents.TagSwapFailedPayloadV1) ([]handlerwrapper.Result, error) {
 	h.Logger.InfoContext(ctx, "Handling TagSwapFailedResponse")
 
-	backendPayload := payload.(*leaderboardevents.TagSwapFailedPayloadV1)
+	backendPayload := payload
 
-	discordPayload := sharedleaderboardevents.LeaderboardTagSwapFailedPayloadV1{
+	discordPayload := discordleaderboardevents.LeaderboardTagSwapFailedPayloadV1{
 		User1ID: backendPayload.RequestorID,
 		User2ID: backendPayload.TargetID,
 		Reason:  backendPayload.Reason,
@@ -103,7 +103,7 @@ func (h *LeaderboardHandlers) HandleTagSwapFailedResponse(ctx context.Context,
 
 	return []handlerwrapper.Result{
 		{
-			Topic:   sharedleaderboardevents.LeaderboardTagSwapFailedV1,
+			Topic:   discordleaderboardevents.LeaderboardTagSwapFailedV1,
 			Payload: discordPayload,
 		},
 	}, nil

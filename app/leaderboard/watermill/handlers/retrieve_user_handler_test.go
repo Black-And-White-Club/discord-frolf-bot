@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"testing"
 
-	sharedleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
-	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
+	discordleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
+	sharedevents "github.com/Black-And-White-Club/frolf-bot-shared/events/shared"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"go.opentelemetry.io/otel/trace/noop"
 )
@@ -15,12 +15,12 @@ import (
 func TestHandleGetTagByDiscordID(t *testing.T) {
 	tests := []struct {
 		name    string
-		payload interface{}
+		payload *discordleaderboardevents.LeaderboardTagAvailabilityRequestPayloadV1
 		wantErr bool
 	}{
 		{
 			name: "successful_get_tag_request",
-			payload: &sharedleaderboardevents.LeaderboardTagAvailabilityRequestPayloadV1{
+			payload: &discordleaderboardevents.LeaderboardTagAvailabilityRequestPayloadV1{
 				GuildID: "guild123",
 				UserID:  sharedtypes.DiscordID("user"),
 			},
@@ -56,12 +56,12 @@ func TestHandleGetTagByDiscordID(t *testing.T) {
 func TestHandleGetTagByDiscordIDResponse(t *testing.T) {
 	tests := []struct {
 		name    string
-		payload interface{}
+		payload *sharedevents.GetTagNumberResponsePayloadV1
 		wantErr bool
 	}{
 		{
 			name: "successful_tag_response",
-			payload: &leaderboardevents.GetTagNumberResponsePayloadV1{
+			payload: &sharedevents.GetTagNumberResponsePayloadV1{
 				GuildID: sharedtypes.GuildID("guild123"),
 				TagNumber: func() *sharedtypes.TagNumber {
 					n := sharedtypes.TagNumber(5)
@@ -73,7 +73,7 @@ func TestHandleGetTagByDiscordIDResponse(t *testing.T) {
 		},
 		{
 			name: "tag_not_found",
-			payload: &leaderboardevents.GetTagNumberResponsePayloadV1{
+			payload: &sharedevents.GetTagNumberResponsePayloadV1{
 				GuildID:   sharedtypes.GuildID("guild123"),
 				TagNumber: nil,
 				Found:     false,
@@ -110,12 +110,12 @@ func TestHandleGetTagByDiscordIDResponse(t *testing.T) {
 func TestHandleGetTagByDiscordIDFailed(t *testing.T) {
 	tests := []struct {
 		name    string
-		payload interface{}
+		payload *sharedevents.GetTagNumberFailedPayloadV1
 		wantErr bool
 	}{
 		{
 			name: "tag_lookup_failed",
-			payload: &leaderboardevents.GetTagNumberFailedPayloadV1{
+			payload: &sharedevents.GetTagNumberFailedPayloadV1{
 				GuildID: sharedtypes.GuildID("guild123"),
 				Reason:  "database error",
 			},

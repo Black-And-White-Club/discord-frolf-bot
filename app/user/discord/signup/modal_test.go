@@ -22,7 +22,7 @@ import (
 func Test_signupManager_SendSignupModal(t *testing.T) {
 	tests := []struct {
 		name        string
-		setup       func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface)
+		setup       func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any])
 		ctx         context.Context
 		args        *discordgo.InteractionCreate
 		wantSuccess string
@@ -31,7 +31,7 @@ func Test_signupManager_SendSignupModal(t *testing.T) {
 	}{
 		{
 			name: "successful send",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				mockSession.EXPECT().
 					InteractionRespond(gomock.Any(), gomock.Any()).
 					Return(nil).Times(1)
@@ -53,7 +53,7 @@ func Test_signupManager_SendSignupModal(t *testing.T) {
 		},
 		{
 			name: "failed to send modal",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				mockInteractionStore.EXPECT().
 					Set(gomock.Any(), gomock.Any(), gomock.Any()).
 					Times(1)
@@ -76,7 +76,7 @@ func Test_signupManager_SendSignupModal(t *testing.T) {
 		},
 		{
 			name: "nil interaction",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				// No interaction with mocks expected
 			},
 			ctx:         context.Background(),
@@ -87,7 +87,7 @@ func Test_signupManager_SendSignupModal(t *testing.T) {
 		},
 		{
 			name: "nil user",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				// No interaction with mocks expected
 			},
 			ctx: context.Background(),
@@ -104,7 +104,7 @@ func Test_signupManager_SendSignupModal(t *testing.T) {
 		},
 		{
 			name: "context cancelled before operation",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
 				// No interaction with mocks expected due to early context cancel
 			},
 			ctx: func() context.Context {
@@ -131,7 +131,7 @@ func Test_signupManager_SendSignupModal(t *testing.T) {
 
 			mockSession := discordmocks.NewMockSession(ctrl)
 			mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
-			mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+			mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
 			logger := loggerfrolfbot.NoOpLogger
 			tracerProvider := noop.NewTracerProvider()
 			tracer := tracerProvider.Tracer("test")
@@ -207,7 +207,7 @@ func Test_signupManager_SendSignupModal(t *testing.T) {
 func Test_signupManager_HandleSignupModalSubmit(t *testing.T) {
 	tests := []struct {
 		name        string
-		setup       func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface, mockPublisher *eventbusmocks.MockEventBus)
+		setup       func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any], mockPublisher *eventbusmocks.MockEventBus)
 		ctx         context.Context
 		args        *discordgo.InteractionCreate
 		wantSuccess string
@@ -217,7 +217,7 @@ func Test_signupManager_HandleSignupModalSubmit(t *testing.T) {
 	}{
 		{
 			name: "successful submission",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface, mockPublisher *eventbusmocks.MockEventBus) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any], mockPublisher *eventbusmocks.MockEventBus) {
 				mockSession.EXPECT().
 					InteractionRespond(gomock.Any(), gomock.Any()).
 					Return(nil).
@@ -240,7 +240,7 @@ func Test_signupManager_HandleSignupModalSubmit(t *testing.T) {
 		},
 		{
 			name: "failed to acknowledge submission",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface, mockPublisher *eventbusmocks.MockEventBus) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any], mockPublisher *eventbusmocks.MockEventBus) {
 				mockSession.EXPECT().
 					InteractionRespond(gomock.Any(), gomock.Any()).
 					Return(fmt.Errorf("failed to acknowledge modal submission: %w", errors.New("acknowledge error"))).
@@ -254,7 +254,7 @@ func Test_signupManager_HandleSignupModalSubmit(t *testing.T) {
 		},
 		{
 			name: "invalid tag number format",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface, mockPublisher *eventbusmocks.MockEventBus) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any], mockPublisher *eventbusmocks.MockEventBus) {
 				mockSession.EXPECT().
 					InteractionRespond(gomock.Any(), gomock.Any()).
 					Return(nil).
@@ -274,7 +274,7 @@ func Test_signupManager_HandleSignupModalSubmit(t *testing.T) {
 		},
 		{
 			name: "failed to publish event",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface, mockPublisher *eventbusmocks.MockEventBus) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any], mockPublisher *eventbusmocks.MockEventBus) {
 				mockSession.EXPECT().
 					InteractionRespond(gomock.Any(), gomock.Any()).
 					Return(nil).
@@ -303,7 +303,7 @@ func Test_signupManager_HandleSignupModalSubmit(t *testing.T) {
 		},
 		{
 			name: "nil_interaction",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface, mockPublisher *eventbusmocks.MockEventBus) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any], mockPublisher *eventbusmocks.MockEventBus) {
 			},
 			ctx:         context.Background(),
 			args:        nil, // Passing nil as the interaction
@@ -313,7 +313,7 @@ func Test_signupManager_HandleSignupModalSubmit(t *testing.T) {
 		},
 		{
 			name: "missing user info",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface, mockPublisher *eventbusmocks.MockEventBus) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any], mockPublisher *eventbusmocks.MockEventBus) {
 			},
 			ctx: context.Background(),
 			args: &discordgo.InteractionCreate{
@@ -335,7 +335,7 @@ func Test_signupManager_HandleSignupModalSubmit(t *testing.T) {
 		},
 		{
 			name: "context cancelled before operation",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface, mockPublisher *eventbusmocks.MockEventBus) {
+			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any], mockPublisher *eventbusmocks.MockEventBus) {
 			},
 			ctx: func() context.Context {
 				ctx, cancel := context.WithCancel(context.Background())
@@ -356,7 +356,7 @@ func Test_signupManager_HandleSignupModalSubmit(t *testing.T) {
 
 			mockSession := discordmocks.NewMockSession(ctrl)
 			mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
-			mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+			mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
 			logger := loggerfrolfbot.NoOpLogger
 			tracerProvider := noop.NewTracerProvider()
 			tracer := tracerProvider.Tracer("test")

@@ -27,10 +27,10 @@ func TestNewLeaderboardDiscord_ConstructsAndExposesManagers(t *testing.T) {
 	var helper utils.Helpers = nil
 	cfg := &config.Config{}
 	var resolver guildconfig.GuildConfigResolver = nil
-	var store storage.ISInterface = nil
+	var store storage.ISInterface[any] = nil
 	tracer := otel.Tracer("test")
 	var metrics discordmetrics.DiscordMetrics = nil
-	ld, err := NewLeaderboardDiscord(ctx, session, publisher, nil, helper, cfg, resolver, store, tracer, metrics)
+	ld, err := NewLeaderboardDiscord(ctx, session, publisher, nil, helper, cfg, resolver, store, nil, tracer, metrics)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

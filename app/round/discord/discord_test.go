@@ -27,12 +27,13 @@ func TestNewRoundDiscord_ConstructsAndExposesManagers(t *testing.T) {
 	var publisher eventbus.EventBus = nil
 	var helper utils.Helpers = nil
 	cfg := &config.Config{}
-	var store storage.ISInterface = nil
+	var store storage.ISInterface[any] = nil
+	var guildCfg storage.ISInterface[storage.GuildConfig] = nil
 	tracer := otel.Tracer("test")
 	var metrics discordmetrics.DiscordMetrics = nil
 	var resolver guildconfig.GuildConfigResolver = nil
 
-	rd, err := NewRoundDiscord(ctx, session, publisher, nil, helper, cfg, store, tracer, metrics, resolver)
+	rd, err := NewRoundDiscord(ctx, session, publisher, nil, helper, cfg, store, guildCfg, resolver, tracer, metrics)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

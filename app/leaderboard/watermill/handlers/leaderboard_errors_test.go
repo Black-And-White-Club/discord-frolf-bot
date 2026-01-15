@@ -14,7 +14,7 @@ import (
 func TestHandleLeaderboardUpdateFailed(t *testing.T) {
 	tests := []struct {
 		name    string
-		payload interface{}
+		payload *leaderboardevents.LeaderboardUpdateFailedPayloadV1
 		wantErr bool
 	}{
 		{
@@ -56,7 +56,7 @@ func TestHandleLeaderboardUpdateFailed(t *testing.T) {
 func TestHandleLeaderboardRetrievalFailed(t *testing.T) {
 	tests := []struct {
 		name    string
-		payload interface{}
+		payload *leaderboardevents.GetLeaderboardFailedPayloadV1
 		wantErr bool
 	}{
 		{

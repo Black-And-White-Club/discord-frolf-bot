@@ -44,7 +44,8 @@ type signupManager struct {
 	helper              utils.Helpers
 	config              *config.Config // Deprecated: use guildConfigResolver for per-guild config
 	guildConfigResolver guildconfig.GuildConfigResolver
-	interactionStore    storage.ISInterface
+	interactionStore    storage.ISInterface[any]
+	guildConfigCache    storage.ISInterface[storage.GuildConfig]
 	tracer              trace.Tracer
 	metrics             discordmetrics.DiscordMetrics
 	operationWrapper    func(ctx context.Context, opName string, fn func(ctx context.Context) (SignupOperationResult, error)) (SignupOperationResult, error)
@@ -59,7 +60,8 @@ func NewSignupManager(
 	helper utils.Helpers,
 	config *config.Config, // Deprecated: use guildConfigResolver for per-guild config
 	guildConfigResolver guildconfig.GuildConfigResolver,
-	interactionStore storage.ISInterface,
+	interactionStore storage.ISInterface[any],
+	guildConfigCache storage.ISInterface[storage.GuildConfig],
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
 ) (SignupManager, error) {
@@ -75,6 +77,7 @@ func NewSignupManager(
 		config:              config, // Deprecated
 		guildConfigResolver: guildConfigResolver,
 		interactionStore:    interactionStore,
+		guildConfigCache:    guildConfigCache,
 		tracer:              tracer,
 		metrics:             metrics,
 		operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (SignupOperationResult, error)) (SignupOperationResult, error) {

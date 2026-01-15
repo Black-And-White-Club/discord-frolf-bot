@@ -26,3 +26,5 @@ reports/
 
 # Editor/backup files
 *.bak
+gob_audit.sh
+discord_mapping.md

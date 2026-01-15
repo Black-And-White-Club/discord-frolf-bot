@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/discordutils"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
@@ -76,18 +77,15 @@ func (crm *createRoundManager) UpdateInteractionResponse(ctx context.Context, co
 		if err := ctx.Err(); err != nil {
 			return CreateRoundOperationResult{Error: err}, err
 		}
-		interaction, found := crm.interactionStore.Get(correlationID)
-		if !found {
-			err := fmt.Errorf("no interaction found for correlation ID: %s", correlationID)
-			crm.logger.ErrorContext(ctx, err.Error(), attr.String("correlation_id", correlationID))
-			return CreateRoundOperationResult{Error: err}, nil
-		}
-
-		interactionObj, ok := interaction.(*discordgo.Interaction)
-		if !ok {
-			err := fmt.Errorf("stored interaction is not of type *discordgo.Interaction")
-			crm.logger.ErrorContext(ctx, err.Error(), attr.String("correlation_id", correlationID))
-			return CreateRoundOperationResult{Error: err}, nil
+		interactionObj, err := discordutils.GetInteraction(ctx, crm.interactionStore, correlationID)
+		if err != nil {
+			crm.logger.ErrorContext(ctx, "no interaction found for correlation ID", attr.String("correlation_id", correlationID), attr.Error(err))
+			// If the error indicates a type mismatch, return it so callers/tests can assert on that
+			if err.Error() == "interaction is not of the expected type" {
+				return CreateRoundOperationResult{Error: err}, nil
+			}
+			// Otherwise return a normalized "no interaction found" error for consumers/tests
+			return CreateRoundOperationResult{Error: fmt.Errorf("no interaction found for correlation ID: %s", correlationID)}, nil
 		}
 
 		var webhookEdit *discordgo.WebhookEdit
@@ -98,11 +96,14 @@ func (crm *createRoundManager) UpdateInteractionResponse(ctx context.Context, co
 			webhookEdit = &discordgo.WebhookEdit{Content: &message}
 		}
 
-		_, err := crm.session.InteractionResponseEdit(interactionObj, webhookEdit)
+		_, err = crm.session.InteractionResponseEdit(interactionObj, webhookEdit)
 		if err != nil {
 			crm.logger.ErrorContext(ctx, "Failed to update interaction response", attr.Error(err))
 			return CreateRoundOperationResult{Error: err}, nil
 		}
+
+		// Cleanup stored interaction after updating
+		crm.interactionStore.Delete(ctx, correlationID)
 
 		return CreateRoundOperationResult{Success: "interaction response updated"}, nil
 	})
@@ -117,21 +118,16 @@ func (crm *createRoundManager) UpdateInteractionResponseWithRetryButton(ctx cont
 		if err := ctx.Err(); err != nil {
 			return CreateRoundOperationResult{Error: err}, err
 		}
-		interaction, found := crm.interactionStore.Get(correlationID)
-		if !found {
-			err := fmt.Errorf("no interaction found for correlation ID: %s", correlationID)
-			crm.logger.ErrorContext(ctx, err.Error(), attr.String("correlation_id", correlationID))
-			return CreateRoundOperationResult{Error: err}, nil
+		interactionObj, err := discordutils.GetInteraction(ctx, crm.interactionStore, correlationID)
+		if err != nil {
+			crm.logger.ErrorContext(ctx, "no interaction found for correlation ID", attr.String("correlation_id", correlationID), attr.Error(err))
+			if err.Error() == "interaction is not of the expected type" {
+				return CreateRoundOperationResult{Error: err}, nil
+			}
+			return CreateRoundOperationResult{Error: fmt.Errorf("no interaction found for correlation ID: %s", correlationID)}, nil
 		}
 
-		interactionObj, ok := interaction.(*discordgo.Interaction)
-		if !ok {
-			err := fmt.Errorf("stored interaction is not of type *discordgo.Interaction")
-			crm.logger.ErrorContext(ctx, err.Error(), attr.String("correlation_id", correlationID))
-			return CreateRoundOperationResult{Error: err}, nil
-		}
-
-		_, err := crm.session.InteractionResponseEdit(interactionObj, &discordgo.WebhookEdit{
+		_, err = crm.session.InteractionResponseEdit(interactionObj, &discordgo.WebhookEdit{
 			Content: &message,
 			Components: &[]discordgo.MessageComponent{
 				discordgo.ActionsRow{Components: []discordgo.MessageComponent{

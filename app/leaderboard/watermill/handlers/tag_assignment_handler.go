@@ -6,19 +6,19 @@ import (
 
 	"github.com/google/uuid"
 
-	sharedleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
+	discordleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
-	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
+	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 )
 
 // HandleTagAssignRequest translates a Discord tag assignment request directly to a batch assignment.
 func (h *LeaderboardHandlers) HandleTagAssignRequest(ctx context.Context,
-	payload interface{}) ([]handlerwrapper.Result, error) {
+	payload *discordleaderboardevents.LeaderboardTagAssignRequestPayloadV1) ([]handlerwrapper.Result, error) {
 	h.Logger.InfoContext(ctx, "Handling TagAssignRequest")
 
-	discordPayload := payload.(*sharedleaderboardevents.LeaderboardTagAssignRequestPayloadV1)
+	discordPayload := payload
 
 	// Validation
 	if discordPayload.TargetUserID == "" || discordPayload.RequestorID == "" ||
@@ -79,10 +79,10 @@ func (h *LeaderboardHandlers) HandleTagAssignRequest(ctx context.Context,
 
 // HandleTagAssignedResponse translates a backend TagAssigned event to a Discord response.
 func (h *LeaderboardHandlers) HandleTagAssignedResponse(ctx context.Context,
-	payload interface{}) ([]handlerwrapper.Result, error) {
+	payload *leaderboardevents.LeaderboardTagAssignedPayloadV1) ([]handlerwrapper.Result, error) {
 	h.Logger.InfoContext(ctx, "Handling TagAssignedResponse")
 
-	backendPayload := payload.(*leaderboardevents.LeaderboardTagAssignedPayloadV1)
+	backendPayload := payload
 
 	// Extract correlation ID from context if available
 	correlationID := ""
@@ -121,7 +121,7 @@ func (h *LeaderboardHandlers) HandleTagAssignedResponse(ctx context.Context,
 		}
 	}
 
-	discordPayload := sharedleaderboardevents.LeaderboardTagAssignedPayloadV1{
+	discordPayload := discordleaderboardevents.LeaderboardTagAssignedPayloadV1{
 		TargetUserID: string(backendPayload.UserID),
 		TagNumber:    *backendPayload.TagNumber,
 		GuildID:      string(backendPayload.GuildID),
@@ -134,7 +134,7 @@ func (h *LeaderboardHandlers) HandleTagAssignedResponse(ctx context.Context,
 
 	return []handlerwrapper.Result{
 		{
-			Topic:   sharedleaderboardevents.LeaderboardTagAssignedV1,
+			Topic:   discordleaderboardevents.LeaderboardTagAssignedV1,
 			Payload: discordPayload,
 		},
 	}, nil
@@ -142,10 +142,10 @@ func (h *LeaderboardHandlers) HandleTagAssignedResponse(ctx context.Context,
 
 // HandleTagAssignFailedResponse translates a backend TagAssignmentFailed event to a Discord response.
 func (h *LeaderboardHandlers) HandleTagAssignFailedResponse(ctx context.Context,
-	payload interface{}) ([]handlerwrapper.Result, error) {
+	payload *leaderboardevents.LeaderboardTagAssignmentFailedPayloadV1) ([]handlerwrapper.Result, error) {
 	h.Logger.InfoContext(ctx, "Handling TagAssignFailedResponse")
 
-	backendPayload := payload.(*leaderboardevents.LeaderboardTagAssignmentFailedPayloadV1)
+	backendPayload := payload
 
 	// Extract correlation ID from context if available
 	correlationID := ""
@@ -184,7 +184,7 @@ func (h *LeaderboardHandlers) HandleTagAssignFailedResponse(ctx context.Context,
 		}
 	}
 
-	discordPayload := sharedleaderboardevents.LeaderboardTagAssignFailedPayloadV1{
+	discordPayload := discordleaderboardevents.LeaderboardTagAssignFailedPayloadV1{
 		TargetUserID: string(backendPayload.UserID),
 		TagNumber:    *backendPayload.TagNumber,
 		Reason:       backendPayload.Reason,
@@ -199,7 +199,7 @@ func (h *LeaderboardHandlers) HandleTagAssignFailedResponse(ctx context.Context,
 
 	return []handlerwrapper.Result{
 		{
-			Topic:   sharedleaderboardevents.LeaderboardTagAssignFailedV1,
+			Topic:   discordleaderboardevents.LeaderboardTagAssignFailedV1,
 			Payload: discordPayload,
 		},
 	}, nil

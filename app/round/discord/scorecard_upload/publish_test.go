@@ -28,16 +28,16 @@ func Test_scorecardUploadManager_publishScorecardURLEvent_SetsMetadataAndPayload
 	url := "https://udisc.com/scorecard?id=123"
 	notes := "notes"
 
-	pub.EXPECT().Publish(roundevents.ScorecardURLRequestedTopic, gomock.Any()).DoAndReturn(
+	pub.EXPECT().Publish(roundevents.ScorecardURLRequestedV1, gomock.Any()).DoAndReturn(
 		func(topic string, msgs ...*message.Message) error {
-			if topic != roundevents.ScorecardURLRequestedTopic {
+			if topic != roundevents.ScorecardURLRequestedV1 {
 				t.Fatalf("topic mismatch: got %q", topic)
 			}
 			if len(msgs) != 1 {
 				t.Fatalf("expected 1 message, got %d", len(msgs))
 			}
 			msg := msgs[0]
-			if msg.Metadata.Get("event_name") != roundevents.ScorecardURLRequestedTopic {
+			if msg.Metadata.Get("event_name") != roundevents.ScorecardURLRequestedV1 {
 				t.Fatalf("expected event_name metadata")
 			}
 			if msg.Metadata.Get("domain") != "scorecard" {
@@ -50,7 +50,7 @@ func Test_scorecardUploadManager_publishScorecardURLEvent_SetsMetadataAndPayload
 				t.Fatalf("expected import_id metadata")
 			}
 
-			var payload roundevents.ScorecardURLRequestedPayload
+			var payload roundevents.ScorecardURLRequestedPayloadV1
 			if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 				t.Fatalf("unmarshal payload: %v", err)
 			}
@@ -105,7 +105,7 @@ func Test_scorecardUploadManager_publishScorecardUploadEvent_PublishFailure_Retu
 	t.Cleanup(ctrl.Finish)
 
 	pub := eventbusmocks.NewMockEventBus(ctrl)
-	pub.EXPECT().Publish(roundevents.ScorecardUploadedTopic, gomock.Any()).Return(errors.New("publish failed")).Times(1)
+	pub.EXPECT().Publish(roundevents.ScorecardUploadedV1, gomock.Any()).Return(errors.New("publish failed")).Times(1)
 
 	m := &scorecardUploadManager{publisher: pub, logger: discardLogger()}
 	importID, err := m.publishScorecardUploadEvent(

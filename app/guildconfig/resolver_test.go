@@ -54,13 +54,13 @@ func TestNewResolver_PanicsOnInvalidConfig(t *testing.T) {
 			t.Fatalf("expected panic on invalid config")
 		}
 	}()
-	_ = NewResolver(context.Background(), fb, bad)
+	_ = NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), bad)
 }
 
 func TestNewResolver_OK(t *testing.T) {
 	fb := &fakeEventBus{}
 	cfg := &ResolverConfig{RequestTimeout: 5 * time.Millisecond, ResponseTimeout: 10 * time.Millisecond}
-	r := NewResolver(context.Background(), fb, cfg)
+	r := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), cfg)
 	if r.config != cfg {
 		t.Fatalf("resolver did not keep provided config")
 	}
@@ -68,7 +68,7 @@ func TestNewResolver_OK(t *testing.T) {
 
 func TestNewResolverWithDefaults(t *testing.T) {
 	fb := &fakeEventBus{}
-	r := NewResolverWithDefaults(context.Background(), fb)
+	r := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), DefaultResolverConfig())
 	def := DefaultResolverConfig()
 	if r.config.RequestTimeout != def.RequestTimeout || r.config.ResponseTimeout != def.ResponseTimeout {
 		t.Fatalf("defaults mismatch: got %+v want %+v", r.config, def)
@@ -78,7 +78,7 @@ func TestNewResolverWithDefaults(t *testing.T) {
 func TestResolver_GetGuildConfig_DelegatesToContextVersion(t *testing.T) {
 	fb := &fakeEventBus{}
 	cfg := &ResolverConfig{RequestTimeout: 5 * time.Millisecond, ResponseTimeout: 5 * time.Millisecond * 2}
-	r := NewResolver(context.Background(), fb, cfg)
+	r := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), cfg)
 	// Force a timeout path: no backend response -> expect ConfigLoadingError after response timeout
 	_, err := r.GetGuildConfig("g1")
 	if err == nil {
@@ -137,7 +137,7 @@ func TestResolver_GetGuildConfigWithContext_Scenarios(t *testing.T) {
 	for _, sc := range cases {
 		t.Run(sc.name, func(t *testing.T) {
 			fb := &fakeEventBus{publishErr: sc.publishErr}
-			r := NewResolver(context.Background(), fb, baseConfig)
+			r := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), baseConfig)
 			if sc.respond != nil {
 				sc.respond(r, guildID)
 			}
@@ -164,7 +164,7 @@ func TestResolver_GetGuildConfigWithContext_Scenarios(t *testing.T) {
 func TestResolver_coordinateConfigRequest_PublishErrorSetsTemporaryError(t *testing.T) {
 	fb := &fakeEventBus{publishErr: errors.New("publish fail")}
 	cfg := &ResolverConfig{RequestTimeout: 5 * time.Millisecond, ResponseTimeout: 10 * time.Millisecond}
-	r := NewResolver(context.Background(), fb, cfg)
+	r := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), cfg)
 	req := &configRequest{ready: make(chan struct{})}
 	r.inflightRequests.Store("g", req)
 	r.coordinateConfigRequest(context.Background(), "g", req)
@@ -177,7 +177,7 @@ func TestResolver_coordinateConfigRequest_PublishErrorSetsTemporaryError(t *test
 func TestResolver_HandleGuildConfigReceived_CompletesRequest(t *testing.T) {
 	fb := &fakeEventBus{}
 	cfg := &ResolverConfig{RequestTimeout: 5 * time.Millisecond, ResponseTimeout: 10 * time.Millisecond}
-	r := NewResolver(context.Background(), fb, cfg)
+	r := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), cfg)
 	req := &configRequest{ready: make(chan struct{})}
 	r.inflightRequests.Store("g", req)
 	gc := &storage.GuildConfig{GuildID: "g", SignupChannelID: "c", EventChannelID: "e", LeaderboardChannelID: "l", RegisteredRoleID: "r"}
@@ -191,7 +191,7 @@ func TestResolver_HandleGuildConfigReceived_CompletesRequest(t *testing.T) {
 func TestResolver_HandleGuildConfigRetrievalFailed_CompletesRequest(t *testing.T) {
 	fb := &fakeEventBus{}
 	cfg := &ResolverConfig{RequestTimeout: 5 * time.Millisecond, ResponseTimeout: 10 * time.Millisecond}
-	r := NewResolver(context.Background(), fb, cfg)
+	r := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), cfg)
 	req := &configRequest{ready: make(chan struct{})}
 	r.inflightRequests.Store("g", req)
 	r.HandleGuildConfigRetrievalFailed(context.Background(), "g", "temporary failure: x", false)
@@ -204,7 +204,7 @@ func TestResolver_HandleGuildConfigRetrievalFailed_CompletesRequest(t *testing.T
 func TestResolver_HandleBackendError_Classification(t *testing.T) {
 	fb := &fakeEventBus{}
 	cfg := &ResolverConfig{RequestTimeout: 5 * time.Millisecond, ResponseTimeout: 10 * time.Millisecond}
-	r := NewResolver(context.Background(), fb, cfg)
+	r := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), cfg)
 	req := &configRequest{ready: make(chan struct{})}
 	r.inflightRequests.Store("g", req)
 	r.HandleBackendError(context.Background(), "g", errors.New("guild not configured"))
@@ -217,7 +217,7 @@ func TestResolver_HandleBackendError_Classification(t *testing.T) {
 func TestResolver_IsGuildSetupComplete(t *testing.T) {
 	fb := &fakeEventBus{}
 	cfg := &ResolverConfig{RequestTimeout: 5 * time.Millisecond, ResponseTimeout: 15 * time.Millisecond}
-	r := NewResolver(context.Background(), fb, cfg)
+	r := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), cfg)
 	// Success path: respond with config
 	go func() {
 		time.Sleep(2 * time.Millisecond)
@@ -235,7 +235,7 @@ func TestResolver_IsGuildSetupComplete(t *testing.T) {
 func TestResolver_recordErrorAndMetrics(t *testing.T) {
 	fb := &fakeEventBus{}
 	cfg := &ResolverConfig{RequestTimeout: 5 * time.Millisecond, ResponseTimeout: 10 * time.Millisecond}
-	r := NewResolver(context.Background(), fb, cfg)
+	r := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), cfg)
 	r.recordError(context.Background(), "g", "temporary")
 	r.recordError(context.Background(), "g", "temporary")
 	r.recordError(context.Background(), "g", "permanent")
@@ -256,7 +256,7 @@ func TestResolver_recordErrorAndMetrics(t *testing.T) {
 
 func TestResolver_LogConfigEvent_NoPanic(t *testing.T) {
 	fb := &fakeEventBus{}
-	r := NewResolverWithDefaults(context.Background(), fb)
+	r := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), DefaultResolverConfig())
 	r.LogConfigEvent(context.Background(), "test_event", "g", slog.String("k", "v"))
 }
 

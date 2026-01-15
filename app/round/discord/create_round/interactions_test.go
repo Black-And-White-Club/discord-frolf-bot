@@ -284,7 +284,7 @@ func Test_createRoundManager_UpdateInteractionResponse(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockSession := discordmocks.NewMockSession(ctrl)
-	mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+	mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
 	logger := loggerfrolfbot.NoOpLogger
 	mockHelper := helpermocks.NewMockHelpers(ctrl)
 	mockConfig := &config.Config{}
@@ -321,8 +321,8 @@ func Test_createRoundManager_UpdateInteractionResponse(t *testing.T) {
 			name: "successful update without existing edit",
 			setup: func(ctx context.Context) {
 				mockInteractionStore.EXPECT().
-					Get("corr-123").
-					Return(&discordgo.Interaction{ID: "int-id"}, true).
+					Get(gomock.Any(), "corr-123").
+					Return(&discordgo.Interaction{ID: "int-id"}, nil).
 					Times(1)
 				mockSession.EXPECT().
 					InteractionResponseEdit(
@@ -330,6 +330,10 @@ func Test_createRoundManager_UpdateInteractionResponse(t *testing.T) {
 						gomock.Eq(&discordgo.WebhookEdit{Content: stringPtr("Updated message")}),
 					).
 					Return(&discordgo.Message{}, nil).
+					Times(1)
+				// Expect cleanup of stored interaction after successful update
+				mockInteractionStore.EXPECT().
+					Delete(gomock.Any(), "corr-123").
 					Times(1)
 			},
 			args: struct {
@@ -351,8 +355,8 @@ func Test_createRoundManager_UpdateInteractionResponse(t *testing.T) {
 			name: "successful update with existing edit",
 			setup: func(ctx context.Context) {
 				mockInteractionStore.EXPECT().
-					Get("corr-456").
-					Return(&discordgo.Interaction{ID: "int-id-2"}, true).
+					Get(gomock.Any(), "corr-456").
+					Return(&discordgo.Interaction{ID: "int-id-2"}, nil).
 					Times(1)
 				existingEmbeds := []*discordgo.MessageEmbed{{Title: "Old Embed"}}
 				expectedEdit := &discordgo.WebhookEdit{Content: stringPtr("New message"), Embeds: &existingEmbeds}
@@ -362,6 +366,10 @@ func Test_createRoundManager_UpdateInteractionResponse(t *testing.T) {
 						gomock.Eq(expectedEdit),
 					).
 					Return(&discordgo.Message{}, nil).
+					Times(1)
+				// Expect cleanup of stored interaction after successful update
+				mockInteractionStore.EXPECT().
+					Delete(gomock.Any(), "corr-456").
 					Times(1)
 			},
 			args: struct {
@@ -387,8 +395,8 @@ func Test_createRoundManager_UpdateInteractionResponse(t *testing.T) {
 			name: "interaction not found",
 			setup: func(ctx context.Context) {
 				mockInteractionStore.EXPECT().
-					Get("corr-not-found").
-					Return(nil, false).
+					Get(gomock.Any(), "corr-not-found").
+					Return(nil, errors.New("not found")).
 					Times(1)
 			},
 			args: struct {
@@ -410,8 +418,8 @@ func Test_createRoundManager_UpdateInteractionResponse(t *testing.T) {
 			name: "stored interaction is wrong type",
 			setup: func(ctx context.Context) {
 				mockInteractionStore.EXPECT().
-					Get("corr-wrong-type").
-					Return("not-an-interaction", true).
+					Get(gomock.Any(), "corr-wrong-type").
+					Return("not-an-interaction", nil).
 					Times(1)
 			},
 			args: struct {
@@ -426,15 +434,15 @@ func Test_createRoundManager_UpdateInteractionResponse(t *testing.T) {
 				edit:          nil,
 			},
 			wantSuccess: "",
-			wantErrMsg:  "stored interaction is not of type *discordgo.Interaction",
+			wantErrMsg:  "interaction is not of the expected type",
 			wantErrIs:   nil,
 		},
 		{
 			name: "interaction response edit fails",
 			setup: func(ctx context.Context) {
 				mockInteractionStore.EXPECT().
-					Get("corr-fail").
-					Return(&discordgo.Interaction{ID: "int-fail"}, true).
+					Get(gomock.Any(), "corr-fail").
+					Return(&discordgo.Interaction{ID: "int-fail"}, nil).
 					Times(1)
 				mockSession.EXPECT().
 					InteractionResponseEdit(
@@ -525,7 +533,7 @@ func Test_createRoundManager_UpdateInteractionResponseWithRetryButton(t *testing
 	defer ctrl.Finish()
 
 	mockSession := discordmocks.NewMockSession(ctrl)
-	mockInteractionStore := storagemocks.NewMockISInterface(ctrl)
+	mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
 	logger := loggerfrolfbot.NoOpLogger
 	mockHelper := helpermocks.NewMockHelpers(ctrl)
 	mockConfig := &config.Config{}
@@ -561,8 +569,8 @@ func Test_createRoundManager_UpdateInteractionResponseWithRetryButton(t *testing
 			name: "successful update with retry button",
 			setup: func(ctx context.Context) {
 				mockInteractionStore.EXPECT().
-					Get("corr-123").
-					Return(&discordgo.Interaction{ID: "int-id"}, true).
+					Get(gomock.Any(), "corr-123").
+					Return(&discordgo.Interaction{ID: "int-id"}, nil).
 					Times(1)
 				expectedEdit := &discordgo.WebhookEdit{
 					Content: stringPtr("Something went wrong"),
@@ -601,8 +609,8 @@ func Test_createRoundManager_UpdateInteractionResponseWithRetryButton(t *testing
 			name: "interaction not found",
 			setup: func(ctx context.Context) {
 				mockInteractionStore.EXPECT().
-					Get("corr-not-found").
-					Return(nil, false).
+					Get(gomock.Any(), "corr-not-found").
+					Return(nil, errors.New("not found")).
 					Times(1)
 			},
 			args: struct {
@@ -622,8 +630,8 @@ func Test_createRoundManager_UpdateInteractionResponseWithRetryButton(t *testing
 			name: "stored interaction is wrong type",
 			setup: func(ctx context.Context) {
 				mockInteractionStore.EXPECT().
-					Get("corr-wrong-type").
-					Return("not-an-interaction", true).
+					Get(gomock.Any(), "corr-wrong-type").
+					Return("not-an-interaction", nil).
 					Times(1)
 			},
 			args: struct {
@@ -636,15 +644,15 @@ func Test_createRoundManager_UpdateInteractionResponseWithRetryButton(t *testing
 				message:       "This also won't be sent",
 			},
 			wantSuccess: "",
-			wantErrMsg:  "stored interaction is not of type *discordgo.Interaction",
+			wantErrMsg:  "interaction is not of the expected type",
 			wantErrIs:   nil,
 		},
 		{
 			name: "interaction response edit fails",
 			setup: func(ctx context.Context) {
 				mockInteractionStore.EXPECT().
-					Get("corr-fail").
-					Return(&discordgo.Interaction{ID: "int-fail"}, true).
+					Get(gomock.Any(), "corr-fail").
+					Return(&discordgo.Interaction{ID: "int-fail"}, nil).
 					Times(1)
 				expectedEdit := &discordgo.WebhookEdit{
 					Content: stringPtr("Failed update"),

@@ -68,6 +68,18 @@ func (mr *MockGuildConfigResolverMockRecorder) GetGuildConfigWithContext(ctx, gu
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetGuildConfigWithContext", reflect.TypeOf((*MockGuildConfigResolver)(nil).GetGuildConfigWithContext), ctx, guildID)
 }
 
+// HandleBackendError mocks base method.
+func (m *MockGuildConfigResolver) HandleBackendError(ctx context.Context, guildID string, err error) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "HandleBackendError", ctx, guildID, err)
+}
+
+// HandleBackendError indicates an expected call of HandleBackendError.
+func (mr *MockGuildConfigResolverMockRecorder) HandleBackendError(ctx, guildID, err any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleBackendError", reflect.TypeOf((*MockGuildConfigResolver)(nil).HandleBackendError), ctx, guildID, err)
+}
+
 // HandleGuildConfigReceived mocks base method.
 func (m *MockGuildConfigResolver) HandleGuildConfigReceived(ctx context.Context, guildID string, config *storage.GuildConfig) {
 	m.ctrl.T.Helper()

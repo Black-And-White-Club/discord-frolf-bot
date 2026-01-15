@@ -24,7 +24,7 @@ func TestNewScoreHandlers(t *testing.T) {
 		tracer := noop.NewTracerProvider().Tracer("test")
 		cfg := &config.Config{}
 
-		handlers := NewScoreHandlers(logger, cfg, mockSession, mockHelpers, tracer, mockMetrics)
+		handlers := NewScoreHandlers(logger, cfg, mockSession, mockHelpers, nil, nil, tracer, mockMetrics)
 
 		if handlers == nil {
 			t.Fatalf("Expected non-nil ScoreHandlers")
@@ -52,6 +52,7 @@ func TestNewScoreHandlers(t *testing.T) {
 		}
 	})
 }
+
 // Note: wrapHandler and message.HandlerFunc-style handlers were removed as part
 // of the refactor to typed handlers. Tests for those wrappers are no longer
 // applicable; behavior is covered by the typed handler unit tests in

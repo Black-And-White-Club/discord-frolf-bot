@@ -20,7 +20,7 @@ import (
 func TestHandleBatchTagAssigned(t *testing.T) {
 	tests := []struct {
 		name    string
-		payload interface{}
+		payload *leaderboardevents.LeaderboardBatchTagAssignedPayloadV1
 		wantErr bool
 		setup   func(*gomock.Controller) (*leaderboarddiscord.MockLeaderboardDiscordInterface, *guildconfigmocks.MockGuildConfigResolver)
 	}{
@@ -97,10 +97,8 @@ func TestHandleBatchTagAssigned(t *testing.T) {
 
 			if !tt.wantErr {
 				// If payload had assignments we expect results; if empty assignments, empty results are valid
-				if p, ok := tt.payload.(*leaderboardevents.LeaderboardBatchTagAssignedPayloadV1); ok {
-					if len(p.Assignments) > 0 && len(results) == 0 {
-						t.Errorf("expected results for non-empty assignments, got empty slice")
-					}
+				if len(tt.payload.Assignments) > 0 && len(results) == 0 {
+					t.Errorf("expected results for non-empty assignments, got empty slice")
 				}
 			}
 		})
