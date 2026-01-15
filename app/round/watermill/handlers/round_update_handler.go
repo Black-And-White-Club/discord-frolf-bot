@@ -36,9 +36,10 @@ func (h *RoundHandlers) HandleRoundUpdateRequested(ctx context.Context, payload 
 			Topic:   roundevents.RoundUpdateRequestedV1,
 			Payload: backendPayload,
 			Metadata: map[string]string{
-				"channel_id": payload.ChannelID,
-				"message_id": payload.MessageID,
-				"user_id":    string(payload.UserID),
+				"discord_message_id": payload.MessageID,
+				"channel_id":         payload.ChannelID,
+				"message_id":         payload.MessageID,
+				"user_id":            string(payload.UserID),
 			},
 		},
 	}, nil
@@ -56,7 +57,11 @@ func (h *RoundHandlers) HandleRoundUpdated(ctx context.Context, payload *roundev
 
 	messageID, ok := ctx.Value("message_id").(string)
 	if !ok || messageID == "" {
-		return nil, fmt.Errorf("message ID is required for updating round embed")
+		if discordMessageID, ok := ctx.Value("discord_message_id").(string); ok && discordMessageID != "" {
+			messageID = discordMessageID
+		} else {
+			return nil, fmt.Errorf("message ID is required for updating round embed")
+		}
 	}
 
 	// Extract updated fields from round
