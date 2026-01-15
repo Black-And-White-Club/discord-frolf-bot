@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/discordutils"
@@ -170,9 +172,20 @@ func (h *GuildHandlers) HandleGuildConfigRetrievalFailed(ctx context.Context, pa
 
 	guildID := string(payload.GuildID)
 
-	h.Logger.ErrorContext(ctx, "Guild config retrieval failed",
-		attr.String("guild_id", guildID),
-		attr.String("reason", payload.Reason))
+	if h.GuildConfigResolver != nil {
+		h.GuildConfigResolver.HandleBackendError(ctx, guildID, errors.New(payload.Reason))
+	}
+
+	reasonLower := strings.ToLower(payload.Reason)
+	if strings.Contains(reasonLower, "not found") || strings.Contains(reasonLower, "not configured") {
+		h.Logger.WarnContext(ctx, "Guild config retrieval failed",
+			attr.String("guild_id", guildID),
+			attr.String("reason", payload.Reason))
+	} else {
+		h.Logger.ErrorContext(ctx, "Guild config retrieval failed",
+			attr.String("guild_id", guildID),
+			attr.String("reason", payload.Reason))
+	}
 
 	// The resolver will handle timeouts and retries automatically
 	// This is just an informational event

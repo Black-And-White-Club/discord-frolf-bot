@@ -335,7 +335,7 @@ func (gc *GuildConfigCache) SetRefreshCallback(callback func(guildID string)) {
 
 func (gc *GuildConfig) IsConfigured() bool {
 	if gc.IsPlaceholder {
-		return true
+		return false
 	}
 	return gc.GuildID != "" && gc.SignupChannelID != "" && gc.EventChannelID != "" &&
 		gc.LeaderboardChannelID != "" && gc.RegisteredRoleID != ""

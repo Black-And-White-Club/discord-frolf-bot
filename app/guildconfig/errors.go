@@ -105,7 +105,7 @@ func ClassifyBackendError(err error, guildID string) (isPermanent bool, reason s
 
 	// Permanent patterns
 	permanentPatterns := []string{
-		"guild not found", "guild does not exist", "not configured",
+		"guild not found", "guild does not exist", "not configured", "not found",
 		"invalid guild", "unauthorized", "forbidden", "setup required",
 	}
 

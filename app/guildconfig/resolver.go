@@ -202,6 +202,12 @@ func (r *Resolver) HandleGuildConfigRetrievalFailed(ctx context.Context, guildID
 	if isPermanent {
 		resultErr = &ConfigNotFoundError{GuildID: guildID, Reason: reason}
 		r.recordError(ctx, guildID, "permanent")
+		r.cache.Set(ctx, guildID, storage.GuildConfig{
+			GuildID:       guildID,
+			IsPlaceholder: true,
+			CachedAt:      time.Now(),
+			RefreshedAt:   time.Now(),
+		})
 	} else {
 		resultErr = &ConfigTemporaryError{GuildID: guildID, Reason: reason}
 		r.recordError(ctx, guildID, "temporary")
