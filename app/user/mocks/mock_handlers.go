@@ -13,8 +13,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	discorduserevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/user"
-	userevents "github.com/Black-And-White-Club/frolf-bot-shared/events/user"
+	user "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/user"
+	user0 "github.com/Black-And-White-Club/frolf-bot-shared/events/user"
 	handlerwrapper "github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -44,7 +44,7 @@ func (m *MockHandler) EXPECT() *MockHandlerMockRecorder {
 }
 
 // HandleAddRole mocks base method.
-func (m *MockHandler) HandleAddRole(ctx context.Context, payload *discorduserevents.AddRolePayloadV1) ([]handlerwrapper.Result, error) {
+func (m *MockHandler) HandleAddRole(ctx context.Context, payload *user.AddRolePayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleAddRole", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -59,7 +59,7 @@ func (mr *MockHandlerMockRecorder) HandleAddRole(ctx, payload any) *gomock.Call 
 }
 
 // HandleRoleAdded mocks base method.
-func (m *MockHandler) HandleRoleAdded(ctx context.Context, payload *discorduserevents.RoleAddedPayloadV1) ([]handlerwrapper.Result, error) {
+func (m *MockHandler) HandleRoleAdded(ctx context.Context, payload *user.RoleAddedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleRoleAdded", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -74,7 +74,7 @@ func (mr *MockHandlerMockRecorder) HandleRoleAdded(ctx, payload any) *gomock.Cal
 }
 
 // HandleRoleAdditionFailed mocks base method.
-func (m *MockHandler) HandleRoleAdditionFailed(ctx context.Context, payload *discorduserevents.RoleAdditionFailedPayloadV1) ([]handlerwrapper.Result, error) {
+func (m *MockHandler) HandleRoleAdditionFailed(ctx context.Context, payload *user.RoleAdditionFailedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleRoleAdditionFailed", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -89,7 +89,7 @@ func (mr *MockHandlerMockRecorder) HandleRoleAdditionFailed(ctx, payload any) *g
 }
 
 // HandleRoleUpdateButtonPress mocks base method.
-func (m *MockHandler) HandleRoleUpdateButtonPress(ctx context.Context, payload *discorduserevents.RoleUpdateButtonPressPayloadV1) ([]handlerwrapper.Result, error) {
+func (m *MockHandler) HandleRoleUpdateButtonPress(ctx context.Context, payload *user.RoleUpdateButtonPressPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleRoleUpdateButtonPress", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -104,7 +104,7 @@ func (mr *MockHandlerMockRecorder) HandleRoleUpdateButtonPress(ctx, payload any)
 }
 
 // HandleRoleUpdateCommand mocks base method.
-func (m *MockHandler) HandleRoleUpdateCommand(ctx context.Context, payload *discorduserevents.RoleUpdateCommandPayloadV1) ([]handlerwrapper.Result, error) {
+func (m *MockHandler) HandleRoleUpdateCommand(ctx context.Context, payload *user.RoleUpdateCommandPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleRoleUpdateCommand", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -119,7 +119,7 @@ func (mr *MockHandlerMockRecorder) HandleRoleUpdateCommand(ctx, payload any) *go
 }
 
 // HandleRoleUpdateFailed mocks base method.
-func (m *MockHandler) HandleRoleUpdateFailed(ctx context.Context, payload *userevents.UserRoleUpdateFailedPayloadV1) ([]handlerwrapper.Result, error) {
+func (m *MockHandler) HandleRoleUpdateFailed(ctx context.Context, payload *user0.UserRoleUpdateFailedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleRoleUpdateFailed", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -134,7 +134,7 @@ func (mr *MockHandlerMockRecorder) HandleRoleUpdateFailed(ctx, payload any) *gom
 }
 
 // HandleRoleUpdated mocks base method.
-func (m *MockHandler) HandleRoleUpdated(ctx context.Context, payload *userevents.UserRoleUpdatedPayloadV1) ([]handlerwrapper.Result, error) {
+func (m *MockHandler) HandleRoleUpdated(ctx context.Context, payload *user0.UserRoleUpdatedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleRoleUpdated", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -149,7 +149,7 @@ func (mr *MockHandlerMockRecorder) HandleRoleUpdated(ctx, payload any) *gomock.C
 }
 
 // HandleUserCreated mocks base method.
-func (m *MockHandler) HandleUserCreated(ctx context.Context, payload *userevents.UserCreatedPayloadV1) ([]handlerwrapper.Result, error) {
+func (m *MockHandler) HandleUserCreated(ctx context.Context, payload *user0.UserCreatedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleUserCreated", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)
@@ -164,7 +164,7 @@ func (mr *MockHandlerMockRecorder) HandleUserCreated(ctx, payload any) *gomock.C
 }
 
 // HandleUserCreationFailed mocks base method.
-func (m *MockHandler) HandleUserCreationFailed(ctx context.Context, payload *userevents.UserCreationFailedPayloadV1) ([]handlerwrapper.Result, error) {
+func (m *MockHandler) HandleUserCreationFailed(ctx context.Context, payload *user0.UserCreationFailedPayloadV1) ([]handlerwrapper.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleUserCreationFailed", ctx, payload)
 	ret0, _ := ret[0].([]handlerwrapper.Result)

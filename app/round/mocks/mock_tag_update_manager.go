@@ -13,9 +13,9 @@ import (
 	context "context"
 	reflect "reflect"
 
-	tagupdates "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/tag_updates"
-	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
-	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
+	tag_updates "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/tag_updates"
+	round "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
+	shared "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -44,10 +44,10 @@ func (m *MockTagUpdateManager) EXPECT() *MockTagUpdateManagerMockRecorder {
 }
 
 // UpdateDiscordEmbedsWithTagChanges mocks base method.
-func (m *MockTagUpdateManager) UpdateDiscordEmbedsWithTagChanges(ctx context.Context, payload roundevents.TagsUpdatedForScheduledRoundsPayloadV1, tagUpdates map[sharedtypes.DiscordID]*sharedtypes.TagNumber) (tagupdates.TagUpdateOperationResult, error) {
+func (m *MockTagUpdateManager) UpdateDiscordEmbedsWithTagChanges(ctx context.Context, payload round.TagsUpdatedForScheduledRoundsPayloadV1, tagUpdates map[shared.DiscordID]*shared.TagNumber) (tag_updates.TagUpdateOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateDiscordEmbedsWithTagChanges", ctx, payload, tagUpdates)
-	ret0, _ := ret[0].(tagupdates.TagUpdateOperationResult)
+	ret0, _ := ret[0].(tag_updates.TagUpdateOperationResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -59,10 +59,10 @@ func (mr *MockTagUpdateManagerMockRecorder) UpdateDiscordEmbedsWithTagChanges(ct
 }
 
 // UpdateTagsInEmbed mocks base method.
-func (m *MockTagUpdateManager) UpdateTagsInEmbed(ctx context.Context, channelID, messageID string, tagUpdates map[sharedtypes.DiscordID]*sharedtypes.TagNumber) (tagupdates.TagUpdateOperationResult, error) {
+func (m *MockTagUpdateManager) UpdateTagsInEmbed(ctx context.Context, channelID, messageID string, tagUpdates map[shared.DiscordID]*shared.TagNumber) (tag_updates.TagUpdateOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateTagsInEmbed", ctx, channelID, messageID, tagUpdates)
-	ret0, _ := ret[0].(tagupdates.TagUpdateOperationResult)
+	ret0, _ := ret[0].(tag_updates.TagUpdateOperationResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

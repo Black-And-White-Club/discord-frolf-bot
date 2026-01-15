@@ -13,9 +13,9 @@ import (
 	context "context"
 	reflect "reflect"
 
-	updateround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/update_round"
-	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
-	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
+	update_round "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/update_round"
+	round "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
+	shared "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	discordgo "github.com/bwmarrin/discordgo"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -45,10 +45,10 @@ func (m *MockUpdateRoundManager) EXPECT() *MockUpdateRoundManagerMockRecorder {
 }
 
 // HandleEditRoundButton mocks base method.
-func (m *MockUpdateRoundManager) HandleEditRoundButton(ctx context.Context, i *discordgo.InteractionCreate) (updateround.UpdateRoundOperationResult, error) {
+func (m *MockUpdateRoundManager) HandleEditRoundButton(ctx context.Context, i *discordgo.InteractionCreate) (update_round.UpdateRoundOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleEditRoundButton", ctx, i)
-	ret0, _ := ret[0].(updateround.UpdateRoundOperationResult)
+	ret0, _ := ret[0].(update_round.UpdateRoundOperationResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -60,10 +60,10 @@ func (mr *MockUpdateRoundManagerMockRecorder) HandleEditRoundButton(ctx, i any) 
 }
 
 // HandleUpdateRoundModalCancel mocks base method.
-func (m *MockUpdateRoundManager) HandleUpdateRoundModalCancel(ctx context.Context, i *discordgo.InteractionCreate) (updateround.UpdateRoundOperationResult, error) {
+func (m *MockUpdateRoundManager) HandleUpdateRoundModalCancel(ctx context.Context, i *discordgo.InteractionCreate) (update_round.UpdateRoundOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleUpdateRoundModalCancel", ctx, i)
-	ret0, _ := ret[0].(updateround.UpdateRoundOperationResult)
+	ret0, _ := ret[0].(update_round.UpdateRoundOperationResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -75,10 +75,10 @@ func (mr *MockUpdateRoundManagerMockRecorder) HandleUpdateRoundModalCancel(ctx, 
 }
 
 // HandleUpdateRoundModalSubmit mocks base method.
-func (m *MockUpdateRoundManager) HandleUpdateRoundModalSubmit(ctx context.Context, i *discordgo.InteractionCreate) (updateround.UpdateRoundOperationResult, error) {
+func (m *MockUpdateRoundManager) HandleUpdateRoundModalSubmit(ctx context.Context, i *discordgo.InteractionCreate) (update_round.UpdateRoundOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleUpdateRoundModalSubmit", ctx, i)
-	ret0, _ := ret[0].(updateround.UpdateRoundOperationResult)
+	ret0, _ := ret[0].(update_round.UpdateRoundOperationResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -90,10 +90,10 @@ func (mr *MockUpdateRoundManagerMockRecorder) HandleUpdateRoundModalSubmit(ctx, 
 }
 
 // SendUpdateRoundModal mocks base method.
-func (m *MockUpdateRoundManager) SendUpdateRoundModal(ctx context.Context, i *discordgo.InteractionCreate, roundID sharedtypes.RoundID) (updateround.UpdateRoundOperationResult, error) {
+func (m *MockUpdateRoundManager) SendUpdateRoundModal(ctx context.Context, i *discordgo.InteractionCreate, roundID shared.RoundID) (update_round.UpdateRoundOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SendUpdateRoundModal", ctx, i, roundID)
-	ret0, _ := ret[0].(updateround.UpdateRoundOperationResult)
+	ret0, _ := ret[0].(update_round.UpdateRoundOperationResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -105,10 +105,10 @@ func (mr *MockUpdateRoundManagerMockRecorder) SendUpdateRoundModal(ctx, i, round
 }
 
 // UpdateRoundEventEmbed mocks base method.
-func (m *MockUpdateRoundManager) UpdateRoundEventEmbed(ctx context.Context, channelID, messageID string, title *roundtypes.Title, description *roundtypes.Description, startTime *sharedtypes.StartTime, location *roundtypes.Location) (updateround.UpdateRoundOperationResult, error) {
+func (m *MockUpdateRoundManager) UpdateRoundEventEmbed(ctx context.Context, channelID, messageID string, title *round.Title, description *round.Description, startTime *shared.StartTime, location *round.Location) (update_round.UpdateRoundOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateRoundEventEmbed", ctx, channelID, messageID, title, description, startTime, location)
-	ret0, _ := ret[0].(updateround.UpdateRoundOperationResult)
+	ret0, _ := ret[0].(update_round.UpdateRoundOperationResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

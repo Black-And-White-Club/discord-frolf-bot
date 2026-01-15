@@ -316,6 +316,16 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 
 	discordgoSession.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
 		bot.Logger.Info("Bot is ready", attr.Int("guilds", len(r.Guilds)))
+		for _, g := range r.Guilds {
+			if g == nil || g.ID == "" {
+				continue
+			}
+			if err := bot.requestGuildConfiguration(ctx, g.ID, g.Name); err != nil {
+				bot.Logger.WarnContext(ctx, "Failed to warm guild configuration",
+					attr.String("guild_id", g.ID),
+					attr.Error(err))
+			}
+		}
 		commandSyncOnce.Do(func() {
 			go bot.syncGuildCommands(ctx, r.Guilds)
 		})
@@ -603,6 +613,14 @@ func (bot *DiscordBot) Shutdown(ctx context.Context) error {
 
 // requestGuildConfiguration requests configuration for a guild from the backend
 func (bot *DiscordBot) requestGuildConfiguration(ctx context.Context, guildID, guildName string) error {
+	if bot.GuildConfigResolver != nil {
+		bot.GuildConfigResolver.RequestGuildConfigAsync(ctx, guildID)
+		bot.Logger.InfoContext(ctx, "Requested guild config retrieval",
+			attr.String("guild_id", guildID),
+			attr.String("guild_name", guildName))
+		return nil
+	}
+
 	// Create guild config retrieval request payload (best practice: only guild_id)
 	payload := &guildevents.GuildConfigRetrievalRequestedPayloadV1{
 		GuildID: sharedtypes.GuildID(guildID),

@@ -27,6 +27,28 @@ func (h *GuildHandlers) HandleGuildConfigUpdated(ctx context.Context, payload *g
 		attr.String("guild_id", guildID),
 		attr.String("updated_fields", fmt.Sprintf("%v", payload.UpdatedFields)))
 
+	convertedConfig := convertGuildConfigFromShared(&payload.Config)
+	if h.GuildConfigResolver != nil && convertedConfig != nil {
+		h.GuildConfigResolver.HandleGuildConfigReceived(ctx, guildID, convertedConfig)
+	}
+
+	if h.Config != nil && convertedConfig != nil {
+		h.Config.UpdateGuildConfig(
+			convertedConfig.GuildID,
+			convertedConfig.SignupChannelID,
+			convertedConfig.EventChannelID,
+			convertedConfig.LeaderboardChannelID,
+			convertedConfig.SignupMessageID,
+			convertedConfig.RegisteredRoleID,
+			convertedConfig.AdminRoleID,
+			convertedConfig.RoleMappings,
+		)
+	}
+
+	if h.SignupManager != nil && convertedConfig != nil && convertedConfig.SignupChannelID != "" {
+		h.SignupManager.TrackChannelForReactions(convertedConfig.SignupChannelID)
+	}
+
 	// 1. UI FEEDBACK: Notify the admin that the update was successful
 	if h.InteractionStore != nil && h.Session != nil {
 		if interaction, err := discordutils.GetInteraction(ctx, h.InteractionStore, guildID); err == nil {

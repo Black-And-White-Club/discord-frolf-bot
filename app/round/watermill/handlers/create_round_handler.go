@@ -96,6 +96,8 @@ func (h *RoundHandlers) HandleRoundCreated(ctx context.Context, payload *roundev
 			Payload: updatePayload,
 			Metadata: map[string]string{
 				"discord_message_id": discordMessageID,
+				// Use idempotency for this specific publish only; do not reuse this key across different event types.
+				"idempotency_key":   fmt.Sprintf("round-event-message-id-update:%s:%s", roundID.String(), discordMessageID),
 			},
 		},
 	}, nil

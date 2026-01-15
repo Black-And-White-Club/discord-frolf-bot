@@ -14,7 +14,7 @@ import (
 	reflect "reflect"
 
 	role "github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord/role"
-	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
+	shared "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	discordgo "github.com/bwmarrin/discordgo"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -44,7 +44,7 @@ func (m *MockRoleManager) EXPECT() *MockRoleManagerMockRecorder {
 }
 
 // AddRoleToUser mocks base method.
-func (m *MockRoleManager) AddRoleToUser(ctx context.Context, guildID string, userID sharedtypes.DiscordID, roleID string) (role.RoleOperationResult, error) {
+func (m *MockRoleManager) AddRoleToUser(ctx context.Context, guildID string, userID shared.DiscordID, roleID string) (role.RoleOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddRoleToUser", ctx, guildID, userID, roleID)
 	ret0, _ := ret[0].(role.RoleOperationResult)
@@ -119,7 +119,7 @@ func (mr *MockRoleManagerMockRecorder) HandleRoleRequestCommand(ctx, i any) *gom
 }
 
 // RespondToRoleButtonPress mocks base method.
-func (m *MockRoleManager) RespondToRoleButtonPress(ctx context.Context, interactionID, interactionToken string, requesterID sharedtypes.DiscordID, selectedRole string, targetUserID sharedtypes.DiscordID) (role.RoleOperationResult, error) {
+func (m *MockRoleManager) RespondToRoleButtonPress(ctx context.Context, interactionID, interactionToken string, requesterID shared.DiscordID, selectedRole string, targetUserID shared.DiscordID) (role.RoleOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RespondToRoleButtonPress", ctx, interactionID, interactionToken, requesterID, selectedRole, targetUserID)
 	ret0, _ := ret[0].(role.RoleOperationResult)
@@ -134,7 +134,7 @@ func (mr *MockRoleManagerMockRecorder) RespondToRoleButtonPress(ctx, interaction
 }
 
 // RespondToRoleRequest mocks base method.
-func (m *MockRoleManager) RespondToRoleRequest(ctx context.Context, interactionID, interactionToken string, targetUserID sharedtypes.DiscordID) (role.RoleOperationResult, error) {
+func (m *MockRoleManager) RespondToRoleRequest(ctx context.Context, interactionID, interactionToken string, targetUserID shared.DiscordID) (role.RoleOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RespondToRoleRequest", ctx, interactionID, interactionToken, targetUserID)
 	ret0, _ := ret[0].(role.RoleOperationResult)

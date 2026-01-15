@@ -94,6 +94,7 @@ func (s *stubResolver) GetGuildConfigWithContext(_ context.Context, _ string) (*
 	}
 	return s.cfg, nil
 }
+func (s *stubResolver) RequestGuildConfigAsync(_ context.Context, _ string) {}
 func (s *stubResolver) IsGuildSetupComplete(_ string) bool { return s.setupComplete }
 func (s *stubResolver) HandleGuildConfigReceived(_ context.Context, _ string, _ *storage.GuildConfig) {
 }

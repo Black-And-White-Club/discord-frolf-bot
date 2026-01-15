@@ -40,6 +40,8 @@ type Resolver struct {
 	config           *ResolverConfig
 	errorMetrics     *ConfigErrorMetrics
 	errorMutex       sync.RWMutex
+	retryMutex       sync.Mutex
+	lastRetry        map[string]time.Time
 }
 
 // NewResolver creates a resolver and validates its configuration.
@@ -58,6 +60,7 @@ func NewResolver(ctx context.Context, eventBus eventbus.EventBus, cache storage.
 		cache:        cache,
 		config:       config,
 		errorMetrics: &ConfigErrorMetrics{ErrorsByType: make(map[string]int64), ErrorsByGuild: make(map[string]int64)},
+		lastRetry:    make(map[string]time.Time),
 	}
 }
 
@@ -106,6 +109,28 @@ func (r *Resolver) GetGuildConfigWithContext(ctx context.Context, guildID string
 	}
 }
 
+// RequestGuildConfigAsync triggers a config retrieval request without blocking on the response.
+func (r *Resolver) RequestGuildConfigAsync(ctx context.Context, guildID string) {
+	if guildID == "" {
+		return
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if _, err := r.cache.Get(ctx, guildID); err == nil {
+		return
+	}
+
+	req := &configRequest{ready: make(chan struct{})}
+	actual, loaded := r.inflightRequests.LoadOrStore(guildID, req)
+	actualReq := actual.(*configRequest)
+	if loaded {
+		return
+	}
+
+	go r.coordinateConfigRequest(ctx, guildID, actualReq)
+}
+
 // coordinateConfigRequest handles the mechanics of publishing the event and waiting for the async response.
 func (r *Resolver) coordinateConfigRequest(ctx context.Context, guildID string, req *configRequest) {
 	defer func() {
@@ -150,6 +175,7 @@ func (r *Resolver) coordinateConfigRequest(ctx context.Context, guildID string, 
 	case <-responseCtx.Done():
 		req.err = &ConfigLoadingError{GuildID: guildID}
 		slog.WarnContext(responseCtx, "Backend response timeout", attr.String("guild_id", guildID))
+		r.scheduleRetry(responseCtx, guildID)
 	}
 }
 
@@ -179,6 +205,7 @@ func (r *Resolver) HandleGuildConfigRetrievalFailed(ctx context.Context, guildID
 	} else {
 		resultErr = &ConfigTemporaryError{GuildID: guildID, Reason: reason}
 		r.recordError(ctx, guildID, "temporary")
+		r.scheduleRetry(ctx, guildID)
 	}
 
 	if reqInterface, exists := r.inflightRequests.LoadAndDelete(guildID); exists {
@@ -187,6 +214,47 @@ func (r *Resolver) HandleGuildConfigRetrievalFailed(ctx context.Context, guildID
 			close(req.ready)
 		}
 	}
+}
+
+func (r *Resolver) scheduleRetry(ctx context.Context, guildID string) {
+	const retryDelay = 5 * time.Second
+
+	if guildID == "" {
+		return
+	}
+	if !r.markRetry(guildID, retryDelay) {
+		return
+	}
+	if ctx == nil || ctx.Err() != nil {
+		ctx = context.Background()
+	}
+
+	go func() {
+		timer := time.NewTimer(retryDelay)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return
+		case <-timer.C:
+		}
+
+		r.RequestGuildConfigAsync(context.Background(), guildID)
+	}()
+}
+
+func (r *Resolver) markRetry(guildID string, retryDelay time.Duration) bool {
+	now := time.Now()
+
+	r.retryMutex.Lock()
+	defer r.retryMutex.Unlock()
+
+	last, exists := r.lastRetry[guildID]
+	if exists && now.Sub(last) < retryDelay {
+		return false
+	}
+
+	r.lastRetry[guildID] = now
+	return true
 }
 
 // ClearInflightRequest invalidates both the inflight status and the local cache entry.

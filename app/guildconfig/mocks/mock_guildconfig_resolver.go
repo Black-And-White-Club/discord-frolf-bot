@@ -105,3 +105,15 @@ func (mr *MockGuildConfigResolverMockRecorder) IsGuildSetupComplete(guildID any)
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsGuildSetupComplete", reflect.TypeOf((*MockGuildConfigResolver)(nil).IsGuildSetupComplete), guildID)
 }
+
+// RequestGuildConfigAsync mocks base method.
+func (m *MockGuildConfigResolver) RequestGuildConfigAsync(ctx context.Context, guildID string) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "RequestGuildConfigAsync", ctx, guildID)
+}
+
+// RequestGuildConfigAsync indicates an expected call of RequestGuildConfigAsync.
+func (mr *MockGuildConfigResolverMockRecorder) RequestGuildConfigAsync(ctx, guildID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RequestGuildConfigAsync", reflect.TypeOf((*MockGuildConfigResolver)(nil).RequestGuildConfigAsync), ctx, guildID)
+}

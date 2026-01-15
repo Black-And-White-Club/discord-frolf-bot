@@ -13,8 +13,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	startround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/start_round"
-	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
+	start_round "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/start_round"
+	round "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	discordgo "github.com/bwmarrin/discordgo"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -44,10 +44,10 @@ func (m *MockStartRoundManager) EXPECT() *MockStartRoundManagerMockRecorder {
 }
 
 // TransformRoundToScorecard mocks base method.
-func (m *MockStartRoundManager) TransformRoundToScorecard(ctx context.Context, payload *roundevents.DiscordRoundStartPayloadV1, existingEmbed *discordgo.MessageEmbed) (startround.StartRoundOperationResult, error) {
+func (m *MockStartRoundManager) TransformRoundToScorecard(ctx context.Context, payload *round.DiscordRoundStartPayloadV1, existingEmbed *discordgo.MessageEmbed) (start_round.StartRoundOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "TransformRoundToScorecard", ctx, payload, existingEmbed)
-	ret0, _ := ret[0].(startround.StartRoundOperationResult)
+	ret0, _ := ret[0].(start_round.StartRoundOperationResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -59,10 +59,10 @@ func (mr *MockStartRoundManagerMockRecorder) TransformRoundToScorecard(ctx, payl
 }
 
 // UpdateRoundToScorecard mocks base method.
-func (m *MockStartRoundManager) UpdateRoundToScorecard(ctx context.Context, channelID, messageID string, payload *roundevents.DiscordRoundStartPayloadV1) (startround.StartRoundOperationResult, error) {
+func (m *MockStartRoundManager) UpdateRoundToScorecard(ctx context.Context, channelID, messageID string, payload *round.DiscordRoundStartPayloadV1) (start_round.StartRoundOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateRoundToScorecard", ctx, channelID, messageID, payload)
-	ret0, _ := ret[0].(startround.StartRoundOperationResult)
+	ret0, _ := ret[0].(start_round.StartRoundOperationResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

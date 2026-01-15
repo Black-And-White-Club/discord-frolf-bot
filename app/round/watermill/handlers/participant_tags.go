@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
+	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
@@ -43,7 +44,15 @@ func (h *RoundHandlers) HandleRoundParticipantsUpdated(ctx context.Context, payl
 	// Get guild config to find the event channel ID
 	guildConfig, err := h.GuildConfigResolver.GetGuildConfigWithContext(ctx, string(payload.GuildID))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get guild config for guild %s: %w", payload.GuildID, err)
+		h.Logger.WarnContext(ctx, "Failed to get guild config for round participants update",
+			attr.String("guild_id", string(payload.GuildID)),
+			attr.Error(err))
+		return []handlerwrapper.Result{}, nil
+	}
+	if guildConfig == nil || guildConfig.EventChannelID == "" {
+		h.Logger.WarnContext(ctx, "Missing event channel ID for round participants update",
+			attr.String("guild_id", string(payload.GuildID)))
+		return []handlerwrapper.Result{}, nil
 	}
 
 	// Categorize participants by response

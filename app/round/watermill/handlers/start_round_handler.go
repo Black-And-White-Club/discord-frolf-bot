@@ -16,6 +16,9 @@ func (h *RoundHandlers) HandleRoundStarted(ctx context.Context, payload *roundev
 
 	// Use the channel ID from the payload instead of config
 	channelID := payload.DiscordChannelID
+	if channelID == "" && payload.Config != nil {
+		channelID = payload.Config.EventChannelID
+	}
 	if channelID == "" {
 		// Fallback to config if payload channel ID is empty
 		channelID = h.Config.GetEventChannelID()

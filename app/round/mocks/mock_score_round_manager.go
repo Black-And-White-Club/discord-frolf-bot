@@ -13,9 +13,9 @@ import (
 	context "context"
 	reflect "reflect"
 
-	scoreround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/score_round"
-	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
-	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
+	score_round "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/score_round"
+	round "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
+	shared "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	discordgo "github.com/bwmarrin/discordgo"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -45,10 +45,10 @@ func (m *MockScoreRoundManager) EXPECT() *MockScoreRoundManagerMockRecorder {
 }
 
 // AddLateParticipantToScorecard mocks base method.
-func (m *MockScoreRoundManager) AddLateParticipantToScorecard(ctx context.Context, channelID, messageID string, participants []roundtypes.Participant) (scoreround.ScoreRoundOperationResult, error) {
+func (m *MockScoreRoundManager) AddLateParticipantToScorecard(ctx context.Context, channelID, messageID string, participants []round.Participant) (score_round.ScoreRoundOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddLateParticipantToScorecard", ctx, channelID, messageID, participants)
-	ret0, _ := ret[0].(scoreround.ScoreRoundOperationResult)
+	ret0, _ := ret[0].(score_round.ScoreRoundOperationResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -60,10 +60,10 @@ func (mr *MockScoreRoundManagerMockRecorder) AddLateParticipantToScorecard(ctx, 
 }
 
 // HandleScoreButton mocks base method.
-func (m *MockScoreRoundManager) HandleScoreButton(ctx context.Context, i *discordgo.InteractionCreate) (scoreround.ScoreRoundOperationResult, error) {
+func (m *MockScoreRoundManager) HandleScoreButton(ctx context.Context, i *discordgo.InteractionCreate) (score_round.ScoreRoundOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleScoreButton", ctx, i)
-	ret0, _ := ret[0].(scoreround.ScoreRoundOperationResult)
+	ret0, _ := ret[0].(score_round.ScoreRoundOperationResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -75,10 +75,10 @@ func (mr *MockScoreRoundManagerMockRecorder) HandleScoreButton(ctx, i any) *gomo
 }
 
 // HandleScoreSubmission mocks base method.
-func (m *MockScoreRoundManager) HandleScoreSubmission(ctx context.Context, i *discordgo.InteractionCreate) (scoreround.ScoreRoundOperationResult, error) {
+func (m *MockScoreRoundManager) HandleScoreSubmission(ctx context.Context, i *discordgo.InteractionCreate) (score_round.ScoreRoundOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleScoreSubmission", ctx, i)
-	ret0, _ := ret[0].(scoreround.ScoreRoundOperationResult)
+	ret0, _ := ret[0].(score_round.ScoreRoundOperationResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -90,10 +90,10 @@ func (mr *MockScoreRoundManagerMockRecorder) HandleScoreSubmission(ctx, i any) *
 }
 
 // SendScoreUpdateConfirmation mocks base method.
-func (m *MockScoreRoundManager) SendScoreUpdateConfirmation(ctx context.Context, channelID string, userID sharedtypes.DiscordID, score *sharedtypes.Score) (scoreround.ScoreRoundOperationResult, error) {
+func (m *MockScoreRoundManager) SendScoreUpdateConfirmation(ctx context.Context, channelID string, userID shared.DiscordID, score *shared.Score) (score_round.ScoreRoundOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SendScoreUpdateConfirmation", ctx, channelID, userID, score)
-	ret0, _ := ret[0].(scoreround.ScoreRoundOperationResult)
+	ret0, _ := ret[0].(score_round.ScoreRoundOperationResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -105,10 +105,10 @@ func (mr *MockScoreRoundManagerMockRecorder) SendScoreUpdateConfirmation(ctx, ch
 }
 
 // SendScoreUpdateError mocks base method.
-func (m *MockScoreRoundManager) SendScoreUpdateError(ctx context.Context, userID sharedtypes.DiscordID, errorMsg string) (scoreround.ScoreRoundOperationResult, error) {
+func (m *MockScoreRoundManager) SendScoreUpdateError(ctx context.Context, userID shared.DiscordID, errorMsg string) (score_round.ScoreRoundOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SendScoreUpdateError", ctx, userID, errorMsg)
-	ret0, _ := ret[0].(scoreround.ScoreRoundOperationResult)
+	ret0, _ := ret[0].(score_round.ScoreRoundOperationResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -120,10 +120,10 @@ func (mr *MockScoreRoundManagerMockRecorder) SendScoreUpdateError(ctx, userID, e
 }
 
 // UpdateScoreEmbed mocks base method.
-func (m *MockScoreRoundManager) UpdateScoreEmbed(ctx context.Context, channelID, messageID string, userID sharedtypes.DiscordID, score *sharedtypes.Score) (scoreround.ScoreRoundOperationResult, error) {
+func (m *MockScoreRoundManager) UpdateScoreEmbed(ctx context.Context, channelID, messageID string, userID shared.DiscordID, score *shared.Score) (score_round.ScoreRoundOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateScoreEmbed", ctx, channelID, messageID, userID, score)
-	ret0, _ := ret[0].(scoreround.ScoreRoundOperationResult)
+	ret0, _ := ret[0].(score_round.ScoreRoundOperationResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

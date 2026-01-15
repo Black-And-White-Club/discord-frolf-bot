@@ -12,8 +12,15 @@ import (
 
 func (m *startRoundManager) UpdateRoundToScorecard(ctx context.Context, channelID, messageID string, payload *roundevents.DiscordRoundStartPayloadV1) (StartRoundOperationResult, error) {
 	return m.operationWrapper(ctx, "UpdateRoundToScorecard", func(ctx context.Context) (StartRoundOperationResult, error) {
-		// Multi-tenant: resolve channel ID from guild config if not provided
+		// Multi-tenant: resolve channel ID from payload/config before backend lookup
 		resolvedChannelID := channelID
+		if resolvedChannelID == "" && payload != nil {
+			if payload.DiscordChannelID != "" {
+				resolvedChannelID = payload.DiscordChannelID
+			} else if payload.Config != nil && payload.Config.EventChannelID != "" {
+				resolvedChannelID = payload.Config.EventChannelID
+			}
+		}
 		if resolvedChannelID == "" && payload != nil && payload.GuildID != "" {
 			cfg, err := m.guildConfigResolver.GetGuildConfigWithContext(ctx, string(payload.GuildID))
 			if err == nil && cfg != nil && cfg.EventChannelID != "" {
