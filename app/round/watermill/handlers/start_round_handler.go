@@ -21,13 +21,13 @@ func (h *RoundHandlers) HandleRoundStarted(ctx context.Context, payload *roundev
 	}
 	if channelID == "" {
 		// Fallback to config if payload channel ID is empty
-		channelID = h.Config.GetEventChannelID()
+		channelID = h.config.GetEventChannelID()
 	}
 
 	eventMessageID := payload.EventMessageID
 
 	// Update round to scorecard
-	_, err := h.RoundDiscord.GetStartRoundManager().UpdateRoundToScorecard(ctx, channelID, eventMessageID, payload)
+	_, err := h.service.GetStartRoundManager().UpdateRoundToScorecard(ctx, channelID, eventMessageID, payload)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update round to scorecard: %w", err)
 	}

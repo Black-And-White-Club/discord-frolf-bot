@@ -9,7 +9,6 @@ import (
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/google/uuid"
-	"go.opentelemetry.io/otel/trace/noop"
 )
 
 func resetGuildRateLimiter(t *testing.T) {
@@ -23,10 +22,13 @@ func TestRoundHandlers_HandleScorecardUploaded(t *testing.T) {
 	resetGuildRateLimiter(t)
 	defer resetGuildRateLimiter(t)
 
-	rh := &RoundHandlers{
-		Logger: loggerfrolfbot.NoOpLogger,
-		Tracer: noop.NewTracerProvider().Tracer("test"),
-	}
+	rh := NewRoundHandlers(
+		loggerfrolfbot.NoOpLogger,
+		nil,
+		nil,
+		nil,
+		nil,
+	)
 
 	tests := []struct {
 		name       string
@@ -100,10 +102,13 @@ func TestRoundHandlers_HandleScorecardUploaded(t *testing.T) {
 }
 
 func TestRoundHandlers_HandleScorecardParseFailed(t *testing.T) {
-	rh := &RoundHandlers{
-		Logger: loggerfrolfbot.NoOpLogger,
-		Tracer: noop.NewTracerProvider().Tracer("test"),
-	}
+	rh := NewRoundHandlers(
+		loggerfrolfbot.NoOpLogger,
+		nil,
+		nil,
+		nil,
+		nil,
+	)
 
 	tests := []struct {
 		name       string
@@ -142,10 +147,13 @@ func TestRoundHandlers_HandleScorecardParseFailed(t *testing.T) {
 }
 
 func TestRoundHandlers_HandleImportFailed(t *testing.T) {
-	rh := &RoundHandlers{
-		Logger: loggerfrolfbot.NoOpLogger,
-		Tracer: noop.NewTracerProvider().Tracer("test"),
-	}
+	rh := NewRoundHandlers(
+		loggerfrolfbot.NoOpLogger,
+		nil,
+		nil,
+		nil,
+		nil,
+	)
 
 	tests := []struct {
 		name       string
@@ -184,10 +192,13 @@ func TestRoundHandlers_HandleImportFailed(t *testing.T) {
 }
 
 func TestRoundHandlers_HandleScorecardURLRequested(t *testing.T) {
-	rh := &RoundHandlers{
-		Logger: loggerfrolfbot.NoOpLogger,
-		Tracer: noop.NewTracerProvider().Tracer("test"),
-	}
+	rh := NewRoundHandlers(
+		loggerfrolfbot.NoOpLogger,
+		nil,
+		nil,
+		nil,
+		nil,
+	)
 
 	tests := []struct {
 		name       string

@@ -10,10 +10,8 @@ import (
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	discordroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
-	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/google/uuid"
-	"go.opentelemetry.io/otel/trace/noop"
 	"go.uber.org/mock/gomock"
 )
 
@@ -77,16 +75,14 @@ func TestRoundHandlers_HandleRoundParticipantJoinRequest(t *testing.T) {
 
 			mockRoundDiscord := mocks.NewMockRoundDiscordInterface(ctrl)
 			mockLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
-			mockMetrics := &discordmetrics.NoOpMetrics{}
-			mockTracer := noop.NewTracerProvider().Tracer("test")
 
-			h := &RoundHandlers{
-				Logger:       mockLogger,
-				Config:       &config.Config{},
-				RoundDiscord: mockRoundDiscord,
-				Tracer:       mockTracer,
-				Metrics:      mockMetrics,
-			}
+			h := NewRoundHandlers(
+				mockLogger,
+				&config.Config{},
+				nil,
+				mockRoundDiscord,
+				nil,
+			)
 
 			got, err := h.HandleRoundParticipantJoinRequest(tt.ctx, tt.payload)
 			if (err != nil) != tt.wantErr {
@@ -152,16 +148,14 @@ func TestRoundHandlers_HandleRoundParticipantRemoved(t *testing.T) {
 
 			mockRoundDiscord := mocks.NewMockRoundDiscordInterface(ctrl)
 			mockLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
-			mockMetrics := &discordmetrics.NoOpMetrics{}
-			mockTracer := noop.NewTracerProvider().Tracer("test")
 
-			h := &RoundHandlers{
-				Logger:       mockLogger,
-				Config:       &config.Config{},
-				RoundDiscord: mockRoundDiscord,
-				Tracer:       mockTracer,
-				Metrics:      mockMetrics,
-			}
+			h := NewRoundHandlers(
+				mockLogger,
+				&config.Config{},
+				nil,
+				mockRoundDiscord,
+				nil,
+			)
 
 			got, err := h.HandleRoundParticipantRemoved(tt.ctx, tt.payload)
 			if (err != nil) != tt.wantErr {

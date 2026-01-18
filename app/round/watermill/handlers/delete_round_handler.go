@@ -36,7 +36,7 @@ func (h *RoundHandlers) HandleRoundDeleted(ctx context.Context, payload *roundev
 		return nil, fmt.Errorf("discord_message_id not found or is empty in message metadata for round %s", payload.RoundID.String())
 	}
 
-	result, err := h.RoundDiscord.GetDeleteRoundManager().DeleteRoundEventEmbed(ctx, discordMessageID, h.Config.GetEventChannelID())
+	result, err := h.service.GetDeleteRoundManager().DeleteRoundEventEmbed(ctx, discordMessageID, h.config.GetEventChannelID())
 	if err != nil {
 		return nil, fmt.Errorf("error calling delete round embed service: %w", err)
 	}

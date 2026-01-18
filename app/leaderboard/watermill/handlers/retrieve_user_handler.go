@@ -14,7 +14,7 @@ import (
 // HandleGetTagByDiscordID handles a request from Discord to get a user's tag.
 func (h *LeaderboardHandlers) HandleGetTagByDiscordID(ctx context.Context,
 	payload *discordleaderboardevents.LeaderboardTagAvailabilityRequestPayloadV1) ([]handlerwrapper.Result, error) {
-	h.Logger.InfoContext(ctx, "Handling GetTagByDiscordID request")
+	h.logger.InfoContext(ctx, "Handling GetTagByDiscordID request")
 
 	discordPayload := payload
 
@@ -26,7 +26,7 @@ func (h *LeaderboardHandlers) HandleGetTagByDiscordID(ctx context.Context,
 		UserID:  sharedtypes.DiscordID(userID),
 	}
 
-	h.Logger.InfoContext(ctx, "Successfully translated GetTagByDiscordID request",
+	h.logger.InfoContext(ctx, "Successfully translated GetTagByDiscordID request",
 		attr.String("user_id", string(userID)),
 		attr.String("guild_id", discordPayload.GuildID))
 
@@ -41,7 +41,7 @@ func (h *LeaderboardHandlers) HandleGetTagByDiscordID(ctx context.Context,
 // HandleGetTagByDiscordIDResponse translates a backend tag number response to a Discord response.
 func (h *LeaderboardHandlers) HandleGetTagByDiscordIDResponse(ctx context.Context,
 	payload *sharedevents.GetTagNumberResponsePayloadV1) ([]handlerwrapper.Result, error) {
-	h.Logger.InfoContext(ctx, "Handling GetTagByDiscordIDResponse")
+	h.logger.InfoContext(ctx, "Handling GetTagByDiscordIDResponse")
 
 	backendPayload := payload
 
@@ -56,7 +56,7 @@ func (h *LeaderboardHandlers) HandleGetTagByDiscordIDResponse(ctx context.Contex
 		Available: backendPayload.Found,
 	}
 
-	h.Logger.InfoContext(ctx, "Successfully translated GetTagByDiscordIDResponse",
+	h.logger.InfoContext(ctx, "Successfully translated GetTagByDiscordIDResponse",
 		attr.String("guild_id", string(backendPayload.GuildID)),
 		attr.String("available", fmt.Sprintf("%v", backendPayload.Found)))
 
@@ -71,12 +71,12 @@ func (h *LeaderboardHandlers) HandleGetTagByDiscordIDResponse(ctx context.Contex
 // HandleGetTagByDiscordIDFailed handles a backend tag number lookup failure.
 func (h *LeaderboardHandlers) HandleGetTagByDiscordIDFailed(ctx context.Context,
 	payload *sharedevents.GetTagNumberFailedPayloadV1) ([]handlerwrapper.Result, error) {
-	h.Logger.InfoContext(ctx, "Handling GetTagByDiscordIDFailed")
+	h.logger.InfoContext(ctx, "Handling GetTagByDiscordIDFailed")
 
 	_ = payload
 
 	// For now, just log the failure - Discord doesn't have a specific failure response for this
-	h.Logger.WarnContext(ctx, "Tag number lookup failed on backend")
+	h.logger.WarnContext(ctx, "Tag number lookup failed on backend")
 
 	return []handlerwrapper.Result{}, nil
 }

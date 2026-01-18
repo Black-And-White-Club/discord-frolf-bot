@@ -14,13 +14,11 @@ import (
 	discordroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	sharedroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
-	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 	"github.com/bwmarrin/discordgo"
 	"github.com/google/uuid"
-	"go.opentelemetry.io/otel/trace/noop"
 	"go.uber.org/mock/gomock"
 )
 
@@ -59,16 +57,14 @@ func TestRoundHandlers_HandleRoundCreateRequested(t *testing.T) {
 
 			mockRoundDiscord := mocks.NewMockRoundDiscordInterface(ctrl)
 			mockLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
-			mockMetrics := &discordmetrics.NoOpMetrics{}
-			mockTracer := noop.NewTracerProvider().Tracer("test")
 
-			h := &RoundHandlers{
-				Logger:       mockLogger,
-				Config:       &config.Config{},
-				RoundDiscord: mockRoundDiscord,
-				Tracer:       mockTracer,
-				Metrics:      mockMetrics,
-			}
+			h := NewRoundHandlers(
+				mockLogger,
+				&config.Config{},
+				nil,
+				mockRoundDiscord,
+				nil,
+			)
 
 			got, err := h.HandleRoundCreateRequested(tt.ctx, tt.payload)
 			if (err != nil) != tt.wantErr {
@@ -226,18 +222,16 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 
 			mockRoundDiscord := mocks.NewMockRoundDiscordInterface(ctrl)
 			mockLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
-			mockMetrics := &discordmetrics.NoOpMetrics{}
-			mockTracer := noop.NewTracerProvider().Tracer("test")
 
 			tt.setup(ctrl, mockRoundDiscord)
 
-			h := &RoundHandlers{
-				Logger:       mockLogger,
-				Config:       &config.Config{},
-				RoundDiscord: mockRoundDiscord,
-				Tracer:       mockTracer,
-				Metrics:      mockMetrics,
-			}
+			h := NewRoundHandlers(
+				mockLogger,
+				&config.Config{},
+				nil,
+				mockRoundDiscord,
+				nil,
+			)
 
 			got, err := h.HandleRoundCreated(tt.ctx, tt.payload)
 			if (err != nil) != tt.wantErr {
@@ -325,18 +319,16 @@ func TestRoundHandlers_HandleRoundCreationFailed(t *testing.T) {
 
 			mockRoundDiscord := mocks.NewMockRoundDiscordInterface(ctrl)
 			mockLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
-			mockMetrics := &discordmetrics.NoOpMetrics{}
-			mockTracer := noop.NewTracerProvider().Tracer("test")
 
 			tt.setup(ctrl, mockRoundDiscord)
 
-			h := &RoundHandlers{
-				Logger:       mockLogger,
-				Config:       &config.Config{},
-				RoundDiscord: mockRoundDiscord,
-				Tracer:       mockTracer,
-				Metrics:      mockMetrics,
-			}
+			h := NewRoundHandlers(
+				mockLogger,
+				&config.Config{},
+				nil,
+				mockRoundDiscord,
+				nil,
+			)
 
 			got, err := h.HandleRoundCreationFailed(tt.ctx, tt.payload)
 			if (err != nil) != tt.wantErr {
@@ -414,18 +406,16 @@ func TestRoundHandlers_HandleRoundValidationFailed(t *testing.T) {
 
 			mockRoundDiscord := mocks.NewMockRoundDiscordInterface(ctrl)
 			mockLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
-			mockMetrics := &discordmetrics.NoOpMetrics{}
-			mockTracer := noop.NewTracerProvider().Tracer("test")
 
 			tt.setup(ctrl, mockRoundDiscord)
 
-			h := &RoundHandlers{
-				Logger:       mockLogger,
-				Config:       &config.Config{},
-				RoundDiscord: mockRoundDiscord,
-				Tracer:       mockTracer,
-				Metrics:      mockMetrics,
-			}
+			h := NewRoundHandlers(
+				mockLogger,
+				&config.Config{},
+				nil,
+				mockRoundDiscord,
+				nil,
+			)
 
 			got, err := h.HandleRoundValidationFailed(tt.ctx, tt.payload)
 			if (err != nil) != tt.wantErr {

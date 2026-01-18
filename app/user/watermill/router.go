@@ -12,7 +12,6 @@ import (
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	discorduserevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/user"
 	userevents "github.com/Black-And-White-Club/frolf-bot-shared/events/user"
-	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	tracingfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/tracing"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
@@ -42,7 +41,6 @@ type UserRouter struct {
 	tracer           trace.Tracer
 	middlewareHelper utils.MiddlewareHelpers
 	userDiscord      interface{} // Store userDiscord for access to signup manager
-	metrics          discordmetrics.DiscordMetrics
 }
 
 // NewUserRouter creates a new UserRouter.
@@ -54,7 +52,6 @@ func NewUserRouter(
 	config *config.Config,
 	helper utils.Helpers,
 	tracer trace.Tracer,
-	metrics discordmetrics.DiscordMetrics,
 ) *UserRouter {
 	return &UserRouter{
 		logger:           logger,
@@ -65,7 +62,6 @@ func NewUserRouter(
 		helper:           helper,
 		tracer:           tracer,
 		middlewareHelper: utils.NewMiddlewareHelper(),
-		metrics:          metrics,
 	}
 }
 
@@ -95,7 +91,7 @@ func registerHandler[T any](
 }
 
 // Configure sets up the router.
-func (r *UserRouter) Configure(ctx context.Context, handlers userhandlers.Handler) error {
+func (r *UserRouter) Configure(ctx context.Context, handlers userhandlers.Handlers) error {
 	// Note: Using Discord metrics instead of separate Prometheus metrics to avoid conflicts
 
 	r.Router.AddMiddleware(
@@ -104,7 +100,6 @@ func (r *UserRouter) Configure(ctx context.Context, handlers userhandlers.Handle
 		r.middlewareHelper.DiscordMetadataMiddleware(),
 		r.middlewareHelper.RoutingMetadataMiddleware(),
 		middleware.Recoverer,
-		middleware.Retry{MaxRetries: 3}.Middleware,
 		tracingfrolfbot.TraceHandler(r.tracer),
 	)
 
@@ -115,7 +110,7 @@ func (r *UserRouter) Configure(ctx context.Context, handlers userhandlers.Handle
 }
 
 // registerHandlers registers all user module handlers using the generic pattern
-func (r *UserRouter) registerHandlers(handlers userhandlers.Handler) error {
+func (r *UserRouter) registerHandlers(handlers userhandlers.Handlers) error {
 	var metrics handlerwrapper.ReturningMetrics // reserved for metrics integration
 
 	deps := handlerDeps{

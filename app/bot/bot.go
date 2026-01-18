@@ -249,9 +249,6 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 		bot.Logger,
 		bot.Config,
 		bot.Helper,
-		bot.Storage.InteractionStore,
-		bot.Storage.GuildConfigCache,
-		bot.Metrics,
 	)
 	if err != nil {
 		return fmt.Errorf("score module initialization failed: %w", err)

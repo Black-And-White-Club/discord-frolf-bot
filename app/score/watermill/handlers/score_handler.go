@@ -71,7 +71,7 @@ func (h *ScoreHandlers) HandleScoreUpdateFailureTyped(ctx context.Context, paylo
 
 	// Suppress known business failure to avoid duplicate Discord posts
 	if strings.Contains(payload.Reason, "score record not found") {
-		h.Logger.InfoContext(ctx, "Suppressing retry for known business failure (aggregate scores missing)",
+		h.logger.InfoContext(ctx, "Suppressing retry for known business failure (aggregate scores missing)",
 			attr.RoundID("round_id", payload.RoundID),
 			attr.String("guild_id", string(payload.GuildID)),
 			attr.String("user_id", string(payload.UserID)),

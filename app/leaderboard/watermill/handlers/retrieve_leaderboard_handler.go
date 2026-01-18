@@ -14,7 +14,7 @@ import (
 // HandleLeaderboardRetrieveRequest handles a leaderboard retrieve request event from Discord.
 func (h *LeaderboardHandlers) HandleLeaderboardRetrieveRequest(ctx context.Context,
 	payload *discordleaderboardevents.LeaderboardRetrieveRequestPayloadV1) ([]handlerwrapper.Result, error) {
-	h.Logger.InfoContext(ctx, "Handling leaderboard retrieve request")
+	h.logger.InfoContext(ctx, "Handling leaderboard retrieve request")
 
 	discordPayload := payload
 
@@ -23,7 +23,7 @@ func (h *LeaderboardHandlers) HandleLeaderboardRetrieveRequest(ctx context.Conte
 		GuildID: sharedtypes.GuildID(discordPayload.GuildID),
 	}
 
-	h.Logger.InfoContext(ctx, "Successfully processed leaderboard retrieve request",
+	h.logger.InfoContext(ctx, "Successfully processed leaderboard retrieve request",
 		attr.String("guild_id", discordPayload.GuildID))
 
 	return []handlerwrapper.Result{
@@ -37,7 +37,7 @@ func (h *LeaderboardHandlers) HandleLeaderboardRetrieveRequest(ctx context.Conte
 // HandleLeaderboardUpdatedNotification handles backend.leaderboard.updated and re-requests full leaderboard.
 func (h *LeaderboardHandlers) HandleLeaderboardUpdatedNotification(ctx context.Context,
 	payload *leaderboardevents.LeaderboardUpdatedPayloadV1) ([]handlerwrapper.Result, error) {
-	h.Logger.InfoContext(ctx, "Handling leaderboard updated notification")
+	h.logger.InfoContext(ctx, "Handling leaderboard updated notification")
 
 	updatePayload := payload
 
@@ -45,7 +45,7 @@ func (h *LeaderboardHandlers) HandleLeaderboardUpdatedNotification(ctx context.C
 		GuildID: updatePayload.GuildID,
 	}
 
-	h.Logger.InfoContext(ctx, "Requesting full leaderboard after update notification",
+	h.logger.InfoContext(ctx, "Requesting full leaderboard after update notification",
 		attr.String("guild_id", string(updatePayload.GuildID)))
 
 	return []handlerwrapper.Result{
@@ -59,7 +59,7 @@ func (h *LeaderboardHandlers) HandleLeaderboardUpdatedNotification(ctx context.C
 // HandleLeaderboardResponse handles backend.leaderboard.get.response and translates to Discord response.
 func (h *LeaderboardHandlers) HandleLeaderboardResponse(ctx context.Context,
 	payload *leaderboardevents.GetLeaderboardResponsePayloadV1) ([]handlerwrapper.Result, error) {
-	h.Logger.InfoContext(ctx, "Handling leaderboard response")
+	h.logger.InfoContext(ctx, "Handling leaderboard response")
 
 	payloadData := payload
 
@@ -76,7 +76,7 @@ func (h *LeaderboardHandlers) HandleLeaderboardResponse(ctx context.Context,
 		GuildID:     string(payloadData.GuildID),
 	}
 
-	h.Logger.InfoContext(ctx, "Successfully processed leaderboard data",
+	h.logger.InfoContext(ctx, "Successfully processed leaderboard data",
 		attr.String("guild_id", string(payloadData.GuildID)),
 		attr.Int("entry_count", len(leaderboardData)))
 

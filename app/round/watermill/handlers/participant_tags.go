@@ -27,7 +27,7 @@ func (h *RoundHandlers) HandleTagsUpdatedForScheduledRounds(ctx context.Context,
 	}
 
 	// Use the tag update manager to update Discord embeds
-	result, err := h.RoundDiscord.GetTagUpdateManager().UpdateDiscordEmbedsWithTagChanges(ctx, *payload, tagUpdates)
+	result, err := h.service.GetTagUpdateManager().UpdateDiscordEmbedsWithTagChanges(ctx, *payload, tagUpdates)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update Discord embeds: %w", err)
 	}
@@ -42,15 +42,15 @@ func (h *RoundHandlers) HandleTagsUpdatedForScheduledRounds(ctx context.Context,
 // HandleRoundParticipantsUpdated processes round participant updates and updates Discord embeds
 func (h *RoundHandlers) HandleRoundParticipantsUpdated(ctx context.Context, payload *roundevents.RoundParticipantsUpdatedPayloadV1) ([]handlerwrapper.Result, error) {
 	// Get guild config to find the event channel ID
-	guildConfig, err := h.GuildConfigResolver.GetGuildConfigWithContext(ctx, string(payload.GuildID))
+	guildConfig, err := h.guildConfigResolver.GetGuildConfigWithContext(ctx, string(payload.GuildID))
 	if err != nil {
-		h.Logger.WarnContext(ctx, "Failed to get guild config for round participants update",
+		h.logger.WarnContext(ctx, "Failed to get guild config for round participants update",
 			attr.String("guild_id", string(payload.GuildID)),
 			attr.Error(err))
 		return []handlerwrapper.Result{}, nil
 	}
 	if guildConfig == nil || guildConfig.EventChannelID == "" {
-		h.Logger.WarnContext(ctx, "Missing event channel ID for round participants update",
+		h.logger.WarnContext(ctx, "Missing event channel ID for round participants update",
 			attr.String("guild_id", string(payload.GuildID)))
 		return []handlerwrapper.Result{}, nil
 	}
@@ -72,7 +72,7 @@ func (h *RoundHandlers) HandleRoundParticipantsUpdated(ctx context.Context, payl
 	}
 
 	// Update the Discord embed using the RoundRsvpManager
-	result, err := h.RoundDiscord.GetRoundRsvpManager().UpdateRoundEventEmbed(ctx, guildConfig.EventChannelID, payload.Round.EventMessageID, accepted, declined, tentative)
+	result, err := h.service.GetRoundRsvpManager().UpdateRoundEventEmbed(ctx, guildConfig.EventChannelID, payload.Round.EventMessageID, accepted, declined, tentative)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update Discord embed for round %s: %w", payload.RoundID, err)
 	}

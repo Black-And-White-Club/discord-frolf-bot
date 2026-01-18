@@ -36,24 +36,24 @@ func (h *GuildHandlers) HandleGuildConfigDeleted(ctx context.Context, payload *g
 
 	guildID := string(payload.GuildID)
 
-	h.Logger.InfoContext(ctx, "Guild config deleted - starting cleanup",
+	h.logger.InfoContext(ctx, "Guild config deleted - starting cleanup",
 		attr.String("guild_id", guildID))
 
-	if h.GuildConfigResolver != nil {
-		h.GuildConfigResolver.ClearInflightRequest(ctx, guildID)
+	if h.guildConfigResolver != nil {
+		h.guildConfigResolver.ClearInflightRequest(ctx, guildID)
 	}
 
 	// Unregister commands. Fail fast so the message can be retried if
 	// command unregistration fails (this is an important cleanup step).
-	if err := h.GuildDiscord.UnregisterAllCommands(guildID); err != nil {
-		h.Logger.ErrorContext(ctx, "Failed to unregister all commands",
+	if err := h.service.UnregisterAllCommands(guildID); err != nil {
+		h.logger.ErrorContext(ctx, "Failed to unregister all commands",
 			attr.String("guild_id", guildID),
 			attr.Error(err))
 		return nil, fmt.Errorf("failed to unregister all commands: %w", err)
 	}
 
 	// Log success for test expectations and observability
-	h.Logger.InfoContext(ctx, "Successfully unregistered all commands",
+	h.logger.InfoContext(ctx, "Successfully unregistered all commands",
 		attr.String("guild_id", guildID))
 
 	results := make(map[string]guildtypes.DeletionResult)
@@ -62,15 +62,15 @@ func (h *GuildHandlers) HandleGuildConfigDeleted(ctx context.Context, payload *g
 	rs := payload.ResourceState
 	if !rs.IsEmpty() {
 		var err error
-		if h.GuildDiscord != nil && h.GuildDiscord.GetResetManager() != nil {
-			results, err = h.GuildDiscord.GetResetManager().DeleteResources(ctx, guildID, rs)
+		if h.service != nil && h.service.GetResetManager() != nil {
+			results, err = h.service.GetResetManager().DeleteResources(ctx, guildID, rs)
 			if err != nil {
-				h.Logger.ErrorContext(ctx, "ResetManager.DeleteResources returned error",
+				h.logger.ErrorContext(ctx, "ResetManager.DeleteResources returned error",
 					attr.String("guild_id", guildID),
 					attr.Error(err))
 			}
 		} else {
-			h.Logger.WarnContext(ctx, "No reset manager available to delete resources",
+			h.logger.WarnContext(ctx, "No reset manager available to delete resources",
 				attr.String("guild_id", guildID))
 		}
 	}
@@ -112,30 +112,30 @@ func (h *GuildHandlers) HandleGuildConfigDeletionFailed(ctx context.Context, pay
 
 	guildID := string(payload.GuildID)
 
-	h.Logger.WarnContext(ctx, "Guild config deletion failed",
+	h.logger.WarnContext(ctx, "Guild config deletion failed",
 		attr.String("guild_id", guildID),
 		attr.String("reason", payload.Reason))
 
-	if h.InteractionStore == nil || h.Session == nil {
+	if h.interactionStore == nil || h.session == nil {
 		return []handlerwrapper.Result{}, nil
 	}
 
 	// UPDATED: Use the bridge utility with context
-	if interaction, err := discordutils.GetInteraction(ctx, h.InteractionStore, guildID); err == nil {
+	if interaction, err := discordutils.GetInteraction(ctx, h.interactionStore, guildID); err == nil {
 		// Clean up immediately
-		h.InteractionStore.Delete(ctx, guildID)
+		h.interactionStore.Delete(ctx, guildID)
 
 		content := fmt.Sprintf(
 			"❌ Failed to reset server configuration.\n\n**Reason:** %s\n\nPlease try again.",
 			payload.Reason,
 		)
 
-		_, err := h.Session.InteractionResponseEdit(interaction, &discordgo.WebhookEdit{
+		_, err := h.session.InteractionResponseEdit(interaction, &discordgo.WebhookEdit{
 			Content:    &content,
 			Components: &[]discordgo.MessageComponent{},
 		})
 		if err != nil {
-			h.Logger.ErrorContext(ctx, "Failed to send deletion failure response",
+			h.logger.ErrorContext(ctx, "Failed to send deletion failure response",
 				attr.String("guild_id", guildID),
 				attr.Error(err))
 		}
@@ -153,19 +153,19 @@ func (h *GuildHandlers) sendDeletionSummary(
 	guildID string,
 	results map[string]guildtypes.DeletionResult,
 ) {
-	if h.InteractionStore == nil || h.Session == nil {
+	if h.interactionStore == nil || h.session == nil {
 		return
 	}
 
 	// UPDATED: Use the bridge utility to replace manual Get + Assertion
-	interaction, err := discordutils.GetInteraction(ctx, h.InteractionStore, guildID)
+	interaction, err := discordutils.GetInteraction(ctx, h.interactionStore, guildID)
 	if err != nil {
 		// If it's not in the store, we can't send a summary, just exit
 		return
 	}
 
 	// Clean up the cache now that we've retrieved it
-	h.InteractionStore.Delete(ctx, guildID)
+	h.interactionStore.Delete(ctx, guildID)
 
 	summary := "✅ Server configuration reset completed.\n\n"
 	summary += "Bot commands have been unregistered. Run `/frolf-setup` when you're ready.\n\n"
@@ -181,12 +181,12 @@ func (h *GuildHandlers) sendDeletionSummary(
 		}
 	}
 
-	_, err = h.Session.InteractionResponseEdit(interaction, &discordgo.WebhookEdit{
+	_, err = h.session.InteractionResponseEdit(interaction, &discordgo.WebhookEdit{
 		Content:    &summary,
 		Components: &[]discordgo.MessageComponent{},
 	})
 	if err != nil {
-		h.Logger.ErrorContext(ctx, "Failed to send deletion summary",
+		h.logger.ErrorContext(ctx, "Failed to send deletion summary",
 			attr.String("guild_id", guildID),
 			attr.Error(err))
 	}

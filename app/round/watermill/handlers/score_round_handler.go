@@ -13,12 +13,12 @@ import (
 func (h *RoundHandlers) HandleParticipantScoreUpdated(ctx context.Context, payload *roundevents.ParticipantScoreUpdatedPayloadV1) ([]handlerwrapper.Result, error) {
 	// Use ChannelID from config if payload ChannelID is empty (as a fallback)
 	channelID := payload.ChannelID
-	if channelID == "" && h.Config != nil && h.Config.GetEventChannelID() != "" {
-		channelID = h.Config.GetEventChannelID()
+	if channelID == "" && h.config != nil && h.config.GetEventChannelID() != "" {
+		channelID = h.config.GetEventChannelID()
 	}
 
 	// Get the ScoreRoundManager
-	scoreRoundManager := h.RoundDiscord.GetScoreRoundManager()
+	scoreRoundManager := h.service.GetScoreRoundManager()
 
 	// Call UpdateScoreEmbed with the specific user's updated score
 	updateResult, err := scoreRoundManager.UpdateScoreEmbed(
@@ -43,11 +43,11 @@ func (h *RoundHandlers) HandleParticipantScoreUpdated(ctx context.Context, paylo
 func (h *RoundHandlers) HandleScoresBulkUpdated(ctx context.Context, payload *roundevents.RoundScoresBulkUpdatedPayloadV1) ([]handlerwrapper.Result, error) {
 	// Use ChannelID from config if payload ChannelID is empty (as a fallback)
 	channelID := payload.ChannelID
-	if channelID == "" && h.Config != nil && h.Config.GetEventChannelID() != "" {
-		channelID = h.Config.GetEventChannelID()
+	if channelID == "" && h.config != nil && h.config.GetEventChannelID() != "" {
+		channelID = h.config.GetEventChannelID()
 	}
 
-	scoreRoundManager := h.RoundDiscord.GetScoreRoundManager()
+	scoreRoundManager := h.service.GetScoreRoundManager()
 	updateResult, err := scoreRoundManager.UpdateScoreEmbedBulk(
 		ctx,
 		channelID,
@@ -70,7 +70,7 @@ func (h *RoundHandlers) HandleScoreUpdateError(ctx context.Context, payload *rou
 		return nil, fmt.Errorf("received empty error message in HandleScoreUpdateError")
 	}
 
-	_, err := h.RoundDiscord.GetScoreRoundManager().SendScoreUpdateError(ctx, payload.ScoreUpdateRequest.UserID, payload.Error)
+	_, err := h.service.GetScoreRoundManager().SendScoreUpdateError(ctx, payload.ScoreUpdateRequest.UserID, payload.Error)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send score update error notification: %w", err)
 	}

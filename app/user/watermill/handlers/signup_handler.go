@@ -37,7 +37,7 @@ func (h *UserHandlers) HandleUserCreationFailed(
 	}
 
 	// Respond with the specific failure reason to the user
-	_, err := h.userDiscord.GetSignupManager().SendSignupResult(ctx, correlationID, false, payload.Reason)
+	_, err := h.service.GetSignupManager().SendSignupResult(ctx, correlationID, false, payload.Reason)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send signup failure: %w", err)
 	}
@@ -56,7 +56,7 @@ func (h *UserHandlers) HandleRoleAdded(
 		correlationID = v.(string)
 	}
 
-	_, err := h.userDiscord.GetSignupManager().SendSignupResult(ctx, correlationID, true)
+	_, err := h.service.GetSignupManager().SendSignupResult(ctx, correlationID, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send signup success: %w", err)
 	}
@@ -75,7 +75,7 @@ func (h *UserHandlers) HandleRoleAdditionFailed(
 		correlationID = v.(string)
 	}
 
-	_, err := h.userDiscord.GetSignupManager().SendSignupResult(ctx, correlationID, false)
+	_, err := h.service.GetSignupManager().SendSignupResult(ctx, correlationID, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send signup failure: %w", err)
 	}

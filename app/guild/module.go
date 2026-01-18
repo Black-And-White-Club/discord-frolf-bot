@@ -70,14 +70,11 @@ func InitializeGuildModule(
 	guildHandlers := guildhandlers.NewGuildHandlers(
 		logger,
 		cfg,
-		helper,
 		guildDiscord,
 		guildConfigResolver,
-		interactionStore, // This is passed to Watermill event handlers
-		session,
-		tracer,
-		discordMetrics,
 		signupManager,
+		interactionStore,
+		session,
 	)
 
 	// Setup Watermill router

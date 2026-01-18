@@ -68,10 +68,6 @@ func InitializeLeaderboardModule(
 		helper,
 		leaderboardDiscord,
 		guildConfigResolver,
-		interactionStore,
-		guildConfigCache,
-		tracer,
-		discordMetricsService,
 	)
 	if leaderboardHandlers == nil {
 		logger.ErrorContext(ctx, "Failed to create leaderboard handlers")
@@ -87,7 +83,6 @@ func InitializeLeaderboardModule(
 		cfg,
 		helper,
 		tracer,
-		discordMetricsService,
 	)
 
 	// Configure the router with context and handlers

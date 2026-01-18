@@ -62,10 +62,6 @@ func InitializeUserModule(
 		cfg,
 		helper,
 		userDiscord,
-		interactionStore,
-		guildConfigCache,
-		tracer,
-		discordMetrics,
 	)
 
 	// Setup Watermill router
@@ -77,7 +73,6 @@ func InitializeUserModule(
 		cfg,
 		helper,
 		tracer,
-		discordMetrics,
 	)
 	// Store the userDiscord instance for access to signup manager in other modules
 	userRouter.SetUserDiscord(userDiscord)

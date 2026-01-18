@@ -7,13 +7,11 @@ import (
 
 	guildevents "github.com/Black-And-White-Club/frolf-bot-shared/events/guild"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
-	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	guildtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/guild"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/guild/mocks"
 	guildconfigmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
-	"go.opentelemetry.io/otel/trace/noop"
 	"go.uber.org/mock/gomock"
 )
 
@@ -81,17 +79,16 @@ func TestGuildHandlers_HandleGuildConfigCreated(t *testing.T) {
 			}
 
 			logger := loggerfrolfbot.NoOpLogger
-			tracer := noop.NewTracerProvider().Tracer("test")
-			metrics := &discordmetrics.NoOpMetrics{}
 
-			h := &GuildHandlers{
-				Logger:              logger,
-				Config:              &config.Config{},
-				GuildDiscord:        mockGuildDiscord,
-				GuildConfigResolver: mockGuildConfigResolver,
-				Tracer:              tracer,
-				Metrics:             metrics,
-			}
+			h := NewGuildHandlers(
+				logger,
+				&config.Config{},
+				mockGuildDiscord,
+				mockGuildConfigResolver,
+				nil, // signupManager
+				nil, // interactionStore
+				nil, // session
+			)
 
 			results, err := h.HandleGuildConfigCreated(context.Background(), tt.payload)
 
@@ -134,14 +131,16 @@ func TestGuildHandlers_HandleGuildConfigCreationFailed(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logger := loggerfrolfbot.NoOpLogger
-			tracer := noop.NewTracerProvider().Tracer("test")
-			metrics := &discordmetrics.NoOpMetrics{}
 
-			h := &GuildHandlers{
-				Logger:  logger,
-				Tracer:  tracer,
-				Metrics: metrics,
-			}
+			h := NewGuildHandlers(
+				logger,
+				nil, // config
+				nil, // guildDiscord
+				nil, // guildConfigResolver
+				nil, // signupManager
+				nil, // interactionStore
+				nil, // session
+			)
 
 			results, err := h.HandleGuildConfigCreationFailed(context.Background(), tt.payload)
 

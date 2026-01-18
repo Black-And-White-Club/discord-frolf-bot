@@ -44,7 +44,7 @@ func TestHandleScoreUpdateRequestTyped(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sh := &ScoreHandlers{Logger: loggerfrolfbot.NoOpLogger}
+			sh := &ScoreHandlers{logger: loggerfrolfbot.NoOpLogger}
 			got, err := sh.HandleScoreUpdateRequestTyped(context.Background(), tt.payload)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("unexpected error state: %v", err)
@@ -103,7 +103,7 @@ func TestHandleScoreUpdateSuccessTyped(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sh := &ScoreHandlers{Logger: loggerfrolfbot.NoOpLogger}
+			sh := &ScoreHandlers{logger: loggerfrolfbot.NoOpLogger}
 			got, err := sh.HandleScoreUpdateSuccessTyped(context.Background(), tt.payload)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("unexpected error state: %v", err)
@@ -169,7 +169,7 @@ func TestHandleScoreUpdateFailureTyped(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sh := &ScoreHandlers{Logger: loggerfrolfbot.NoOpLogger}
+			sh := &ScoreHandlers{logger: loggerfrolfbot.NoOpLogger}
 			got, err := sh.HandleScoreUpdateFailureTyped(context.Background(), tt.payload)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("unexpected error state: %v", err)

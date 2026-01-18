@@ -6,15 +6,12 @@ import (
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	leaderboarddiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord"
-	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	discordleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	sharedevents "github.com/Black-And-White-Club/frolf-bot-shared/events/shared"
-	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
-	"go.opentelemetry.io/otel/trace"
 )
 
 // Handlers defines the interface for leaderboard handlers.
@@ -50,15 +47,11 @@ type Handlers interface {
 
 // LeaderboardHandlers handles leaderboard-related events.
 type LeaderboardHandlers struct {
-	Logger              *slog.Logger
-	Config              *config.Config
-	Helpers             utils.Helpers
-	LeaderboardDiscord  leaderboarddiscord.LeaderboardDiscordInterface
-	GuildConfigResolver guildconfig.GuildConfigResolver
-	InteractionStore    storage.ISInterface[any]
-	GuildConfigCache    storage.ISInterface[storage.GuildConfig]
-	Tracer              trace.Tracer
-	Metrics             discordmetrics.DiscordMetrics
+	service             leaderboarddiscord.LeaderboardDiscordInterface
+	helpers             utils.Helpers
+	config              *config.Config
+	guildConfigResolver guildconfig.GuildConfigResolver
+	logger              *slog.Logger
 }
 
 // NewLeaderboardHandlers creates a new LeaderboardHandlers instance.
@@ -68,20 +61,12 @@ func NewLeaderboardHandlers(
 	helpers utils.Helpers,
 	leaderboardDiscord leaderboarddiscord.LeaderboardDiscordInterface,
 	guildConfigResolver guildconfig.GuildConfigResolver,
-	interactionStore storage.ISInterface[any],
-	guildConfigCache storage.ISInterface[storage.GuildConfig],
-	tracer trace.Tracer,
-	metrics discordmetrics.DiscordMetrics,
 ) Handlers {
 	return &LeaderboardHandlers{
-		Logger:              logger,
-		Config:              config,
-		Helpers:             helpers,
-		LeaderboardDiscord:  leaderboardDiscord,
-		GuildConfigResolver: guildConfigResolver,
-		InteractionStore:    interactionStore,
-		GuildConfigCache:    guildConfigCache,
-		Tracer:              tracer,
-		Metrics:             metrics,
+		service:             leaderboardDiscord,
+		helpers:             helpers,
+		config:              config,
+		guildConfigResolver: guildConfigResolver,
+		logger:              logger,
 	}
 }
