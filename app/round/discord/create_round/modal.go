@@ -83,7 +83,7 @@ func (crm *createRoundManager) SendCreateRoundModal(ctx context.Context, i *disc
 						Components: []discordgo.MessageComponent{
 							discordgo.TextInput{
 								CustomID:    "start_time",
-								Label:       "Start Time (YYYY-MM-DD HH:MM) or Tomorrow at 5pm",
+								Label:       "Start Time (YYYY-MM-DD HH:MM)",
 								Style:       discordgo.TextInputShort,
 								Placeholder: "YYYY-MM-DD HH:MM",
 								Required:    true,
