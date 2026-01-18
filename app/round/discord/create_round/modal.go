@@ -83,7 +83,7 @@ func (crm *createRoundManager) SendCreateRoundModal(ctx context.Context, i *disc
 						Components: []discordgo.MessageComponent{
 							discordgo.TextInput{
 								CustomID:    "start_time",
-								Label:       "Start Time",
+								Label:       "Start Time (YYYY-MM-DD HH:MM) or Tomorrow at 5pm",
 								Style:       discordgo.TextInputShort,
 								Placeholder: "YYYY-MM-DD HH:MM",
 								Required:    true,
@@ -95,7 +95,7 @@ func (crm *createRoundManager) SendCreateRoundModal(ctx context.Context, i *disc
 						Components: []discordgo.MessageComponent{
 							discordgo.TextInput{
 								CustomID:    "timezone",
-								Label:       "Timezone (Optional)",
+								Label:       "Timezone (Optional Default: CST)",
 								Style:       discordgo.TextInputShort,
 								Placeholder: "America/Chicago (CST)",
 								Required:    false,
@@ -109,8 +109,8 @@ func (crm *createRoundManager) SendCreateRoundModal(ctx context.Context, i *disc
 								CustomID:    "location",
 								Label:       "Location",
 								Style:       discordgo.TextInputShort,
-								Placeholder: "Enter the location (optional)",
-								Required:    false,
+								Placeholder: "Enter the location",
+								Required:    true,
 								MaxLength:   100,
 							},
 						},
