@@ -83,7 +83,7 @@ func (h *RoundHandlers) HandleRoundUpdated(ctx context.Context, payload *roundev
 		location = round.Location
 	}
 
-	result, err := h.RoundDiscord.GetUpdateRoundManager().UpdateRoundEventEmbed(
+	result, err := h.service.GetUpdateRoundManager().UpdateRoundEventEmbed(
 		ctx,
 		channelID,
 		messageID,

@@ -11,10 +11,8 @@ import (
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/round/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
-	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/google/uuid"
-	"go.opentelemetry.io/otel/trace/noop"
 	"go.uber.org/mock/gomock"
 )
 
@@ -101,22 +99,20 @@ func TestRoundHandlers_HandleRoundReminder(t *testing.T) {
 			mockRoundDiscord := mocks.NewMockRoundDiscordInterface(ctrl)
 			mockReminderManager := mocks.NewMockRoundReminderManager(ctrl)
 			mockLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
-			mockMetrics := &discordmetrics.NoOpMetrics{}
-			mockTracer := noop.NewTracerProvider().Tracer("test")
 
 			tt.setup(ctrl, mockRoundDiscord, mockReminderManager)
 
-			h := &RoundHandlers{
-				Logger: mockLogger,
-				Config: &config.Config{
+			h := NewRoundHandlers(
+				mockLogger,
+				&config.Config{
 					Discord: config.DiscordConfig{
 						EventChannelID: "test-channel-id",
 					},
 				},
-				RoundDiscord: mockRoundDiscord,
-				Tracer:       mockTracer,
-				Metrics:      mockMetrics,
-			}
+				nil,
+				mockRoundDiscord,
+				nil,
+			)
 
 			got, err := h.HandleRoundReminder(tt.ctx, tt.payload)
 			if (err != nil) != tt.wantErr {

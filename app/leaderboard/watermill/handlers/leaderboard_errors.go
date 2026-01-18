@@ -13,7 +13,7 @@ func (h *LeaderboardHandlers) HandleLeaderboardUpdateFailed(ctx context.Context,
 	payload *leaderboardevents.LeaderboardUpdateFailedPayloadV1) ([]handlerwrapper.Result, error) {
 	p := payload
 
-	h.Logger.WarnContext(ctx, "Leaderboard update failed",
+	h.logger.WarnContext(ctx, "Leaderboard update failed",
 		attr.String("guild_id", string(p.GuildID)),
 		attr.String("reason", p.Reason))
 
@@ -31,7 +31,7 @@ func (h *LeaderboardHandlers) HandleLeaderboardRetrievalFailed(ctx context.Conte
 	payload *leaderboardevents.GetLeaderboardFailedPayloadV1) ([]handlerwrapper.Result, error) {
 	p := payload
 
-	h.Logger.WarnContext(ctx, "Leaderboard retrieval failed",
+	h.logger.WarnContext(ctx, "Leaderboard retrieval failed",
 		attr.String("guild_id", string(p.GuildID)),
 		attr.String("reason", p.Reason))
 

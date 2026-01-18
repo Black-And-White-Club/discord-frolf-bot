@@ -16,7 +16,7 @@ import (
 // HandleTagAssignRequest translates a Discord tag assignment request directly to a batch assignment.
 func (h *LeaderboardHandlers) HandleTagAssignRequest(ctx context.Context,
 	payload *discordleaderboardevents.LeaderboardTagAssignRequestPayloadV1) ([]handlerwrapper.Result, error) {
-	h.Logger.InfoContext(ctx, "Handling TagAssignRequest")
+	h.logger.InfoContext(ctx, "Handling TagAssignRequest")
 
 	discordPayload := payload
 
@@ -24,7 +24,7 @@ func (h *LeaderboardHandlers) HandleTagAssignRequest(ctx context.Context,
 	if discordPayload.TargetUserID == "" || discordPayload.RequestorID == "" ||
 		discordPayload.TagNumber <= 0 || discordPayload.ChannelID == "" || discordPayload.MessageID == "" {
 		err := fmt.Errorf("invalid TagAssignRequest payload: missing required fields")
-		h.Logger.ErrorContext(ctx, err.Error(),
+		h.logger.ErrorContext(ctx, err.Error(),
 			attr.String("target_user_id", string(discordPayload.TargetUserID)),
 			attr.String("requestor_id", string(discordPayload.RequestorID)),
 		)
@@ -34,7 +34,7 @@ func (h *LeaderboardHandlers) HandleTagAssignRequest(ctx context.Context,
 	// Validate MessageID is a valid UUID format
 	if _, err := uuid.Parse(discordPayload.MessageID); err != nil {
 		err := fmt.Errorf("invalid TagAssignRequest payload: MessageID is not a valid UUID: %w", err)
-		h.Logger.ErrorContext(ctx, err.Error(), attr.Error(err))
+		h.logger.ErrorContext(ctx, err.Error(), attr.Error(err))
 		return nil, err
 	}
 
@@ -43,7 +43,7 @@ func (h *LeaderboardHandlers) HandleTagAssignRequest(ctx context.Context,
 	// Parse MessageID as UUID for the update tracking ID
 	updateUUID, err := uuid.Parse(discordPayload.MessageID)
 	if err != nil {
-		h.Logger.ErrorContext(ctx, "Failed to parse message ID as UUID", attr.Error(err))
+		h.logger.ErrorContext(ctx, "Failed to parse message ID as UUID", attr.Error(err))
 		return nil, fmt.Errorf("failed to parse message ID as UUID: %w", err)
 	}
 	updateID := sharedtypes.RoundID(updateUUID)
@@ -56,7 +56,7 @@ func (h *LeaderboardHandlers) HandleTagAssignRequest(ctx context.Context,
 		UpdateType: "manual_assignment",
 	}
 
-	h.Logger.InfoContext(ctx, "Successfully created assignment for Discord claim",
+	h.logger.InfoContext(ctx, "Successfully created assignment for Discord claim",
 		attr.String("update_id", backendPayload.UpdateID.String()),
 		attr.String("target_user_id", string(discordPayload.TargetUserID)),
 		attr.Int("tag_number", int(tagNumber)))
@@ -80,7 +80,7 @@ func (h *LeaderboardHandlers) HandleTagAssignRequest(ctx context.Context,
 // HandleTagAssignedResponse translates a backend TagAssigned event to a Discord response.
 func (h *LeaderboardHandlers) HandleTagAssignedResponse(ctx context.Context,
 	payload *leaderboardevents.LeaderboardTagAssignedPayloadV1) ([]handlerwrapper.Result, error) {
-	h.Logger.InfoContext(ctx, "Handling TagAssignedResponse")
+	h.logger.InfoContext(ctx, "Handling TagAssignedResponse")
 
 	backendPayload := payload
 
@@ -97,26 +97,26 @@ func (h *LeaderboardHandlers) HandleTagAssignedResponse(ctx context.Context,
 		successMessage := fmt.Sprintf("✅ Successfully claimed tag #%d!", *backendPayload.TagNumber)
 
 		// Get the claim tag manager and update the interaction
-		if h.LeaderboardDiscord != nil {
-			claimTagManager := h.LeaderboardDiscord.GetClaimTagManager()
+		if h.service != nil {
+			claimTagManager := h.service.GetClaimTagManager()
 			if claimTagManager != nil {
 				result, err := claimTagManager.UpdateInteractionResponse(ctx, correlationID, successMessage)
 				if err != nil {
-					h.Logger.ErrorContext(ctx, "Failed to update Discord interaction for tag success",
+					h.logger.ErrorContext(ctx, "Failed to update Discord interaction for tag success",
 						attr.String("correlation_id", correlationID),
 						attr.Error(err))
 					// Don't fail the whole handler - log and continue
 				} else {
-					h.Logger.InfoContext(ctx, "Successfully updated Discord interaction for tag claim success",
+					h.logger.InfoContext(ctx, "Successfully updated Discord interaction for tag claim success",
 						attr.String("correlation_id", correlationID),
 						attr.String("result", fmt.Sprintf("%v", result.Success)))
 				}
 			} else {
-				h.Logger.WarnContext(ctx, "ClaimTagManager is nil, cannot update Discord interaction",
+				h.logger.WarnContext(ctx, "ClaimTagManager is nil, cannot update Discord interaction",
 					attr.String("correlation_id", correlationID))
 			}
 		} else {
-			h.Logger.WarnContext(ctx, "LeaderboardDiscord is nil, cannot update Discord interaction",
+			h.logger.WarnContext(ctx, "LeaderboardDiscord is nil, cannot update Discord interaction",
 				attr.String("correlation_id", correlationID))
 		}
 	}
@@ -127,7 +127,7 @@ func (h *LeaderboardHandlers) HandleTagAssignedResponse(ctx context.Context,
 		GuildID:      string(backendPayload.GuildID),
 	}
 
-	h.Logger.InfoContext(ctx, "Successfully translated TagAssignedResponse",
+	h.logger.InfoContext(ctx, "Successfully translated TagAssignedResponse",
 		attr.String("target_user_id", string(backendPayload.UserID)),
 		attr.Int("tag_number", int(*backendPayload.TagNumber)),
 	)
@@ -143,7 +143,7 @@ func (h *LeaderboardHandlers) HandleTagAssignedResponse(ctx context.Context,
 // HandleTagAssignFailedResponse translates a backend TagAssignmentFailed event to a Discord response.
 func (h *LeaderboardHandlers) HandleTagAssignFailedResponse(ctx context.Context,
 	payload *leaderboardevents.LeaderboardTagAssignmentFailedPayloadV1) ([]handlerwrapper.Result, error) {
-	h.Logger.InfoContext(ctx, "Handling TagAssignFailedResponse")
+	h.logger.InfoContext(ctx, "Handling TagAssignFailedResponse")
 
 	backendPayload := payload
 
@@ -160,26 +160,26 @@ func (h *LeaderboardHandlers) HandleTagAssignFailedResponse(ctx context.Context,
 		errorMessage := fmt.Sprintf("❌ Could not claim tag #%d: %s", *backendPayload.TagNumber, backendPayload.Reason)
 
 		// Get the claim tag manager and update the interaction
-		if h.LeaderboardDiscord != nil {
-			claimTagManager := h.LeaderboardDiscord.GetClaimTagManager()
+		if h.service != nil {
+			claimTagManager := h.service.GetClaimTagManager()
 			if claimTagManager != nil {
 				result, err := claimTagManager.UpdateInteractionResponse(ctx, correlationID, errorMessage)
 				if err != nil {
-					h.Logger.ErrorContext(ctx, "Failed to update Discord interaction for tag failure",
+					h.logger.ErrorContext(ctx, "Failed to update Discord interaction for tag failure",
 						attr.String("correlation_id", correlationID),
 						attr.Error(err))
 					// Don't fail the whole handler - log and continue
 				} else {
-					h.Logger.InfoContext(ctx, "Successfully updated Discord interaction for tag claim failure",
+					h.logger.InfoContext(ctx, "Successfully updated Discord interaction for tag claim failure",
 						attr.String("correlation_id", correlationID),
 						attr.String("result", fmt.Sprintf("%v", result.Success)))
 				}
 			} else {
-				h.Logger.WarnContext(ctx, "ClaimTagManager is nil, cannot update Discord interaction",
+				h.logger.WarnContext(ctx, "ClaimTagManager is nil, cannot update Discord interaction",
 					attr.String("correlation_id", correlationID))
 			}
 		} else {
-			h.Logger.WarnContext(ctx, "LeaderboardDiscord is nil, cannot update Discord interaction",
+			h.logger.WarnContext(ctx, "LeaderboardDiscord is nil, cannot update Discord interaction",
 				attr.String("correlation_id", correlationID))
 		}
 	}
@@ -191,7 +191,7 @@ func (h *LeaderboardHandlers) HandleTagAssignFailedResponse(ctx context.Context,
 		GuildID:      string(backendPayload.GuildID),
 	}
 
-	h.Logger.InfoContext(ctx, "Successfully translated TagAssignFailedResponse",
+	h.logger.InfoContext(ctx, "Successfully translated TagAssignFailedResponse",
 		attr.String("target_user_id", string(backendPayload.UserID)),
 		attr.Int("tag_number", int(*backendPayload.TagNumber)),
 		attr.String("reason", backendPayload.Reason),

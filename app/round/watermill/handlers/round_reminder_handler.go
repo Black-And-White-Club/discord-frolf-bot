@@ -21,7 +21,7 @@ func (h *RoundHandlers) HandleRoundReminder(ctx context.Context, payload *rounde
 	// Use default channel from config if payload doesn't have one
 	channelID := payload.DiscordChannelID
 	if channelID == "" {
-		defaultChannelID := h.Config.GetEventChannelID()
+		defaultChannelID := h.config.GetEventChannelID()
 		if defaultChannelID == "" {
 			return nil, nil // Don't return error - configuration issue, no point retrying
 		}
@@ -45,7 +45,7 @@ func (h *RoundHandlers) HandleRoundReminder(ctx context.Context, payload *rounde
 	defer cancel()
 
 	// Send the Discord reminder with timeout protection
-	result, err := h.RoundDiscord.GetRoundReminderManager().SendRoundReminder(apiCtx, payload)
+	result, err := h.service.GetRoundReminderManager().SendRoundReminder(apiCtx, payload)
 	if err != nil {
 		// Check if it's a timeout or context cancellation
 		if apiCtx.Err() == context.DeadlineExceeded {

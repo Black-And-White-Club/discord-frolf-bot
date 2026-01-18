@@ -79,8 +79,6 @@ func InitializeRoundModule(
 		cfg,
 		helper,
 		roundDiscord,
-		tracer,
-		discordMetrics,
 		guildConfig,
 	)
 

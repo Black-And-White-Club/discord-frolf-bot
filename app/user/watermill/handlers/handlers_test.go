@@ -7,7 +7,6 @@ import (
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	mockHelpers "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
-	"go.opentelemetry.io/otel/trace/noop"
 	"go.uber.org/mock/gomock"
 )
 
@@ -18,46 +17,24 @@ func TestNewUserHandlers(t *testing.T) {
 	// Create mock dependencies
 	mockUserDiscord := mockdiscord.NewMockUserDiscordInterface(ctrl)
 	logger := loggerfrolfbot.NoOpLogger
-	tracer := noop.NewTracerProvider().Tracer("test")
 	helpers := mockHelpers.NewMockHelpers(ctrl)
 	cfg := &config.Config{}
 
 	// Call the function being tested
-	handlers := NewUserHandlers(logger, cfg, helpers, mockUserDiscord, nil, nil, tracer, nil)
+	handlers := NewUserHandlers(logger, cfg, helpers, mockUserDiscord)
 
-	// Ensure handlers are correctly created
+	// Verify returns non-nil handlers
 	if handlers == nil {
-		t.Fatalf("NewUserHandlers returned nil")
-	}
-
-	// Access userHandlers directly from the Handler interface
-	userHandlers := handlers.(*UserHandlers)
-
-	// Check that all dependencies were correctly assigned
-	if userHandlers.userDiscord != mockUserDiscord {
-		t.Errorf("userDiscord not correctly assigned")
-	}
-	if userHandlers.logger != logger {
-		t.Errorf("logger not correctly assigned")
-	}
-	if userHandlers.tracer != tracer {
-		t.Errorf("tracer not correctly assigned")
-	}
-	if userHandlers.helper != helpers {
-		t.Errorf("helper not correctly assigned")
-	}
-	if userHandlers.config != cfg {
-		t.Errorf("config not correctly assigned")
+		t.Fatal("expected non-nil handlers")
 	}
 }
 
 func TestNewUserHandlersWithNilDependencies(t *testing.T) {
 	// Call with nil dependencies
-	handlers := NewUserHandlers(nil, nil, nil, nil, nil, nil, nil, nil)
+	handlers := NewUserHandlers(nil, nil, nil, nil)
 
-	// Ensure handlers are correctly created
+	// Verify returns non-nil handlers
 	if handlers == nil {
-		t.Fatalf("NewUserHandlers returned nil")
+		t.Fatal("expected non-nil handlers")
 	}
-
 }

@@ -66,8 +66,8 @@ func (h *RoundHandlers) HandleRoundParticipantJoinRequest(ctx context.Context, p
 func (h *RoundHandlers) HandleRoundParticipantJoined(ctx context.Context, payload *roundevents.ParticipantJoinedPayloadV1) ([]handlerwrapper.Result, error) {
 	// Resolve channel ID (currently from in-memory config). If empty, embed update can't proceed.
 	channelID := ""
-	if h.Config != nil && h.Config.GetEventChannelID() != "" {
-		channelID = h.Config.GetEventChannelID()
+	if h.config != nil && h.config.GetEventChannelID() != "" {
+		channelID = h.config.GetEventChannelID()
 	}
 
 	if channelID == "" {
@@ -92,7 +92,7 @@ func (h *RoundHandlers) HandleRoundParticipantJoined(ctx context.Context, payloa
 	// If not a late join, it's still an RSVP embed
 	if joinedLate {
 		// Use scorecard embed update for started rounds - add late participant to scorecard
-		_, err = h.RoundDiscord.GetScoreRoundManager().AddLateParticipantToScorecard(
+		_, err = h.service.GetScoreRoundManager().AddLateParticipantToScorecard(
 			ctx,
 			channelID,
 			messageID,
@@ -100,7 +100,7 @@ func (h *RoundHandlers) HandleRoundParticipantJoined(ctx context.Context, payloa
 		)
 	} else {
 		// Use RSVP embed update for rounds that haven't started
-		_, err = h.RoundDiscord.GetRoundRsvpManager().UpdateRoundEventEmbed(
+		_, err = h.service.GetRoundRsvpManager().UpdateRoundEventEmbed(
 			ctx,
 			channelID,
 			messageID,
@@ -120,8 +120,8 @@ func (h *RoundHandlers) HandleRoundParticipantJoined(ctx context.Context, payloa
 func (h *RoundHandlers) HandleRoundParticipantRemoved(ctx context.Context, payload *roundevents.ParticipantRemovedPayloadV1) ([]handlerwrapper.Result, error) {
 	// Resolve channel ID similarly for removal events
 	channelID := ""
-	if h.Config != nil && h.Config.GetEventChannelID() != "" {
-		channelID = h.Config.GetEventChannelID()
+	if h.config != nil && h.config.GetEventChannelID() != "" {
+		channelID = h.config.GetEventChannelID()
 	}
 
 	if channelID == "" {
@@ -149,7 +149,7 @@ func (h *RoundHandlers) HandleRoundParticipantRemoved(ctx context.Context, paylo
 	}
 
 	// Only update RSVP embeds (before round starts)
-	_, err := h.RoundDiscord.GetRoundRsvpManager().UpdateRoundEventEmbed(
+	_, err := h.service.GetRoundRsvpManager().UpdateRoundEventEmbed(
 		ctx,
 		channelID,
 		messageID,

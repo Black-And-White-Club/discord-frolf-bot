@@ -55,7 +55,7 @@ func (h *RoundHandlers) HandleRoundCreated(ctx context.Context, payload *roundev
 		location = string(*payload.Location)
 	}
 
-	sendResult, err := h.RoundDiscord.GetCreateRoundManager().SendRoundEventEmbed(
+	sendResult, err := h.service.GetCreateRoundManager().SendRoundEventEmbed(
 		guildID,
 		channelID,
 		roundtypes.Title(payload.Title),
@@ -115,7 +115,7 @@ func (h *RoundHandlers) HandleRoundCreationFailed(ctx context.Context, payload *
 		return nil, nil
 	}
 
-	_, err := h.RoundDiscord.GetCreateRoundManager().UpdateInteractionResponseWithRetryButton(ctx, correlationID, errorMessage)
+	_, err := h.service.GetCreateRoundManager().UpdateInteractionResponseWithRetryButton(ctx, correlationID, errorMessage)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update interaction response: %w", err)
 	}
@@ -133,7 +133,7 @@ func (h *RoundHandlers) HandleRoundValidationFailed(ctx context.Context, payload
 		return nil, nil
 	}
 
-	_, err := h.RoundDiscord.GetCreateRoundManager().UpdateInteractionResponseWithRetryButton(ctx, correlationID, errorMessage)
+	_, err := h.service.GetCreateRoundManager().UpdateInteractionResponseWithRetryButton(ctx, correlationID, errorMessage)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update interaction response: %w", err)
 	}

@@ -14,7 +14,7 @@ func (h *ScoreHandlers) HandleProcessRoundScoresFailedTyped(ctx context.Context,
 		return nil, nil
 	}
 
-	h.Logger.ErrorContext(ctx, "Score processing failed",
+	h.logger.ErrorContext(ctx, "Score processing failed",
 		attr.String("round_id", payload.RoundID.String()),
 		attr.String("guild_id", string(payload.GuildID)),
 		attr.String("reason", payload.Reason),

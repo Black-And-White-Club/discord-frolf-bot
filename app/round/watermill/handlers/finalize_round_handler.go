@@ -10,7 +10,7 @@ import (
 
 // HandleRoundFinalized handles the DiscordRoundFinalized event and updates the Discord embed
 func (h *RoundHandlers) HandleRoundFinalized(ctx context.Context, payload *roundevents.RoundFinalizedDiscordPayloadV1) ([]handlerwrapper.Result, error) {
-	discordChannelID := h.Config.GetEventChannelID()
+	discordChannelID := h.config.GetEventChannelID()
 
 	// Get message ID from context (set by wrapper from message metadata)
 	discordMessageID, ok := ctx.Value("discord_message_id").(string)
@@ -32,7 +32,7 @@ func (h *RoundHandlers) HandleRoundFinalized(ctx context.Context, payload *round
 	}
 
 	// Get the FinalizeRoundManager and finalize the round embed
-	finalizeRoundManager := h.RoundDiscord.GetFinalizeRoundManager()
+	finalizeRoundManager := h.service.GetFinalizeRoundManager()
 	finalizeResult, err := finalizeRoundManager.FinalizeScorecardEmbed(
 		ctx,
 		discordMessageID, // Pass message ID obtained from context

@@ -8,7 +8,6 @@ import (
 
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
-	"go.opentelemetry.io/otel/trace/noop"
 	"go.uber.org/mock/gomock"
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
@@ -63,7 +62,6 @@ func TestHandleBatchTagAssigned(t *testing.T) {
 	}
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	tracer := noop.NewTracerProvider().Tracer("test")
 	cfg := &config.Config{}
 
 	for _, tt := range tests {
@@ -79,13 +77,13 @@ func TestHandleBatchTagAssigned(t *testing.T) {
 				guildResolver = mockGuildConfig
 			}
 
-			h := &LeaderboardHandlers{
-				Logger:              logger,
-				Tracer:              tracer,
-				Config:              cfg,
-				LeaderboardDiscord:  mockDiscord,
-				GuildConfigResolver: guildResolver,
-			}
+			h := NewLeaderboardHandlers(
+				logger,
+				cfg,
+				nil,
+				mockDiscord,
+				guildResolver,
+			)
 
 			ctx := context.Background()
 			results, err := h.HandleBatchTagAssigned(ctx, tt.payload)

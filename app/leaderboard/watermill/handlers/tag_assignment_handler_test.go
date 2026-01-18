@@ -9,7 +9,6 @@ import (
 	discordleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
-	"go.opentelemetry.io/otel/trace/noop"
 )
 
 func TestHandleTagAssignRequest(t *testing.T) {
@@ -55,12 +54,14 @@ func TestHandleTagAssignRequest(t *testing.T) {
 	}
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	tracer := noop.NewTracerProvider().Tracer("test")
 
-	h := &LeaderboardHandlers{
-		Logger: logger,
-		Tracer: tracer,
-	}
+	h := NewLeaderboardHandlers(
+		logger,
+		nil,
+		nil,
+		nil,
+		nil,
+	)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -100,12 +101,14 @@ func TestHandleTagAssignedResponse(t *testing.T) {
 	}
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	tracer := noop.NewTracerProvider().Tracer("test")
 
-	h := &LeaderboardHandlers{
-		Logger: logger,
-		Tracer: tracer,
-	}
+	h := NewLeaderboardHandlers(
+		logger,
+		nil,
+		nil,
+		nil,
+		nil,
+	)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -146,12 +149,14 @@ func TestHandleTagAssignFailedResponse(t *testing.T) {
 	}
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	tracer := noop.NewTracerProvider().Tracer("test")
 
-	h := &LeaderboardHandlers{
-		Logger: logger,
-		Tracer: tracer,
-	}
+	h := NewLeaderboardHandlers(
+		logger,
+		nil,
+		nil,
+		nil,
+		nil,
+	)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

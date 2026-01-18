@@ -11,7 +11,6 @@ import (
 	discordleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	sharedevents "github.com/Black-And-White-Club/frolf-bot-shared/events/shared"
-	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	tracingfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/tracing"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
@@ -41,7 +40,6 @@ func NewLeaderboardRouter(
 	config *config.Config,
 	helper utils.Helpers,
 	tracer trace.Tracer,
-	metrics discordmetrics.DiscordMetrics,
 ) *LeaderboardRouter {
 	return &LeaderboardRouter{
 		logger:           logger,

@@ -6,9 +6,7 @@ import (
 
 	guildevents "github.com/Black-And-White-Club/frolf-bot-shared/events/guild"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
-	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
-	"go.opentelemetry.io/otel/trace/noop"
 )
 
 func TestGuildHandlers_HandleGuildConfigUpdated(t *testing.T) {
@@ -65,14 +63,16 @@ func TestGuildHandlers_HandleGuildConfigUpdated(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logger := loggerfrolfbot.NoOpLogger
-			tracer := noop.NewTracerProvider().Tracer("test")
-			metrics := &discordmetrics.NoOpMetrics{}
 
-			h := &GuildHandlers{
-				Logger:  logger,
-				Tracer:  tracer,
-				Metrics: metrics,
-			}
+			h := NewGuildHandlers(
+				logger,
+				nil, // config
+				nil, // guildDiscord
+				nil, // guildConfigResolver
+				nil, // signupManager
+				nil, // interactionStore
+				nil, // session
+			)
 
 			results, err := h.HandleGuildConfigUpdated(context.Background(), tt.payload)
 
@@ -115,14 +115,16 @@ func TestGuildHandlers_HandleGuildConfigUpdateFailed(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logger := loggerfrolfbot.NoOpLogger
-			tracer := noop.NewTracerProvider().Tracer("test")
-			metrics := &discordmetrics.NoOpMetrics{}
 
-			h := &GuildHandlers{
-				Logger:  logger,
-				Tracer:  tracer,
-				Metrics: metrics,
-			}
+			h := NewGuildHandlers(
+				logger,
+				nil, // config
+				nil, // guildDiscord
+				nil, // guildConfigResolver
+				nil, // signupManager
+				nil, // interactionStore
+				nil, // session
+			)
 
 			results, err := h.HandleGuildConfigUpdateFailed(context.Background(), tt.payload)
 
@@ -164,14 +166,16 @@ func TestGuildHandlers_HandleGuildConfigRetrieved(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logger := loggerfrolfbot.NoOpLogger
-			tracer := noop.NewTracerProvider().Tracer("test")
-			metrics := &discordmetrics.NoOpMetrics{}
 
-			h := &GuildHandlers{
-				Logger:  logger,
-				Tracer:  tracer,
-				Metrics: metrics,
-			}
+			h := NewGuildHandlers(
+				logger,
+				nil, // config
+				nil, // guildDiscord
+				nil, // guildConfigResolver
+				nil, // signupManager
+				nil, // interactionStore
+				nil, // session
+			)
 
 			results, err := h.HandleGuildConfigRetrieved(context.Background(), tt.payload)
 
@@ -214,14 +218,16 @@ func TestGuildHandlers_HandleGuildConfigRetrievalFailed(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logger := loggerfrolfbot.NoOpLogger
-			tracer := noop.NewTracerProvider().Tracer("test")
-			metrics := &discordmetrics.NoOpMetrics{}
 
-			h := &GuildHandlers{
-				Logger:  logger,
-				Tracer:  tracer,
-				Metrics: metrics,
-			}
+			h := NewGuildHandlers(
+				logger,
+				nil, // config
+				nil, // guildDiscord
+				nil, // guildConfigResolver
+				nil, // signupManager
+				nil, // interactionStore
+				nil, // session
+			)
 
 			results, err := h.HandleGuildConfigRetrievalFailed(context.Background(), tt.payload)
 

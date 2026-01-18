@@ -14,14 +14,14 @@ import (
 // HandleBatchTagAssigned handles batch tag assignment completions and sends leaderboard embed
 func (h *LeaderboardHandlers) HandleBatchTagAssigned(ctx context.Context,
 	payload *leaderboardevents.LeaderboardBatchTagAssignedPayloadV1) ([]handlerwrapper.Result, error) {
-	h.Logger.InfoContext(ctx, "Handling batch tag assigned event")
+	h.logger.InfoContext(ctx, "Handling batch tag assigned event")
 
 	batchPayload := payload
 
 	guildID := string(batchPayload.GuildID)
 
 	if len(batchPayload.Assignments) == 0 {
-		h.Logger.WarnContext(ctx, "Received empty batch assignment data",
+		h.logger.WarnContext(ctx, "Received empty batch assignment data",
 			attr.String("guild_id", guildID))
 		return []handlerwrapper.Result{}, nil
 	}
@@ -32,11 +32,11 @@ func (h *LeaderboardHandlers) HandleBatchTagAssigned(ctx context.Context,
 	var channelID string
 
 	// Try guild-specific config via resolver first
-	if h.GuildConfigResolver != nil && guildID != "" {
-		if guildCfg, err := h.GuildConfigResolver.GetGuildConfigWithContext(ctx, guildID); err == nil && guildCfg != nil && guildCfg.LeaderboardChannelID != "" {
+	if h.guildConfigResolver != nil && guildID != "" {
+		if guildCfg, err := h.guildConfigResolver.GetGuildConfigWithContext(ctx, guildID); err == nil && guildCfg != nil && guildCfg.LeaderboardChannelID != "" {
 			channelID = guildCfg.LeaderboardChannelID
 		} else if err != nil {
-			h.Logger.WarnContext(ctx, "Failed to get guild config, will try static config",
+			h.logger.WarnContext(ctx, "Failed to get guild config, will try static config",
 				attr.Error(err),
 				attr.String("guild_id", guildID),
 			)
@@ -44,13 +44,13 @@ func (h *LeaderboardHandlers) HandleBatchTagAssigned(ctx context.Context,
 	}
 
 	// Static config fallback (single-tenant / tests)
-	if channelID == "" && h.Config != nil && h.Config.Discord.LeaderboardChannelID != "" {
-		channelID = h.Config.Discord.LeaderboardChannelID
+	if channelID == "" && h.config != nil && h.config.Discord.LeaderboardChannelID != "" {
+		channelID = h.config.Discord.LeaderboardChannelID
 	}
 
 	// If still missing, emit trace and return early
 	if channelID == "" {
-		h.Logger.ErrorContext(ctx,
+		h.logger.ErrorContext(ctx,
 			"No leaderboard channel could be resolved (guild config + static config empty)",
 			attr.String("guild_id", guildID),
 			attr.Int("assignment_count", batchPayload.AssignmentCount),
@@ -91,14 +91,14 @@ func (h *LeaderboardHandlers) HandleBatchTagAssigned(ctx context.Context,
 	})
 
 	// Send the leaderboard embed
-	result, err := h.LeaderboardDiscord.GetLeaderboardUpdateManager().SendLeaderboardEmbed(
+	result, err := h.service.GetLeaderboardUpdateManager().SendLeaderboardEmbed(
 		ctx,
 		channelID,
 		leaderboardEntries,
 		int32(1),
 	)
 	if err != nil {
-		h.Logger.ErrorContext(ctx, "Failed to send leaderboard embed",
+		h.logger.ErrorContext(ctx, "Failed to send leaderboard embed",
 			attr.Error(err),
 			attr.String("guild_id", guildID),
 			attr.String("channel_id", channelID),
@@ -106,14 +106,14 @@ func (h *LeaderboardHandlers) HandleBatchTagAssigned(ctx context.Context,
 		return nil, err
 	}
 	if result.Error != nil {
-		h.Logger.ErrorContext(ctx, "Error in result from SendLeaderboardEmbed",
+		h.logger.ErrorContext(ctx, "Error in result from SendLeaderboardEmbed",
 			attr.Error(result.Error),
 			attr.String("guild_id", guildID),
 		)
 		return nil, result.Error
 	}
 
-	h.Logger.InfoContext(ctx,
+	h.logger.InfoContext(ctx,
 		"Successfully sent leaderboard embed for batch assignment",
 		attr.Int("assignment_count", batchPayload.AssignmentCount),
 		attr.String("batch_id", batchPayload.BatchID),

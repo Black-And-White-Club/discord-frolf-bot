@@ -9,14 +9,11 @@ import (
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/interactions"
 	scorerouter "github.com/Black-And-White-Club/discord-frolf-bot/app/score/watermill"
 	scorehandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/score/watermill/handlers"
-	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
-	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"github.com/ThreeDotsLabs/watermill/message"
-	"go.opentelemetry.io/otel"
 )
 
 // InitializeScoreModule initializes the score domain module.
@@ -30,22 +27,11 @@ func InitializeScoreModule(
 	logger *slog.Logger,
 	cfg *config.Config,
 	helper utils.Helpers,
-	interactionStore storage.ISInterface[any],
-	guildConfigCache storage.ISInterface[storage.GuildConfig],
-	discordMetrics discordmetrics.DiscordMetrics,
 ) (*scorerouter.ScoreRouter, error) {
-	tracer := otel.Tracer("score-module")
 
 	// Build Watermill Handlers first
 	scoreHandlers := scorehandlers.NewScoreHandlers(
 		logger,
-		cfg,
-		session,
-		helper,
-		interactionStore,
-		guildConfigCache,
-		tracer,
-		discordMetrics,
 	)
 
 	// Setup Watermill router
@@ -56,7 +42,7 @@ func InitializeScoreModule(
 		eventBus,
 		cfg,
 		helper,
-		tracer,
+		nil,
 	)
 
 	// Configure with context and handlers

@@ -19,7 +19,7 @@ func (h *UserHandlers) HandleRoleUpdateCommand(
 	// Respond to the role request with an ephemeral message
 	// Note: interaction metadata would need to be passed in payload or context
 	// For now, this is a placeholder that needs coordination with Discord module
-	_ = h.userDiscord.GetRoleManager()
+	_ = h.service.GetRoleManager()
 	return nil, nil
 }
 
@@ -33,7 +33,7 @@ func (h *UserHandlers) HandleRoleUpdateButtonPress(
 	selectedRole := sharedtypes.UserRoleEnum(roleStr)
 
 	// Acknowledge the button press with an ephemeral message
-	_, err := h.userDiscord.GetRoleManager().RespondToRoleButtonPress(
+	_, err := h.service.GetRoleManager().RespondToRoleButtonPress(
 		ctx,
 		payload.InteractionID,
 		payload.InteractionToken,
@@ -82,7 +82,7 @@ func (h *UserHandlers) HandleAddRole(
 	payload *discorduserevents.AddRolePayloadV1,
 ) ([]handlerwrapper.Result, error) {
 	// Attempt to add the role
-	_, err := h.userDiscord.GetRoleManager().AddRoleToUser(ctx, h.config.GetGuildID(), payload.UserID, payload.RoleID)
+	_, err := h.service.GetRoleManager().AddRoleToUser(ctx, h.config.GetGuildID(), payload.UserID, payload.RoleID)
 	if err != nil {
 		// Create a failure result
 		failurePayload := discorduserevents.RoleAdditionFailedPayloadV1{
