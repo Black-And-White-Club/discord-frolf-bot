@@ -32,9 +32,9 @@ func (h *RoundHandlers) HandleRoundCreateRequested(ctx context.Context, payload 
 			Topic:   roundevents.RoundCreationRequestedV1,
 			Payload: backendPayload,
 			Metadata: map[string]string{
-				"submitted_at":    time.Now().UTC().Format(time.RFC3339),
-				"user_timezone":   string(payload.Timezone),
-				"raw_start_time":  payload.StartTime,
+				"submitted_at":   time.Now().UTC().Format(time.RFC3339),
+				"user_timezone":  string(payload.Timezone),
+				"raw_start_time": payload.StartTime,
 			},
 		},
 	}, nil
@@ -97,7 +97,7 @@ func (h *RoundHandlers) HandleRoundCreated(ctx context.Context, payload *roundev
 			Metadata: map[string]string{
 				"discord_message_id": discordMessageID,
 				// Use idempotency for this specific publish only; do not reuse this key across different event types.
-				"idempotency_key":   fmt.Sprintf("round-event-message-id-update:%s:%s", roundID.String(), discordMessageID),
+				"idempotency_key": fmt.Sprintf("round-event-message-id-update:%s:%s", roundID.String(), discordMessageID),
 			},
 		},
 	}, nil

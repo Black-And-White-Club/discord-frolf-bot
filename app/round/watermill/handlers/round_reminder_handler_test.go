@@ -21,12 +21,12 @@ func TestRoundHandlers_HandleRoundReminder(t *testing.T) {
 	testReminderType := "start"
 
 	tests := []struct {
-		name       string
-		payload    *roundevents.DiscordReminderPayloadV1
-		ctx        context.Context
-		wantErr    bool
-		wantLen    int
-		setup      func(*gomock.Controller, *mocks.MockRoundDiscordInterface, *mocks.MockRoundReminderManager)
+		name    string
+		payload *roundevents.DiscordReminderPayloadV1
+		ctx     context.Context
+		wantErr bool
+		wantLen int
+		setup   func(*gomock.Controller, *mocks.MockRoundDiscordInterface, *mocks.MockRoundReminderManager)
 	}{
 		{
 			name: "successful_reminder_sent",

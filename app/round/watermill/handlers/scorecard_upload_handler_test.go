@@ -31,11 +31,11 @@ func TestRoundHandlers_HandleScorecardUploaded(t *testing.T) {
 	)
 
 	tests := []struct {
-		name       string
-		payload    *roundevents.ScorecardUploadedPayloadV1
-		ctx        context.Context
-		wantErr    bool
-		wantLen    int
+		name    string
+		payload *roundevents.ScorecardUploadedPayloadV1
+		ctx     context.Context
+		wantErr bool
+		wantLen int
 	}{
 		{
 			name: "successful_scorecard_upload",
@@ -52,8 +52,8 @@ func TestRoundHandlers_HandleScorecardUploaded(t *testing.T) {
 		{
 			name: "missing_import_id",
 			payload: &roundevents.ScorecardUploadedPayloadV1{
-				GuildID: sharedtypes.GuildID("guild-id"),
-				RoundID: sharedtypes.RoundID(uuid.New()),
+				GuildID:  sharedtypes.GuildID("guild-id"),
+				RoundID:  sharedtypes.RoundID(uuid.New()),
 				UDiscURL: "https://example.com/scorecard.csv",
 			},
 			ctx:     context.Background(),
@@ -111,11 +111,11 @@ func TestRoundHandlers_HandleScorecardParseFailed(t *testing.T) {
 	)
 
 	tests := []struct {
-		name       string
-		payload    *roundevents.ScorecardParseFailedPayloadV1
-		ctx        context.Context
-		wantErr    bool
-		wantLen    int
+		name    string
+		payload *roundevents.ScorecardParseFailedPayloadV1
+		ctx     context.Context
+		wantErr bool
+		wantLen int
 	}{
 		{
 			name: "successful_parse_failure_handling",
@@ -156,11 +156,11 @@ func TestRoundHandlers_HandleImportFailed(t *testing.T) {
 	)
 
 	tests := []struct {
-		name       string
-		payload    *roundevents.ImportFailedPayloadV1
-		ctx        context.Context
-		wantErr    bool
-		wantLen    int
+		name    string
+		payload *roundevents.ImportFailedPayloadV1
+		ctx     context.Context
+		wantErr bool
+		wantLen int
 	}{
 		{
 			name: "successful_import_failure_handling",
@@ -201,11 +201,11 @@ func TestRoundHandlers_HandleScorecardURLRequested(t *testing.T) {
 	)
 
 	tests := []struct {
-		name       string
-		payload    *roundevents.ScorecardURLRequestedPayloadV1
-		ctx        context.Context
-		wantErr    bool
-		wantLen    int
+		name    string
+		payload *roundevents.ScorecardURLRequestedPayloadV1
+		ctx     context.Context
+		wantErr bool
+		wantLen int
 	}{
 		{
 			name: "successful_scorecard_url_request",

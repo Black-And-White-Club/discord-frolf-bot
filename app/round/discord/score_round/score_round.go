@@ -41,8 +41,8 @@ type scoreRoundManager struct {
 	logger              *slog.Logger
 	helper              utils.Helpers
 	config              *config.Config
-		interactionStore    storage.ISInterface[any]
-		guildConfigCache    storage.ISInterface[storage.GuildConfig]
+	interactionStore    storage.ISInterface[any]
+	guildConfigCache    storage.ISInterface[storage.GuildConfig]
 	tracer              trace.Tracer
 	metrics             discordmetrics.DiscordMetrics
 	operationWrapper    func(ctx context.Context, opName string, fn func(ctx context.Context) (ScoreRoundOperationResult, error)) (ScoreRoundOperationResult, error)
@@ -70,15 +70,15 @@ func NewScoreRoundManager(
 		)
 	}
 	return &scoreRoundManager{
-		session:   session,
-		publisher: publisher,
-		logger:    logger,
-		helper:    helper,
-		config:    config,
+		session:          session,
+		publisher:        publisher,
+		logger:           logger,
+		helper:           helper,
+		config:           config,
 		interactionStore: interactionStore,
 		guildConfigCache: guildConfigCache,
-		tracer:    tracer,
-		metrics:   metrics,
+		tracer:           tracer,
+		metrics:          metrics,
 		operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (ScoreRoundOperationResult, error)) (ScoreRoundOperationResult, error) {
 			return wrapScoreRoundOperation(ctx, opName, fn, logger, tracer, metrics)
 		},

@@ -26,12 +26,12 @@ func TestRoundHandlers_HandleRoundUpdateRequested(t *testing.T) {
 	testDescription := roundtypes.Description("Updated Description")
 
 	tests := []struct {
-		name       string
-		payload    *discordroundevents.RoundUpdateModalSubmittedPayloadV1
-		ctx        context.Context
-		want       []handlerwrapper.Result
-		wantErr    bool
-		wantLen    int // Expected number of results
+		name    string
+		payload *discordroundevents.RoundUpdateModalSubmittedPayloadV1
+		ctx     context.Context
+		want    []handlerwrapper.Result
+		wantErr bool
+		wantLen int // Expected number of results
 	}{
 		{
 			name: "successful_update_request",
@@ -117,12 +117,12 @@ func TestRoundHandlers_HandleRoundUpdated(t *testing.T) {
 	testLocation := roundtypes.LocationPtr("Updated Location")
 
 	tests := []struct {
-		name       string
-		payload    *roundevents.RoundEntityUpdatedPayloadV1
-		ctx        context.Context
-		wantErr    bool
-		wantLen    int // Expected number of results
-		setup      func(*gomock.Controller, *mocks.MockRoundDiscordInterface, *mocks.MockUpdateRoundManager)
+		name    string
+		payload *roundevents.RoundEntityUpdatedPayloadV1
+		ctx     context.Context
+		wantErr bool
+		wantLen int // Expected number of results
+		setup   func(*gomock.Controller, *mocks.MockRoundDiscordInterface, *mocks.MockUpdateRoundManager)
 	}{
 		{
 			name: "successful_round_updated",
@@ -135,7 +135,7 @@ func TestRoundHandlers_HandleRoundUpdated(t *testing.T) {
 					Location:    testLocation,
 				},
 			},
-			ctx: context.WithValue(context.WithValue(context.Background(), "channel_id", testChannelID), "message_id", testMessageID),
+			ctx:     context.WithValue(context.WithValue(context.Background(), "channel_id", testChannelID), "message_id", testMessageID),
 			wantErr: false,
 			wantLen: 0, // Side-effect only
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockUpdateRoundManager *mocks.MockUpdateRoundManager) {
@@ -161,7 +161,7 @@ func TestRoundHandlers_HandleRoundUpdated(t *testing.T) {
 					Location: testLocation,
 				},
 			},
-			ctx: context.WithValue(context.WithValue(context.Background(), "channel_id", testChannelID), "message_id", testMessageID),
+			ctx:     context.WithValue(context.WithValue(context.Background(), "channel_id", testChannelID), "message_id", testMessageID),
 			wantErr: false,
 			wantLen: 0, // Side-effect only
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockUpdateRoundManager *mocks.MockUpdateRoundManager) {
@@ -186,7 +186,7 @@ func TestRoundHandlers_HandleRoundUpdated(t *testing.T) {
 					Title: testTitle,
 				},
 			},
-			ctx: context.WithValue(context.WithValue(context.Background(), "channel_id", testChannelID), "message_id", testMessageID),
+			ctx:     context.WithValue(context.WithValue(context.Background(), "channel_id", testChannelID), "message_id", testMessageID),
 			wantErr: true,
 			wantLen: 0,
 			setup: func(ctrl *gomock.Controller, mockRoundDiscord *mocks.MockRoundDiscordInterface, mockUpdateRoundManager *mocks.MockUpdateRoundManager) {
@@ -250,11 +250,11 @@ func TestRoundHandlers_HandleRoundUpdateFailed(t *testing.T) {
 	testUserID := sharedtypes.DiscordID("user123")
 
 	tests := []struct {
-		name       string
-		payload    *roundevents.RoundUpdateErrorPayloadV1
-		ctx        context.Context
-		wantErr    bool
-		wantLen    int // Expected number of results
+		name    string
+		payload *roundevents.RoundUpdateErrorPayloadV1
+		ctx     context.Context
+		wantErr bool
+		wantLen int // Expected number of results
 	}{
 		{
 			name: "handle_update_failed_with_full_payload",
@@ -326,11 +326,11 @@ func TestRoundHandlers_HandleRoundUpdateValidationFailed(t *testing.T) {
 	testUserID := sharedtypes.DiscordID("user123")
 
 	tests := []struct {
-		name       string
-		payload    *roundevents.RoundUpdateValidatedPayloadV1
-		ctx        context.Context
-		wantErr    bool
-		wantLen    int // Expected number of results
+		name    string
+		payload *roundevents.RoundUpdateValidatedPayloadV1
+		ctx     context.Context
+		wantErr bool
+		wantLen int // Expected number of results
 	}{
 		{
 			name: "handle_validation_failed_full_payload",

@@ -36,8 +36,8 @@ func Test_signupManager_SendSignupResult(t *testing.T) {
 				interaction := &discordgo.Interaction{}
 				mockStore.EXPECT().Get(gomock.Any(), "valid_id").Return(interaction, nil)
 				mockDiscord.EXPECT().InteractionResponseEdit(gomock.Any(), gomock.Any()).Return(&discordgo.Message{}, nil)
-					// Expect stored interaction to be deleted after sending the follow-up
-					mockStore.EXPECT().Delete(gomock.Any(), "valid_id").Times(1)
+				// Expect stored interaction to be deleted after sending the follow-up
+				mockStore.EXPECT().Delete(gomock.Any(), "valid_id").Times(1)
 			},
 			wantSuccess: "🎉 Signup successful! Welcome!",
 			wantErr:     false,
@@ -53,8 +53,8 @@ func Test_signupManager_SendSignupResult(t *testing.T) {
 				interaction := &discordgo.Interaction{}
 				mockStore.EXPECT().Get(gomock.Any(), "valid_id").Return(interaction, nil)
 				mockDiscord.EXPECT().InteractionResponseEdit(gomock.Any(), gomock.Any()).Return(&discordgo.Message{}, nil)
-					// Expect stored interaction to be deleted after sending the follow-up
-					mockStore.EXPECT().Delete(gomock.Any(), "valid_id").Times(1)
+				// Expect stored interaction to be deleted after sending the follow-up
+				mockStore.EXPECT().Delete(gomock.Any(), "valid_id").Times(1)
 			},
 			wantSuccess: "❌ Signup failed. Please try again.",
 			wantErr:     false,

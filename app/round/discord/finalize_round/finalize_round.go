@@ -59,15 +59,15 @@ func NewFinalizeRoundManager(
 		logger.InfoContext(context.Background(), "Creating FinalizeRoundManager")
 	}
 	return &finalizeRoundManager{
-		session:   session,
-		publisher: publisher,
-		logger:    logger,
-		helper:    helper,
-		config:    config,
+		session:          session,
+		publisher:        publisher,
+		logger:           logger,
+		helper:           helper,
+		config:           config,
 		interactionStore: interactionStore,
 		guildConfigCache: guildConfigCache,
-		tracer:    tracer,
-		metrics:   metrics,
+		tracer:           tracer,
+		metrics:          metrics,
 		operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (FinalizeRoundOperationResult, error)) (FinalizeRoundOperationResult, error) {
 			return wrapFinalizeRoundOperation(ctx, opName, fn, logger, tracer, metrics)
 		},

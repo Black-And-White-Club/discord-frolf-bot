@@ -22,12 +22,12 @@ func TestRoundHandlers_HandleRoundStarted(t *testing.T) {
 	testEventMessageID := "12345"
 
 	tests := []struct {
-		name       string
-		payload    *roundevents.DiscordRoundStartPayloadV1
-		ctx        context.Context
-		wantErr    bool
-		wantLen    int
-		setup      func(*gomock.Controller, *mocks.MockRoundDiscordInterface, *mocks.MockStartRoundManager)
+		name    string
+		payload *roundevents.DiscordRoundStartPayloadV1
+		ctx     context.Context
+		wantErr bool
+		wantLen int
+		setup   func(*gomock.Controller, *mocks.MockRoundDiscordInterface, *mocks.MockStartRoundManager)
 	}{
 		{
 			name: "successful_round_start",
@@ -52,7 +52,7 @@ func TestRoundHandlers_HandleRoundStarted(t *testing.T) {
 			},
 		},
 		{
-			name: "invalid_payload_type",
+			name:    "invalid_payload_type",
 			payload: &roundevents.DiscordRoundStartPayloadV1{},
 			ctx:     context.Background(),
 			wantErr: true,

@@ -23,12 +23,12 @@ func TestRoundHandlers_HandleRoundFinalized(t *testing.T) {
 	configChannelID := "config-channel-id"
 
 	tests := []struct {
-		name       string
-		payload    *roundevents.RoundFinalizedDiscordPayloadV1
-		ctx        context.Context
-		wantErr    bool
-		wantLen    int
-		setup      func(*gomock.Controller, *mocks.MockRoundDiscordInterface, *mocks.MockFinalizeRoundManager)
+		name    string
+		payload *roundevents.RoundFinalizedDiscordPayloadV1
+		ctx     context.Context
+		wantErr bool
+		wantLen int
+		setup   func(*gomock.Controller, *mocks.MockRoundDiscordInterface, *mocks.MockFinalizeRoundManager)
 	}{
 		{
 			name: "successful_round_finalized",

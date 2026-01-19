@@ -20,11 +20,11 @@ func TestRoundHandlers_HandleRoundParticipantJoinRequest(t *testing.T) {
 	testUserID := sharedtypes.DiscordID("123456789")
 
 	tests := []struct {
-		name       string
-		payload    *discordroundevents.RoundParticipantJoinRequestDiscordPayloadV1
-		ctx        context.Context
-		wantErr    bool
-		wantLen    int
+		name    string
+		payload *discordroundevents.RoundParticipantJoinRequestDiscordPayloadV1
+		ctx     context.Context
+		wantErr bool
+		wantLen int
 	}{
 		{
 			name: "successful_accepted_response",
@@ -113,11 +113,11 @@ func TestRoundHandlers_HandleRoundParticipantRemoved(t *testing.T) {
 	testUserID := sharedtypes.DiscordID("user123")
 
 	tests := []struct {
-		name       string
-		payload    *roundevents.ParticipantRemovedPayloadV1
-		ctx        context.Context
-		wantErr    bool
-		wantLen    int
+		name    string
+		payload *roundevents.ParticipantRemovedPayloadV1
+		ctx     context.Context
+		wantErr bool
+		wantLen int
 	}{
 		{
 			name: "successful_participant_removal",

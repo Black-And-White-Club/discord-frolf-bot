@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guild/mocks"
+	guildconfigmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
+	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	guildevents "github.com/Black-And-White-Club/frolf-bot-shared/events/guild"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
 	guildtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/guild"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
-	"github.com/Black-And-White-Club/discord-frolf-bot/app/guild/mocks"
-	guildconfigmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
-	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"go.uber.org/mock/gomock"
 )
 

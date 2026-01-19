@@ -21,12 +21,12 @@ func TestRoundHandlers_HandleRoundDeleteRequested(t *testing.T) {
 	testRoundID := sharedtypes.RoundID(uuid.New())
 
 	tests := []struct {
-		name       string
-		payload    *discordroundevents.RoundDeleteRequestDiscordPayloadV1
-		ctx        context.Context
-		wantErr    bool
-		wantLen    int
-		setup      func(*gomock.Controller, *mocks.MockRoundDiscordInterface)
+		name    string
+		payload *discordroundevents.RoundDeleteRequestDiscordPayloadV1
+		ctx     context.Context
+		wantErr bool
+		wantLen int
+		setup   func(*gomock.Controller, *mocks.MockRoundDiscordInterface)
 	}{
 		{
 			name: "successful_delete_request",
@@ -89,12 +89,12 @@ func TestRoundHandlers_HandleRoundDeleted(t *testing.T) {
 	testDiscordMessageID := "123456789012345678"
 
 	tests := []struct {
-		name       string
-		payload    *roundevents.RoundDeletedPayloadV1
-		ctx        context.Context
-		wantErr    bool
-		wantLen    int
-		setup      func(*gomock.Controller, *mocks.MockRoundDiscordInterface, *mocks.MockDeleteRoundManager)
+		name    string
+		payload *roundevents.RoundDeletedPayloadV1
+		ctx     context.Context
+		wantErr bool
+		wantLen int
+		setup   func(*gomock.Controller, *mocks.MockRoundDiscordInterface, *mocks.MockDeleteRoundManager)
 	}{
 		{
 			name: "successful_round_deletion",

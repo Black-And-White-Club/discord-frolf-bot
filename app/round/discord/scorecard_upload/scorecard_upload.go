@@ -67,15 +67,15 @@ func NewScorecardUploadManager(
 	}
 
 	m := &scorecardUploadManager{
-		session:        session,
-		publisher:      publisher,
-		logger:         logger,
-		config:         cfg,
+		session:          session,
+		publisher:        publisher,
+		logger:           logger,
+		config:           cfg,
 		interactionStore: interactionStore,
 		guildConfigCache: guildConfigCache,
-		tracer:         tracer,
-		metrics:        metrics,
-		pendingUploads: make(map[string]*pendingUpload),
+		tracer:           tracer,
+		metrics:          metrics,
+		pendingUploads:   make(map[string]*pendingUpload),
 		operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error) {
 			return operationWrapper(ctx, opName, fn, logger, tracer)
 		},

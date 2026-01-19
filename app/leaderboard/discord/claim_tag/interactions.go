@@ -56,15 +56,15 @@ func (ctm *claimTagManager) HandleClaimTagCommand(ctx context.Context, i *discor
 		// Generate unique request ID
 		requestID := uuid.New().String()
 
-			// Store interaction for later response
-			if ctm.interactionStore != nil {
-				if err = ctm.interactionStore.Set(ctx, requestID, i.Interaction); err != nil {
-					ctm.logger.ErrorContext(ctx, "Failed to store interaction", attr.Error(err))
-					return ClaimTagOperationResult{Error: err}, err
-				}
-			} else {
-				ctm.logger.WarnContext(ctx, "interaction store is nil; cannot persist interaction for callback")
+		// Store interaction for later response
+		if ctm.interactionStore != nil {
+			if err = ctm.interactionStore.Set(ctx, requestID, i.Interaction); err != nil {
+				ctm.logger.ErrorContext(ctx, "Failed to store interaction", attr.Error(err))
+				return ClaimTagOperationResult{Error: err}, err
 			}
+		} else {
+			ctm.logger.WarnContext(ctx, "interaction store is nil; cannot persist interaction for callback")
+		}
 
 		// Create the batch payload (single-assignment batch) so backend receives the expected schema
 		batchPayload := leaderboardevents.LeaderboardBatchTagAssignmentRequestedPayloadV1{
@@ -115,25 +115,25 @@ func (ctm *claimTagManager) UpdateInteractionResponse(ctx context.Context, corre
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.CorrelationIDKey, correlationID)
 
 	return ctm.operationWrapper(ctx, "update_interaction_response", func(ctx context.Context) (ClaimTagOperationResult, error) {
-			// Retrieve stored interaction using the type-safe helper
-			interactionObj, err := discordutils.GetInteraction(ctx, ctm.interactionStore, correlationID)
-			if err != nil {
-				ctm.logger.ErrorContext(ctx, "no interaction found for correlation ID", attr.String("correlation_id", correlationID), attr.Error(err))
-				return ClaimTagOperationResult{Error: err}, nil
-			}
+		// Retrieve stored interaction using the type-safe helper
+		interactionObj, err := discordutils.GetInteraction(ctx, ctm.interactionStore, correlationID)
+		if err != nil {
+			ctm.logger.ErrorContext(ctx, "no interaction found for correlation ID", attr.String("correlation_id", correlationID), attr.Error(err))
+			return ClaimTagOperationResult{Error: err}, nil
+		}
 
-			_, err = ctm.session.InteractionResponseEdit(interactionObj, &discordgo.WebhookEdit{
-				Content: &message,
-			})
-			if err != nil {
-				ctm.logger.ErrorContext(ctx, "Failed to update interaction response", attr.Error(err))
-				return ClaimTagOperationResult{Error: err}, nil
-			}
+		_, err = ctm.session.InteractionResponseEdit(interactionObj, &discordgo.WebhookEdit{
+			Content: &message,
+		})
+		if err != nil {
+			ctm.logger.ErrorContext(ctx, "Failed to update interaction response", attr.Error(err))
+			return ClaimTagOperationResult{Error: err}, nil
+		}
 
-			// Clean up the stored interaction after successful response
-			if ctm.interactionStore != nil {
-				ctm.interactionStore.Delete(ctx, correlationID)
-			}
+		// Clean up the stored interaction after successful response
+		if ctm.interactionStore != nil {
+			ctm.interactionStore.Delete(ctx, correlationID)
+		}
 
 		return ClaimTagOperationResult{Success: "interaction response updated"}, nil
 	})

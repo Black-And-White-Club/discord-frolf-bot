@@ -69,7 +69,6 @@ func (r *GuildRouter) Configure(ctx context.Context, handlers guildhandlers.Hand
 	return nil
 }
 
-
 // RegisterHandlers registers event handlers using pure transformation pattern.
 func (r *GuildRouter) RegisterHandlers(ctx context.Context, handlers guildhandlers.Handlers) error {
 	r.logger.InfoContext(ctx, "Registering Guild Handlers")
