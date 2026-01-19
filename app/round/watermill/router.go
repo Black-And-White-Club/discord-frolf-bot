@@ -178,7 +178,7 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers roundhandle
 
 	// Reminders
 	registerHandler(deps, roundevents.RoundReminderSentV1, handlers.HandleRoundReminder)
-	registerHandler(deps, roundevents.TagsUpdatedForScheduledRoundsV1, handlers.HandleTagsUpdatedForScheduledRounds)
+	registerHandler(deps, roundevents.ScheduledRoundsSyncedV1, handlers.HandleScheduledRoundsSynced)
 
 	// NOTE: Several backend-only failure topics are intentionally NOT mapped to
 	// Discord-side handlers. These topics are published by the `frolf-bot` backend

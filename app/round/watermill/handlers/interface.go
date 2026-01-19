@@ -53,8 +53,8 @@ type Handlers interface {
 	// Tag handling
 	HandleRoundParticipantJoined(ctx context.Context, payload *roundevents.ParticipantJoinedPayloadV1) ([]handlerwrapper.Result, error)
 	HandleRoundParticipantsUpdated(ctx context.Context, payload *roundevents.RoundParticipantsUpdatedPayloadV1) ([]handlerwrapper.Result, error)
+	HandleScheduledRoundsSynced(ctx context.Context, payload *roundevents.ScheduledRoundsSyncedPayloadV1) ([]handlerwrapper.Result, error)
 
 	// Reminders
 	HandleRoundReminder(ctx context.Context, payload *roundevents.DiscordReminderPayloadV1) ([]handlerwrapper.Result, error)
-	HandleTagsUpdatedForScheduledRounds(ctx context.Context, payload *roundevents.TagsUpdatedForScheduledRoundsPayloadV1) ([]handlerwrapper.Result, error)
 }

@@ -44,7 +44,7 @@ func (m *MockTagUpdateManager) EXPECT() *MockTagUpdateManagerMockRecorder {
 }
 
 // UpdateDiscordEmbedsWithTagChanges mocks base method.
-func (m *MockTagUpdateManager) UpdateDiscordEmbedsWithTagChanges(ctx context.Context, payload roundevents.TagsUpdatedForScheduledRoundsPayloadV1, tagUpdates map[sharedtypes.DiscordID]*sharedtypes.TagNumber) (tagupdates.TagUpdateOperationResult, error) {
+func (m *MockTagUpdateManager) UpdateDiscordEmbedsWithTagChanges(ctx context.Context, payload roundevents.ScheduledRoundsSyncedPayloadV1, tagUpdates map[sharedtypes.DiscordID]*sharedtypes.TagNumber) (tagupdates.TagUpdateOperationResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateDiscordEmbedsWithTagChanges", ctx, payload, tagUpdates)
 	ret0, _ := ret[0].(tagupdates.TagUpdateOperationResult)
