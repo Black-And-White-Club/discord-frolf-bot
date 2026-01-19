@@ -24,7 +24,7 @@ import (
 
 // TagUpdateManager defines the interface for tag update operations.
 type TagUpdateManager interface {
-	UpdateDiscordEmbedsWithTagChanges(ctx context.Context, payload roundevents.TagsUpdatedForScheduledRoundsPayloadV1, tagUpdates map[sharedtypes.DiscordID]*sharedtypes.TagNumber) (TagUpdateOperationResult, error)
+	UpdateDiscordEmbedsWithTagChanges(ctx context.Context, payload roundevents.ScheduledRoundsSyncedPayloadV1, tagUpdates map[sharedtypes.DiscordID]*sharedtypes.TagNumber) (TagUpdateOperationResult, error)
 	UpdateTagsInEmbed(ctx context.Context, channelID, messageID string, tagUpdates map[sharedtypes.DiscordID]*sharedtypes.TagNumber) (TagUpdateOperationResult, error)
 }
 

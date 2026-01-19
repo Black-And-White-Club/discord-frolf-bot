@@ -11,7 +11,15 @@ import (
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 )
 
-func (h *RoundHandlers) HandleTagsUpdatedForScheduledRounds(ctx context.Context, payload *roundevents.TagsUpdatedForScheduledRoundsPayloadV1) ([]handlerwrapper.Result, error) {
+// frolf-bot-discord/app/round/watermill/handlers/handlers.go
+
+// HandleScheduledRoundsSynced (formerly HandleTagsUpdatedForScheduledRounds)
+// This processes the result of the sync and refreshes the Discord embeds.
+func (h *RoundHandlers) HandleScheduledRoundsSynced(
+	ctx context.Context,
+	payload *roundevents.ScheduledRoundsSyncedPayloadV1,
+) ([]handlerwrapper.Result, error) {
+
 	if len(payload.UpdatedRounds) == 0 {
 		return nil, nil
 	}
@@ -27,6 +35,8 @@ func (h *RoundHandlers) HandleTagsUpdatedForScheduledRounds(ctx context.Context,
 	}
 
 	// Use the tag update manager to update Discord embeds
+	// Note: Pass the payload directly; the manager might need to be updated
+	// if it strictly expects the old payload type.
 	result, err := h.service.GetTagUpdateManager().UpdateDiscordEmbedsWithTagChanges(ctx, *payload, tagUpdates)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update Discord embeds: %w", err)
@@ -36,7 +46,7 @@ func (h *RoundHandlers) HandleTagsUpdatedForScheduledRounds(ctx context.Context,
 		return nil, fmt.Errorf("discord embed update failed: %w", result.Error)
 	}
 
-	return nil, nil // No further messages to publish
+	return nil, nil
 }
 
 // HandleRoundParticipantsUpdated processes round participant updates and updates Discord embeds
