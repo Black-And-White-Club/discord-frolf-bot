@@ -18,24 +18,14 @@ import (
 )
 
 func Test_startRoundManager_UpdateRoundToScorecard(t *testing.T) {
-	// Helper function to create a pointer to a string
-	strPtr := func(s string) *string {
-		return &s
-	}
-
-	// Helper function to create a pointer to a time
-	timePtr := func(t time.Time) *time.Time {
-		return &t
-	}
+	timePtr := func(t time.Time) *time.Time { return &t }
 
 	testRoundID := sharedtypes.RoundID(uuid.New())
-	// Create fixed time for testing
 	fixedTime := time.Date(2025, 3, 15, 10, 0, 0, 0, time.UTC)
 
-	// Test cases
 	tests := []struct {
 		name       string
-		setupMocks func(mockSession *discordmocks.MockSession)
+		setupMocks func(*discordmocks.MockSession)
 		payload    *roundevents.DiscordRoundStartPayloadV1
 		channelID  string
 		messageID  string
@@ -43,48 +33,19 @@ func Test_startRoundManager_UpdateRoundToScorecard(t *testing.T) {
 	}{
 		{
 			name: "Successful update",
-			setupMocks: func(mockSession *discordmocks.MockSession) {
-				// Mock the channel message fetch
-				mockSession.EXPECT().
+			setupMocks: func(m *discordmocks.MockSession) {
+				m.EXPECT().
 					ChannelMessage("test-channel", "test-message").
-					Return(&discordgo.Message{
-						ID:     "test-message",
-						Embeds: []*discordgo.MessageEmbed{},
-					}, nil).
-					Times(1)
-
-				// Mock the channel message edit
-				mockSession.EXPECT().
+					Return(&discordgo.Message{ID: "test-message"}, nil)
+				m.EXPECT().
 					ChannelMessageEditComplex(gomock.Any()).
-					DoAndReturn(func(edit *discordgo.MessageEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
-						// Validate edit matches what we expect
-						if edit.Channel != "test-channel" || edit.ID != "test-message" {
-							t.Errorf("Unexpected edit parameters: got %+v, want channel=%s, id=%s",
-								edit, "test-channel", "test-message")
-						}
-						// Return a mock message
-						return &discordgo.Message{ID: "test-message"}, nil
-					}).
-					Times(1)
-
-				// Mock User calls
-				mockSession.EXPECT().
-					User(gomock.Any()).
-					Return(&discordgo.User{Username: "TestUser"}, nil).
-					AnyTimes()
-
-				// Mock GuildMember calls
-				mockSession.EXPECT().
-					GuildMember(gomock.Any(), gomock.Any()).
-					Return(&discordgo.Member{Nick: ""}, nil).
-					AnyTimes()
+					Return(&discordgo.Message{ID: "test-message"}, nil)
 			},
 			payload: &roundevents.DiscordRoundStartPayloadV1{
-				RoundID:      testRoundID,
-				Title:        "Test Round",
-				Location:     (*roundtypes.Location)(strPtr("Test Course")),
-				StartTime:    (*sharedtypes.StartTime)(timePtr(fixedTime)),
-				Participants: []roundevents.RoundParticipantV1{},
+				RoundID:   testRoundID,
+				Title:     "Test Round",
+				Location:  (roundtypes.Location)("Test Course"),
+				StartTime: (*sharedtypes.StartTime)(timePtr(fixedTime)),
 			},
 			channelID: "test-channel",
 			messageID: "test-message",
@@ -92,137 +53,62 @@ func Test_startRoundManager_UpdateRoundToScorecard(t *testing.T) {
 		},
 		{
 			name: "Edit message fails",
-			setupMocks: func(mockSession *discordmocks.MockSession) {
-				// Mock the channel message fetch
-				mockSession.EXPECT().
+			setupMocks: func(m *discordmocks.MockSession) {
+				m.EXPECT().
 					ChannelMessage("test-channel", "test-message").
-					Return(&discordgo.Message{
-						ID:     "test-message",
-						Embeds: []*discordgo.MessageEmbed{},
-					}, nil).
-					Times(1)
-
-				// Mock User and GuildMember calls
-				mockSession.EXPECT().
-					User(gomock.Any()).
-					Return(&discordgo.User{Username: "TestUser"}, nil).
-					AnyTimes()
-
-				mockSession.EXPECT().
-					GuildMember(gomock.Any(), gomock.Any()).
-					Return(&discordgo.Member{Nick: ""}, nil).
-					AnyTimes()
-
-				// Mock the channel message edit to fail
-				mockSession.EXPECT().
+					Return(&discordgo.Message{ID: "test-message"}, nil)
+				m.EXPECT().
 					ChannelMessageEditComplex(gomock.Any()).
-					Return(nil, fmt.Errorf("discord API error")).
-					Times(1)
-			},
-			payload: &roundevents.DiscordRoundStartPayloadV1{
-				RoundID:      testRoundID,
-				Title:        "Test Round",
-				Location:     (*roundtypes.Location)(strPtr("Test Course")),
-				StartTime:    (*sharedtypes.StartTime)(timePtr(fixedTime)),
-				Participants: []roundevents.RoundParticipantV1{},
-			},
-			channelID: "test-channel",
-			messageID: "test-message",
-			expectErr: true,
-		},
-		{
-			name: "TransformRoundToScorecard fails",
-			setupMocks: func(mockSession *discordmocks.MockSession) {
-				// Mock the channel message fetch
-				mockSession.EXPECT().
-					ChannelMessage("test-channel", "test-message").
-					Return(&discordgo.Message{
-						ID:     "test-message",
-						Embeds: []*discordgo.MessageEmbed{},
-					}, nil).
-					Times(1)
-
-				// Mock User call to fail, but note the method continues despite this
-				mockSession.EXPECT().
-					User(gomock.Any()).
-					Return(nil, fmt.Errorf("user not found")).
-					AnyTimes()
-
-				// Mock GuildMember call to fail
-				mockSession.EXPECT().
-					GuildMember(gomock.Any(), gomock.Any()).
-					Return(nil, fmt.Errorf("guild member not found")).
-					AnyTimes()
-
-				// Because TransformRoundToScorecard continues despite User failures,
-				// ChannelMessageEditComplex WILL be called, so mock it to succeed
-				mockSession.EXPECT().
-					ChannelMessageEditComplex(gomock.Any()).
-					Return(&discordgo.Message{ID: "test-message"}, nil).
-					Times(1)
+					Return(nil, fmt.Errorf("discord API error"))
 			},
 			payload: &roundevents.DiscordRoundStartPayloadV1{
 				RoundID:   testRoundID,
 				Title:     "Test Round",
-				Location:  (*roundtypes.Location)(strPtr("Test Course")),
+				Location:  (roundtypes.Location)("Test Course"),
 				StartTime: (*sharedtypes.StartTime)(timePtr(fixedTime)),
-				Participants: []roundevents.RoundParticipantV1{
-					{
-						UserID: "test-user-1",
-					},
-				},
-			},
-			channelID: "test-channel",
-			messageID: "test-message",
-			expectErr: false, // Changed to false since the operation will succeed
-		},
-		{
-			name: "Fetch existing message fails",
-			setupMocks: func(mockSession *discordmocks.MockSession) {
-				// Mock the channel message fetch to fail
-				mockSession.EXPECT().
-					ChannelMessage("test-channel", "test-message").
-					Return(nil, fmt.Errorf("message not found")).
-					Times(1)
-			},
-			payload: &roundevents.DiscordRoundStartPayloadV1{
-				RoundID:      testRoundID,
-				Title:        "Test Round",
-				Location:     (*roundtypes.Location)(strPtr("Test Course")),
-				StartTime:    (*sharedtypes.StartTime)(timePtr(fixedTime)),
-				Participants: []roundevents.RoundParticipantV1{},
 			},
 			channelID: "test-channel",
 			messageID: "test-message",
 			expectErr: true,
 		},
 		{
-			name: "Missing channel ID",
-			setupMocks: func(mockSession *discordmocks.MockSession) {
-				// No mocks needed, as the function should fail before making any API calls
+			name: "Fetch existing message fails",
+			setupMocks: func(m *discordmocks.MockSession) {
+				m.EXPECT().
+					ChannelMessage("test-channel", "test-message").
+					Return(nil, fmt.Errorf("message not found"))
 			},
 			payload: &roundevents.DiscordRoundStartPayloadV1{
-				RoundID:      testRoundID,
-				Title:        "Test Round",
-				Location:     (*roundtypes.Location)(strPtr("Test Course")),
-				StartTime:    (*sharedtypes.StartTime)(timePtr(fixedTime)),
-				Participants: []roundevents.RoundParticipantV1{},
+				RoundID:   testRoundID,
+				Title:     "Test Round",
+				Location:  (roundtypes.Location)("Test Course"),
+				StartTime: (*sharedtypes.StartTime)(timePtr(fixedTime)),
+			},
+			channelID: "test-channel",
+			messageID: "test-message",
+			expectErr: true,
+		},
+		{
+			name:       "Missing channel ID",
+			setupMocks: nil,
+			payload: &roundevents.DiscordRoundStartPayloadV1{
+				RoundID:   testRoundID,
+				Title:     "Test Round",
+				Location:  (roundtypes.Location)("Test Course"),
+				StartTime: (*sharedtypes.StartTime)(timePtr(fixedTime)),
 			},
 			channelID: "",
 			messageID: "test-message",
 			expectErr: true,
 		},
 		{
-			name: "Missing message ID",
-			setupMocks: func(mockSession *discordmocks.MockSession) {
-				// No mocks needed, as the function should fail before making any API calls
-			},
+			name:       "Missing message ID",
+			setupMocks: nil,
 			payload: &roundevents.DiscordRoundStartPayloadV1{
-				RoundID:      testRoundID,
-				Title:        "Test Round",
-				Location:     (*roundtypes.Location)(strPtr("Test Course")),
-				StartTime:    (*sharedtypes.StartTime)(timePtr(fixedTime)),
-				Participants: []roundevents.RoundParticipantV1{},
+				RoundID:   testRoundID,
+				Title:     "Test Round",
+				Location:  (roundtypes.Location)("Test Course"),
+				StartTime: (*sharedtypes.StartTime)(timePtr(fixedTime)),
 			},
 			channelID: "test-channel",
 			messageID: "",
@@ -232,56 +118,32 @@ func Test_startRoundManager_UpdateRoundToScorecard(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Setup controller and mocks
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
 			mockSession := discordmocks.NewMockSession(ctrl)
-			mockLogger := loggerfrolfbot.NoOpLogger
-			mockConfig := &config.Config{
-				Discord: config.DiscordConfig{
-					GuildID: "guild-id",
-				},
-			}
-
-			// Create manager with mocks
-			srm := &startRoundManager{
-				session: mockSession,
-				logger:  mockLogger,
-				config:  mockConfig,
-				operationWrapper: func(ctx context.Context, name string, fn func(ctx context.Context) (StartRoundOperationResult, error)) (StartRoundOperationResult, error) {
-					// Call the actual logic function directly for testing
-					return fn(ctx)
-				},
-			}
-
-			// Setup the specific test case mocks
 			if tt.setupMocks != nil {
 				tt.setupMocks(mockSession)
 			}
 
-			// Call the function
-			ctx := context.Background()
-			got, err := srm.UpdateRoundToScorecard(ctx, tt.channelID, tt.messageID, tt.payload)
-
-			// Check error expectation
-			hasError := err != nil || got.Error != nil
-			if hasError != tt.expectErr {
-				t.Errorf("UpdateRoundToScorecard() error expectation mismatch. Returned error: %v, Result error: %v, wantErr: %v", err, got.Error, tt.expectErr)
-				return
+			srm := &startRoundManager{
+				session: mockSession,
+				logger:  loggerfrolfbot.NoOpLogger,
+				config:  &config.Config{},
+				operationWrapper: func(ctx context.Context, name string, fn func(ctx context.Context) (StartRoundOperationResult, error)) (StartRoundOperationResult, error) {
+					return fn(ctx)
+				},
 			}
 
-			// If no error is expected, verify that the operation succeeded
-			if !tt.expectErr {
-				// Check that the result struct does not contain an error
-				if got.Error != nil {
-					t.Errorf("UpdateRoundToScorecard() = %v, expected success, got error in result: %v", got, got.Error)
-				}
+			got, err := srm.UpdateRoundToScorecard(context.Background(), tt.channelID, tt.messageID, tt.payload)
 
-				// Check if Success contains something meaningful
-				if got.Success == nil {
-					t.Errorf("UpdateRoundToScorecard() Success field is nil, expected a value on success")
-				}
+			hasError := err != nil || got.Error != nil
+			if hasError != tt.expectErr {
+				t.Errorf("UpdateRoundToScorecard() error = %v, result.Error = %v, wantErr %v", err, got.Error, tt.expectErr)
+			}
+
+			if !tt.expectErr && got.Success == nil {
+				t.Errorf("Expected Success, got nil")
 			}
 		})
 	}

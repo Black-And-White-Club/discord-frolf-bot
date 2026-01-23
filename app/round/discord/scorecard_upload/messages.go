@@ -20,6 +20,12 @@ func (m *scorecardUploadManager) HandleFileUploadMessage(s discord.Session, msg 
 		return
 	}
 
+	// Note: accept uploads sent in any channel; pending uploads are keyed by
+	// user:channel so we'll look up pending context below. Previously this
+	// returned early for guild channels which prevented processing when tests
+	// expect uploads to be accepted in guild channels where a pending upload
+	// existed.
+
 	// Check if message has attachments
 	if len(msg.Attachments) == 0 {
 		return

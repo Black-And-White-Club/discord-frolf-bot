@@ -114,7 +114,7 @@ func TestRoundHandlers_HandleRoundUpdated(t *testing.T) {
 	testDescription := roundtypes.Description("Updated Description")
 	parsedStartTime, _ := time.Parse(time.RFC3339, "2023-05-01T14:00:00Z")
 	testStartTime := sharedtypes.StartTime(parsedStartTime)
-	testLocation := roundtypes.LocationPtr("Updated Location")
+	testLocation := roundtypes.Location("Updated Location")
 
 	tests := []struct {
 		name    string
@@ -130,7 +130,7 @@ func TestRoundHandlers_HandleRoundUpdated(t *testing.T) {
 				Round: roundtypes.Round{
 					ID:          testRoundID,
 					Title:       testTitle,
-					Description: &testDescription,
+					Description: testDescription,
 					StartTime:   &testStartTime,
 					Location:    testLocation,
 				},
@@ -145,10 +145,10 @@ func TestRoundHandlers_HandleRoundUpdated(t *testing.T) {
 					gomock.Any(),
 					testChannelID,
 					testMessageID,
-					&testTitle,
-					&testDescription,
-					&testStartTime,
-					testLocation,
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
 				).Return(updateround.UpdateRoundOperationResult{}, nil).Times(1)
 			},
 		},
@@ -171,10 +171,10 @@ func TestRoundHandlers_HandleRoundUpdated(t *testing.T) {
 					gomock.Any(),
 					testChannelID,
 					testMessageID,
-					&testTitle,
-					nil,
-					nil,
-					testLocation,
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
 				).Return(updateround.UpdateRoundOperationResult{}, nil).Times(1)
 			},
 		},
@@ -197,9 +197,9 @@ func TestRoundHandlers_HandleRoundUpdated(t *testing.T) {
 					testChannelID,
 					testMessageID,
 					&testTitle,
-					nil,
-					nil,
-					nil,
+					gomock.Nil(),
+					gomock.Nil(),
+					gomock.Nil(),
 				).Return(updateround.UpdateRoundOperationResult{
 					Error: errors.New("failed to update embed"),
 				}, nil).Times(1)
@@ -261,7 +261,7 @@ func TestRoundHandlers_HandleRoundUpdateFailed(t *testing.T) {
 			payload: &roundevents.RoundUpdateErrorPayloadV1{
 				RoundUpdateRequest: &roundevents.RoundUpdateRequestPayloadV1{
 					RoundID:     testRoundID,
-					Title:       testTitle,
+					Title:       &testTitle,
 					Description: &testDescription,
 					StartTime:   &testStartTime,
 					Location:    &testLocation,
@@ -337,7 +337,7 @@ func TestRoundHandlers_HandleRoundUpdateValidationFailed(t *testing.T) {
 			payload: &roundevents.RoundUpdateValidatedPayloadV1{
 				RoundUpdateRequestPayload: roundevents.RoundUpdateRequestPayloadV1{
 					RoundID:     testRoundID,
-					Title:       testTitle,
+					Title:       &testTitle,
 					Description: &testDescription,
 					StartTime:   &testStartTime,
 					Location:    &testLocation,

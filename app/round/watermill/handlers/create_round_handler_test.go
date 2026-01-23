@@ -36,8 +36,8 @@ func TestRoundHandlers_HandleRoundCreateRequested(t *testing.T) {
 			payload: &sharedroundevents.CreateRoundModalPayloadV1{
 				GuildID:     "123456789",
 				Title:       "Test Round",
-				Description: *roundtypes.DescriptionPtr("Test Description"),
-				Location:    *roundtypes.LocationPtr("Test Location"),
+				Description: "Test Description",
+				Location:    "Test Location",
 				StartTime:   "2024-01-01T12:00:00Z",
 				UserID:      "user123",
 				ChannelID:   "channel123",
@@ -112,8 +112,8 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 				BaseRoundPayload: roundtypes.BaseRoundPayload{
 					RoundID:     testRoundID,
 					Title:       roundtypes.Title("Test Round"),
-					Description: roundtypes.DescriptionPtr("Test Description"),
-					Location:    roundtypes.LocationPtr("Test Location"),
+					Description: roundtypes.Description("Test Description"),
+					Location:    roundtypes.Location("Test Location"),
 					StartTime:   &startTime,
 					UserID:      sharedtypes.DiscordID("user_id"),
 				},
@@ -150,8 +150,8 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 				BaseRoundPayload: roundtypes.BaseRoundPayload{
 					RoundID:     testRoundID,
 					Title:       roundtypes.Title("Test Round"),
-					Description: roundtypes.DescriptionPtr("Test Description"),
-					Location:    roundtypes.LocationPtr("Test Location"),
+					Description: roundtypes.Description("Test Description"),
+					Location:    roundtypes.Location("Test Location"),
 					StartTime:   &startTime,
 					UserID:      sharedtypes.DiscordID("user_id"),
 				},
@@ -182,8 +182,8 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 				BaseRoundPayload: roundtypes.BaseRoundPayload{
 					RoundID:     testRoundID,
 					Title:       roundtypes.Title("Test Round"),
-					Description: roundtypes.DescriptionPtr("Test Description"),
-					Location:    roundtypes.LocationPtr("Test Location"),
+					Description: roundtypes.Description("Test Description"),
+					Location:    roundtypes.Location("Test Location"),
 					StartTime:   &startTime,
 					UserID:      sharedtypes.DiscordID("user_id"),
 				},

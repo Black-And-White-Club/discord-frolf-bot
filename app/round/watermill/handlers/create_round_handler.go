@@ -45,15 +45,8 @@ func (h *RoundHandlers) HandleRoundCreated(ctx context.Context, payload *roundev
 	roundID := payload.RoundID
 	guildID := string(payload.GuildID)
 	channelID := string(payload.ChannelID)
-
-	description := ""
-	if payload.Description != nil {
-		description = string(*payload.Description)
-	}
-	location := ""
-	if payload.Location != nil {
-		location = string(*payload.Location)
-	}
+	description := string(payload.Description)
+	location := string(payload.Location)
 
 	sendResult, err := h.service.GetCreateRoundManager().SendRoundEventEmbed(
 		guildID,
