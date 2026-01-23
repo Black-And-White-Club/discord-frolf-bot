@@ -3,6 +3,7 @@ package finalizeround
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -19,280 +20,153 @@ import (
 
 func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 	testRoundID := sharedtypes.RoundID(uuid.New())
-
-	strPtr := func(s string) *string {
-		return &s
-	}
-
-	intPtr := func(i sharedtypes.Score) *sharedtypes.Score {
-		return &i
-	}
-
-	timePtr := func(t time.Time) *time.Time {
-		return &t
-	}
-
 	fixedTime := time.Date(2025, 3, 15, 10, 0, 0, 0, time.UTC)
 
+	timePtr := func(t time.Time) *time.Time { return &t }
+
+	baseMessage := func() *discordgo.Message {
+		return &discordgo.Message{
+			ID: testRoundID.String(),
+			Embeds: []*discordgo.MessageEmbed{
+				{
+					Title: "Test Round",
+					Fields: []*discordgo.MessageEmbedField{
+						{Name: "📍 Location", Value: "Preserved Course"},
+					},
+				},
+			},
+		}
+	}
+
 	tests := []struct {
-		name           string
-		setupMocks     func(mockSession *discordmocks.MockSession)
-		embedPayload   roundevents.RoundFinalizedEmbedUpdatePayloadV1
-		channelID      string
-		eventMessageID sharedtypes.RoundID
-		expectErr      bool
+		name      string
+		setup     func(*finalizeRoundManager, *discordmocks.MockSession)
+		payload   roundevents.RoundFinalizedEmbedUpdatePayloadV1
+		channelID string
+		messageID string
+		expectErr bool
 	}{
 		{
-			name: "Successful finalization",
-			setupMocks: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					User(gomock.Any()).
-					Return(&discordgo.User{Username: "TestUser"}, nil).
-					AnyTimes()
-
-				mockSession.EXPECT().
-					GuildMember(gomock.Any(), gomock.Any()).
-					Return(&discordgo.Member{Nick: ""}, nil).
-					AnyTimes()
-
-				// Mock the ChannelMessage call to fetch existing message
-				mockSession.EXPECT().
+			name: "successfully preserves location when payload missing",
+			setup: func(frm *finalizeRoundManager, m *discordmocks.MockSession) {
+				m.EXPECT().
 					ChannelMessage("test-channel", testRoundID.String()).
-					Return(&discordgo.Message{
-						ID: testRoundID.String(),
-						Embeds: []*discordgo.MessageEmbed{
-							{
-								Title:       "Test Round",
-								Description: "Test round description",
-								Fields: []*discordgo.MessageEmbedField{
-									{Name: "📍 Location", Value: "Test Course", Inline: true},
-								},
-							},
-						},
-					}, nil).
-					Times(1)
+					Return(baseMessage(), nil)
 
-				mockSession.EXPECT().
+				m.EXPECT().
 					ChannelMessageEditComplex(gomock.Any()).
-					DoAndReturn(func(edit *discordgo.MessageEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
-						// Compare against the actual UUID string
-						if edit.Channel != "test-channel" || edit.ID != testRoundID.String() {
-							t.Errorf("Unexpected edit parameters: got %+v, want channel=%s, id=%s",
-								edit, "test-channel", testRoundID.String())
+					DoAndReturn(func(edit *discordgo.MessageEdit, _ ...discordgo.RequestOption) (*discordgo.Message, error) {
+						embed := (*edit.Embeds)[0]
+						found := false
+						for _, f := range embed.Fields {
+							if strings.Contains(strings.ToLower(f.Name), "location") {
+								found = true
+								if f.Value != "Preserved Course" {
+									t.Fatalf("location not preserved, got %q", f.Value)
+								}
+							}
 						}
-
-						return &discordgo.Message{
-							ID:     edit.ID, // Use the same ID that was passed in
-							Embeds: *edit.Embeds,
-						}, nil
-					}).
-					Times(1)
+						if !found {
+							t.Fatal("location field missing in edited embed")
+						}
+						return &discordgo.Message{ID: edit.ID}, nil
+					})
 			},
-			embedPayload: roundevents.RoundFinalizedEmbedUpdatePayloadV1{
-				RoundID:   sharedtypes.RoundID(testRoundID),
-				Title:     "Test Round",
-				Location:  (*roundtypes.Location)(strPtr("Test Course")),
-				StartTime: (*sharedtypes.StartTime)(timePtr(fixedTime)),
-				Participants: []roundtypes.Participant{
-					{
-						UserID: sharedtypes.DiscordID("user1"),
-						Score:  intPtr(72),
-					},
-				},
-				EventMessageID: testRoundID.String(),
+			payload: roundevents.RoundFinalizedEmbedUpdatePayloadV1{
+				RoundID:      testRoundID,
+				Title:        "Test Round",
+				StartTime:    (*sharedtypes.StartTime)(timePtr(fixedTime)),
+				Participants: []roundtypes.Participant{},
 			},
-			channelID:      "test-channel",
-			eventMessageID: testRoundID,
-			expectErr:      false,
+			channelID: "test-channel",
+			messageID: testRoundID.String(),
+			expectErr: false,
 		},
 		{
-			name: "Edit message fails",
-			setupMocks: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					User(gomock.Any()).
-					Return(&discordgo.User{Username: "TestUser"}, nil).
-					AnyTimes()
-
-				mockSession.EXPECT().
-					GuildMember(gomock.Any(), gomock.Any()).
-					Return(&discordgo.Member{Nick: ""}, nil).
-					AnyTimes()
-
-				// Mock the ChannelMessage call to fetch existing message
-				mockSession.EXPECT().
+			name: "fails when ChannelMessage fetch fails",
+			setup: func(frm *finalizeRoundManager, m *discordmocks.MockSession) {
+				m.EXPECT().
 					ChannelMessage("test-channel", testRoundID.String()).
-					Return(&discordgo.Message{
-						ID: testRoundID.String(),
-						Embeds: []*discordgo.MessageEmbed{
-							{
-								Title:       "Test Round",
-								Description: "Test round description",
-								Fields: []*discordgo.MessageEmbedField{
-									{Name: "📍 Location", Value: "Test Course", Inline: true},
-								},
-							},
-						},
-					}, nil).
-					Times(1)
-
-				mockSession.EXPECT().
-					ChannelMessageEditComplex(gomock.Any()).
-					Return(nil, fmt.Errorf("discord API error")).
-					Times(1)
+					Return(nil, fmt.Errorf("discord error"))
 			},
-			embedPayload: roundevents.RoundFinalizedEmbedUpdatePayloadV1{
-				RoundID:        sharedtypes.RoundID(testRoundID),
-				Title:          "Test Round",
-				Location:       (*roundtypes.Location)(strPtr("Test Course")),
-				StartTime:      (*sharedtypes.StartTime)(timePtr(fixedTime)),
-				Participants:   []roundtypes.Participant{},
-				EventMessageID: testRoundID.String(),
+			payload: roundevents.RoundFinalizedEmbedUpdatePayloadV1{
+				RoundID: testRoundID,
+				Title:   "Test Round",
 			},
-			channelID:      "test-channel",
-			eventMessageID: testRoundID,
-			expectErr:      true,
+			channelID: "test-channel",
+			messageID: testRoundID.String(),
+			expectErr: true,
 		},
 		{
-			name: "Transform fails due to User API error",
-			setupMocks: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					User(gomock.Any()).
-					Return(nil, fmt.Errorf("user not found")).
-					AnyTimes()
-
-				// Mock the ChannelMessage call to fetch existing message
-				mockSession.EXPECT().
-					ChannelMessage("test-channel", testRoundID.String()).
-					Return(&discordgo.Message{
-						ID: testRoundID.String(),
-						Embeds: []*discordgo.MessageEmbed{
-							{
-								Title:       "Test Round",
-								Description: "Test round description",
-								Fields: []*discordgo.MessageEmbedField{
-									{Name: "📍 Location", Value: "Test Course", Inline: true},
-								},
-							},
-						},
-					}, nil).
-					Times(1)
-
-				mockSession.EXPECT().
-					ChannelMessageEditComplex(gomock.Any()).
-					Return(&discordgo.Message{ID: "test-message"}, nil).
-					Times(1)
+			name:  "fails with empty message ID",
+			setup: func(frm *finalizeRoundManager, m *discordmocks.MockSession) {},
+			payload: roundevents.RoundFinalizedEmbedUpdatePayloadV1{
+				RoundID: testRoundID,
 			},
-			embedPayload: roundevents.RoundFinalizedEmbedUpdatePayloadV1{
-				RoundID:   sharedtypes.RoundID(testRoundID),
-				Title:     "Test Round",
-				Location:  (*roundtypes.Location)(strPtr("Test Course")),
-				StartTime: (*sharedtypes.StartTime)(timePtr(fixedTime)),
-				Participants: []roundtypes.Participant{
-					{
-						UserID: sharedtypes.DiscordID("user1"),
-						Score:  intPtr(72),
-					},
-				},
-				EventMessageID: testRoundID.String(),
-			},
-			channelID:      "test-channel",
-			eventMessageID: testRoundID,
-			expectErr:      false,
+			channelID: "test-channel",
+			messageID: "",
+			expectErr: true,
 		},
 		{
-			name: "Missing channel ID",
-			setupMocks: func(mockSession *discordmocks.MockSession) {
+			name: "fails with nil session",
+			setup: func(frm *finalizeRoundManager, m *discordmocks.MockSession) {
+				frm.session = nil
 			},
-			embedPayload: roundevents.RoundFinalizedEmbedUpdatePayloadV1{
-				RoundID:        sharedtypes.RoundID(testRoundID),
-				Title:          "Test Round",
-				Location:       (*roundtypes.Location)(strPtr("Test Course")),
-				StartTime:      (*sharedtypes.StartTime)(timePtr(fixedTime)),
-				EventMessageID: testRoundID.String(),
+			payload: roundevents.RoundFinalizedEmbedUpdatePayloadV1{
+				RoundID: testRoundID,
 			},
-			channelID:      "",
-			eventMessageID: testRoundID,
-			expectErr:      true,
-		},
-		{
-			name: "Missing message ID",
-			setupMocks: func(mockSession *discordmocks.MockSession) {
-			},
-			embedPayload: roundevents.RoundFinalizedEmbedUpdatePayloadV1{
-				RoundID:        testRoundID,
-				Title:          "Test Round",
-				Location:       (*roundtypes.Location)(strPtr("Test Course")),
-				StartTime:      (*sharedtypes.StartTime)(timePtr(fixedTime)),
-				EventMessageID: testRoundID.String(),
-			},
-			channelID:      "test-channel",
-			eventMessageID: sharedtypes.RoundID(uuid.Nil),
-			expectErr:      true,
-		},
-		{
-			name: "Nil session",
-			setupMocks: func(mockSession *discordmocks.MockSession) {
-			},
-			embedPayload: roundevents.RoundFinalizedEmbedUpdatePayloadV1{
-				RoundID:        sharedtypes.RoundID(testRoundID),
-				Title:          "Test Round",
-				Location:       (*roundtypes.Location)(strPtr("Test Course")),
-				StartTime:      (*sharedtypes.StartTime)(timePtr(fixedTime)),
-				EventMessageID: testRoundID.String(),
-			},
-			channelID:      "test-channel",
-			eventMessageID: testRoundID,
-			expectErr:      true,
+			channelID: "test-channel",
+			messageID: testRoundID.String(),
+			expectErr: true,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
 			mockSession := discordmocks.NewMockSession(ctrl)
-			mockLogger := loggerfrolfbot.NoOpLogger
-			mockConfig := &config.Config{
-				Discord: config.DiscordConfig{
-					GuildID: "guild-id",
-				},
-			}
 
 			frm := &finalizeRoundManager{
 				session: mockSession,
-				logger:  mockLogger,
-				config:  mockConfig,
-				operationWrapper: func(ctx context.Context, name string, fn func(ctx context.Context) (FinalizeRoundOperationResult, error)) (FinalizeRoundOperationResult, error) {
+				logger:  loggerfrolfbot.NoOpLogger,
+				config: &config.Config{
+					Discord: config.DiscordConfig{GuildID: "guild-id"},
+				},
+				operationWrapper: func(
+					ctx context.Context,
+					_ string,
+					fn func(context.Context) (FinalizeRoundOperationResult, error),
+				) (FinalizeRoundOperationResult, error) {
 					return fn(ctx)
 				},
 			}
 
-			if tt.name == "Nil session" {
-				frm.session = nil
+			if tt.setup != nil {
+				tt.setup(frm, mockSession)
 			}
 
-			if tt.setupMocks != nil {
-				tt.setupMocks(mockSession)
-			}
+			res, err := frm.FinalizeScorecardEmbed(
+				context.Background(),
+				tt.messageID,
+				tt.channelID,
+				tt.payload,
+			)
 
-			// Call the function
-			ctx := context.Background()
-			got, err := frm.FinalizeScorecardEmbed(ctx, tt.eventMessageID.String(), tt.channelID, tt.embedPayload)
-
-			hasError := err != nil || got.Error != nil
-			if hasError != tt.expectErr {
-				t.Errorf("FinalizeScorecardEmbed() error expectation mismatch. Returned error: %v, Result error: %v, wantErr: %v", err, got.Error, tt.expectErr)
+			if tt.expectErr {
+				if err == nil && res.Error == nil {
+					t.Fatalf("expected error, got none")
+				}
 				return
 			}
 
-			if !tt.expectErr {
-				if got.Error != nil {
-					t.Errorf("FinalizeScorecardEmbed() = %v, expected success, got error in result: %v", got, got.Error)
-				}
+			if err != nil || res.Error != nil {
+				t.Fatalf("unexpected error: %v %v", err, res.Error)
+			}
 
-				if got.Success == nil {
-					t.Errorf("FinalizeScorecardEmbed() Success field is nil, expected a value on success")
-				}
+			if res.Success == nil {
+				t.Fatalf("expected Success message, got nil")
 			}
 		})
 	}

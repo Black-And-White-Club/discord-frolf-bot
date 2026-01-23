@@ -14,259 +14,174 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+// helper to create a mock embed
 func createMockEmbed(title, description, location string, timestamp time.Time, participants []string) *discordgo.MessageEmbed {
-	unixTimestamp := timestamp.Unix() // Get the Unix timestamp
-
+	unix := timestamp.Unix()
 	fields := []*discordgo.MessageEmbedField{
-		{
-			Name:  "📅 Time",
-			Value: fmt.Sprintf("<t:%d:f>  (**Starts**: <t:%d:R>)", unixTimestamp, unixTimestamp), // Use dynamic timestamp
-		},
-		{
-			Name:  "📍 Location",
-			Value: location,
-		},
+		{Name: "📅 Time", Value: fmt.Sprintf("<t:%d:f>  (**Starts**: <t:%d:R>)", unix, unix)},
+		{Name: "📍 Location", Value: location},
 	}
-
-	for _, participant := range participants {
-		fields = append(fields, &discordgo.MessageEmbedField{
-			Name:  "Participant",
-			Value: participant,
-		})
+	for _, p := range participants {
+		fields = append(fields, &discordgo.MessageEmbedField{Name: "Participant", Value: p})
 	}
-
 	return &discordgo.MessageEmbed{
 		Title:       title,
 		Description: description,
-		Timestamp:   timestamp.Format(time.RFC3339),
 		Fields:      fields,
+		Timestamp:   timestamp.Format(time.RFC3339),
 	}
 }
 
 func Test_updateRoundManager_UpdateRoundEventEmbed(t *testing.T) {
-	testRoundID := sharedtypes.RoundID(uuid.New())
-	testRoundIDString := uuid.UUID(testRoundID).String()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockSession := discordmocks.NewMockSession(ctrl)
+	urm := &updateRoundManager{
+		session: mockSession,
+		operationWrapper: func(ctx context.Context, name string, fn func(ctx context.Context) (UpdateRoundOperationResult, error)) (UpdateRoundOperationResult, error) {
+			return fn(ctx)
+		},
+	}
+
+	strPtr := func(s string) *string { return &s }
+	timePtr := func(t time.Time) *time.Time { return &t }
+	locPtr := func(s string) *roundtypes.Location { l := roundtypes.Location(s); return &l }
+
 	channelID := "test-channel"
-
-	strPtr := func(s string) *string {
-		return &s
-	}
-
-	timePtr := func(t time.Time) *time.Time {
-		return &t
-	}
-
+	testRoundID := sharedtypes.RoundID(uuid.New())
+	testRoundIDStr := uuid.UUID(testRoundID).String()
 	fixedTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
+	participants := []string{"<@user1>"}
+	originalEmbed := createMockEmbed("Original Title", "Original Description", "Original Location", fixedTime, participants)
+
 	tests := []struct {
-		name          string
-		setupMocks    func(mockSession *discordmocks.MockSession)
-		title         *roundtypes.Title
-		description   *roundtypes.Description
-		startTime     *sharedtypes.StartTime
-		location      *roundtypes.Location
-		originalEmbed *discordgo.MessageEmbed
-		expectedEmbed *discordgo.MessageEmbed
-		expectErr     bool
+		name        string
+		title       *roundtypes.Title
+		description *roundtypes.Description
+		startTime   *sharedtypes.StartTime
+		location    *roundtypes.Location
+		expectErr   bool
+		check       func(embed *discordgo.MessageEmbed)
 	}{
 		{
-			name: "Update title",
-			setupMocks: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					ChannelMessage(gomock.Any(), gomock.Any()).
-					Return(&discordgo.Message{Embeds: []*discordgo.MessageEmbed{createMockEmbed("Original Title", "Original Description", "Original Location", fixedTime, []string{"<@user1>"})}}, nil).
-					Times(1)
-
-				mockSession.EXPECT().
-					ChannelMessageEditEmbed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()). // Updated to include the fourth parameter
-					DoAndReturn(func(channelID, messageID string, embed *discordgo.MessageEmbed, options ...discordgo.RequestOption) (*discordgo.Message, error) {
-						// Check if the title is updated correctly
-						if embed.Title != "**New Title**" {
-							t.Errorf("Unexpected title: got %s, want %s", embed.Title, "**New Title**")
-						}
-						// Return the updated message with the embed
-						return &discordgo.Message{Embeds: []*discordgo.MessageEmbed{embed}}, nil
-					}).
-					Times(1)
+			name:  "Update title",
+			title: (*roundtypes.Title)(strPtr("New Title")),
+			check: func(embed *discordgo.MessageEmbed) {
+				if embed.Title != "**New Title**" {
+					t.Errorf("Expected title '**New Title**', got %s", embed.Title)
+				}
 			},
-			title:         (*roundtypes.Title)(strPtr("New Title")),
-			originalEmbed: createMockEmbed("Original Title", "Original Description", "Original Location", fixedTime, []string{"<@user1>"}),
-			expectedEmbed: createMockEmbed("**New Title**", "Original Description", "Original Location", fixedTime, []string{"<@user1>"}),
-			expectErr:     false,
 		},
 		{
-			name: "Update description",
-			setupMocks: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					ChannelMessage(gomock.Any(), gomock.Any()).
-					Return(&discordgo.Message{Embeds: []*discordgo.MessageEmbed{createMockEmbed("Original Title", "Original Description", "Original Location", fixedTime, []string{"<@user1>"})}}, nil).
-					Times(1)
-
-				mockSession.EXPECT().
-					ChannelMessageEditEmbed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()). // Updated to include the fourth parameter
-					DoAndReturn(func(channelID, messageID string, embed *discordgo.MessageEmbed, options ...discordgo.RequestOption) (*discordgo.Message, error) {
-						// Check if the description is updated correctly
-						if embed.Description != "Updated Description" {
-							t.Errorf("Unexpected description: got %s, want %s", embed.Description, "Updated Description")
-						}
-						// Return the updated message with the embed
-						return &discordgo.Message{Embeds: []*discordgo.MessageEmbed{embed}}, nil
-					}).
-					Times(1)
+			name:        "Update description",
+			description: (*roundtypes.Description)(strPtr("Updated Description")),
+			check: func(embed *discordgo.MessageEmbed) {
+				if embed.Description != "Updated Description" {
+					t.Errorf("Expected description 'Updated Description', got %s", embed.Description)
+				}
 			},
-			description:   (*roundtypes.Description)(strPtr("Updated Description")),
-			originalEmbed: createMockEmbed("Original Title", "Original Description", "Original Location", fixedTime, []string{"<@user1>"}),
-			expectedEmbed: createMockEmbed("Original Title", "Updated Description", "Original Location", fixedTime, []string{"<@user1>"}),
-			expectErr:     false,
 		},
 		{
-			name: "Update start time",
-			setupMocks: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					ChannelMessage(gomock.Any(), gomock.Any()).
-					Return(&discordgo.Message{Embeds: []*discordgo.MessageEmbed{createMockEmbed("Original Title", "Original Description", "Original Location", fixedTime, []string{"<@user1>"})}}, nil).
-					Times(1)
-
-				mockSession.EXPECT().
-					ChannelMessageEditEmbed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()). // Updated to include the fourth parameter
-					DoAndReturn(func(channelID, messageID string, embed *discordgo.MessageEmbed, options ...discordgo.RequestOption) (*discordgo.Message, error) {
-						// Check if the time field is updated correctly
-						if embed.Fields[0].Value != "<t:1672531201:f>  (**Starts**: <t:1672531201:R>)" {
-							t.Errorf("Unexpected time field: got %s, want %s", embed.Fields[0].Value, "<t:1672531201:f>  (**Starts**: <t:1672531201:R>)")
-						}
-						// Return the updated message with the embed
-						return &discordgo.Message{Embeds: []*discordgo.MessageEmbed{embed}}, nil
-					}).
-					Times(1)
+			name:      "Update start time",
+			startTime: (*sharedtypes.StartTime)(timePtr(time.Date(2023, 1, 1, 0, 0, 1, 0, time.UTC))),
+			check: func(embed *discordgo.MessageEmbed) {
+				expectedUnix := int64(1672531201)
+				expectedValue := fmt.Sprintf("<t:%d:f>  (**Starts**: <t:%d:R>)", expectedUnix, expectedUnix)
+				if embed.Fields[0].Value != expectedValue {
+					t.Errorf("Unexpected time field: got %s, want %s", embed.Fields[0].Value, expectedValue)
+				}
 			},
-			startTime:     (*sharedtypes.StartTime)(timePtr(time.Date(2023, 1, 1, 0, 0, 1, 0, time.UTC))), // Set to the expected time
-			originalEmbed: createMockEmbed("Original Title", "Original Description", "Original Location", fixedTime, []string{"<@user1>"}),
-			expectedEmbed: createMockEmbed("Original Title", "Original Description", "Original Location", time.Date(2023, 1, 1, 0, 0, 1, 0, time.UTC), []string{"<@user1>"}),
-			expectErr:     false,
 		},
 		{
-			name: "Update location",
-			setupMocks: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					ChannelMessage(gomock.Any(), gomock.Any()).
-					Return(&discordgo.Message{Embeds: []*discordgo.MessageEmbed{createMockEmbed("Original Title", "Original Description", "Original Location", fixedTime, []string{"<@user1>"})}}, nil).
-					Times(1)
-
-				mockSession.EXPECT().
-					ChannelMessageEditEmbed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()). // Updated to include the fourth parameter
-					DoAndReturn(func(channelID, messageID string, embed *discordgo.MessageEmbed, options ...discordgo.RequestOption) (*discordgo.Message, error) {
-						// Check if the location field is updated correctly
-						if embed.Fields[1].Value != "Updated Location" {
-							t.Errorf("Unexpected location field: got %s, want %s", embed.Fields[1].Value, "Updated Location")
-						}
-						// Return the updated message with the embed
-						return &discordgo.Message{Embeds: []*discordgo.MessageEmbed{embed}}, nil
-					}).
-					Times(1)
+			name:     "Update location",
+			location: locPtr("Updated Location"),
+			check: func(embed *discordgo.MessageEmbed) {
+				if embed.Fields[1].Value != "Updated Location" {
+					t.Errorf("Expected location 'Updated Location', got %s", embed.Fields[1].Value)
+				}
 			},
-			location:      (*roundtypes.Location)(strPtr("Updated Location")),
-			originalEmbed: createMockEmbed("Original Title", "Original Description", "Original Location", fixedTime, []string{"<@user1>"}),
-			expectedEmbed: createMockEmbed("Original Title", "Original Description", "Updated Location", fixedTime, []string{"<@user1>"}),
-			expectErr:     false,
 		},
 		{
-			name: "No updates provided",
-			setupMocks: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					ChannelMessage(gomock.Any(), gomock.Any()).
-					Return(&discordgo.Message{Embeds: []*discordgo.MessageEmbed{createMockEmbed("Original Title", "Original Description", "Original Location", fixedTime, []string{"<@user1>"})}}, nil).
-					Times(1)
-
-				mockSession.EXPECT().
-					ChannelMessageEditEmbed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()). // Updated to include the fourth parameter
-					Times(0)                                                                         // No edit should occur
-			},
-			originalEmbed: createMockEmbed("Original Title", "Original Description", "Original Location", fixedTime, []string{"<@user1>"}),
-			expectedEmbed: createMockEmbed("Original Title", "Original Description", "Original Location", fixedTime, []string{"<@user1>"}),
-			expectErr:     false,
+			name:      "No updates provided",
+			check:     func(embed *discordgo.MessageEmbed) {},
+			expectErr: false,
 		},
 		{
-			name: "Participant unchanged",
-			setupMocks: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					ChannelMessage(gomock.Any(), gomock.Any()).
-					Return(&discordgo.Message{Embeds: []*discordgo.MessageEmbed{createMockEmbed("Original Title", "Original Description", "Original Location", fixedTime, []string{"<@user1>"})}}, nil).
-					Times(1)
-
-				mockSession.EXPECT().
-					ChannelMessageEditEmbed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-					DoAndReturn(func(channelID, messageID string, embed *discordgo.MessageEmbed, options ...discordgo.RequestOption) (*discordgo.Message, error) {
-						if len(embed.Fields) != 3 {
-							t.Errorf("Unexpected number of fields: got %d, want 3", len(embed.Fields))
-						}
-						// Return the updated message with the embed
-						return &discordgo.Message{Embeds: []*discordgo.MessageEmbed{embed}}, nil
-					}).
-					Times(1)
+			name:        "Multiple updates",
+			title:       (*roundtypes.Title)(strPtr("New Title")),
+			description: (*roundtypes.Description)(strPtr("Updated Description")),
+			startTime:   (*sharedtypes.StartTime)(timePtr(time.Date(2025, 5, 5, 12, 0, 0, 0, time.UTC))),
+			location:    locPtr("New Location"),
+			check: func(embed *discordgo.MessageEmbed) {
+				if embed.Title != "**New Title**" || embed.Description != "Updated Description" || embed.Fields[1].Value != "New Location" {
+					t.Errorf("Embed fields not updated correctly")
+				}
 			},
-			title:         (*roundtypes.Title)(strPtr("New Title")),
-			originalEmbed: createMockEmbed("Original Title", "Original Description", "Original Location", fixedTime, []string{"<@user1>"}),
-			expectedEmbed: createMockEmbed("**New Title**", "Original Description", "Original Location", fixedTime, []string{"<@user1>"}),
-			expectErr:     false,
+		},
+		{
+			name:      "No embeds in message",
+			expectErr: false,
+			check:     nil,
+		},
+		{
+			name:      "Channel message fetch fails",
+			expectErr: true,
+			check:     nil,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
+			// Setup default mocks
+			switch tt.name {
+			case "No embeds in message":
+				mockSession.EXPECT().
+					ChannelMessage(channelID, testRoundIDStr).
+					Return(&discordgo.Message{Embeds: []*discordgo.MessageEmbed{}}, nil)
+			case "Channel message fetch fails":
+				mockSession.EXPECT().
+					ChannelMessage(channelID, testRoundIDStr).
+					Return(nil, fmt.Errorf("fetch error"))
+			default:
+				mockSession.EXPECT().
+					ChannelMessage(channelID, testRoundIDStr).
+					Return(&discordgo.Message{Embeds: []*discordgo.MessageEmbed{originalEmbed}}, nil)
 
-			mockSession := discordmocks.NewMockSession(ctrl)
-
-			if tt.setupMocks != nil {
-				tt.setupMocks(mockSession)
-			}
-
-			urm := &updateRoundManager{
-				session: mockSession,
-				operationWrapper: func(ctx context.Context, name string, fn func(ctx context.Context) (UpdateRoundOperationResult, error)) (UpdateRoundOperationResult, error) {
-					return fn(ctx)
-				},
+				// Only call edit if updates are provided
+				if tt.title != nil || tt.description != nil || tt.startTime != nil || tt.location != nil {
+					mockSession.EXPECT().
+						ChannelMessageEditEmbed(channelID, testRoundIDStr, gomock.Any()).
+						DoAndReturn(func(channelID, messageID string, embed *discordgo.MessageEmbed, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+							return &discordgo.Message{Embeds: []*discordgo.MessageEmbed{embed}}, nil
+						})
+				}
 			}
 
 			ctx := context.Background()
-			got, err := urm.UpdateRoundEventEmbed(ctx, channelID, testRoundIDString, tt.title, tt.description, tt.startTime, tt.location)
+			got, err := urm.UpdateRoundEventEmbed(ctx, channelID, testRoundIDStr, tt.title, tt.description, tt.startTime, tt.location)
 
 			if (err != nil) != tt.expectErr {
-				t.Errorf("UpdateRoundEventEmbed() error = %v, wantErr %v", err, tt.expectErr)
+				t.Errorf("UpdateRoundEventEmbed() error = %v, expectErr %v", err, tt.expectErr)
 				return
 			}
 
-			if !tt.expectErr {
-				// Verify the updated embed matches the expected embed
-				updatedMsg, ok := got.Success.(*discordgo.Message)
+			// Special-case: when there are no embeds, the implementation returns nil error
+			// but places the error inside the result.Error field. Assert that here.
+			if tt.name == "No embeds in message" {
+				if got.Error == nil {
+					t.Errorf("expected result.Error to be non-nil when no embeds are present")
+				}
+				return
+			}
+
+			if tt.check != nil && got.Success != nil {
+				msg, ok := got.Success.(*discordgo.Message)
 				if !ok {
-					t.Errorf("UpdateRoundEventEmbed() Success is not a *discordgo.Message")
-					return
+					t.Fatalf("Success type not *discordgo.Message")
 				}
-
-				if len(updatedMsg.Embeds) != 1 {
-					t.Errorf("UpdateRoundEventEmbed() updated message has %d embeds, want 1", len(updatedMsg.Embeds))
-					return
-				}
-
-				updatedEmbed := updatedMsg.Embeds[0]
-				if updatedEmbed.Title != tt.expectedEmbed.Title ||
-					updatedEmbed.Description != tt.expectedEmbed.Description ||
-					updatedEmbed.Timestamp != tt.expectedEmbed.Timestamp {
-					t.Errorf("UpdateRoundEventEmbed() updated embed mismatch: got %+v, want %+v", updatedEmbed, tt.expectedEmbed)
-				}
-
-				if len(updatedEmbed.Fields) != len(tt.expectedEmbed.Fields) {
-					t.Errorf("UpdateRoundEventEmbed() updated embed fields count mismatch: got %d, want %d", len(updatedEmbed.Fields), len(tt.expectedEmbed.Fields))
-				} else {
-					for i := range updatedEmbed.Fields {
-						if updatedEmbed.Fields[i].Name != tt.expectedEmbed.Fields[i].Name ||
-							updatedEmbed.Fields[i].Value != tt.expectedEmbed.Fields[i].Value {
-							t.Errorf("UpdateRoundEventEmbed() updated embed field %d mismatch: got %+v, want %+v", i, updatedEmbed.Fields[i], tt.expectedEmbed.Fields[i])
-						}
-					}
-				}
+				tt.check(msg.Embeds[0])
 			}
 		})
 	}

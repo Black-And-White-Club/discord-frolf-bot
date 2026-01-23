@@ -65,12 +65,15 @@ func (h *RoundHandlers) HandleRoundUpdated(ctx context.Context, payload *roundev
 	}
 
 	// Extract updated fields from round
-	title := &round.Title
+	var title *roundtypes.Title
+	if round.Title != "" {
+		title = &round.Title
+	}
 
-	// Handle pointer fields correctly
+	// Handle optional fields by passing nil when not provided
 	var description *roundtypes.Description
-	if round.Description != nil {
-		description = round.Description
+	if round.Description != "" {
+		description = &round.Description
 	}
 
 	var startTime *sharedtypes.StartTime
@@ -79,8 +82,8 @@ func (h *RoundHandlers) HandleRoundUpdated(ctx context.Context, payload *roundev
 	}
 
 	var location *roundtypes.Location
-	if round.Location != nil {
-		location = round.Location
+	if round.Location != "" {
+		location = &round.Location
 	}
 
 	result, err := h.service.GetUpdateRoundManager().UpdateRoundEventEmbed(

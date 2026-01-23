@@ -19,13 +19,11 @@ func (h *RoundHandlers) HandleRoundReminder(ctx context.Context, payload *rounde
 	}
 
 	// Use default channel from config if payload doesn't have one
-	channelID := payload.DiscordChannelID
-	if channelID == "" {
+	if payload.DiscordChannelID == "" {
 		defaultChannelID := h.config.GetEventChannelID()
 		if defaultChannelID == "" {
 			return nil, nil // Don't return error - configuration issue, no point retrying
 		}
-		channelID = defaultChannelID
 		// Create new payload with default channel
 		payload = &roundevents.DiscordReminderPayloadV1{
 			RoundID:          payload.RoundID,

@@ -11,174 +11,183 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
+// SendRoundReminder sends a 1-hour round reminder to the appropriate Discord thread or channel.
 func (rm *roundReminderManager) SendRoundReminder(ctx context.Context, payload *roundevents.DiscordReminderPayloadV1) (RoundReminderOperationResult, error) {
 	return rm.operationWrapper(ctx, "SendRoundReminder", func(ctx context.Context) (RoundReminderOperationResult, error) {
-		rm.logger.InfoContext(ctx, "Processing round reminder",
-			attr.RoundID("round_id", payload.RoundID),
-			attr.String("reminder_type", payload.ReminderType),
-			attr.String("channel_id", payload.DiscordChannelID))
+		rm.logPayloadDetails(ctx, payload)
 
-		// Debug payload data with proper type handling
-		rm.logger.InfoContext(ctx, "Reminder payload details",
-			attr.String("start_time_is_nil", fmt.Sprintf("%t", payload.StartTime == nil)),
-			attr.String("location_is_nil", fmt.Sprintf("%t", payload.Location == nil)),
-			attr.Int("user_count", len(payload.UserIDs)))
-
-		if payload.StartTime != nil {
-			rm.logger.InfoContext(ctx, "StartTime value",
-				attr.String("start_time", payload.StartTime.AsTime().Format(time.RFC3339)))
-		}
-
-		if payload.Location != nil {
-			rm.logger.InfoContext(ctx, "Location value",
-				attr.String("location", string(*payload.Location)))
-		}
-
-		// Early validation - fail fast before any Discord operations
-		if payload.EventMessageID == "" {
-			err := fmt.Errorf("no message ID provided in payload")
-			rm.logger.ErrorContext(ctx, err.Error(), attr.RoundID("round_id", payload.RoundID))
+		// Early payload validation
+		if err := rm.validatePayload(ctx, payload); err != nil {
 			return RoundReminderOperationResult{Error: err}, err
 		}
 
-		// If channel ID is empty, try to resolve from guild config if possible
-		resolvedChannelID := payload.DiscordChannelID
-		guildID := payload.DiscordGuildID
-		if resolvedChannelID == "" && rm.guildConfigResolver != nil && guildID != "" {
-			guildConfig, err := rm.guildConfigResolver.GetGuildConfigWithContext(ctx, guildID)
-			if err == nil && guildConfig != nil && guildConfig.EventChannelID != "" {
-				resolvedChannelID = guildConfig.EventChannelID
-				rm.logger.InfoContext(ctx, "Resolved channel ID from guild config", attr.String("channel_id", resolvedChannelID))
-			} else {
-				rm.logger.WarnContext(ctx, "Failed to resolve channel ID from guild config, reminder may fail", attr.Error(err))
-			}
-		}
+		// Resolve the channel ID to send the reminder to
+		resolvedChannelID := rm.resolveChannelID(ctx, payload)
 
-		// Validate channel exists - fail fast
-		_, err := rm.session.GetChannel(resolvedChannelID)
-		if err != nil {
+		// Validate channel existence
+		if _, err := rm.session.GetChannel(resolvedChannelID); err != nil {
 			err = fmt.Errorf("failed to get channel: %w", err)
-			rm.logger.ErrorContext(ctx, err.Error(),
-				attr.String("channel_id", resolvedChannelID),
-				attr.Error(err))
+			rm.logger.ErrorContext(ctx, err.Error(), attr.String("channel_id", resolvedChannelID), attr.Error(err))
 			return RoundReminderOperationResult{Error: err}, err
 		}
 
-		// Build message content early - fail fast if data is invalid
-		var userMentions []string
-		for _, userID := range payload.UserIDs {
-			userMentions = append(userMentions, fmt.Sprintf("<@%s>", string(userID)))
-		}
-
-		startTimeStr := "TBD"
-		if payload.StartTime != nil {
-			unixTimestamp := payload.StartTime.AsTime().Unix()
-			startTimeStr = fmt.Sprintf("<t:%d:f>", unixTimestamp)
-		}
-
-		locationStr := "TBD"
-		if payload.Location != nil && string(*payload.Location) != "" {
-			locationStr = string(*payload.Location)
-		}
-
-		mentionsText := ""
-		if len(userMentions) > 0 {
-			mentionsText = strings.Join(userMentions, " ") + "\n\n"
-		}
-
-		reminderMessage := fmt.Sprintf("**1 HOUR REMINDER** 🏆\n\n%sRound \"%s\" is starting in 1 hour (%s) at %s!",
-			mentionsText,
-			string(payload.RoundTitle),
-			startTimeStr,
-			locationStr)
-
+		// Build message content
+		reminderMessage := rm.buildReminderMessage(payload)
 		threadName := fmt.Sprintf("⏰ 1 Hour Reminder: %s", payload.RoundTitle)
 
-		// Try to find existing thread first (with simplified logic)
-		var thread *discordgo.Channel
-
-		// Method 1: Check if the original message already has a thread
-		if message, msgErr := rm.session.ChannelMessage(resolvedChannelID, payload.EventMessageID); msgErr == nil && message.Thread != nil {
-			thread = message.Thread
-			rm.logger.InfoContext(ctx, "Found existing thread via message", attr.String("thread_id", thread.ID))
-		}
-
-		// Method 2: Search active threads if no thread found via message
-		if thread == nil {
-			if threads, threadErr := rm.session.ThreadsActive(guildID); threadErr == nil && threads != nil && threads.Threads != nil {
-				for _, t := range threads.Threads {
-					if t.ParentID == resolvedChannelID && t.Name == threadName {
-						thread = t
-						rm.logger.InfoContext(ctx, "Found existing thread via search", attr.String("thread_id", t.ID))
-						break
-					}
-				}
-			}
-		}
-
-		// Create thread only if absolutely necessary
-		if thread == nil {
-			rm.logger.InfoContext(ctx, "Creating new thread for reminder")
-
-			newThread, createErr := rm.session.MessageThreadStartComplex(resolvedChannelID, payload.EventMessageID, &discordgo.ThreadStart{
-				Name: threadName,
-				Type: discordgo.ChannelTypeGuildPublicThread,
-			})
-
-			if createErr != nil {
-				// Handle thread already exists error gracefully
-				if strings.Contains(createErr.Error(), "Thread already exists") || strings.Contains(createErr.Error(), "160004") {
-					rm.logger.InfoContext(ctx, "Thread creation failed due to existing thread, attempting final search")
-
-					// One more attempt to find the thread
-					if message, msgErr := rm.session.ChannelMessage(resolvedChannelID, payload.EventMessageID); msgErr == nil && message.Thread != nil {
-						thread = message.Thread
-						rm.logger.InfoContext(ctx, "Found thread after creation failure", attr.String("thread_id", thread.ID))
-					}
-
-					if thread == nil {
-						// If we still can't find it, this might be a race condition
-						// Log as warning but don't fail - the thread might exist but be inaccessible
-						rm.logger.WarnContext(ctx, "Thread exists but cannot be found, will attempt to send to main channel")
-
-						// Fallback: send to main channel instead of failing
-						_, sendErr := rm.session.ChannelMessageSend(resolvedChannelID, fmt.Sprintf("🧵 Thread creation issue - posting reminder here:\n\n%s", reminderMessage))
-						if sendErr != nil {
-							err = fmt.Errorf("failed to send reminder to main channel as fallback: %w", sendErr)
-							rm.logger.ErrorContext(ctx, err.Error())
-							return RoundReminderOperationResult{Error: err}, err
-						}
-
-						rm.logger.InfoContext(ctx, "Successfully sent reminder to main channel as fallback")
-						return RoundReminderOperationResult{Success: true}, nil
-					}
-				} else {
-					err = fmt.Errorf("failed to create thread: %w", createErr)
-					rm.logger.ErrorContext(ctx, err.Error())
-					return RoundReminderOperationResult{Error: err}, err
-				}
-			} else {
-				thread = newThread
-				rm.logger.InfoContext(ctx, "Successfully created new thread", attr.String("thread_id", thread.ID))
-			}
-		}
-
-		// CRITICAL: Send the reminder message - this is the main operation
-		// Everything after this point should be non-critical
-		_, err = rm.session.ChannelMessageSend(thread.ID, reminderMessage)
+		// Find or create the thread
+		thread, err := rm.findOrCreateThread(ctx, resolvedChannelID, payload.EventMessageID, threadName)
 		if err != nil {
+			// If thread creation fails, fallback to sending to main channel
+			rm.logger.WarnContext(ctx, "Thread unavailable, sending to main channel as fallback")
+			if sendErr := rm.sendMessageToChannel(ctx, resolvedChannelID, reminderMessage); sendErr != nil {
+				err = fmt.Errorf("failed to send reminder to main channel as fallback: %w", sendErr)
+				rm.logger.ErrorContext(ctx, err.Error())
+				return RoundReminderOperationResult{Error: err}, err
+			}
+			return RoundReminderOperationResult{Success: true}, nil
+		}
+
+		// Send the reminder to the thread
+		if err := rm.sendMessageToChannel(ctx, thread.ID, reminderMessage); err != nil {
 			err = fmt.Errorf("failed to send reminder message to thread: %w", err)
 			rm.logger.ErrorContext(ctx, err.Error(), attr.String("thread_id", thread.ID))
 			return RoundReminderOperationResult{Error: err}, err
 		}
 
-		// SUCCESS: The reminder has been sent successfully
 		rm.logger.InfoContext(ctx, "Successfully sent round reminder",
 			attr.RoundID("round_id", payload.RoundID),
 			attr.String("thread_id", thread.ID),
 			attr.Int("mentioned_users", len(payload.UserIDs)))
 
-		// Return success immediately - no additional operations that could fail
 		return RoundReminderOperationResult{Success: true}, nil
 	})
+}
+
+// -------------------- Helper Functions --------------------
+
+// logPayloadDetails logs relevant payload information
+func (rm *roundReminderManager) logPayloadDetails(ctx context.Context, payload *roundevents.DiscordReminderPayloadV1) {
+	startTimeStr := "nil"
+	if payload.StartTime != nil {
+		startTimeStr = payload.StartTime.AsTime().Format(time.RFC3339)
+	}
+
+	locationStr := "nil"
+	if payload.Location != "" {
+		locationStr = string(payload.Location)
+	}
+
+	rm.logger.InfoContext(ctx, "Processing round reminder",
+		attr.RoundID("round_id", payload.RoundID),
+		attr.String("reminder_type", payload.ReminderType),
+		attr.String("channel_id", payload.DiscordChannelID),
+		attr.String("start_time", startTimeStr),
+		attr.String("location", locationStr),
+		attr.Int("user_count", len(payload.UserIDs)),
+	)
+}
+
+// validatePayload performs basic validation on the payload
+func (rm *roundReminderManager) validatePayload(ctx context.Context, payload *roundevents.DiscordReminderPayloadV1) error {
+	if payload.EventMessageID == "" {
+		err := fmt.Errorf("no message ID provided in payload")
+		rm.logger.ErrorContext(ctx, err.Error(), attr.RoundID("round_id", payload.RoundID))
+		return err
+	}
+	if payload.RoundTitle == "" {
+		err := fmt.Errorf("no round title provided in payload")
+		rm.logger.WarnContext(ctx, err.Error())
+	}
+	return nil
+}
+
+// resolveChannelID determines which channel ID to use for sending the reminder
+func (rm *roundReminderManager) resolveChannelID(ctx context.Context, payload *roundevents.DiscordReminderPayloadV1) string {
+	if payload.DiscordChannelID != "" {
+		return payload.DiscordChannelID
+	}
+
+	if rm.guildConfigResolver != nil && payload.DiscordGuildID != "" {
+		guildConfig, err := rm.guildConfigResolver.GetGuildConfigWithContext(ctx, payload.DiscordGuildID)
+		if err == nil && guildConfig != nil && guildConfig.EventChannelID != "" {
+			rm.logger.InfoContext(ctx, "Resolved channel ID from guild config", attr.String("channel_id", guildConfig.EventChannelID))
+			return guildConfig.EventChannelID
+		}
+		rm.logger.WarnContext(ctx, "Failed to resolve channel ID from guild config", attr.Error(err))
+	}
+
+	return ""
+}
+
+// buildReminderMessage constructs the reminder message with mentions and formatted start time/location
+func (rm *roundReminderManager) buildReminderMessage(payload *roundevents.DiscordReminderPayloadV1) string {
+	var sb strings.Builder
+
+	if len(payload.UserIDs) > 0 {
+		for _, userID := range payload.UserIDs {
+			sb.WriteString(fmt.Sprintf("<@%s> ", string(userID)))
+		}
+		sb.WriteString("\n\n")
+	}
+
+	startTimeStr := "TBD"
+	if payload.StartTime != nil {
+		startTimeStr = fmt.Sprintf("<t:%d:f>", payload.StartTime.AsTime().Unix())
+	}
+
+	locationStr := "TBD"
+	if payload.Location != "" {
+		locationStr = string(payload.Location)
+	}
+
+	sb.WriteString(fmt.Sprintf("**1 HOUR REMINDER** 🏆\n\nRound \"%s\" is starting in 1 hour (%s) at %s!",
+		payload.RoundTitle, startTimeStr, locationStr))
+
+	return sb.String()
+}
+
+// findOrCreateThread finds an existing thread or creates a new one
+func (rm *roundReminderManager) findOrCreateThread(ctx context.Context, channelID, messageID, threadName string) (*discordgo.Channel, error) {
+	// Check if the message already has a thread
+	if message, err := rm.session.ChannelMessage(channelID, messageID); err == nil && message.Thread != nil {
+		rm.logger.InfoContext(ctx, "Found existing thread via message", attr.String("thread_id", message.Thread.ID))
+		return message.Thread, nil
+	}
+
+	// Search active threads in the guild
+	if threadsResp, err := rm.session.ThreadsActive(channelID); err == nil && threadsResp != nil {
+		for _, t := range threadsResp.Threads {
+			if t.ParentID == channelID && t.Name == threadName {
+				rm.logger.InfoContext(ctx, "Found existing thread via search", attr.String("thread_id", t.ID))
+				return t, nil
+			}
+		}
+	}
+
+	// Attempt to create a new thread
+	newThread, err := rm.session.MessageThreadStartComplex(channelID, messageID, &discordgo.ThreadStart{
+		Name: threadName,
+		Type: discordgo.ChannelTypeGuildPublicThread,
+	})
+	if err != nil {
+		if strings.Contains(err.Error(), "Thread already exists") || strings.Contains(err.Error(), "160004") {
+			// Attempt to fetch again after race condition
+			if message, msgErr := rm.session.ChannelMessage(channelID, messageID); msgErr == nil && message.Thread != nil {
+				rm.logger.InfoContext(ctx, "Found thread after creation race", attr.String("thread_id", message.Thread.ID))
+				return message.Thread, nil
+			}
+			return nil, fmt.Errorf("thread exists but cannot be retrieved: %w", err)
+		}
+		return nil, fmt.Errorf("failed to create thread: %w", err)
+	}
+
+	rm.logger.InfoContext(ctx, "Successfully created new thread", attr.String("thread_id", newThread.ID))
+	return newThread, nil
+}
+
+// sendMessageToChannel sends a message to the given Discord channel ID
+func (rm *roundReminderManager) sendMessageToChannel(ctx context.Context, channelID, message string) error {
+	_, err := rm.session.ChannelMessageSend(channelID, message)
+	return err
 }

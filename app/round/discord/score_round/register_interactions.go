@@ -21,7 +21,7 @@ func RegisterHandlers(registry *interactions.Registry, manager ScoreRoundManager
 		manager.HandleScoreButton(ctx, i)
 	})
 
-	// Unified override button (finalized only, handles single or multi-line overrides)
+	// Bulk override button
 	registry.RegisterHandler("round_bulk_score_override|", func(ctx context.Context, i *discordgo.InteractionCreate) {
 		slog.InfoContext(ctx, "Handling round_bulk_score_override button press",
 			attr.String("custom_id", i.MessageComponentData().CustomID),
@@ -29,7 +29,7 @@ func RegisterHandlers(registry *interactions.Registry, manager ScoreRoundManager
 			attr.String("user_id", i.Member.User.ID),
 			attr.String("user_username", i.Member.User.Username),
 		)
-		manager.HandleScoreButton(ctx, i) // Reuse handler; it will detect finalized & permissions; we'll branch in HandleScoreButton for bulk
+		manager.HandleScoreButton(ctx, i)
 	})
 
 	// Standard modal submission
@@ -43,7 +43,7 @@ func RegisterHandlers(registry *interactions.Registry, manager ScoreRoundManager
 		manager.HandleScoreSubmission(ctx, i)
 	})
 
-	// Bulk override modal submission (finalized rounds, supports single or multiple lines)
+	// Bulk override modal submission
 	registry.RegisterHandler("submit_score_bulk_override|", func(ctx context.Context, i *discordgo.InteractionCreate) {
 		slog.InfoContext(ctx, "Handling bulk score override submission",
 			attr.String("custom_id", i.ModalSubmitData().CustomID),
@@ -53,6 +53,4 @@ func RegisterHandlers(registry *interactions.Registry, manager ScoreRoundManager
 		)
 		manager.HandleScoreSubmission(ctx, i)
 	})
-
-	// Deprecated handlers (submit_score_modal_finalized| / submit_score_override|) intentionally not registered anymore.
 }

@@ -13,192 +13,127 @@ import (
 	"github.com/google/uuid"
 )
 
-// TransformRoundToFinalizedScorecard transforms the round event embed into a finalized scorecard format
-// showing participants with their final scores and modifying the UI to indicate the round is finalized
-func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roundevents.RoundFinalizedEmbedUpdatePayloadV1) (*discordgo.MessageEmbed, []discordgo.MessageComponent, error) {
-	var embed *discordgo.MessageEmbed
-	var components []discordgo.MessageComponent
-	var err error
+const (
+	finalizedColor = 0x0000FF
 
-	// Add nil check for the payload itself
+	fieldStarted  = "📅 Started"
+	fieldLocation = "📍 Location"
+
+	overrideButtonID = "round_bulk_score_override"
+)
+
+type participantWithUser struct {
+	UserID    sharedtypes.DiscordID
+	Username  string
+	Score     *sharedtypes.Score
+	TagNumber *sharedtypes.TagNumber
+}
+
+func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roundevents.RoundFinalizedEmbedUpdatePayloadV1) (*discordgo.MessageEmbed, []discordgo.MessageComponent, error) {
+
 	if payload.RoundID == sharedtypes.RoundID(uuid.Nil) {
 		return nil, nil, fmt.Errorf("invalid payload: round ID is empty")
 	}
 
-	_, err = frm.operationWrapper(context.Background(), "TransformRoundToFinalizedScorecard", func(ctx context.Context) (FinalizeRoundOperationResult, error) {
-		// Log incoming payload for debugging
+	var (
+		embed      *discordgo.MessageEmbed
+		components []discordgo.MessageComponent
+	)
+
+	ctx := context.Background()
+
+	_, err := frm.operationWrapper(ctx, "TransformRoundToFinalizedScorecard", func(ctx context.Context) (FinalizeRoundOperationResult, error) {
 		frm.logger.InfoContext(ctx, "Processing round finalization",
 			attr.RoundID("round_id", payload.RoundID),
-			attr.String("title", string(payload.Title)))
+			attr.String("title", string(payload.Title)),
+		)
 
-		// Create a slice to hold participants with their user info for sorting
-		type participantWithUser struct {
-			UserID    string
-			Username  string
-			Score     *sharedtypes.Score
-			TagNumber *sharedtypes.TagNumber
-		}
-
-		// Create a map to hold participants for efficient lookups
-		participantsMap := make(map[sharedtypes.DiscordID]participantWithUser)
-
-		var guildID string
-		if payload.GuildID != "" {
-			guildID = string(payload.GuildID)
-		} else {
+		guildID := string(payload.GuildID)
+		if guildID == "" {
 			guildID = frm.config.GetGuildID()
 		}
 
-		for i, participant := range payload.Participants {
-			// Check if UserID is valid
-			if participant.UserID == "" {
-				frm.logger.WarnContext(ctx, "Skipping participant with empty UserID",
-					attr.Int("index", i))
+		participants := make(map[sharedtypes.DiscordID]*participantWithUser)
+
+		for i, p := range payload.Participants {
+			if p.UserID == "" {
+				frm.logger.WarnContext(ctx, "Skipping participant with empty UserID", attr.Int("index", i))
 				continue
 			}
 
-			var username string
-			user, err := frm.session.User(string(participant.UserID))
+			user, err := frm.session.User(string(p.UserID))
 			if err != nil {
-				frm.logger.WarnContext(ctx, "Failed to get participant info, skipping participant",
-					attr.Error(err), attr.String("user_id", string(participant.UserID)))
+				frm.logger.WarnContext(ctx, "Failed to fetch user",
+					attr.Error(err),
+					attr.String("user_id", string(p.UserID)),
+				)
 				continue
-			} else {
-				username = user.Username
-				// Only try to get member info if we successfully got the user
-				if frm.guildConfigResolver != nil && guildID != "" {
-					if member, err := frm.session.GuildMember(guildID, string(participant.UserID)); err == nil && member != nil && member.Nick != "" {
-						username = member.Nick
-					}
-				} else if member, err := frm.session.GuildMember(frm.config.GetGuildID(), string(participant.UserID)); err == nil && member != nil && member.Nick != "" {
-					username = member.Nick
-				}
 			}
 
-			participantsMap[participant.UserID] = participantWithUser{
-				UserID:    string(participant.UserID),
+			username := user.Username
+			if member, err := frm.session.GuildMember(guildID, string(p.UserID)); err == nil && member != nil && member.Nick != "" {
+				username = member.Nick
+			}
+
+			participants[p.UserID] = &participantWithUser{
+				UserID:    p.UserID,
 				Username:  username,
-				Score:     participant.Score,
-				TagNumber: participant.TagNumber, // Include tag number for sorting
+				Score:     p.Score,
+				TagNumber: p.TagNumber,
 			}
 		}
 
-		// Convert map to slice for consistent ordering (only when we need to sort)
-		participantsWithUsers := make([]participantWithUser, 0, len(participantsMap))
-		for _, participant := range participantsMap {
-			participantsWithUsers = append(participantsWithUsers, participant)
+		ordered := make([]*participantWithUser, 0, len(participants))
+		for _, p := range participants {
+			ordered = append(ordered, p)
 		}
 
-		// Sort participants by score (best score first - in frolf, lower is better)
-		// But also use tag number as secondary sort for consistent ordering
-		sort.Slice(participantsWithUsers, func(i, j int) bool {
-			// Handle nil scores - put them at the end
-			if participantsWithUsers[i].Score == nil && participantsWithUsers[j].Score == nil {
-				// If both scores are nil, sort by tag number then user ID
-				if participantsWithUsers[i].TagNumber != nil && participantsWithUsers[j].TagNumber != nil {
-					return *participantsWithUsers[i].TagNumber < *participantsWithUsers[j].TagNumber
-				}
-				if participantsWithUsers[i].TagNumber != nil && participantsWithUsers[j].TagNumber == nil {
-					return true
-				}
-				if participantsWithUsers[i].TagNumber == nil && participantsWithUsers[j].TagNumber != nil {
-					return false
-				}
-				return participantsWithUsers[i].UserID < participantsWithUsers[j].UserID
+		sort.Slice(ordered, func(i, j int) bool {
+			a, b := ordered[i], ordered[j]
+
+			if a.Score == nil && b.Score == nil {
+				return compareByTagThenUser(a, b)
 			}
-			if participantsWithUsers[i].Score == nil {
-				return false // nil scores go to the end
+			if a.Score == nil {
+				return false
 			}
-			if participantsWithUsers[j].Score == nil {
-				return true // non-nil scores come first
+			if b.Score == nil {
+				return true
 			}
-			// Lower scores are better in frolf
-			return *participantsWithUsers[i].Score < *participantsWithUsers[j].Score
+			if *a.Score != *b.Score {
+				return *a.Score < *b.Score
+			}
+			return compareByTagThenUser(a, b)
 		})
 
-		// Create participant fields with ranking emojis
-		participantFields := make([]*discordgo.MessageEmbedField, 0, len(participantsWithUsers))
-		totalParticipants := len(participantsWithUsers)
+		participantFields := buildParticipantFields(ordered)
 
-		for i, participant := range participantsWithUsers {
-			scoreDisplay := "Score: --"
-			if participant.Score != nil {
-				if *participant.Score == 0 {
-					scoreDisplay = "Score: Even"
-				} else {
-					scoreDisplay = fmt.Sprintf("Score: %+d", *participant.Score)
-				}
-			}
-
-			// Determine emoji based on position and total participants
-			var emoji string
-			switch totalParticipants {
-			case 1:
-				emoji = "😢" // Just sad emoji for solo play
-			case 2:
-				if i == 0 {
-					emoji = "🥇" // Winner gets gold
-				} else {
-					emoji = "🗑️" // Loser gets trash can
-				}
-			case 3:
-				switch i {
-				case 0:
-					emoji = "🥇" // 1st place
-				case 1:
-					emoji = "🥈" // 2nd place
-				case 2:
-					emoji = "🗑️" // Last place gets trash can
-				}
-			default: // 4 or more participants
-				switch i {
-				case 0:
-					emoji = "🥇" // 1st place
-				case 1:
-					emoji = "🥈" // 2nd place
-				case 2:
-					emoji = "🥉" // 3rd place
-				case totalParticipants - 1:
-					emoji = "🗑️" // Last place gets trash can
-				default:
-					emoji = "🏌️" // Everyone else gets golf emoji
-				}
-			}
-
-			participantFields = append(participantFields, &discordgo.MessageEmbedField{
-				Name:   fmt.Sprintf("%s %s", emoji, participant.Username),
-				Value:  fmt.Sprintf("%s (<@%s>)", scoreDisplay, participant.UserID), // embed mention in value for parsing
-				Inline: true,
-			})
+		location := ""
+		if payload.Location != "" {
+			location = string(payload.Location)
 		}
 
-		// Handle nil location
-		locationStr := ""
-		if payload.Location != nil {
-			locationStr = string(*payload.Location)
-		}
+		fields := []*discordgo.MessageEmbedField{}
 
-		// Start with base fields - StartTime and Location
-		embedFields := []*discordgo.MessageEmbedField{}
-
-		// Add StartTime field if available
 		if payload.StartTime != nil {
-			embedFields = append(embedFields, &discordgo.MessageEmbedField{
-				Name:  "📅 Started",
+			fields = append(fields, &discordgo.MessageEmbedField{
+				Name:  fieldStarted,
 				Value: fmt.Sprintf("<t:%d:f>", time.Time(*payload.StartTime).Unix()),
 			})
 		}
 
-		// Add Location field
-		embedFields = append(embedFields, &discordgo.MessageEmbedField{
-			Name:  "📍 Location",
-			Value: locationStr,
+		fields = append(fields, &discordgo.MessageEmbedField{
+			Name:  fieldLocation,
+			Value: location,
 		})
 
-		// Add participant fields
-		embedFields = append(embedFields, participantFields...)
+		if len(payload.Teams) > 0 {
+			teamFields, _ := renderTeamsFinalizedFields(payload.Teams)
+			fields = append(fields, teamFields...)
+		} else {
+			fields = append(fields, participantFields...)
+		}
 
-		// Construct the embed with defensive programming
 		title := "Round Finalized"
 		if payload.Title != "" {
 			title = fmt.Sprintf("**%s** - Round Finalized", payload.Title)
@@ -206,50 +141,121 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 
 		embed = &discordgo.MessageEmbed{
 			Title:       title,
-			Description: fmt.Sprintf("Round at %s has been finalized. Admin/Editor access required for score updates.", locationStr),
-			Color:       0x0000FF, // Blue for finalized round
-			Fields:      embedFields,
+			Description: fmt.Sprintf("Round at %s has been finalized. Admin/Editor access required for score updates.", location),
+			Color:       finalizedColor,
+			Fields:      fields,
 			Footer: &discordgo.MessageEmbedFooter{
 				Text: "Round has been finalized. Only admins/editors can update scores.",
 			},
-			Timestamp: time.Now().Format(time.RFC3339), // Current time when finalized
+			Timestamp: time.Now().UTC().Format(time.RFC3339),
 		}
 
-		// (Deprecated) previously generated a separate finalized button ID; now consolidated into a single override button
-
-		// Single consolidated override button (supports single or bulk overrides in one modal)
-		components = []discordgo.MessageComponent{
-			discordgo.ActionsRow{
-				Components: []discordgo.MessageComponent{
-					discordgo.Button{
-						Label:    "Score Override",
-						Style:    discordgo.DangerButton,
-						CustomID: fmt.Sprintf("round_bulk_score_override|%s", payload.RoundID),
-						Emoji:    &discordgo.ComponentEmoji{Name: "🛠️"},
+		if len(payload.Teams) == 0 {
+			components = []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						discordgo.Button{
+							Label:    "Score Override",
+							Style:    discordgo.DangerButton,
+							CustomID: fmt.Sprintf("%s|%s", overrideButtonID, payload.RoundID),
+							Emoji:    &discordgo.ComponentEmoji{Name: "🛠️"},
+						},
 					},
 				},
-			},
+			}
 		}
 
-		// Log successful transformation
 		frm.logger.InfoContext(ctx, "Successfully transformed round to finalized scorecard",
-			attr.RoundID("round_id", payload.RoundID))
+			attr.RoundID("round_id", payload.RoundID),
+		)
 
 		return FinalizeRoundOperationResult{Success: true}, nil
 	})
-	// Add additional error handling outside the operation wrapper
+
 	if err != nil {
-		frm.logger.ErrorContext(context.Background(), "Failed to transform round to finalized scorecard",
-			attr.Error(err), attr.RoundID("round_id", payload.RoundID))
+		frm.logger.ErrorContext(ctx, "Failed to transform round to finalized scorecard",
+			attr.Error(err),
+			attr.RoundID("round_id", payload.RoundID),
+		)
 		return nil, nil, fmt.Errorf("failed to transform round to finalized scorecard: %w", err)
 	}
 
-	// Add a safety check to ensure we're not returning a nil embed
 	if embed == nil {
-		frm.logger.ErrorContext(context.Background(), "Embed is nil after transformation",
-			attr.RoundID("round_id", payload.RoundID))
 		return nil, nil, fmt.Errorf("transformed embed is nil for round %s", payload.RoundID)
 	}
 
 	return embed, components, nil
+}
+
+func compareByTagThenUser(a, b *participantWithUser) bool {
+	if a.TagNumber != nil && b.TagNumber != nil {
+		return *a.TagNumber < *b.TagNumber
+	}
+	if a.TagNumber != nil {
+		return true
+	}
+	if b.TagNumber != nil {
+		return false
+	}
+	return string(a.UserID) < string(b.UserID)
+}
+
+func buildParticipantFields(participants []*participantWithUser) []*discordgo.MessageEmbedField {
+	total := len(participants)
+	fields := make([]*discordgo.MessageEmbedField, 0, total)
+
+	for i, p := range participants {
+		score := "Score: --"
+		if p.Score != nil {
+			if *p.Score == 0 {
+				score = "Score: Even"
+			} else {
+				score = fmt.Sprintf("Score: %+d", *p.Score)
+			}
+		}
+
+		emoji := rankEmoji(i, total)
+
+		fields = append(fields, &discordgo.MessageEmbedField{
+			Name:   fmt.Sprintf("%s %s", emoji, p.Username),
+			Value:  fmt.Sprintf("%s (<@%s>)", score, p.UserID),
+			Inline: true,
+		})
+	}
+
+	return fields
+}
+
+func rankEmoji(index, total int) string {
+	switch total {
+	case 1:
+		return "😢"
+	case 2:
+		if index == 0 {
+			return "🥇"
+		}
+		return "🗑️"
+	case 3:
+		switch index {
+		case 0:
+			return "🥇"
+		case 1:
+			return "🥈"
+		default:
+			return "🗑️"
+		}
+	default:
+		switch index {
+		case 0:
+			return "🥇"
+		case 1:
+			return "🥈"
+		case 2:
+			return "🥉"
+		case total - 1:
+			return "🗑️"
+		default:
+			return "🏌️"
+		}
+	}
 }
