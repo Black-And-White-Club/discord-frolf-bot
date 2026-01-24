@@ -165,8 +165,9 @@ func (r *Resolver) coordinateConfigRequest(ctx context.Context, guildID string, 
 	}
 
 	// Wait for HandleGuildConfigReceived or Timeout
-	responseTimeout := r.config.ResponseTimeout
-	responseCtx, responseCancel := context.WithTimeout(requestCtx, responseTimeout)
+	// Use independent context for response wait to get full ResponseTimeout
+	// (not limited by requestCtx's shorter deadline)
+	responseCtx, responseCancel := context.WithTimeout(context.Background(), r.config.ResponseTimeout)
 	defer responseCancel()
 
 	select {
@@ -181,11 +182,16 @@ func (r *Resolver) coordinateConfigRequest(ctx context.Context, guildID string, 
 
 // HandleGuildConfigReceived populates the cache and unblocks any waiting requests.
 func (r *Resolver) HandleGuildConfigReceived(ctx context.Context, guildID string, config *storage.GuildConfig) {
+	slog.InfoContext(ctx, "HandleGuildConfigReceived called",
+		attr.String("guild_id", guildID),
+		attr.Bool("config_nil", config == nil))
+
 	if config != nil {
-		// 3. Populate the local cache for future Get calls
-		// UPDATED: Added 'ctx' to the Set call
+		// Populate the local cache for future Get calls
 		r.cache.Set(ctx, guildID, *config)
-		slog.InfoContext(ctx, "Guild config cached successfully", attr.String("guild_id", guildID))
+		slog.InfoContext(ctx, "Guild config cached successfully",
+			attr.String("guild_id", guildID),
+			attr.Bool("is_placeholder", config.IsPlaceholder))
 	}
 
 	if reqInterface, exists := r.inflightRequests.LoadAndDelete(guildID); exists {

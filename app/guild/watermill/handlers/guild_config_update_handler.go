@@ -128,8 +128,11 @@ func (h *GuildHandlers) HandleGuildConfigRetrieved(ctx context.Context, payload 
 
 	guildID := string(payload.GuildID)
 
-	h.logger.InfoContext(ctx, "Guild config retrieved successfully",
-		attr.String("guild_id", guildID))
+	h.logger.InfoContext(ctx, "Guild config retrieved - handler invoked",
+		attr.String("guild_id", guildID),
+		attr.Bool("has_signup_channel", payload.Config.SignupChannelID != ""),
+		attr.Bool("has_event_channel", payload.Config.EventChannelID != ""),
+		attr.Bool("resolver_nil", h.guildConfigResolver == nil))
 
 	var convertedConfig *storage.GuildConfig
 	if payload.Config.GuildID != "" || payload.Config.SignupChannelID != "" || payload.Config.LeaderboardChannelID != "" {
@@ -160,6 +163,9 @@ func (h *GuildHandlers) HandleGuildConfigRetrieved(ctx context.Context, payload 
 	if h.signupManager != nil && convertedConfig != nil && convertedConfig.SignupChannelID != "" {
 		h.signupManager.TrackChannelForReactions(convertedConfig.SignupChannelID)
 	}
+
+	h.logger.InfoContext(ctx, "Guild config retrieval handler completed successfully",
+		attr.String("guild_id", guildID))
 
 	return []handlerwrapper.Result{}, nil
 }
