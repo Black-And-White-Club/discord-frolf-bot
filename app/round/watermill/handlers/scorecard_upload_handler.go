@@ -89,8 +89,9 @@ func (rh *RoundHandlers) HandleScorecardUploaded(ctx context.Context, payload *r
 // HandleScorecardParseFailed handles scorecard parse failed events.
 func (rh *RoundHandlers) HandleScorecardParseFailed(ctx context.Context, payload *roundevents.ScorecardParseFailedPayloadV1) ([]handlerwrapper.Result, error) {
 	// Notify user in Discord about parsing failure
+	// If guild channel, sends DM to user instead of public message
 	if payload.ChannelID != "" {
-		err := rh.service.GetScorecardUploadManager().SendUploadError(ctx, payload.ChannelID, payload.Error)
+		err := rh.service.GetScorecardUploadManager().SendUploadError(ctx, payload.ChannelID, string(payload.UserID), payload.Error)
 		if err != nil {
 			return nil, fmt.Errorf("failed to notify user of parsing failure: %w", err)
 		}
@@ -102,8 +103,9 @@ func (rh *RoundHandlers) HandleScorecardParseFailed(ctx context.Context, payload
 // HandleImportFailed handles import failed events.
 func (rh *RoundHandlers) HandleImportFailed(ctx context.Context, payload *roundevents.ImportFailedPayloadV1) ([]handlerwrapper.Result, error) {
 	// Notify user in Discord about import failure
+	// If guild channel, sends DM to user instead of public message
 	if payload.ChannelID != "" {
-		err := rh.service.GetScorecardUploadManager().SendUploadError(ctx, payload.ChannelID, payload.Error)
+		err := rh.service.GetScorecardUploadManager().SendUploadError(ctx, payload.ChannelID, string(payload.UserID), payload.Error)
 		if err != nil {
 			return nil, fmt.Errorf("failed to notify user of import failure: %w", err)
 		}

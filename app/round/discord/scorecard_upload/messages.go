@@ -129,16 +129,75 @@ func (m *scorecardUploadManager) HandleFileUploadMessage(s discord.Session, msg 
 	}
 }
 
-// SendUploadError sends an error message to the specified channel.
-func (m *scorecardUploadManager) SendUploadError(ctx context.Context, channelID, errorMsg string) error {
-	_, err := m.session.ChannelMessageSend(channelID, fmt.Sprintf("❌ Scorecard import failed: %s", errorMsg))
+// SendUploadError sends an error message. If the channel is a guild channel,
+// sends a DM to the user instead to avoid leaking import errors publicly.
+func (m *scorecardUploadManager) SendUploadError(ctx context.Context, channelID, userID, errorMsg string) error {
+	// Get channel info to determine if it's a DM or guild channel
+	channel, err := m.session.GetChannel(channelID)
 	if err != nil {
-		m.logger.ErrorContext(ctx, "Failed to send upload error message",
+		m.logger.ErrorContext(ctx, "Failed to get channel info",
 			attr.Error(err),
 			attr.String("channel_id", channelID),
 		)
+		// Fallback: try to send to channel anyway
+		_, sendErr := m.session.ChannelMessageSend(channelID, fmt.Sprintf("❌ Scorecard import failed: %s", errorMsg))
+		if sendErr != nil {
+			return sendErr
+		}
+		return nil
+	}
+
+	// If it's a DM channel (type 1), send error there
+	if channel.Type == 1 {
+		_, err := m.session.ChannelMessageSend(channelID, fmt.Sprintf("❌ Scorecard import failed: %s", errorMsg))
+		if err != nil {
+			m.logger.ErrorContext(ctx, "Failed to send upload error message to DM",
+				attr.Error(err),
+				attr.String("channel_id", channelID),
+			)
+			return err
+		}
+		return nil
+	}
+
+	// It's a guild channel - send DM to user instead
+	if userID == "" {
+		m.logger.WarnContext(ctx, "Cannot send DM: userID is empty, falling back to channel message")
+		_, err := m.session.ChannelMessageSend(channelID, fmt.Sprintf("❌ Scorecard import failed: %s", errorMsg))
 		return err
 	}
+
+	// Create DM channel with user
+	dmChannel, err := m.session.UserChannelCreate(userID)
+	if err != nil {
+		m.logger.ErrorContext(ctx, "Failed to create DM channel",
+			attr.Error(err),
+			attr.String("user_id", userID),
+		)
+		// Fallback: send ephemeral-style message in channel
+		_, sendErr := m.session.ChannelMessageSend(channelID,
+			fmt.Sprintf("<@%s> Your scorecard import failed (DM sent privately)", userID))
+		if sendErr != nil {
+			return fmt.Errorf("failed to create DM and send fallback: %w", err)
+		}
+		return err
+	}
+
+	// Send error via DM
+	_, err = m.session.ChannelMessageSend(dmChannel.ID,
+		fmt.Sprintf("❌ Scorecard import failed: %s\n\n(This message was sent privately to avoid cluttering the channel)", errorMsg))
+	if err != nil {
+		m.logger.ErrorContext(ctx, "Failed to send upload error via DM",
+			attr.Error(err),
+			attr.String("user_id", userID),
+		)
+		return err
+	}
+
+	m.logger.InfoContext(ctx, "Sent import error via DM to user",
+		attr.String("user_id", userID),
+		attr.String("original_channel", channelID))
+
 	return nil
 }
 

@@ -32,7 +32,7 @@ type ScorecardUploadManager interface {
 	HandleScorecardUploadButton(ctx context.Context, i *discordgo.InteractionCreate) (ScorecardUploadOperationResult, error)
 	HandleScorecardUploadModalSubmit(ctx context.Context, i *discordgo.InteractionCreate) (ScorecardUploadOperationResult, error)
 	HandleFileUploadMessage(s discord.Session, m *discordgo.MessageCreate)
-	SendUploadError(ctx context.Context, channelID, errorMsg string) error
+	SendUploadError(ctx context.Context, channelID, userID, errorMsg string) error
 }
 
 // scorecardUploadManager implements the ScorecardUploadManager interface.

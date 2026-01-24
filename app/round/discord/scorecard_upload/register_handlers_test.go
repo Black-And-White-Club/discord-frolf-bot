@@ -38,7 +38,7 @@ func (m *fakeScorecardUploadManager) HandleFileUploadMessage(s discord.Session, 
 	m.lastMsg = msg
 }
 
-func (m *fakeScorecardUploadManager) SendUploadError(ctx context.Context, channelID, errorMsg string) error {
+func (m *fakeScorecardUploadManager) SendUploadError(ctx context.Context, channelID, errorMsg, messageID string) error {
 	return nil
 }
 
