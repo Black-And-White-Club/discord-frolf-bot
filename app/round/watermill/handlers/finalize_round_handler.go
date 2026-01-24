@@ -27,6 +27,7 @@ func (h *RoundHandlers) HandleRoundFinalized(ctx context.Context, payload *round
 		StartTime:        payload.StartTime,
 		Location:         payload.Location,
 		Participants:     payload.Participants,
+		Teams:            payload.Teams,
 		EventMessageID:   payload.EventMessageID,
 		DiscordChannelID: payload.DiscordChannelID,
 	}
