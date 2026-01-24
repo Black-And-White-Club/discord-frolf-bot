@@ -150,7 +150,10 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 			Timestamp: time.Now().UTC().Format(time.RFC3339),
 		}
 
-		if len(payload.Teams) == 0 {
+		if len(payload.Teams) > 0 {
+			// For teams rounds, clear all buttons (no score override for doubles)
+			components = []discordgo.MessageComponent{}
+		} else {
 			components = []discordgo.MessageComponent{
 				discordgo.ActionsRow{
 					Components: []discordgo.MessageComponent{
