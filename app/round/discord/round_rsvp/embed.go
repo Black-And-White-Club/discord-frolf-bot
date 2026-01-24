@@ -2,12 +2,14 @@ package roundrsvp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
 
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
+	"github.com/bwmarrin/discordgo"
 )
 
 // --- Constants (Consider moving to a shared package) ---
@@ -33,6 +35,15 @@ func (rrm *roundRsvpManager) UpdateRoundEventEmbed(ctx context.Context, channelI
 	return rrm.operationWrapper(ctx, "UpdateRoundEventEmbed", func(ctx context.Context) (RoundRsvpOperationResult, error) {
 		msg, err := rrm.session.ChannelMessage(resolvedChannelID, messageID)
 		if err != nil {
+			// Check if message was deleted (404) - don't retry, just log and succeed
+			var restErr *discordgo.RESTError
+			if errors.As(err, &restErr) && restErr.Message.Code == discordgo.ErrCodeUnknownMessage {
+				rrm.logger.WarnContext(ctx, "Message was deleted, skipping embed update",
+					attr.String("channel_id", resolvedChannelID),
+					attr.String("discord_message_id", messageID),
+					attr.Int("discord_error_code", restErr.Message.Code))
+				return RoundRsvpOperationResult{}, nil // Success - nothing to update
+			}
 			wrappedErr := fmt.Errorf("failed to fetch message: %w", err)
 			rrm.logger.ErrorContext(ctx, "Failed to fetch message for embed update",
 				attr.Error(wrappedErr),

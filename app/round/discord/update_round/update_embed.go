@@ -2,6 +2,7 @@ package updateround
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -15,6 +16,11 @@ func (urm *updateRoundManager) UpdateRoundEventEmbed(ctx context.Context, channe
 		// Fetch the original message first to get existing data
 		msg, err := urm.session.ChannelMessage(channelID, messageID)
 		if err != nil {
+			// Check if message was deleted (404) - don't retry, just succeed
+			var restErr *discordgo.RESTError
+			if errors.As(err, &restErr) && restErr.Message.Code == discordgo.ErrCodeUnknownMessage {
+				return UpdateRoundOperationResult{}, nil // Message gone, nothing to update
+			}
 			return UpdateRoundOperationResult{Error: fmt.Errorf("failed to fetch message: %w", err)}, err
 		}
 
