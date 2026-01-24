@@ -290,13 +290,21 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 		return fmt.Errorf("guild module initialization failed: %w", err)
 	}
 
-	// Start guild router
+	// Start guild router - MUST be running before Discord session opens
+	// to ensure we can receive guild config retrieval responses
 	go func() {
 		bot.Logger.Info("Starting Guild Watermill router")
 		if err := bot.GuildWatermillRouter.Run(ctx); err != nil && err != context.Canceled {
 			bot.Logger.Error("Guild Watermill router failed", attr.Error(err))
 		}
 	}()
+
+	// Wait for guild router to be fully running before proceeding
+	// This ensures the subscription for guild.config.retrieved.v1 is established
+	// before we open Discord session and trigger config retrieval requests
+	bot.Logger.Info("Waiting for Guild Watermill router to be running...")
+	<-bot.GuildWatermillRouter.Running()
+	bot.Logger.Info("Guild Watermill router is now running")
 
 	// Multi-tenant deployment: register all commands globally with proper gating
 	// Setup command is admin-gated, other commands are setup-completion-gated
