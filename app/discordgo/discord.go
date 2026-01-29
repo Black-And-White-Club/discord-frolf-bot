@@ -7,48 +7,70 @@ import (
 )
 
 // Session defines the interface for interacting with Discord.
+// This interface contains only the methods that are actually used in the codebase.
 type Session interface {
-	UserChannelCreate(recipientID string, options ...discordgo.RequestOption) (st *discordgo.Channel, err error)
+	// --- Interaction Methods (most frequently used) ---
+	InteractionRespond(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error
+	InteractionResponseEdit(interaction *discordgo.Interaction, newresp *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error)
+	FollowupMessageCreate(interaction *discordgo.Interaction, wait bool, data *discordgo.WebhookParams, options ...discordgo.RequestOption) (*discordgo.Message, error)
+	FollowupMessageEdit(interaction *discordgo.Interaction, messageID string, data *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error)
+
+	// --- Message Methods ---
 	ChannelMessageSend(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error)
+	ChannelMessageSendComplex(channelID string, data *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error)
+	ChannelMessageEditComplex(m *discordgo.MessageEdit, options ...discordgo.RequestOption) (*discordgo.Message, error)
+	ChannelMessageEditEmbed(channelID, messageID string, embed *discordgo.MessageEmbed, options ...discordgo.RequestOption) (*discordgo.Message, error)
+	ChannelMessageDelete(channelID, messageID string, options ...discordgo.RequestOption) error
+	ChannelMessage(channelID, messageID string, options ...discordgo.RequestOption) (*discordgo.Message, error)
+	ChannelMessages(channelID string, limit int, beforeID, afterID, aroundID string, options ...discordgo.RequestOption) ([]*discordgo.Message, error)
+
+	// --- User/Member Methods ---
+	User(userID string, options ...discordgo.RequestOption) (*discordgo.User, error)
+	GetBotUser() (*discordgo.User, error)
+	UserChannelCreate(recipientID string, options ...discordgo.RequestOption) (*discordgo.Channel, error)
 	GuildMember(guildID, userID string, options ...discordgo.RequestOption) (*discordgo.Member, error)
 	GuildMemberRoleAdd(guildID, userID, roleID string, options ...discordgo.RequestOption) error
 	GuildMemberRoleRemove(guildID, userID, roleID string, options ...discordgo.RequestOption) error
-	MessageReactionAdd(channelID, messageID, emojiID string) error
-	GetChannel(channelID string, options ...discordgo.RequestOption) (st *discordgo.Channel, err error)
-	ChannelMessageEditComplex(m *discordgo.MessageEdit, options ...discordgo.RequestOption) (st *discordgo.Message, err error)
-	WebhookExecute(webhookID string, token string, wait bool, data *discordgo.WebhookParams, options ...discordgo.RequestOption) (st *discordgo.Message, err error)
-	ChannelMessages(channelID string, limit int, beforeID string, afterID string, aroundID string, options ...discordgo.RequestOption) (st []*discordgo.Message, err error)
-	ThreadsActive(channelID string, options ...discordgo.RequestOption) (threads *discordgo.ThreadsList, err error)
-	MessageThreadStartComplex(channelID string, messageID string, data *discordgo.ThreadStart, options ...discordgo.RequestOption) (ch *discordgo.Channel, err error)
-	ThreadMemberAdd(threadID string, memberID string, options ...discordgo.RequestOption) error
-	GetBotUser() (*discordgo.User, error)
-	ChannelMessageSendComplex(channelID string, data *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error)
-	GuildScheduledEventCreate(guildID string, params *discordgo.GuildScheduledEventParams, options ...discordgo.RequestOption) (*discordgo.GuildScheduledEvent, error)
-	GuildScheduledEventEdit(guildID, eventID string, params *discordgo.GuildScheduledEventParams, options ...discordgo.RequestOption) (*discordgo.GuildScheduledEvent, error)
-	ThreadStartComplex(channelID string, data *discordgo.ThreadStart, options ...discordgo.RequestOption) (ch *discordgo.Channel, err error)
-	AddHandler(handler interface{}) func()
-	ChannelMessageDelete(channelID string, messageID string, options ...discordgo.RequestOption) (err error)
-	ChannelDelete(channelID string, options ...discordgo.RequestOption) (err error)
-	User(userID string, options ...discordgo.RequestOption) (st *discordgo.User, err error)
-	FollowupMessageCreate(interaction *discordgo.Interaction, wait bool, data *discordgo.WebhookParams, options ...discordgo.RequestOption) (*discordgo.Message, error)
-	FollowupMessageEdit(interaction *discordgo.Interaction, messageID string, data *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error)
-	Open() error
-	Close() error
-	InteractionRespond(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error
-	InteractionResponseEdit(interaction *discordgo.Interaction, newresp *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error)
-	ApplicationCommandPermissionsEdit(appID string, guildID string, cmdID string, permissions *discordgo.ApplicationCommandPermissionsList, options ...discordgo.RequestOption) (err error)
-	ApplicationCommandCreate(appID, guildID string, cmd *discordgo.ApplicationCommand, options ...discordgo.RequestOption) (*discordgo.ApplicationCommand, error)
-	ApplicationCommands(appID, guildID string, options ...discordgo.RequestOption) ([]*discordgo.ApplicationCommand, error)
-	ApplicationCommandDelete(appID, guildID, cmdID string, options ...discordgo.RequestOption) error
-	WebhookMessageEdit(webhookID string, token string, messageID string, data *discordgo.WebhookEdit, options ...discordgo.RequestOption) (st *discordgo.Message, err error)
-	ChannelMessageEditEmbed(channelID string, messageID string, embed *discordgo.MessageEmbed, options ...discordgo.RequestOption) (*discordgo.Message, error)
-	ChannelMessage(channelID string, messageID string, options ...discordgo.RequestOption) (st *discordgo.Message, err error)
+
+	// --- Channel Methods ---
+	GetChannel(channelID string, options ...discordgo.RequestOption) (*discordgo.Channel, error)
+	ChannelDelete(channelID string, options ...discordgo.RequestOption) error
+	ChannelEdit(channelID string, data *discordgo.ChannelEdit, options ...discordgo.RequestOption) (*discordgo.Channel, error)
+
+	// --- Guild Methods ---
 	Guild(guildID string, options ...discordgo.RequestOption) (*discordgo.Guild, error)
 	GuildChannels(guildID string, options ...discordgo.RequestOption) ([]*discordgo.Channel, error)
 	GuildChannelCreate(guildID, name string, ctype discordgo.ChannelType, options ...discordgo.RequestOption) (*discordgo.Channel, error)
-	ChannelEdit(channelID string, data *discordgo.ChannelEdit, options ...discordgo.RequestOption) (*discordgo.Channel, error)
 	GuildRoleCreate(guildID string, params *discordgo.RoleParams, options ...discordgo.RequestOption) (*discordgo.Role, error)
-	GuildRoleDelete(guildID, roleID string, options ...discordgo.RequestOption) (err error)
+	GuildRoleDelete(guildID, roleID string, options ...discordgo.RequestOption) error
+
+	// --- Thread Methods ---
+	ThreadsActive(channelID string, options ...discordgo.RequestOption) (*discordgo.ThreadsList, error)
+	MessageThreadStartComplex(channelID, messageID string, data *discordgo.ThreadStart, options ...discordgo.RequestOption) (*discordgo.Channel, error)
+	ThreadStartComplex(channelID string, data *discordgo.ThreadStart, options ...discordgo.RequestOption) (*discordgo.Channel, error)
+	ThreadMemberAdd(threadID, memberID string, options ...discordgo.RequestOption) error
+
+	// --- Reaction Methods ---
+	MessageReactionAdd(channelID, messageID, emojiID string) error
+
+	// --- Webhook Methods ---
+	WebhookExecute(webhookID, token string, wait bool, data *discordgo.WebhookParams, options ...discordgo.RequestOption) (*discordgo.Message, error)
+	WebhookMessageEdit(webhookID, token, messageID string, data *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error)
+
+	// --- Scheduled Event Methods ---
+	GuildScheduledEventCreate(guildID string, params *discordgo.GuildScheduledEventParams, options ...discordgo.RequestOption) (*discordgo.GuildScheduledEvent, error)
+	GuildScheduledEventEdit(guildID, eventID string, params *discordgo.GuildScheduledEventParams, options ...discordgo.RequestOption) (*discordgo.GuildScheduledEvent, error)
+
+	// --- Application Command Methods ---
+	ApplicationCommandCreate(appID, guildID string, cmd *discordgo.ApplicationCommand, options ...discordgo.RequestOption) (*discordgo.ApplicationCommand, error)
+	ApplicationCommands(appID, guildID string, options ...discordgo.RequestOption) ([]*discordgo.ApplicationCommand, error)
+	ApplicationCommandDelete(appID, guildID, cmdID string, options ...discordgo.RequestOption) error
+	ApplicationCommandPermissionsEdit(appID, guildID, cmdID string, permissions *discordgo.ApplicationCommandPermissionsList, options ...discordgo.RequestOption) error
+
+	// --- Handler/Lifecycle Methods ---
+	AddHandler(handler interface{}) func()
+	Open() error
+	Close() error
 }
 
 // State defines an interface that provides access to the Discord state.

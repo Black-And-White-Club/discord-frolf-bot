@@ -6,64 +6,57 @@ import (
 	"log/slog"
 	"strings"
 	"testing"
+	"time"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
-	guildconfigmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
-	storagemocks "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage/mocks"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/testutils"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
-	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
-	utilsmocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
-	discordmetricsmocks "github.com/Black-And-White-Club/frolf-bot-shared/observability/mocks"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
 	"go.opentelemetry.io/otel/trace/noop"
-	"go.uber.org/mock/gomock"
 )
 
 func TestNewRoundRsvpManager(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
-	mockEventBus := eventbusmocks.NewMockEventBus(ctrl)
+	fakeSession := discord.NewFakeSession()
+	fakeEventBus := &testutils.FakeEventBus{}
 	testHandler := loggerfrolfbot.NewTestHandler()
 	logger := slog.New(testHandler)
-	mockHelper := utilsmocks.NewMockHelpers(ctrl)
-	mockConfig := &config.Config{}
-	mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
-	mockGuildConfigCache := storagemocks.NewMockISInterface[storage.GuildConfig](ctrl)
-	mockMetrics := discordmetricsmocks.NewMockDiscordMetrics(ctrl)
+	fakeHelper := &testutils.FakeHelpers{}
+	fakeConfig := &config.Config{}
+	fakeInteractionStore := &testutils.FakeStorage[any]{}
+	fakeGuildConfigCache := &testutils.FakeStorage[storage.GuildConfig]{}
+	fakeMetrics := &testutils.FakeDiscordMetrics{}
 	tracer := noop.NewTracerProvider().Tracer("test")
-	mockGuildConfigResolver := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
+	fakeGuildConfigResolver := &testutils.FakeGuildConfigResolver{}
 
-	manager := NewRoundRsvpManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockInteractionStore, mockGuildConfigCache, tracer, mockMetrics, mockGuildConfigResolver)
+	manager := NewRoundRsvpManager(fakeSession, fakeEventBus, logger, fakeHelper, fakeConfig, fakeInteractionStore, fakeGuildConfigCache, tracer, fakeMetrics, fakeGuildConfigResolver)
 	impl, ok := manager.(*roundRsvpManager)
 	if !ok {
 		t.Fatalf("Expected *roundRsvpManager, got %T", manager)
 	}
 
-	if impl.session != mockSession {
+	if impl.session != fakeSession {
 		t.Error("Expected session to be assigned")
 	}
-	if impl.publisher != mockEventBus {
+	if impl.publisher != fakeEventBus {
 		t.Error("Expected publisher to be assigned")
 	}
 	if impl.logger != logger {
 		t.Error("Expected logger to be assigned")
 	}
-	if impl.helper != mockHelper {
+	if impl.helper != fakeHelper {
 		t.Error("Expected helper to be assigned")
 	}
-	if impl.config != mockConfig {
+	if impl.config != fakeConfig {
 		t.Error("Expected config to be assigned")
 	}
-	if impl.interactionStore != mockInteractionStore {
+	if impl.interactionStore != fakeInteractionStore {
 		t.Error("Expected interactionStore to be assigned")
 	}
 	if impl.tracer != tracer {
 		t.Error("Expected tracer to be assigned")
 	}
-	if impl.metrics != mockMetrics {
+	if impl.metrics != fakeMetrics {
 		t.Error("Expected metrics to be assigned")
 	}
 	if impl.operationWrapper == nil {
@@ -72,21 +65,18 @@ func TestNewRoundRsvpManager(t *testing.T) {
 }
 
 func Test_wrapRoundRsvpOperation(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	testHandler := loggerfrolfbot.NewTestHandler()
 	logger := slog.New(testHandler)
-	mockMetrics := discordmetricsmocks.NewMockDiscordMetrics(ctrl)
+	fakeMetrics := &testutils.FakeDiscordMetrics{}
 	tracer := noop.NewTracerProvider().Tracer("test")
 
 	tests := []struct {
-		name       string
-		operation  string
-		fn         func(context.Context) (RoundRsvpOperationResult, error)
-		expectErr  string
-		expectRes  RoundRsvpOperationResult
-		mockMetric func()
+		name      string
+		operation string
+		fn        func(context.Context) (RoundRsvpOperationResult, error)
+		expectErr string
+		expectRes RoundRsvpOperationResult
+		setup     func()
 	}{
 		{
 			name:      "success path",
@@ -95,9 +85,17 @@ func Test_wrapRoundRsvpOperation(t *testing.T) {
 				return RoundRsvpOperationResult{Success: "success"}, nil
 			},
 			expectRes: RoundRsvpOperationResult{Success: "success"},
-			mockMetric: func() {
-				mockMetrics.EXPECT().RecordAPIRequestDuration(gomock.Any(), "handle_success", gomock.Any()).Times(1)
-				mockMetrics.EXPECT().RecordAPIRequest(gomock.Any(), "handle_success").Times(1)
+			setup: func() {
+				fakeMetrics.RecordAPIRequestDurationFunc = func(ctx context.Context, operation string, duration time.Duration) {
+					if operation != "handle_success" {
+						t.Errorf("expected operation handle_success, got %s", operation)
+					}
+				}
+				fakeMetrics.RecordAPIRequestFunc = func(ctx context.Context, operation string) {
+					if operation != "handle_success" {
+						t.Errorf("expected operation handle_success, got %s", operation)
+					}
+				}
 			},
 		},
 		{
@@ -107,9 +105,17 @@ func Test_wrapRoundRsvpOperation(t *testing.T) {
 				return RoundRsvpOperationResult{}, errors.New("operation failed")
 			},
 			expectErr: "handle_error operation error: operation failed",
-			mockMetric: func() {
-				mockMetrics.EXPECT().RecordAPIRequestDuration(gomock.Any(), "handle_error", gomock.Any()).Times(1)
-				mockMetrics.EXPECT().RecordAPIError(gomock.Any(), "handle_error", "operation_error").Times(1)
+			setup: func() {
+				fakeMetrics.RecordAPIRequestDurationFunc = func(ctx context.Context, operation string, duration time.Duration) {
+					if operation != "handle_error" {
+						t.Errorf("expected operation handle_error, got %s", operation)
+					}
+				}
+				fakeMetrics.RecordAPIErrorFunc = func(ctx context.Context, operation, errorType string) {
+					if operation != "handle_error" || errorType != "operation_error" {
+						t.Errorf("expected operation handle_error and errorType operation_error, got %s, %s", operation, errorType)
+					}
+				}
 			},
 		},
 		{
@@ -119,9 +125,17 @@ func Test_wrapRoundRsvpOperation(t *testing.T) {
 				return RoundRsvpOperationResult{Error: errors.New("result error")}, nil
 			},
 			expectRes: RoundRsvpOperationResult{Error: errors.New("result error")},
-			mockMetric: func() {
-				mockMetrics.EXPECT().RecordAPIRequestDuration(gomock.Any(), "handle_result_error", gomock.Any()).Times(1)
-				mockMetrics.EXPECT().RecordAPIError(gomock.Any(), "handle_result_error", "result_error").Times(1)
+			setup: func() {
+				fakeMetrics.RecordAPIRequestDurationFunc = func(ctx context.Context, operation string, duration time.Duration) {
+					if operation != "handle_result_error" {
+						t.Errorf("expected operation handle_result_error, got %s", operation)
+					}
+				}
+				fakeMetrics.RecordAPIErrorFunc = func(ctx context.Context, operation, errorType string) {
+					if operation != "handle_result_error" || errorType != "result_error" {
+						t.Errorf("expected operation handle_result_error and errorType result_error, got %s, %s", operation, errorType)
+					}
+				}
 			},
 		},
 		{
@@ -132,9 +146,17 @@ func Test_wrapRoundRsvpOperation(t *testing.T) {
 			},
 			expectErr: "",
 			expectRes: RoundRsvpOperationResult{Error: nil},
-			mockMetric: func() {
-				mockMetrics.EXPECT().RecordAPIRequestDuration(gomock.Any(), "handle_panic", gomock.Any()).Times(1)
-				mockMetrics.EXPECT().RecordAPIError(gomock.Any(), "handle_panic", "panic").Times(1)
+			setup: func() {
+				fakeMetrics.RecordAPIRequestDurationFunc = func(ctx context.Context, operation string, duration time.Duration) {
+					if operation != "handle_panic" {
+						t.Errorf("expected operation handle_panic, got %s", operation)
+					}
+				}
+				fakeMetrics.RecordAPIErrorFunc = func(ctx context.Context, operation, errorType string) {
+					if operation != "handle_panic" || errorType != "panic" {
+						t.Errorf("expected operation handle_panic and errorType panic, got %s, %s", operation, errorType)
+					}
+				}
 			},
 		},
 		{
@@ -147,10 +169,10 @@ func Test_wrapRoundRsvpOperation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.mockMetric != nil {
-				tt.mockMetric()
+			if tt.setup != nil {
+				tt.setup()
 			}
-			got, err := wrapRoundRsvpOperation(context.Background(), tt.operation, tt.fn, logger, tracer, mockMetrics)
+			got, err := wrapRoundRsvpOperation(context.Background(), tt.operation, tt.fn, logger, tracer, fakeMetrics)
 
 			if tt.expectErr != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.expectErr) {

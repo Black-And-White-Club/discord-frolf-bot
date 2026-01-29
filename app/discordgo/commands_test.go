@@ -4,11 +4,10 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"slices"
 	"testing"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
 	"github.com/bwmarrin/discordgo"
-	"go.uber.org/mock/gomock"
 )
 
 func testLogger() *slog.Logger {
@@ -16,82 +15,117 @@ func testLogger() *slog.Logger {
 }
 
 func TestRegisterCommands_Idempotent_SkipsExistingGuildCommands(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	ms := discordmocks.NewMockSession(ctrl)
+	fs := NewFakeSession()
 	logger := testLogger()
 
-	ms.EXPECT().GetBotUser().Return(&discordgo.User{ID: "bot"}, nil)
-	ms.EXPECT().ApplicationCommands("bot", "g1").Return([]*discordgo.ApplicationCommand{
-		{Name: "updaterole"},
-		{Name: "createround"},
-		nil,
-		{Name: ""},
-	}, nil)
+	// Configure the fake to return existing commands
+	fs.GetBotUserFunc = func() (*discordgo.User, error) {
+		return &discordgo.User{ID: "bot"}, nil
+	}
+
+	// Return some existing commands - the ones not listed here should be created
+	fs.ApplicationCommandsFunc = func(appID, guildID string, options ...discordgo.RequestOption) ([]*discordgo.ApplicationCommand, error) {
+		return []*discordgo.ApplicationCommand{
+			{Name: "updaterole"},
+			{Name: "createround"},
+			nil,
+			{Name: ""},
+		}, nil
+	}
 
 	var created []string
-	ms.EXPECT().ApplicationCommandCreate("bot", "g1", gomock.Any()).
-		DoAndReturn(func(_ string, _ string, cmd *discordgo.ApplicationCommand, _ ...discordgo.RequestOption) (*discordgo.ApplicationCommand, error) {
-			created = append(created, cmd.Name)
-			return &discordgo.ApplicationCommand{ID: cmd.Name + "-id"}, nil
-		}).
-		Times(2)
+	fs.ApplicationCommandCreateFunc = func(appID, guildID string, cmd *discordgo.ApplicationCommand, options ...discordgo.RequestOption) (*discordgo.ApplicationCommand, error) {
+		created = append(created, cmd.Name)
+		return &discordgo.ApplicationCommand{ID: cmd.Name + "-id"}, nil
+	}
 
-	if err := RegisterCommands(ms, logger, "g1"); err != nil {
+	if err := RegisterCommands(fs, logger, "g1"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	want := map[string]bool{"claimtag": true, "set-udisc-name": true}
-	if len(created) != 2 {
-		t.Fatalf("expected 2 created commands, got %v", created)
+	// Verify the expected commands were created (claimtag, set-udisc-name, dashboard)
+	want := map[string]bool{"claimtag": true, "set-udisc-name": true, "dashboard": true}
+	if len(created) != 3 {
+		t.Fatalf("expected 3 created commands, got %d: %v", len(created), created)
 	}
 	for _, name := range created {
 		if !want[name] {
 			t.Fatalf("unexpected created command: %q (all created: %v)", name, created)
 		}
 	}
+
+	// Verify trace includes expected calls
+	trace := fs.Trace()
+	if !slices.Contains(trace, "GetBotUser") {
+		t.Error("expected GetBotUser to be called")
+	}
+	if !slices.Contains(trace, "ApplicationCommands") {
+		t.Error("expected ApplicationCommands to be called")
+	}
+	if !slices.Contains(trace, "ApplicationCommandCreate") {
+		t.Error("expected ApplicationCommandCreate to be called")
+	}
 }
 
 func TestRegisterCommands_Idempotent_AllCommandsPresent_NoCreates(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	ms := discordmocks.NewMockSession(ctrl)
+	fs := NewFakeSession()
 	logger := testLogger()
 
-	ms.EXPECT().GetBotUser().Return(&discordgo.User{ID: "bot"}, nil)
-	ms.EXPECT().ApplicationCommands("bot", "g1").Return([]*discordgo.ApplicationCommand{
-		{Name: "updaterole"},
-		{Name: "createround"},
-		{Name: "claimtag"},
-		{Name: "set-udisc-name"},
-	}, nil)
+	fs.GetBotUserFunc = func() (*discordgo.User, error) {
+		return &discordgo.User{ID: "bot"}, nil
+	}
 
-	ms.EXPECT().ApplicationCommandCreate(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	// All 5 commands already exist
+	fs.ApplicationCommandsFunc = func(appID, guildID string, options ...discordgo.RequestOption) ([]*discordgo.ApplicationCommand, error) {
+		return []*discordgo.ApplicationCommand{
+			{Name: "updaterole"},
+			{Name: "createround"},
+			{Name: "claimtag"},
+			{Name: "set-udisc-name"},
+			{Name: "dashboard"},
+		}, nil
+	}
 
-	if err := RegisterCommands(ms, logger, "g1"); err != nil {
+	var createCalled bool
+	fs.ApplicationCommandCreateFunc = func(appID, guildID string, cmd *discordgo.ApplicationCommand, options ...discordgo.RequestOption) (*discordgo.ApplicationCommand, error) {
+		createCalled = true
+		return &discordgo.ApplicationCommand{ID: cmd.Name + "-id"}, nil
+	}
+
+	if err := RegisterCommands(fs, logger, "g1"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if createCalled {
+		t.Error("expected ApplicationCommandCreate to not be called when all commands are present")
 	}
 }
 
 func TestRegisterCommands_ListError_FallsBackToCreate(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	ms := discordmocks.NewMockSession(ctrl)
+	fs := NewFakeSession()
 	logger := testLogger()
 
-	ms.EXPECT().GetBotUser().Return(&discordgo.User{ID: "bot"}, nil)
-	ms.EXPECT().ApplicationCommands("bot", "g1").Return(nil, errors.New("list failed"))
+	fs.GetBotUserFunc = func() (*discordgo.User, error) {
+		return &discordgo.User{ID: "bot"}, nil
+	}
 
-	ms.EXPECT().ApplicationCommandCreate("bot", "g1", gomock.Any()).
-		DoAndReturn(func(_ string, _ string, cmd *discordgo.ApplicationCommand, _ ...discordgo.RequestOption) (*discordgo.ApplicationCommand, error) {
-			return &discordgo.ApplicationCommand{ID: cmd.Name + "-id"}, nil
-		}).
-		Times(4)
+	// Simulate an error when listing commands
+	fs.ApplicationCommandsFunc = func(appID, guildID string, options ...discordgo.RequestOption) ([]*discordgo.ApplicationCommand, error) {
+		return nil, errors.New("list failed")
+	}
 
-	if err := RegisterCommands(ms, logger, "g1"); err != nil {
+	var createCount int
+	fs.ApplicationCommandCreateFunc = func(appID, guildID string, cmd *discordgo.ApplicationCommand, options ...discordgo.RequestOption) (*discordgo.ApplicationCommand, error) {
+		createCount++
+		return &discordgo.ApplicationCommand{ID: cmd.Name + "-id"}, nil
+	}
+
+	if err := RegisterCommands(fs, logger, "g1"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should have created all 5 commands since list failed
+	if createCount != 5 {
+		t.Fatalf("expected 5 commands to be created (fallback behavior), got %d", createCount)
 	}
 }

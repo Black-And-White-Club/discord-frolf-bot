@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
@@ -14,7 +14,6 @@ import (
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
 	"github.com/google/uuid"
-	"go.uber.org/mock/gomock"
 )
 
 func Test_startRoundManager_UpdateRoundToScorecard(t *testing.T) {
@@ -25,7 +24,7 @@ func Test_startRoundManager_UpdateRoundToScorecard(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		setupMocks func(*discordmocks.MockSession)
+		setupMocks func(*discord.FakeSession)
 		payload    *roundevents.DiscordRoundStartPayloadV1
 		channelID  string
 		messageID  string
@@ -33,13 +32,13 @@ func Test_startRoundManager_UpdateRoundToScorecard(t *testing.T) {
 	}{
 		{
 			name: "Successful update",
-			setupMocks: func(m *discordmocks.MockSession) {
-				m.EXPECT().
-					ChannelMessage("test-channel", "test-message").
-					Return(&discordgo.Message{ID: "test-message"}, nil)
-				m.EXPECT().
-					ChannelMessageEditComplex(gomock.Any()).
-					Return(&discordgo.Message{ID: "test-message"}, nil)
+			setupMocks: func(fs *discord.FakeSession) {
+				fs.ChannelMessageFunc = func(channelID, messageID string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{ID: "test-message"}, nil
+				}
+				fs.ChannelMessageEditComplexFunc = func(edit *discordgo.MessageEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{ID: "test-message"}, nil
+				}
 			},
 			payload: &roundevents.DiscordRoundStartPayloadV1{
 				RoundID:   testRoundID,
@@ -53,13 +52,13 @@ func Test_startRoundManager_UpdateRoundToScorecard(t *testing.T) {
 		},
 		{
 			name: "Edit message fails",
-			setupMocks: func(m *discordmocks.MockSession) {
-				m.EXPECT().
-					ChannelMessage("test-channel", "test-message").
-					Return(&discordgo.Message{ID: "test-message"}, nil)
-				m.EXPECT().
-					ChannelMessageEditComplex(gomock.Any()).
-					Return(nil, fmt.Errorf("discord API error"))
+			setupMocks: func(fs *discord.FakeSession) {
+				fs.ChannelMessageFunc = func(channelID, messageID string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{ID: "test-message"}, nil
+				}
+				fs.ChannelMessageEditComplexFunc = func(edit *discordgo.MessageEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return nil, fmt.Errorf("discord API error")
+				}
 			},
 			payload: &roundevents.DiscordRoundStartPayloadV1{
 				RoundID:   testRoundID,
@@ -73,10 +72,10 @@ func Test_startRoundManager_UpdateRoundToScorecard(t *testing.T) {
 		},
 		{
 			name: "Fetch existing message fails",
-			setupMocks: func(m *discordmocks.MockSession) {
-				m.EXPECT().
-					ChannelMessage("test-channel", "test-message").
-					Return(nil, fmt.Errorf("message not found"))
+			setupMocks: func(fs *discord.FakeSession) {
+				fs.ChannelMessageFunc = func(channelID, messageID string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return nil, fmt.Errorf("message not found")
+				}
 			},
 			payload: &roundevents.DiscordRoundStartPayloadV1{
 				RoundID:   testRoundID,
@@ -118,16 +117,13 @@ func Test_startRoundManager_UpdateRoundToScorecard(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
-			mockSession := discordmocks.NewMockSession(ctrl)
+			fakeSession := discord.NewFakeSession()
 			if tt.setupMocks != nil {
-				tt.setupMocks(mockSession)
+				tt.setupMocks(fakeSession)
 			}
 
 			srm := &startRoundManager{
-				session: mockSession,
+				session: fakeSession,
 				logger:  loggerfrolfbot.NoOpLogger,
 				config:  &config.Config{},
 				operationWrapper: func(ctx context.Context, name string, fn func(ctx context.Context) (StartRoundOperationResult, error)) (StartRoundOperationResult, error) {

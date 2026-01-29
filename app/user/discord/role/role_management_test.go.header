@@ -1,0 +1,30 @@
+package role
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"testing"
+
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/config"
+	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
+	"github.com/bwmarrin/discordgo"
+	"go.opentelemetry.io/otel/trace/noop"
+)
+
+func Test_roleManager_EditRoleUpdateResponse(t *testing.T) {
+	// Test cases updated to match implementation
+	fakeSession := &discord.FakeSession{}
+	fakeInteractionStore := &FakeISInterface[any]{}
+
+	tests := []struct {
+		name           string
+		setup          func()
+		ctx            context.Context
+		correlationID  string
+		content        string
+		wantErr        bool
+		expectedResult RoleOperationResult
+	}{

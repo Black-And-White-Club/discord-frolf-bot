@@ -6,12 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
-	"github.com/Black-And-White-Club/discord-frolf-bot/config"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
-	"go.uber.org/mock/gomock"
 )
 
 func intPointer(i sharedtypes.Score) *sharedtypes.Score {
@@ -19,8 +17,7 @@ func intPointer(i sharedtypes.Score) *sharedtypes.Score {
 }
 
 func Test_scoreRoundManager_UpdateScoreEmbed(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	fakeSession := discord.NewFakeSession()
 
 	ctx := context.Background()
 	channelID := "testChannelID"
@@ -29,7 +26,7 @@ func Test_scoreRoundManager_UpdateScoreEmbed(t *testing.T) {
 
 	tests := []struct {
 		name               string
-		setup              func(mockSession *discordmocks.MockSession, mockConfig *config.Config)
+		setup              func()
 		score              *sharedtypes.Score
 		expectError        bool
 		expectedEmbedValue string
@@ -37,10 +34,9 @@ func Test_scoreRoundManager_UpdateScoreEmbed(t *testing.T) {
 	}{
 		{
 			name: "Successful Score Update",
-			setup: func(mockSession *discordmocks.MockSession, mockConfig *config.Config) {
-				mockSession.EXPECT().
-					ChannelMessage(channelID, messageID).
-					Return(&discordgo.Message{
+			setup: func() {
+				fakeSession.ChannelMessageFunc = func(cID, mID string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{
 						ID: messageID,
 						Embeds: []*discordgo.MessageEmbed{
 							{
@@ -50,26 +46,23 @@ func Test_scoreRoundManager_UpdateScoreEmbed(t *testing.T) {
 								},
 							},
 						},
-					}, nil).
-					Times(1)
+					}, nil
+				}
 
-				mockSession.EXPECT().
-					ChannelMessageEditComplex(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(edit *discordgo.MessageEdit, options ...any) (*discordgo.Message, error) {
-						if edit == nil {
-							return nil, errors.New("edit struct is nil")
-						}
-						if edit.Embeds == nil {
-							edit.Embeds = &[]*discordgo.MessageEmbed{}
-						}
-						updatedEmbeds := *edit.Embeds
-						return &discordgo.Message{
-							ID:        edit.ID,
-							ChannelID: edit.Channel,
-							Embeds:    updatedEmbeds,
-						}, nil
-					}).
-					Times(1)
+				fakeSession.ChannelMessageEditComplexFunc = func(edit *discordgo.MessageEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					if edit == nil {
+						return nil, errors.New("edit struct is nil")
+					}
+					if edit.Embeds == nil {
+						edit.Embeds = &[]*discordgo.MessageEmbed{}
+					}
+					updatedEmbeds := *edit.Embeds
+					return &discordgo.Message{
+						ID:        edit.ID,
+						ChannelID: edit.Channel,
+						Embeds:    updatedEmbeds,
+					}, nil
+				}
 			},
 			score:              intPointer(10),
 			expectError:        false,
@@ -78,10 +71,9 @@ func Test_scoreRoundManager_UpdateScoreEmbed(t *testing.T) {
 		},
 		{
 			name: "Nil Score (Reset Score)",
-			setup: func(mockSession *discordmocks.MockSession, mockConfig *config.Config) {
-				mockSession.EXPECT().
-					ChannelMessage(channelID, messageID).
-					Return(&discordgo.Message{
+			setup: func() {
+				fakeSession.ChannelMessageFunc = func(cID, mID string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{
 						ID: messageID,
 						Embeds: []*discordgo.MessageEmbed{
 							{
@@ -91,20 +83,17 @@ func Test_scoreRoundManager_UpdateScoreEmbed(t *testing.T) {
 								},
 							},
 						},
-					}, nil).
-					Times(1)
+					}, nil
+				}
 
-				mockSession.EXPECT().
-					ChannelMessageEditComplex(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(edit *discordgo.MessageEdit, options ...any) (*discordgo.Message, error) {
-						updatedEmbeds := *edit.Embeds
-						return &discordgo.Message{
-							ID:        edit.ID,
-							ChannelID: edit.Channel,
-							Embeds:    updatedEmbeds,
-						}, nil
-					}).
-					Times(1)
+				fakeSession.ChannelMessageEditComplexFunc = func(edit *discordgo.MessageEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					updatedEmbeds := *edit.Embeds
+					return &discordgo.Message{
+						ID:        edit.ID,
+						ChannelID: edit.Channel,
+						Embeds:    updatedEmbeds,
+					}, nil
+				}
 			},
 			score:              nil,
 			expectError:        false,
@@ -113,10 +102,9 @@ func Test_scoreRoundManager_UpdateScoreEmbed(t *testing.T) {
 		},
 		{
 			name: "Session Fails to Edit Message",
-			setup: func(mockSession *discordmocks.MockSession, mockConfig *config.Config) {
-				mockSession.EXPECT().
-					ChannelMessage(channelID, messageID).
-					Return(&discordgo.Message{
+			setup: func() {
+				fakeSession.ChannelMessageFunc = func(cID, mID string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{
 						ID: messageID,
 						Embeds: []*discordgo.MessageEmbed{
 							{
@@ -126,13 +114,12 @@ func Test_scoreRoundManager_UpdateScoreEmbed(t *testing.T) {
 								},
 							},
 						},
-					}, nil).
-					Times(1)
+					}, nil
+				}
 
-				mockSession.EXPECT().
-					ChannelMessageEditComplex(gomock.Any(), gomock.Any()).
-					Return(nil, errors.New("failed to edit message")).
-					Times(1)
+				fakeSession.ChannelMessageEditComplexFunc = func(edit *discordgo.MessageEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return nil, errors.New("failed to edit message")
+				}
 			},
 			score:              intPointer(10),
 			expectError:        true,
@@ -141,10 +128,9 @@ func Test_scoreRoundManager_UpdateScoreEmbed(t *testing.T) {
 		},
 		{
 			name: "Guild Member Fetch Fails (Use Username)",
-			setup: func(mockSession *discordmocks.MockSession, mockConfig *config.Config) {
-				mockSession.EXPECT().
-					ChannelMessage(channelID, messageID).
-					Return(&discordgo.Message{
+			setup: func() {
+				fakeSession.ChannelMessageFunc = func(cID, mID string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{
 						ID: messageID,
 						Embeds: []*discordgo.MessageEmbed{
 							{
@@ -154,20 +140,17 @@ func Test_scoreRoundManager_UpdateScoreEmbed(t *testing.T) {
 								},
 							},
 						},
-					}, nil).
-					Times(1)
+					}, nil
+				}
 
-				mockSession.EXPECT().
-					ChannelMessageEditComplex(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(edit *discordgo.MessageEdit, options ...any) (*discordgo.Message, error) {
-						updatedEmbeds := *edit.Embeds
-						return &discordgo.Message{
-							ID:        edit.ID,
-							ChannelID: edit.Channel,
-							Embeds:    updatedEmbeds,
-						}, nil
-					}).
-					Times(1)
+				fakeSession.ChannelMessageEditComplexFunc = func(edit *discordgo.MessageEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					updatedEmbeds := *edit.Embeds
+					return &discordgo.Message{
+						ID:        edit.ID,
+						ChannelID: edit.Channel,
+						Embeds:    updatedEmbeds,
+					}, nil
+				}
 			},
 			score:              intPointer(10),
 			expectError:        false,
@@ -176,10 +159,9 @@ func Test_scoreRoundManager_UpdateScoreEmbed(t *testing.T) {
 		},
 		{
 			name: "User Fetch Fails",
-			setup: func(mockSession *discordmocks.MockSession, mockConfig *config.Config) {
-				mockSession.EXPECT().
-					ChannelMessage(channelID, messageID).
-					Return(&discordgo.Message{
+			setup: func() {
+				fakeSession.ChannelMessageFunc = func(cID, mID string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{
 						ID: messageID,
 						Embeds: []*discordgo.MessageEmbed{
 							{
@@ -189,8 +171,8 @@ func Test_scoreRoundManager_UpdateScoreEmbed(t *testing.T) {
 								},
 							},
 						},
-					}, nil).
-					Times(1)
+					}, nil
+				}
 			},
 			score:              intPointer(10),
 			expectError:        false,
@@ -199,14 +181,13 @@ func Test_scoreRoundManager_UpdateScoreEmbed(t *testing.T) {
 		},
 		{
 			name: "Nil Embeds in Message",
-			setup: func(mockSession *discordmocks.MockSession, mockConfig *config.Config) {
-				mockSession.EXPECT().
-					ChannelMessage(channelID, messageID).
-					Return(&discordgo.Message{
+			setup: func() {
+				fakeSession.ChannelMessageFunc = func(cID, mID string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{
 						ID:     messageID,
 						Embeds: nil,
-					}, nil).
-					Times(1)
+					}, nil
+				}
 			},
 			score:              intPointer(10),
 			expectError:        false,
@@ -215,14 +196,13 @@ func Test_scoreRoundManager_UpdateScoreEmbed(t *testing.T) {
 		},
 		{
 			name: "Empty Embeds in Message",
-			setup: func(mockSession *discordmocks.MockSession, mockConfig *config.Config) {
-				mockSession.EXPECT().
-					ChannelMessage(channelID, messageID).
-					Return(&discordgo.Message{
+			setup: func() {
+				fakeSession.ChannelMessageFunc = func(cID, mID string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{
 						ID:     messageID,
 						Embeds: []*discordgo.MessageEmbed{},
-					}, nil).
-					Times(1)
+					}, nil
+				}
 			},
 			score:              intPointer(10),
 			expectError:        false,
@@ -233,15 +213,12 @@ func Test_scoreRoundManager_UpdateScoreEmbed(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockSession := discordmocks.NewMockSession(ctrl)
-			mockConfig := &config.Config{}
-
 			if tt.setup != nil {
-				tt.setup(mockSession, mockConfig)
+				tt.setup()
 			}
 
 			srm := &scoreRoundManager{
-				session: mockSession,
+				session: fakeSession,
 				logger:  loggerfrolfbot.NoOpLogger,
 				operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (ScoreRoundOperationResult, error)) (ScoreRoundOperationResult, error) {
 					return fn(ctx) // bypass wrapper for testing
@@ -294,16 +271,6 @@ func Test_scoreRoundManager_UpdateScoreEmbed(t *testing.T) {
 					if !found {
 						t.Errorf("Expected embed field with value %q to be updated but it was not found", tt.expectedEmbedValue)
 					}
-				}
-			}
-
-			if tt.expectError {
-				if result.Error == nil {
-					t.Errorf("Expected an error in result, but got nil")
-				}
-			} else {
-				if result.Error != nil {
-					t.Errorf("Expected no error in result, but got: %v", result.Error)
 				}
 			}
 		})

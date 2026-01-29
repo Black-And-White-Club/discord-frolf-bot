@@ -5,13 +5,12 @@ import (
 	"errors"
 	"testing"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/interactions"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	"github.com/bwmarrin/discordgo"
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
-	"go.uber.org/mock/gomock"
 )
 
 // localSetupManager is a minimal stub implementing SetupManager to avoid import cycles in tests.
@@ -62,15 +61,15 @@ func TestRegisterHandlers_WiresManager(t *testing.T) {
 }
 
 func TestHandleSetupCommand_Paths(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	ms := discordmocks.NewMockSession(ctrl)
+	fakeSession := discord.NewFakeSession()
 
 	// Happy path should send a modal response via SendSetupModal
-	ms.EXPECT().InteractionRespond(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
+	fakeSession.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
+		return nil
+	}
 
 	sm := &setupManager{
-		session:          ms,
+		session:          fakeSession,
 		logger:           discardLogger(),
 		operationWrapper: func(ctx context.Context, _ string, fn func(ctx context.Context) error) error { return fn(ctx) },
 	}
@@ -123,13 +122,13 @@ func Test_wrapSetupOperation_SuccessAndError(t *testing.T) {
 }
 
 func TestSendFollowupSuccess_AllFields(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	ms := discordmocks.NewMockSession(ctrl)
+	fakeSession := discord.NewFakeSession()
 
-	ms.EXPECT().FollowupMessageCreate(gomock.Any(), true, gomock.Any(), gomock.Any()).Return(&discordgo.Message{ID: "ok"}, nil)
+	fakeSession.FollowupMessageCreateFunc = func(interaction *discordgo.Interaction, wait bool, data *discordgo.WebhookParams, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+		return &discordgo.Message{ID: "ok"}, nil
+	}
 
-	sm := &setupManager{session: ms}
+	sm := &setupManager{session: fakeSession}
 	i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{ID: uuid.New().String()}}
 	res := &SetupResult{
 		EventChannelID:       "e",

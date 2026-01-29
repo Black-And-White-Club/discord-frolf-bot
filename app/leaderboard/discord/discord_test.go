@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	discordgo "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
@@ -13,16 +12,14 @@ import (
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"go.opentelemetry.io/otel"
-	"go.uber.org/mock/gomock"
 )
 
 // Minimal nil-safe stubs; NewLeaderboardDiscord shouldn't invoke any methods during construction
 func TestNewLeaderboardDiscord_ConstructsAndExposesManagers(t *testing.T) {
 	ctx := context.Background()
 
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	var session discordgo.Session = discordmocks.NewMockSession(ctrl)
+	// Use FakeSession instead of gomock
+	fakeSession := discordgo.NewFakeSession()
 	var publisher eventbus.EventBus = nil
 	var helper utils.Helpers = nil
 	cfg := &config.Config{}
@@ -30,7 +27,7 @@ func TestNewLeaderboardDiscord_ConstructsAndExposesManagers(t *testing.T) {
 	var store storage.ISInterface[any] = nil
 	tracer := otel.Tracer("test")
 	var metrics discordmetrics.DiscordMetrics = nil
-	ld, err := NewLeaderboardDiscord(ctx, session, publisher, nil, helper, cfg, resolver, store, nil, tracer, metrics)
+	ld, err := NewLeaderboardDiscord(ctx, fakeSession, publisher, nil, helper, cfg, resolver, store, nil, tracer, metrics)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

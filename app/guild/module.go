@@ -9,8 +9,8 @@ import (
 	guilddiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/guild/discord"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/guild/discord/reset"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/guild/discord/setup"
-	guildwatermill "github.com/Black-And-White-Club/discord-frolf-bot/app/guild/watermill"
-	guildhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/guild/watermill/handlers"
+	guildhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/guild/handlers"
+	guildrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/guild/router"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/interactions"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord/signup"
@@ -41,7 +41,7 @@ func InitializeGuildModule(
 	discordMetrics discordmetrics.DiscordMetrics,
 	guildConfigResolver guildconfig.GuildConfigResolver,
 	signupManager signup.SignupManager,
-) (*guildwatermill.GuildRouter, error) {
+) (*guildrouter.GuildRouter, error) {
 	tracer := otel.Tracer("guild-module")
 
 	// Initialize Discord services
@@ -78,7 +78,7 @@ func InitializeGuildModule(
 	)
 
 	// Setup Watermill router
-	guildRouter := guildwatermill.NewGuildRouter(
+	guildRouter := guildrouter.NewGuildRouter(
 		logger,
 		router,
 		eventBus,

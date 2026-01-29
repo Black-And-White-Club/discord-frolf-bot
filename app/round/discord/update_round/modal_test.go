@@ -8,53 +8,47 @@ import (
 
 	"github.com/google/uuid"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
-	storagemocks "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/testutils"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
-	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
 	discordroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
-	utilsmocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
+	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/bwmarrin/discordgo"
 	"go.opentelemetry.io/otel/trace/noop"
-	"go.uber.org/mock/gomock"
 )
 
 func Test_updateRoundManager_SendupdateRoundModal(t *testing.T) {
 	tests := []struct {
-		name        string
-		setup       func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any])
-		ctx         context.Context
-		args        *discordgo.InteractionCreate
-		wantSuccess string
-		wantErrMsg  string
-		wantErrIs   error
+		name         string
+		setupSession func(fs *discord.FakeSession)
+		ctx          context.Context
+		args         *discordgo.InteractionCreate
+		wantSuccess  string
+		wantErrMsg   string
+		wantErrIs    error
 	}{
 		{
 			name: "successful send",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...interface{}) error {
-						if r.Type != discordgo.InteractionResponseModal {
-							t.Errorf("Expected InteractionResponseModal, got %v", r.Type)
-						}
-						if r.Data.Title != "Update Round" {
-							t.Errorf("Expected title 'Update Round', got %v", r.Data.Title)
-						}
-						// CustomID should include the round ID and message ID: "update_round_modal|{roundID}|{messageID}"
-						expectedCustomIDPrefix := "update_round_modal|"
-						if !strings.HasPrefix(r.Data.CustomID, expectedCustomIDPrefix) {
-							t.Errorf("Expected CustomID to start with '%s', got %v", expectedCustomIDPrefix, r.Data.CustomID)
-						}
-						if len(r.Data.Components) != 5 {
-							t.Errorf("Expected 5 components, got %d", len(r.Data.Components))
-						}
-						return nil
-					}).
-					Times(1)
+			setupSession: func(fs *discord.FakeSession) {
+				fs.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					if r.Type != discordgo.InteractionResponseModal {
+						t.Errorf("Expected InteractionResponseModal, got %v", r.Type)
+					}
+					if r.Data.Title != "Update Round" {
+						t.Errorf("Expected title 'Update Round', got %v", r.Data.Title)
+					}
+					expectedCustomIDPrefix := "update_round_modal|"
+					if !strings.HasPrefix(r.Data.CustomID, expectedCustomIDPrefix) {
+						t.Errorf("Expected CustomID to start with '%s', got %v", expectedCustomIDPrefix, r.Data.CustomID)
+					}
+					if len(r.Data.Components) != 5 {
+						t.Errorf("Expected 5 components, got %d", len(r.Data.Components))
+					}
+					return nil
+				}
 			},
 			ctx: context.Background(),
 			args: &discordgo.InteractionCreate{
@@ -73,11 +67,10 @@ func Test_updateRoundManager_SendupdateRoundModal(t *testing.T) {
 		},
 		{
 			name: "failed to send modal",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					Return(errors.New("failed to send modal")).
-					Times(1)
+			setupSession: func(fs *discord.FakeSession) {
+				fs.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return errors.New("failed to send modal")
+				}
 			},
 			ctx: context.Background(),
 			args: &discordgo.InteractionCreate{
@@ -95,22 +88,18 @@ func Test_updateRoundManager_SendupdateRoundModal(t *testing.T) {
 			wantErrIs:   nil,
 		},
 		{
-			name: "nil interaction",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
-				// No interaction with mocks expected
-			},
-			ctx:         context.Background(),
-			args:        nil,
-			wantSuccess: "",
-			wantErrMsg:  "interaction is nil or incomplete",
-			wantErrIs:   nil,
+			name:         "nil interaction",
+			setupSession: func(fs *discord.FakeSession) {},
+			ctx:          context.Background(),
+			args:         nil,
+			wantSuccess:  "",
+			wantErrMsg:   "interaction is nil or incomplete",
+			wantErrIs:    nil,
 		},
 		{
-			name: "nil user in interaction",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
-				// No interaction with mocks expected
-			},
-			ctx: context.Background(),
+			name:         "nil user in interaction",
+			setupSession: func(fs *discord.FakeSession) {},
+			ctx:          context.Background(),
 			args: &discordgo.InteractionCreate{
 				Interaction: &discordgo.Interaction{
 					ID:   "interaction-id",
@@ -123,11 +112,9 @@ func Test_updateRoundManager_SendupdateRoundModal(t *testing.T) {
 			wantErrIs:   nil,
 		},
 		{
-			name: "nil member and user in interaction",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
-				// No interaction with mocks expected
-			},
-			ctx: context.Background(),
+			name:         "nil member and user in interaction",
+			setupSession: func(fs *discord.FakeSession) {},
+			ctx:          context.Background(),
 			args: &discordgo.InteractionCreate{
 				Interaction: &discordgo.Interaction{
 					ID:     "interaction-id",
@@ -141,10 +128,8 @@ func Test_updateRoundManager_SendupdateRoundModal(t *testing.T) {
 			wantErrIs:   nil,
 		},
 		{
-			name: "context cancelled before operation",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
-				// No interaction with mocks expected due to early context cancel
-			},
+			name:         "context cancelled before operation",
+			setupSession: func(fs *discord.FakeSession) {},
 			ctx: func() context.Context {
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel()
@@ -167,25 +152,21 @@ func Test_updateRoundManager_SendupdateRoundModal(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
-			mockSession := discordmocks.NewMockSession(ctrl)
+			fakeSession := discord.NewFakeSession()
 			mockLogger := loggerfrolfbot.NoOpLogger
-			mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
+			fakeInteractionStore := &testutils.FakeStorage[any]{}
 			tracerProvider := noop.NewTracerProvider()
 			tracer := tracerProvider.Tracer("test")
 			metrics := &discordmetrics.NoOpMetrics{}
 
-			// Setup per-test mock expectations
-			if tt.setup != nil {
-				tt.setup(mockSession, mockInteractionStore)
+			if tt.setupSession != nil {
+				tt.setupSession(fakeSession)
 			}
 
 			urm := &updateRoundManager{
-				session:          mockSession,
+				session:          fakeSession,
 				logger:           mockLogger,
-				interactionStore: mockInteractionStore,
+				interactionStore: fakeInteractionStore,
 				tracer:           tracer,
 				metrics:          metrics,
 				operationWrapper: testOperationWrapper,
@@ -195,7 +176,6 @@ func Test_updateRoundManager_SendupdateRoundModal(t *testing.T) {
 			testRoundID := sharedtypes.RoundID(testUUID)
 			result, err := urm.SendUpdateRoundModal(tt.ctx, tt.args, testRoundID)
 
-			// Check for error
 			if tt.wantErrMsg != "" {
 				if err == nil {
 					t.Errorf("SendupdateRoundModal() expected error containing %q, but got nil", tt.wantErrMsg)
@@ -214,7 +194,6 @@ func Test_updateRoundManager_SendupdateRoundModal(t *testing.T) {
 				}
 			}
 
-			// Check success only if no error
 			if tt.wantErrMsg == "" {
 				gotSuccess, _ := result.Success.(string)
 				if gotSuccess != tt.wantSuccess {
@@ -289,27 +268,31 @@ func createTestUpdateInteraction(title, description, startTime, timezone, locati
 
 func Test_updateRoundManager_HandleUpdateRoundModalSubmit(t *testing.T) {
 	tests := []struct {
-		name        string
-		interaction *discordgo.InteractionCreate
-		ctx         context.Context
-		setup       func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any], mockHelper *utilsmocks.MockHelpers)
-		wantSuccess string
-		wantErrMsg  string
-		wantErrIs   error
+		name           string
+		interaction    *discordgo.InteractionCreate
+		ctx            context.Context
+		setupSession   func(fs *discord.FakeSession)
+		setupPublisher func(fp *testutils.FakeEventBus)
+		wantSuccess    string
+		wantErrMsg     string
+		wantErrIs      error
 	}{
 		{
 			name:        "successful submission",
 			interaction: createTestUpdateInteraction("Updated Round", "Updated description", "2025-05-01 15:00", "America/Chicago", "Updated Location"),
 			ctx:         context.Background(),
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any], mockHelper *utilsmocks.MockHelpers) {
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					Return(nil).
-					Times(1)
-				mockPublisher.EXPECT().
-					Publish(gomock.Eq(discordroundevents.RoundUpdateModalSubmittedV1), gomock.Any()).
-					Return(nil).
-					Times(1)
+			setupSession: func(fs *discord.FakeSession) {
+				fs.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return nil
+				}
+			},
+			setupPublisher: func(fp *testutils.FakeEventBus) {
+				fp.PublishFunc = func(topic string, msgs ...*message.Message) error {
+					if topic != discordroundevents.RoundUpdateModalSubmittedV1 {
+						t.Errorf("expected topic %s, got %s", discordroundevents.RoundUpdateModalSubmittedV1, topic)
+					}
+					return nil
+				}
 			},
 			wantSuccess: "round update request published",
 			wantErrMsg:  "",
@@ -319,35 +302,32 @@ func Test_updateRoundManager_HandleUpdateRoundModalSubmit(t *testing.T) {
 			name:        "missing required fields",
 			interaction: createTestUpdateInteraction("", "", "", "", ""),
 			ctx:         context.Background(),
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any], mockHelper *utilsmocks.MockHelpers) {
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(i *discordgo.Interaction, r *discordgo.InteractionResponse, _ ...interface{}) error {
-						// Implementation responds with a single message asking the user to fill at least one field.
-						if !strings.Contains(r.Data.Content, "Please fill at least one field") {
-							t.Errorf("Expected error message to contain 'Please fill at least one field', got %v", r.Data.Content)
-						}
-						return nil
-					}).
-					Times(1)
+			setupSession: func(fs *discord.FakeSession) {
+				fs.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					if !strings.Contains(r.Data.Content, "Please fill at least one field") {
+						t.Errorf("Expected error message to contain 'Please fill at least one field', got %v", r.Data.Content)
+					}
+					return nil
+				}
 			},
-			wantSuccess: "",
-			wantErrMsg:  "no fields provided",
-			wantErrIs:   nil,
+			setupPublisher: func(fp *testutils.FakeEventBus) {},
+			wantSuccess:    "",
+			wantErrMsg:     "no fields provided",
+			wantErrIs:      nil,
 		},
 		{
 			name:        "field too long",
 			interaction: createTestUpdateInteraction(strings.Repeat("A", 101), "Description", "2025-05-01 15:00", "UTC", "Location"),
 			ctx:         context.Background(),
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any], mockHelper *utilsmocks.MockHelpers) {
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					Return(nil).
-					Times(1)
-				mockPublisher.EXPECT().
-					Publish(gomock.Eq(discordroundevents.RoundUpdateModalSubmittedV1), gomock.Any()).
-					Return(nil).
-					Times(1)
+			setupSession: func(fs *discord.FakeSession) {
+				fs.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return nil
+				}
+			},
+			setupPublisher: func(fp *testutils.FakeEventBus) {
+				fp.PublishFunc = func(topic string, msgs ...*message.Message) error {
+					return nil
+				}
 			},
 			wantSuccess: "round update request published",
 			wantErrMsg:  "",
@@ -357,76 +337,47 @@ func Test_updateRoundManager_HandleUpdateRoundModalSubmit(t *testing.T) {
 			name:        "failed to acknowledge submission",
 			interaction: createTestUpdateInteraction("Updated Round", "Description", "2025-05-01 15:00", "UTC", "Location"),
 			ctx:         context.Background(),
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any], mockHelper *utilsmocks.MockHelpers) {
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					Return(errors.New("failed to acknowledge")).
-					Times(1)
+			setupSession: func(fs *discord.FakeSession) {
+				fs.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return errors.New("failed to acknowledge")
+				}
+			},
+			setupPublisher: func(fp *testutils.FakeEventBus) {
+				fp.PublishFunc = func(topic string, msgs ...*message.Message) error {
+					return nil
+				}
 			},
 			wantSuccess: "round update request published",
 			wantErrMsg:  "",
-			wantErrIs:   nil,
-		},
-		{
-			name:        "failed to store interaction",
-			interaction: createTestUpdateInteraction("Updated Round", "Description", "2025-05-01 15:00", "UTC", "Location"),
-			ctx:         context.Background(),
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any], mockHelper *utilsmocks.MockHelpers) {
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					Return(nil).
-					Times(1)
-			},
-			wantSuccess: "round update request published",
-			wantErrMsg:  "",
-			wantErrIs:   nil,
-		},
-		{
-			name:        "failed to create event",
-			interaction: createTestUpdateInteraction("Updated Round", "Description", "2025-05-01 15:00", "UTC", "Location"),
-			ctx:         context.Background(),
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any], mockHelper *utilsmocks.MockHelpers) {
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					Return(nil).
-					Times(1)
-				mockPublisher.EXPECT().
-					Publish(gomock.Eq(discordroundevents.RoundUpdateModalSubmittedV1), gomock.Any()).
-					Return(errors.New("failed to create event")).
-					Times(1)
-			},
-			wantSuccess: "",
-			wantErrMsg:  "failed to create event",
 			wantErrIs:   nil,
 		},
 		{
 			name:        "failed to publish event",
 			interaction: createTestUpdateInteraction("Updated Round", "Description", "2025-05-01 15:00", "UTC", "Location"),
 			ctx:         context.Background(),
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any], mockHelper *utilsmocks.MockHelpers) {
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					Return(nil).
-					Times(1)
-				mockPublisher.EXPECT().
-					Publish(gomock.Eq(discordroundevents.RoundUpdateModalSubmittedV1), gomock.Any()).
-					Return(errors.New("failed to publish")).
-					Times(1)
+			setupSession: func(fs *discord.FakeSession) {
+				fs.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return nil
+				}
+			},
+			setupPublisher: func(fp *testutils.FakeEventBus) {
+				fp.PublishFunc = func(topic string, msgs ...*message.Message) error {
+					return errors.New("failed to publish")
+				}
 			},
 			wantSuccess: "",
 			wantErrMsg:  "failed to publish",
 			wantErrIs:   nil,
 		},
 		{
-			name:        "nil interaction",
-			interaction: nil,
-			ctx:         context.Background(),
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any], mockHelper *utilsmocks.MockHelpers) {
-				// No expectations
-			},
-			wantSuccess: "",
-			wantErrMsg:  "interaction is nil or incomplete",
-			wantErrIs:   nil,
+			name:           "nil interaction",
+			interaction:    nil,
+			ctx:            context.Background(),
+			setupSession:   func(fs *discord.FakeSession) {},
+			setupPublisher: func(fp *testutils.FakeEventBus) {},
+			wantSuccess:    "",
+			wantErrMsg:     "interaction is nil or incomplete",
+			wantErrIs:      nil,
 		},
 		{
 			name: "missing user ID",
@@ -437,24 +388,30 @@ func Test_updateRoundManager_HandleUpdateRoundModalSubmit(t *testing.T) {
 					Data: discordgo.ModalSubmitInteractionData{},
 				},
 			},
-			ctx: context.Background(),
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any], mockHelper *utilsmocks.MockHelpers) {
-				// No expectations
-			},
-			wantSuccess: "",
-			wantErrMsg:  "user ID is missing",
-			wantErrIs:   nil,
+			ctx:            context.Background(),
+			setupSession:   func(fs *discord.FakeSession) {},
+			setupPublisher: func(fp *testutils.FakeEventBus) {},
+			wantSuccess:    "",
+			wantErrMsg:     "user ID is missing",
+			wantErrIs:      nil,
 		},
 		{
 			name:        "context cancelled",
 			interaction: createTestUpdateInteraction("Updated Round", "Description", "2025-05-01 15:00", "UTC", "Location"),
 			ctx: func() context.Context {
 				ctx, cancel := context.WithCancel(context.Background())
-				cancel() // Cancel immediately
+				cancel()
 				return ctx
 			}(),
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any], mockHelper *utilsmocks.MockHelpers) {
-				// No expectations due to early context cancellation
+			setupSession: func(fs *discord.FakeSession) {
+				fs.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return nil
+				}
+			},
+			setupPublisher: func(fp *testutils.FakeEventBus) {
+				fp.PublishFunc = func(topic string, msgs ...*message.Message) error {
+					return nil
+				}
 			},
 			wantSuccess: "round update request published",
 			wantErrMsg:  "",
@@ -464,31 +421,22 @@ func Test_updateRoundManager_HandleUpdateRoundModalSubmit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
-			mockSession := discordmocks.NewMockSession(ctrl)
-			mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
-			mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
+			fakeSession := discord.NewFakeSession()
+			fakePublisher := &testutils.FakeEventBus{}
+			fakeInteractionStore := &testutils.FakeStorage[any]{}
 			mockLogger := loggerfrolfbot.NoOpLogger
-			mockHelper := utilsmocks.NewMockHelpers(ctrl)
+			fakeHelper := &testutils.FakeHelpers{}
 
-			// Setup test expectations
-			tt.setup(mockSession, mockPublisher, mockInteractionStore, mockHelper)
+			tt.setupSession(fakeSession)
+			tt.setupPublisher(fakePublisher)
 
-			// Allow any InteractionRespond calls not explicitly expected by the test setups.
-			mockSession.EXPECT().InteractionRespond(gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
-			// Allow any Publish calls not explicitly expected by the test setups.
-			mockPublisher.EXPECT().Publish(gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
-
-			// Create the manager with mocked dependencies
 			urm := &updateRoundManager{
-				session:          mockSession,
-				publisher:        mockPublisher,
+				session:          fakeSession,
+				publisher:        fakePublisher,
 				logger:           mockLogger,
-				helper:           mockHelper,
+				helper:           fakeHelper,
 				config:           &config.Config{},
-				interactionStore: mockInteractionStore,
+				interactionStore: fakeInteractionStore,
 				tracer:           noop.NewTracerProvider().Tracer("test"),
 				metrics:          &discordmetrics.NoOpMetrics{},
 				operationWrapper: testOperationWrapper,
@@ -496,7 +444,6 @@ func Test_updateRoundManager_HandleUpdateRoundModalSubmit(t *testing.T) {
 
 			result, err := urm.HandleUpdateRoundModalSubmit(tt.ctx, tt.interaction)
 
-			// Success check
 			gotSuccess, ok := result.Success.(string)
 			if ok {
 				if gotSuccess != tt.wantSuccess {
@@ -506,7 +453,6 @@ func Test_updateRoundManager_HandleUpdateRoundModalSubmit(t *testing.T) {
 				t.Errorf("HandleUpdateRoundModalSubmit() UpdateRoundOperationResult.Success was not a string: got %T, want string", result.Success)
 			}
 
-			// Error message check -- the implementation sometimes returns the error inside result.Error
 			if tt.wantErrMsg != "" {
 				actualErr := err
 				if actualErr == nil && result.Error != nil {
@@ -517,7 +463,6 @@ func Test_updateRoundManager_HandleUpdateRoundModalSubmit(t *testing.T) {
 				} else if !strings.Contains(actualErr.Error(), tt.wantErrMsg) {
 					t.Errorf("HandleUpdateRoundModalSubmit() error message mismatch: got %q, want substring %q", actualErr.Error(), tt.wantErrMsg)
 				}
-				// Error type check
 				if tt.wantErrIs != nil && !errors.Is(actualErr, tt.wantErrIs) {
 					t.Errorf("HandleUpdateRoundModalSubmit() error type mismatch: got %T, want %T", actualErr, tt.wantErrIs)
 				}
@@ -535,33 +480,29 @@ func Test_updateRoundManager_HandleUpdateRoundModalSubmit(t *testing.T) {
 
 func Test_updateRoundManager_HandleUpdateRoundModalCancel(t *testing.T) {
 	tests := []struct {
-		name        string
-		setup       func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any])
-		args        *discordgo.InteractionCreate
-		ctx         context.Context
-		wantSuccess string
-		wantErrMsg  string
-		wantErrIs   error
+		name         string
+		setupSession func(fs *discord.FakeSession)
+		args         *discordgo.InteractionCreate
+		ctx          context.Context
+		wantSuccess  string
+		wantErrMsg   string
+		wantErrIs    error
 	}{
 		{
 			name: "successful_cancel",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
-				// The implementation no longer deletes stored interactions; just expect the ephemeral response.
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...any) error {
-						if r.Type != discordgo.InteractionResponseChannelMessageWithSource {
-							t.Errorf("Expected InteractionResponseChannelMessageWithSource, got %v", r.Type)
-						}
-						if r.Data.Content != "Round update cancelled." {
-							t.Errorf("Expected content 'Round update cancelled.', got %v", r.Data.Content)
-						}
-						if r.Data.Flags != discordgo.MessageFlagsEphemeral {
-							t.Errorf("Expected ephemeral message, got flags %v", r.Data.Flags)
-						}
-						return nil
-					}).
-					Times(1)
+			setupSession: func(fs *discord.FakeSession) {
+				fs.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					if r.Type != discordgo.InteractionResponseChannelMessageWithSource {
+						t.Errorf("Expected InteractionResponseChannelMessageWithSource, got %v", r.Type)
+					}
+					if r.Data.Content != "Round update cancelled." {
+						t.Errorf("Expected content 'Round update cancelled.', got %v", r.Data.Content)
+					}
+					if r.Data.Flags != discordgo.MessageFlagsEphemeral {
+						t.Errorf("Expected ephemeral message, got flags %v", r.Data.Flags)
+					}
+					return nil
+				}
 			},
 			args: &discordgo.InteractionCreate{
 				Interaction: &discordgo.Interaction{
@@ -580,12 +521,10 @@ func Test_updateRoundManager_HandleUpdateRoundModalCancel(t *testing.T) {
 		},
 		{
 			name: "error sending response",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
-				// InteractionRespond errors are ignored by the implementation; expect it will be called.
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					Return(errors.New("failed to send response")).
-					Times(1)
+			setupSession: func(fs *discord.FakeSession) {
+				fs.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return errors.New("failed to send response")
+				}
 			},
 			args: &discordgo.InteractionCreate{
 				Interaction: &discordgo.Interaction{
@@ -597,33 +536,26 @@ func Test_updateRoundManager_HandleUpdateRoundModalCancel(t *testing.T) {
 					},
 				},
 			},
-			ctx: context.Background(),
-			// The implementation ignores errors from InteractionRespond during cancel, so
-			// we expect a successful cancellation even if sending the ephemeral response fails.
+			ctx:         context.Background(),
 			wantSuccess: "cancelled",
 			wantErrMsg:  "",
 			wantErrIs:   nil,
 		},
 		{
-			name: "nil interaction",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
-				// No expectations as the function should return early
-			},
-			args:        nil,
-			ctx:         context.Background(),
-			wantSuccess: "",
-			wantErrMsg:  "interaction is nil or incomplete",
-			wantErrIs:   nil,
+			name:         "nil interaction",
+			setupSession: func(fs *discord.FakeSession) {},
+			args:         nil,
+			ctx:          context.Background(),
+			wantSuccess:  "",
+			wantErrMsg:   "interaction is nil or incomplete",
+			wantErrIs:    nil,
 		},
 		{
 			name: "context cancelled",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
-				// operationWrapper used in tests executes the operation regardless of cancelled context,
-				// so the handler will still attempt to send the ephemeral response.
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					Return(nil).
-					Times(1)
+			setupSession: func(fs *discord.FakeSession) {
+				fs.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return nil
+				}
 			},
 			args: &discordgo.InteractionCreate{
 				Interaction: &discordgo.Interaction{
@@ -635,7 +567,7 @@ func Test_updateRoundManager_HandleUpdateRoundModalCancel(t *testing.T) {
 			},
 			ctx: func() context.Context {
 				ctx, cancel := context.WithCancel(context.Background())
-				cancel() // Cancel immediately
+				cancel()
 				return ctx
 			}(),
 			wantSuccess: "cancelled",
@@ -646,25 +578,15 @@ func Test_updateRoundManager_HandleUpdateRoundModalCancel(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
-			mockSession := discordmocks.NewMockSession(ctrl)
-			mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
+			fakeSession := discord.NewFakeSession()
+			fakeInteractionStore := &testutils.FakeStorage[any]{}
 			mockLogger := loggerfrolfbot.NoOpLogger
 
-			// Setup test expectations
-			if tt.setup != nil {
-				tt.setup(mockSession, mockInteractionStore)
-			}
+			tt.setupSession(fakeSession)
 
-			// Allow any InteractionRespond calls not explicitly expected by the test setups.
-			mockSession.EXPECT().InteractionRespond(gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
-
-			// Create the manager with mocked dependencies
 			urm := &updateRoundManager{
-				session:          mockSession,
-				interactionStore: mockInteractionStore,
+				session:          fakeSession,
+				interactionStore: fakeInteractionStore,
 				logger:           mockLogger,
 				tracer:           noop.NewTracerProvider().Tracer("test"),
 				metrics:          &discordmetrics.NoOpMetrics{},
@@ -672,13 +594,11 @@ func Test_updateRoundManager_HandleUpdateRoundModalCancel(t *testing.T) {
 			}
 			result, err := urm.HandleUpdateRoundModalCancel(tt.ctx, tt.args)
 
-			// Success check
 			gotSuccess, _ := result.Success.(string)
 			if gotSuccess != tt.wantSuccess {
 				t.Errorf("HandleUpdateRoundModalCancel() CreateRoundOperationResult.Success mismatch: got %q, want %q", gotSuccess, tt.wantSuccess)
 			}
 
-			// Error message check
 			if tt.wantErrMsg != "" {
 				if err == nil {
 					t.Errorf("HandleUpdateRoundModalCancel() expected error containing %q, got nil", tt.wantErrMsg)

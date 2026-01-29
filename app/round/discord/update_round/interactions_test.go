@@ -8,10 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/bwmarrin/discordgo"
 	"github.com/google/uuid"
-	"go.uber.org/mock/gomock"
 )
 
 var testOperationWrapper = func(ctx context.Context, operationName string, operationFunc func(ctx context.Context) (UpdateRoundOperationResult, error)) (UpdateRoundOperationResult, error) {
@@ -21,7 +20,7 @@ var testOperationWrapper = func(ctx context.Context, operationName string, opera
 type updateRoundManagerMock struct {
 	sendModalCalled          bool
 	mockSendUpdateRoundModal func(ctx context.Context, i *discordgo.InteractionCreate) (UpdateRoundOperationResult, error)
-	session                  *discordmocks.MockSession
+	session                  *discord.FakeSession
 	logger                   *slog.Logger
 	operationWrapper         func(ctx context.Context, operationName string, operationFunc func(ctx context.Context) (UpdateRoundOperationResult, error)) (UpdateRoundOperationResult, error)
 }
@@ -70,9 +69,6 @@ func (urm *updateRoundManagerMock) SendUpdateRoundModal(ctx context.Context, i *
 }
 
 func Test_updateRoundManager_HandleEditRoundButton(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	tests := []struct {
 		name            string
 		mockModalFn     func(ctx context.Context, i *discordgo.InteractionCreate) (UpdateRoundOperationResult, error)
@@ -124,9 +120,10 @@ func Test_updateRoundManager_HandleEditRoundButton(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			fakeSession := discord.NewFakeSession()
 			urm := &updateRoundManagerMock{
 				mockSendUpdateRoundModal: tt.mockModalFn,
-				session:                  discordmocks.NewMockSession(ctrl),
+				session:                  fakeSession,
 				logger:                   slog.Default(),
 				operationWrapper:         testOperationWrapper,
 			}

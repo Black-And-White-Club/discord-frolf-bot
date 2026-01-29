@@ -7,90 +7,73 @@ import (
 	"testing"
 	"time"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
 	"github.com/google/uuid"
-	"go.uber.org/mock/gomock"
 )
 
 func Test_createRoundManager_SendRoundEventEmbed(t *testing.T) {
 	tests := []struct {
 		name          string
-		setup         func(mockSession *discordmocks.MockSession)
+		setup         func(f *discord.FakeSession)
 		expectedErr   bool
 		expectedError string
 	}{
 		{
 			name: "successful embed creation",
-			setup: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					User("user-123").
-					Return(&discordgo.User{ID: "user-123", Username: "TestUser"}, nil).
-					Times(1)
-
-				mockSession.EXPECT().
-					GuildMember("guild-id", "user-123").
-					Return(&discordgo.Member{Nick: "NickName"}, nil).
-					Times(1)
-
-				mockSession.EXPECT().
-					ChannelMessageSendComplex("channel-123", gomock.Any()).
-					Return(&discordgo.Message{ID: "msg-1"}, nil).
-					Times(1)
+			setup: func(f *discord.FakeSession) {
+				f.UserFunc = func(userID string, options ...discordgo.RequestOption) (*discordgo.User, error) {
+					return &discordgo.User{ID: "user-123", Username: "TestUser"}, nil
+				}
+				f.GuildMemberFunc = func(guildID, userID string, options ...discordgo.RequestOption) (*discordgo.Member, error) {
+					return &discordgo.Member{Nick: "NickName"}, nil
+				}
+				f.ChannelMessageSendComplexFunc = func(channelID string, data *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{ID: "msg-1"}, nil
+				}
 			},
 			expectedErr: false,
 		},
 		{
 			name: "user fetch fails",
-			setup: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					User("user-123").
-					Return(nil, errors.New("user fetch fail")).
-					Times(1)
+			setup: func(f *discord.FakeSession) {
+				f.UserFunc = func(userID string, options ...discordgo.RequestOption) (*discordgo.User, error) {
+					return nil, errors.New("user fetch fail")
+				}
 			},
 			expectedErr:   true,
 			expectedError: "failed to get creator info: user fetch fail",
 		},
 		{
 			name: "nickname fallback (member not found)",
-			setup: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					User("user-123").
-					Return(&discordgo.User{ID: "user-123", Username: "FallbackUser"}, nil).
-					Times(1)
-
-				mockSession.EXPECT().
-					GuildMember("guild-id", "user-123").
-					Return(nil, errors.New("no member")).
-					Times(1)
-
-				mockSession.EXPECT().
-					ChannelMessageSendComplex("channel-123", gomock.Any()).
-					Return(&discordgo.Message{ID: "msg-2"}, nil).
-					Times(1)
+			setup: func(f *discord.FakeSession) {
+				f.UserFunc = func(userID string, options ...discordgo.RequestOption) (*discordgo.User, error) {
+					return &discordgo.User{ID: "user-123", Username: "FallbackUser"}, nil
+				}
+				f.GuildMemberFunc = func(guildID, userID string, options ...discordgo.RequestOption) (*discordgo.Member, error) {
+					return nil, errors.New("no member")
+				}
+				f.ChannelMessageSendComplexFunc = func(channelID string, data *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{ID: "msg-2"}, nil
+				}
 			},
 			expectedErr: false,
 		},
 		{
 			name: "message send failure",
-			setup: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					User("user-123").
-					Return(&discordgo.User{ID: "user-123", Username: "TestUser"}, nil).
-					Times(1)
-
-				mockSession.EXPECT().
-					GuildMember("guild-id", "user-123").
-					Return(&discordgo.Member{Nick: "NickName"}, nil).
-					Times(1)
-
-				mockSession.EXPECT().
-					ChannelMessageSendComplex("channel-123", gomock.Any()).
-					Return(nil, errors.New("send fail")).
-					Times(1)
+			setup: func(f *discord.FakeSession) {
+				f.UserFunc = func(userID string, options ...discordgo.RequestOption) (*discordgo.User, error) {
+					return &discordgo.User{ID: "user-123", Username: "TestUser"}, nil
+				}
+				f.GuildMemberFunc = func(guildID, userID string, options ...discordgo.RequestOption) (*discordgo.Member, error) {
+					return &discordgo.Member{Nick: "NickName"}, nil
+				}
+				f.ChannelMessageSendComplexFunc = func(channelID string, data *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return nil, errors.New("send fail")
+				}
 			},
 			expectedErr:   true,
 			expectedError: "failed to send embed message: send fail",
@@ -99,17 +82,14 @@ func Test_createRoundManager_SendRoundEventEmbed(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
-			mockSession := discordmocks.NewMockSession(ctrl)
+			fakeSession := discord.NewFakeSession()
 
 			if tt.setup != nil {
-				tt.setup(mockSession)
+				tt.setup(fakeSession)
 			}
 
 			manager := &createRoundManager{
-				session: mockSession,
+				session: fakeSession,
 				config: &config.Config{
 					Discord: config.DiscordConfig{
 						GuildID: "guild-id",
