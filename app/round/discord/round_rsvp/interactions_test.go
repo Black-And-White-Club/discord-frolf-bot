@@ -6,27 +6,22 @@ import (
 	"strings"
 	"testing"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/testutils"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
-	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
-	discordroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
-	helpersmocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/bwmarrin/discordgo"
 	"github.com/google/uuid"
-	"go.uber.org/mock/gomock"
 )
 
 func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 	testRoundID := sharedtypes.RoundID(uuid.New())
-	mockSession := discordmocks.NewMockSession(ctrl)
-	mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
+	fakeSession := discord.NewFakeSession()
+	fakePublisher := &testutils.FakeEventBus{}
 	mockLogger := loggerfrolfbot.NoOpLogger
-	mockHelper := helpersmocks.NewMockHelpers(ctrl)
+	fakeHelper := &testutils.FakeHelpers{}
 	mockConfig := &config.Config{}
 
 	createInteraction := func(customID string) *discordgo.InteractionCreate {
@@ -63,10 +58,9 @@ func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
 		{
 			name: "interaction respond error",
 			setup: func() {
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					Return(errors.New("failed to respond to interaction")).
-					Times(1)
+				fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return errors.New("failed to respond to interaction")
+				}
 			},
 			args: struct {
 				ctx context.Context
@@ -94,10 +88,9 @@ func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
 		{
 			name: "invalid event ID",
 			setup: func() {
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(nil).
-					Times(1)
+				fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return nil
+				}
 			},
 			args: struct {
 				ctx context.Context
@@ -111,15 +104,13 @@ func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
 		{
 			name: "create result message error",
 			setup: func() {
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(nil).
-					Times(1)
+				fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return nil
+				}
 
-				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(discordroundevents.RoundParticipantJoinRequestDiscordV1)).
-					Return(nil, errors.New("failed to create result message")).
-					Times(1)
+				fakeHelper.CreateResultMessageFunc = func(originalMsg *message.Message, payload interface{}, topic string) (*message.Message, error) {
+					return nil, errors.New("failed to create result message")
+				}
 			},
 			args: struct {
 				ctx context.Context
@@ -133,20 +124,17 @@ func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
 		{
 			name: "publish error",
 			setup: func() {
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(nil).
-					Times(1)
+				fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return nil
+				}
 
-				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(discordroundevents.RoundParticipantJoinRequestDiscordV1)).
-					Return(&message.Message{UUID: "msg-123"}, nil).
-					Times(1)
+				fakeHelper.CreateResultMessageFunc = func(originalMsg *message.Message, payload interface{}, topic string) (*message.Message, error) {
+					return &message.Message{UUID: "msg-123"}, nil
+				}
 
-				mockPublisher.EXPECT().
-					Publish(gomock.Eq(discordroundevents.RoundParticipantJoinRequestDiscordV1), gomock.Any()).
-					Return(errors.New("failed to publish message")).
-					Times(1)
+				fakePublisher.PublishFunc = func(topic string, messages ...*message.Message) error {
+					return errors.New("failed to publish message")
+				}
 			},
 			args: struct {
 				ctx context.Context
@@ -166,10 +154,10 @@ func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
 			}
 
 			rrm := &roundRsvpManager{
-				session:   mockSession,
-				publisher: mockPublisher,
+				session:   fakeSession,
+				publisher: fakePublisher,
 				logger:    mockLogger,
-				helper:    mockHelper,
+				helper:    fakeHelper,
 				config:    mockConfig,
 				operationWrapper: func(ctx context.Context, name string, fn func(context.Context) (RoundRsvpOperationResult, error)) (RoundRsvpOperationResult, error) {
 					return fn(ctx) // bypass wrapper for testing
@@ -193,13 +181,11 @@ func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
 }
 
 func Test_roundRsvpManager_InteractionJoinRoundLate(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
-	mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
+	testRoundID := sharedtypes.RoundID(uuid.New())
+	fakeSession := discord.NewFakeSession()
+	fakePublisher := &testutils.FakeEventBus{}
 	mockLogger := loggerfrolfbot.NoOpLogger
-	mockHelper := helpersmocks.NewMockHelpers(ctrl)
+	fakeHelper := &testutils.FakeHelpers{}
 	mockConfig := &config.Config{}
 
 	createInteraction := func(customID string) *discordgo.InteractionCreate {
@@ -250,20 +236,18 @@ func Test_roundRsvpManager_InteractionJoinRoundLate(t *testing.T) {
 		{
 			name: "interaction respond error",
 			setup: func() {
-				mockSession.EXPECT().
-					ChannelMessage(gomock.Any(), gomock.Any()).
-					Return(&discordgo.Message{
+				fakeSession.ChannelMessageFunc = func(channelID, messageID string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{
 						ID: "message-123",
 						Embeds: []*discordgo.MessageEmbed{
 							{Title: "Test Round", Description: "Test Description"},
 						},
-					}, nil).
-					Times(1)
+					}, nil
+				}
 
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(errors.New("failed to respond")).
-					Times(1)
+				fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return errors.New("failed to respond")
+				}
 			},
 			args: struct {
 				ctx context.Context
@@ -277,30 +261,26 @@ func Test_roundRsvpManager_InteractionJoinRoundLate(t *testing.T) {
 		{
 			name: "publish error",
 			setup: func() {
-				mockSession.EXPECT().
-					ChannelMessage(gomock.Any(), gomock.Any()).
-					Return(&discordgo.Message{
+				fakeSession.ChannelMessageFunc = func(channelID, messageID string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{
 						ID: "message-123",
 						Embeds: []*discordgo.MessageEmbed{
 							{Title: "Test Round", Description: "Test Description"},
 						},
-					}, nil).
-					Times(1)
+					}, nil
+				}
 
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(nil).
-					Times(1)
+				fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return nil
+				}
 
-				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(discordroundevents.RoundParticipantJoinRequestDiscordV1)).
-					Return(&message.Message{UUID: "msg-123"}, nil).
-					Times(1)
+				fakeHelper.CreateResultMessageFunc = func(originalMsg *message.Message, payload interface{}, topic string) (*message.Message, error) {
+					return &message.Message{UUID: "msg-123"}, nil
+				}
 
-				mockPublisher.EXPECT().
-					Publish(gomock.Eq(discordroundevents.RoundParticipantJoinRequestDiscordV1), gomock.Any()).
-					Return(errors.New("failed to publish")).
-					Times(1)
+				fakePublisher.PublishFunc = func(topic string, messages ...*message.Message) error {
+					return errors.New("failed to publish")
+				}
 			},
 			args: struct {
 				ctx context.Context
@@ -333,10 +313,10 @@ func Test_roundRsvpManager_InteractionJoinRoundLate(t *testing.T) {
 			}
 
 			rrm := &roundRsvpManager{
-				session:   mockSession,
-				publisher: mockPublisher,
+				session:   fakeSession,
+				publisher: fakePublisher,
 				logger:    mockLogger,
-				helper:    mockHelper,
+				helper:    fakeHelper,
 				config:    mockConfig,
 				operationWrapper: func(ctx context.Context, name string, fn func(context.Context) (RoundRsvpOperationResult, error)) (RoundRsvpOperationResult, error) {
 					return fn(ctx) // bypass wrapper for testing

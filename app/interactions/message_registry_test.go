@@ -6,9 +6,7 @@ import (
 	"testing"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
 	"github.com/bwmarrin/discordgo"
-	"go.uber.org/mock/gomock"
 )
 
 type testDiscordgoAdder struct {
@@ -25,16 +23,12 @@ func (a *testDiscordgoAdder) AddHandler(handler interface{}) func() {
 }
 
 func TestMessageRegistry_RegisterWithSession_fansOutToHandlers(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	t.Cleanup(ctrl.Finish)
-
-	wrapperSession := discordmocks.NewMockSession(ctrl)
-	wrapper := discord.Session(wrapperSession)
+	fakeSession := discord.NewFakeSession()
 	reg := NewMessageRegistry(slog.Default())
 
 	var called []string
 	reg.RegisterMessageCreateHandler(func(ctx context.Context, s discord.Session, m *discordgo.MessageCreate) {
-		if s != wrapper {
+		if s != fakeSession {
 			t.Fatalf("expected wrapper session to be passed through")
 		}
 		if m == nil || m.Message == nil || m.Message.ID != "msg-1" {
@@ -43,14 +37,14 @@ func TestMessageRegistry_RegisterWithSession_fansOutToHandlers(t *testing.T) {
 		called = append(called, "h1")
 	})
 	reg.RegisterMessageCreateHandler(func(ctx context.Context, s discord.Session, m *discordgo.MessageCreate) {
-		if s != wrapper {
+		if s != fakeSession {
 			t.Fatalf("expected wrapper session to be passed through")
 		}
 		called = append(called, "h2")
 	})
 
 	adder := &testDiscordgoAdder{}
-	reg.RegisterWithSession(adder, wrapper)
+	reg.RegisterWithSession(adder, fakeSession)
 	if adder.handler == nil {
 		t.Fatalf("expected a discordgo MessageCreate handler to be registered")
 	}

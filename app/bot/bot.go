@@ -9,19 +9,21 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/auth"
+	authrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/auth/watermill"
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/guild"
-	guildrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/guild/watermill"
+	guildrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/guild/router"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/interactions"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard"
-	leaderboardrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/watermill"
+	leaderboardrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/router"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/round"
-	roundrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/round/watermill"
+	roundrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/round/router"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/score"
 	scorerouter "github.com/Black-And-White-Club/discord-frolf-bot/app/score/watermill"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/user"
-	userrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/user/watermill"
+	userrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/user/router"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	guildevents "github.com/Black-And-White-Club/frolf-bot-shared/events/guild"
@@ -57,6 +59,7 @@ type DiscordBot struct {
 	ScoreWatermillRouter       *message.Router
 	LeaderboardWatermillRouter *message.Router
 	GuildWatermillRouter       *message.Router
+	AuthWatermillRouter        *message.Router
 
 	// Module routers
 	UserRouter        *userrouter.UserRouter
@@ -64,6 +67,7 @@ type DiscordBot struct {
 	ScoreRouter       *scorerouter.ScoreRouter
 	LeaderboardRouter *leaderboardrouter.LeaderboardRouter
 	GuildRouter       *guildrouter.GuildRouter
+	AuthRouter        *authrouter.AuthRouter
 
 	// Shutdown synchronization
 	shutdownOnce sync.Once
@@ -159,6 +163,11 @@ func NewDiscordBot(
 		return nil, fmt.Errorf("failed to create guild router: %w", err)
 	}
 
+	authRouter, err := message.NewRouter(message.RouterConfig{}, watermill.NopLogger{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create auth router: %w", err)
+	}
+
 	return &DiscordBot{
 		Session:                    session,
 		Logger:                     logger,
@@ -174,6 +183,7 @@ func NewDiscordBot(
 		ScoreWatermillRouter:       scoreRouter,
 		LeaderboardWatermillRouter: leaderboardRouter,
 		GuildWatermillRouter:       guildRouter,
+		AuthWatermillRouter:        authRouter,
 		commandRegistrar:           discord.RegisterCommands,
 		commandSyncDelay:           commandSyncDelayFromEnv(logger),
 	}, nil
@@ -290,6 +300,24 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 		return fmt.Errorf("guild module initialization failed: %w", err)
 	}
 
+	// Initialize Auth Module
+	bot.AuthRouter, err = auth.InitializeAuthModule(
+		ctx,
+		bot.Session,
+		bot.AuthWatermillRouter,
+		registry,
+		bot.EventBus,
+		bot.Logger,
+		bot.Config,
+		bot.Helper,
+		bot.Storage.InteractionStore,
+		bot.Metrics,
+		bot.GuildConfigResolver,
+	)
+	if err != nil {
+		return fmt.Errorf("auth module initialization failed: %w", err)
+	}
+
 	// Start guild router - MUST be running before Discord session opens
 	// to ensure we can receive guild config retrieval responses
 	go func() {
@@ -402,6 +430,13 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 		bot.Logger.Info("Starting Leaderboard Watermill router")
 		if err := bot.LeaderboardWatermillRouter.Run(ctx); err != nil {
 			bot.Logger.Error("Leaderboard Watermill router failed", attr.Error(err))
+		}
+	}()
+
+	go func() {
+		bot.Logger.Info("Starting Auth Watermill router")
+		if err := bot.AuthWatermillRouter.Run(ctx); err != nil && err != context.Canceled {
+			bot.Logger.Error("Auth Watermill router failed", attr.Error(err))
 		}
 	}()
 
@@ -541,6 +576,16 @@ func (bot *DiscordBot) Shutdown(ctx context.Context) error {
 			}
 			bot.LeaderboardRouter = nil
 		}
+		if bot.AuthRouter != nil {
+			bot.Logger.Info("Closing auth router...")
+			if err := bot.AuthRouter.Close(); err != nil {
+				bot.Logger.Warn("Error closing auth router", attr.Error(err))
+				if shutdownErr == nil {
+					shutdownErr = err
+				}
+			}
+			bot.AuthRouter = nil
+		}
 
 		// Close Watermill infrastructure routers
 		if bot.UserWatermillRouter != nil {
@@ -592,6 +637,16 @@ func (bot *DiscordBot) Shutdown(ctx context.Context) error {
 				}
 			}
 			bot.GuildWatermillRouter = nil
+		}
+		if bot.AuthWatermillRouter != nil {
+			bot.Logger.Info("Closing auth watermill router...")
+			if err := bot.AuthWatermillRouter.Close(); err != nil {
+				bot.Logger.Warn("Error closing auth watermill router", attr.Error(err))
+				if shutdownErr == nil {
+					shutdownErr = err
+				}
+			}
+			bot.AuthWatermillRouter = nil
 		}
 
 		// Close EventBus last (after all routers are closed)

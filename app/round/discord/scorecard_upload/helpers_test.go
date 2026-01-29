@@ -9,39 +9,36 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
 	"github.com/google/uuid"
-	"go.uber.org/mock/gomock"
 )
 
 func Test_scorecardUploadManager_sendUploadConfirmation_RespondError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	t.Cleanup(ctrl.Finish)
-
-	sess := discordmocks.NewMockSession(ctrl)
+	fakeSession := discord.NewFakeSession()
 	inter := &discordgo.Interaction{ID: "i1"}
 
-	sess.EXPECT().InteractionRespond(gomock.Eq(inter), gomock.Any()).Return(errors.New("boom")).Times(1)
+	fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+		return errors.New("boom")
+	}
 
 	m := &scorecardUploadManager{logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
-	if err := m.sendUploadConfirmation(context.Background(), sess, inter, "import-1"); err == nil {
+	if err := m.sendUploadConfirmation(context.Background(), fakeSession, inter, "import-1"); err == nil {
 		t.Fatalf("expected error")
 	}
 }
 
 func Test_scorecardUploadManager_sendUploadError_RespondError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	t.Cleanup(ctrl.Finish)
-
-	sess := discordmocks.NewMockSession(ctrl)
+	fakeSession := discord.NewFakeSession()
 	inter := &discordgo.Interaction{ID: "i1"}
 
-	sess.EXPECT().InteractionRespond(gomock.Eq(inter), gomock.Any()).Return(errors.New("boom")).Times(1)
+	fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+		return errors.New("boom")
+	}
 
 	m := &scorecardUploadManager{logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
-	if err := m.sendUploadError(context.Background(), sess, inter, "nope"); err == nil {
+	if err := m.sendUploadError(context.Background(), fakeSession, inter, "nope"); err == nil {
 		t.Fatalf("expected error")
 	}
 }
@@ -67,29 +64,28 @@ func Test_scorecardUploadManager_downloadAttachment_BadURL(t *testing.T) {
 
 func Test_scorecardUploadManager_sendFileUploadPrompt_StoresPendingAndResponds(t *testing.T) {
 	// This overlaps with existing coverage, but hits the prompt + pending-store path directly.
-	ctrl := gomock.NewController(t)
-	t.Cleanup(ctrl.Finish)
-
-	sess := discordmocks.NewMockSession(ctrl)
+	fakeSession := discord.NewFakeSession()
 	inter := &discordgo.Interaction{ID: "i1", ChannelID: "c1", GuildID: "g1", Member: &discordgo.Member{User: &discordgo.User{ID: "u1"}}}
 	rID := sharedtypes.RoundID(uuid.New())
 
-	// Expect DM channel creation
-	dmChannel := &discordgo.Channel{ID: "dm-channel-id"}
-	sess.EXPECT().UserChannelCreate("u1").Return(dmChannel, nil).Times(1)
+	fakeSession.UserChannelCreateFunc = func(recipientID string, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+		return &discordgo.Channel{ID: "dm-channel-id"}, nil
+	}
 
-	// Expect DM message
-	sess.EXPECT().ChannelMessageSend("dm-channel-id", gomock.Any()).Return(&discordgo.Message{}, nil).Times(1)
+	fakeSession.ChannelMessageSendFunc = func(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+		return &discordgo.Message{}, nil
+	}
 
-	// Expect interaction response
-	sess.EXPECT().InteractionRespond(gomock.Eq(inter), gomock.Any()).Return(nil).Times(1)
+	fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+		return nil
+	}
 
 	m := &scorecardUploadManager{
 		logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
 		pendingUploads: make(map[string]*pendingUpload),
 	}
 
-	if err := m.sendFileUploadPrompt(context.Background(), sess, inter, rID, "notes", "msg-123"); err != nil {
+	if err := m.sendFileUploadPrompt(context.Background(), fakeSession, inter, rID, "notes", "msg-123"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 

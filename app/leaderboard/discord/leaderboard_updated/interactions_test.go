@@ -7,9 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/bwmarrin/discordgo"
-	"go.uber.org/mock/gomock"
 )
 
 var testOperationWrapper = func(ctx context.Context, operationName string, operationFunc func(ctx context.Context) (LeaderboardUpdateOperationResult, error)) (LeaderboardUpdateOperationResult, error) {
@@ -89,23 +88,19 @@ func Test_leaderboardUpdateManager_HandleLeaderboardPagination(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
+			// Use FakeSession instead of gomock
+			fakeSession := discord.NewFakeSession()
 
-			// Create mock session
-			mockSession := discordmocks.NewMockSession(ctrl)
-
-			// Setup mock for InteractionRespond if needed
+			// Setup fake for InteractionRespond if needed
 			if tt.expectRespondCalled {
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					Return(tt.mockRespondErr).
-					Times(1)
+				fakeSession.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
+					return tt.mockRespondErr
+				}
 			}
 
-			// Create the real leaderboard manager with mocked dependencies
+			// Create the real leaderboard manager with faked dependencies
 			manager := &leaderboardUpdateManager{
-				session:          mockSession,
+				session:          fakeSession,
 				logger:           slog.Default(),
 				operationWrapper: testOperationWrapper, // Use a simple wrapper for testing
 			}

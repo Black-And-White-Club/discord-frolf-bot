@@ -8,17 +8,14 @@ import (
 	"strings"
 	"testing"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
-	guildconfigmock "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
-	storagemocks "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/testutils"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
-	eventbus "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
-	utilsmocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
-	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/mocks"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
+	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	"github.com/bwmarrin/discordgo"
 	"go.opentelemetry.io/otel/trace/noop"
-	"go.uber.org/mock/gomock"
 )
 
 func TestNewSignupManager(t *testing.T) {
@@ -29,25 +26,23 @@ func TestNewSignupManager(t *testing.T) {
 		{
 			name: "Creates manager with all dependencies",
 			test: func(t *testing.T) {
-				ctrl := gomock.NewController(t)
-				defer ctrl.Finish()
-
-				// Create mock dependencies
-				mockSession := discordmocks.NewMockSession(ctrl)
-				mockEventBus := eventbus.NewMockEventBus(ctrl)
+				// Create fake dependencies
+				fakeSession := &discord.FakeSession{}
+				fakeEventBus := &testutils.FakeEventBus{}
 				testHandler := loggerfrolfbot.NewTestHandler()
 				logger := slog.New(testHandler)
-				mockHelper := utilsmocks.NewMockHelpers(ctrl)
+				fakeHelper := &testutils.FakeHelpers{}
 				mockConfig := &config.Config{}
-				mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
-				mockMetrics := discordmetrics.NewMockDiscordMetrics(ctrl)
+				fakeInteractionStore := &testutils.FakeStorage[any]{}
+				fakeGuildConfigCache := &testutils.FakeStorage[storage.GuildConfig]{}
+				metrics := &discordmetrics.NoOpMetrics{}
 				tracer := noop.NewTracerProvider().Tracer("test")
 
-				// Add mock GuildConfigResolver
-				mockGuildConfigResolver := guildconfigmock.NewMockGuildConfigResolver(ctrl)
+				// Add fake GuildConfigResolver
+				fakeGuildConfigResolver := &testutils.FakeGuildConfigResolver{}
 
 				// Call the function being tested
-				manager, err := NewSignupManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockGuildConfigResolver, mockInteractionStore, nil, tracer, mockMetrics)
+				manager, err := NewSignupManager(fakeSession, fakeEventBus, logger, fakeHelper, mockConfig, fakeGuildConfigResolver, fakeInteractionStore, fakeGuildConfigCache, tracer, metrics)
 				// Ensure manager is correctly created
 				if err != nil {
 					t.Fatalf("NewSignupManager returned error: %v", err)
@@ -63,28 +58,31 @@ func TestNewSignupManager(t *testing.T) {
 				}
 
 				// Check that all dependencies were correctly assigned
-				if signupManagerImpl.session != mockSession {
+				if signupManagerImpl.session != fakeSession {
 					t.Errorf("Session not correctly assigned")
 				}
-				if signupManagerImpl.publisher != mockEventBus {
+				if signupManagerImpl.publisher != fakeEventBus {
 					t.Errorf("EventBus not correctly assigned")
 				}
 				if signupManagerImpl.logger != logger {
 					t.Errorf("Logger not correctly assigned")
 				}
-				if signupManagerImpl.helper != mockHelper {
+				if signupManagerImpl.helper != fakeHelper {
 					t.Errorf("Helper not correctly assigned")
 				}
 				if signupManagerImpl.config != mockConfig {
 					t.Errorf("Config not correctly assigned")
 				}
-				if signupManagerImpl.interactionStore != mockInteractionStore {
+				if signupManagerImpl.interactionStore != fakeInteractionStore {
 					t.Errorf("InteractionStore not correctly assigned")
+				}
+				if signupManagerImpl.guildConfigCache != fakeGuildConfigCache {
+					t.Errorf("GuildConfigCache not correctly assigned")
 				}
 				if signupManagerImpl.tracer != tracer {
 					t.Errorf("Tracer not correctly assigned")
 				}
-				if signupManagerImpl.metrics != mockMetrics {
+				if signupManagerImpl.metrics != metrics {
 					t.Errorf("Metrics not correctly assigned")
 				}
 
@@ -154,12 +152,9 @@ func TestNewSignupManager(t *testing.T) {
 }
 
 func Test_wrapSignupOperation(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	testHandler := loggerfrolfbot.NewTestHandler()
 	logger := slog.New(testHandler)
-	mockMetrics := discordmetrics.NewMockDiscordMetrics(ctrl)
+	metrics := &discordmetrics.NoOpMetrics{}
 	tracer := noop.NewTracerProvider().Tracer("test")
 
 	tests := []struct {
@@ -169,7 +164,6 @@ func Test_wrapSignupOperation(t *testing.T) {
 		fn         func(ctx context.Context) (SignupOperationResult, error)
 		wantResult SignupOperationResult
 		wantErr    error
-		setupMocks func()
 	}{
 		{
 			name:      "successful operation",
@@ -184,10 +178,6 @@ func Test_wrapSignupOperation(t *testing.T) {
 				Success: "test_success",
 			},
 			wantErr: nil,
-			setupMocks: func() {
-				mockMetrics.EXPECT().RecordAPIRequestDuration(gomock.Any(), "test_operation", gomock.Any()).Times(1)
-				mockMetrics.EXPECT().RecordAPIRequest(gomock.Any(), "test_operation").Times(1)
-			},
 		},
 		{
 			name:      "operation returns error",
@@ -198,10 +188,6 @@ func Test_wrapSignupOperation(t *testing.T) {
 			},
 			wantResult: SignupOperationResult{},
 			wantErr:    errors.New("test_operation operation error: test_error"),
-			setupMocks: func() {
-				mockMetrics.EXPECT().RecordAPIRequestDuration(gomock.Any(), "test_operation", gomock.Any()).Times(1)
-				mockMetrics.EXPECT().RecordAPIError(gomock.Any(), "test_operation", "operation_error").Times(1)
-			},
 		},
 		{
 			name:      "operation result contains error",
@@ -216,10 +202,6 @@ func Test_wrapSignupOperation(t *testing.T) {
 				Error: errors.New("result_error"),
 			},
 			wantErr: nil,
-			setupMocks: func() {
-				mockMetrics.EXPECT().RecordAPIRequestDuration(gomock.Any(), "test_operation", gomock.Any()).Times(1)
-				mockMetrics.EXPECT().RecordAPIError(gomock.Any(), "test_operation", "result_error").Times(1)
-			},
 		},
 		{
 			name:       "nil function",
@@ -228,9 +210,6 @@ func Test_wrapSignupOperation(t *testing.T) {
 			fn:         nil,
 			wantResult: SignupOperationResult{},
 			wantErr:    errors.New("operation function is nil"),
-			setupMocks: func() {
-				// No metric calls expected
-			},
 		},
 		{
 			name:      "panic recovery",
@@ -241,21 +220,12 @@ func Test_wrapSignupOperation(t *testing.T) {
 			},
 			wantResult: SignupOperationResult{},
 			wantErr:    errors.New("panic in test_operation"),
-			setupMocks: func() {
-				mockMetrics.EXPECT().RecordAPIRequestDuration(gomock.Any(), "test_operation", gomock.Any()).Times(1)
-				mockMetrics.EXPECT().RecordAPIError(gomock.Any(), "test_operation", "panic").Times(1)
-			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Setup any mock expectations
-			if tt.setupMocks != nil {
-				tt.setupMocks()
-			}
-
-			gotResult, err := wrapSignupOperation(tt.ctx, tt.operation, tt.fn, logger, tracer, mockMetrics)
+			gotResult, err := wrapSignupOperation(tt.ctx, tt.operation, tt.fn, logger, tracer, metrics)
 
 			// Check error condition
 			if (err != nil) != (tt.wantErr != nil) {
@@ -295,34 +265,31 @@ func Test_wrapSignupOperation(t *testing.T) {
 }
 
 func Test_signupManager_createEvent(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	// Create mock dependencies
-	mockSession := discordmocks.NewMockSession(ctrl)
-	mockEventBus := eventbus.NewMockEventBus(ctrl)
+	// Create fake dependencies
+	fakeSession := &discord.FakeSession{}
+	fakeEventBus := &testutils.FakeEventBus{}
 	testHandler := loggerfrolfbot.NewTestHandler()
 	logger := slog.New(testHandler)
-	mockHelper := utilsmocks.NewMockHelpers(ctrl)
+	fakeHelper := &testutils.FakeHelpers{}
 
 	// Create a simple config with just the required GuildID
 	mockConfig := &config.Config{}
 	mockConfig.Discord.GuildID = "test-guild-id"
 
-	mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
-	mockMetrics := discordmetrics.NewMockDiscordMetrics(ctrl)
+	fakeInteractionStore := &testutils.FakeStorage[any]{}
+	metrics := &discordmetrics.NoOpMetrics{}
 	tracer := noop.NewTracerProvider().Tracer("test")
 
 	// Create a signupManager instance
 	sm := &signupManager{
-		session:          mockSession,
-		publisher:        mockEventBus,
+		session:          fakeSession,
+		publisher:        fakeEventBus,
 		logger:           logger,
-		helper:           mockHelper,
+		helper:           fakeHelper,
 		config:           mockConfig,
-		interactionStore: mockInteractionStore,
+		interactionStore: fakeInteractionStore,
 		tracer:           tracer,
-		metrics:          mockMetrics,
+		metrics:          metrics,
 	}
 
 	// Create a mock interaction

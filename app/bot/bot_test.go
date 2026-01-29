@@ -8,9 +8,8 @@ import (
 	"testing"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
-	guildconfigmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/testutils"
 	"github.com/bwmarrin/discordgo"
-	"go.uber.org/mock/gomock"
 )
 
 func testLogger() *slog.Logger {
@@ -32,11 +31,10 @@ func TestSyncGuildCommands_EmptyGuildList_NoRegistrarCalls(t *testing.T) {
 }
 
 func TestSyncGuildCommands_SkipsGuildsWithIncompleteSetup(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	resolver := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
-	resolver.EXPECT().IsGuildSetupComplete("g1").Return(false)
+	resolver := &testutils.FakeGuildConfigResolver{}
+	resolver.IsGuildSetupCompleteFunc = func(guildID string) bool {
+		return guildID != "g1"
+	}
 
 	called := 0
 	bot := &DiscordBot{
@@ -56,12 +54,10 @@ func TestSyncGuildCommands_SkipsGuildsWithIncompleteSetup(t *testing.T) {
 }
 
 func TestSyncGuildCommands_RegistersSetupCompleteGuilds_ContinuesOnError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	resolver := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
-	resolver.EXPECT().IsGuildSetupComplete("g1").Return(true)
-	resolver.EXPECT().IsGuildSetupComplete("g2").Return(true)
+	resolver := &testutils.FakeGuildConfigResolver{}
+	resolver.IsGuildSetupCompleteFunc = func(guildID string) bool {
+		return guildID == "g1" || guildID == "g2"
+	}
 
 	var got []string
 	bot := &DiscordBot{

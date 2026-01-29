@@ -7,18 +7,15 @@ import (
 	"log/slog"
 	"testing"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
-	gc_mocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
-	util_mocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/bwmarrin/discordgo"
 	nc "github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"go.opentelemetry.io/otel"
-	"go.uber.org/mock/gomock"
 )
 
 // simple in-memory ISInterface stub
@@ -78,6 +75,82 @@ func (f *fakeEventBus) SubscribeForTest(ctx context.Context, topic string) (<-ch
 
 func discard() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
 
+// fakeHelpers provides a programmable stub for utils.Helpers
+type fakeHelpers struct {
+	CreateNewMessageFunc    func(payload interface{}, topic string) (*message.Message, error)
+	CreateResultMessageFunc func(originalMsg *message.Message, payload interface{}, topic string) (*message.Message, error)
+	UnmarshalPayloadFunc    func(msg *message.Message, payload interface{}) error
+}
+
+func (f *fakeHelpers) CreateNewMessage(payload interface{}, topic string) (*message.Message, error) {
+	if f.CreateNewMessageFunc != nil {
+		return f.CreateNewMessageFunc(payload, topic)
+	}
+	return &message.Message{}, nil
+}
+
+func (f *fakeHelpers) CreateResultMessage(originalMsg *message.Message, payload interface{}, topic string) (*message.Message, error) {
+	if f.CreateResultMessageFunc != nil {
+		return f.CreateResultMessageFunc(originalMsg, payload, topic)
+	}
+	return &message.Message{}, nil
+}
+
+func (f *fakeHelpers) UnmarshalPayload(msg *message.Message, payload interface{}) error {
+	if f.UnmarshalPayloadFunc != nil {
+		return f.UnmarshalPayloadFunc(msg, payload)
+	}
+	return nil
+}
+
+// fakeGuildConfigResolver provides a programmable stub for GuildConfigResolver
+type fakeGuildConfigResolver struct {
+	GetGuildConfigWithContextFunc func(ctx context.Context, guildID string) (*storage.GuildConfig, error)
+	RequestGuildConfigAsyncFunc   func(ctx context.Context, guildID string)
+	IsGuildSetupCompleteFunc      func(guildID string) bool
+	HandleGuildConfigReceivedFunc func(ctx context.Context, guildID string, config *storage.GuildConfig)
+	HandleBackendErrorFunc        func(ctx context.Context, guildID string, err error)
+	ClearInflightRequestFunc      func(ctx context.Context, guildID string)
+}
+
+func (f *fakeGuildConfigResolver) GetGuildConfigWithContext(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
+	if f.GetGuildConfigWithContextFunc != nil {
+		return f.GetGuildConfigWithContextFunc(ctx, guildID)
+	}
+	return &storage.GuildConfig{}, nil
+}
+
+func (f *fakeGuildConfigResolver) RequestGuildConfigAsync(ctx context.Context, guildID string) {
+	if f.RequestGuildConfigAsyncFunc != nil {
+		f.RequestGuildConfigAsyncFunc(ctx, guildID)
+	}
+}
+
+func (f *fakeGuildConfigResolver) IsGuildSetupComplete(guildID string) bool {
+	if f.IsGuildSetupCompleteFunc != nil {
+		return f.IsGuildSetupCompleteFunc(guildID)
+	}
+	return true
+}
+
+func (f *fakeGuildConfigResolver) HandleGuildConfigReceived(ctx context.Context, guildID string, config *storage.GuildConfig) {
+	if f.HandleGuildConfigReceivedFunc != nil {
+		f.HandleGuildConfigReceivedFunc(ctx, guildID, config)
+	}
+}
+
+func (f *fakeGuildConfigResolver) HandleBackendError(ctx context.Context, guildID string, err error) {
+	if f.HandleBackendErrorFunc != nil {
+		f.HandleBackendErrorFunc(ctx, guildID, err)
+	}
+}
+
+func (f *fakeGuildConfigResolver) ClearInflightRequest(ctx context.Context, guildID string) {
+	if f.ClearInflightRequestFunc != nil {
+		f.ClearInflightRequestFunc(ctx, guildID)
+	}
+}
+
 func TestHandleClaimTagCommand_Variants(t *testing.T) {
 	ctx := context.Background()
 	tracer := otel.Tracer("test")
@@ -97,17 +170,22 @@ func TestHandleClaimTagCommand_Variants(t *testing.T) {
 	}
 
 	t.Run("success", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
+		sess := discord.NewFakeSession()
+		sess.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
+			return nil
+		}
 
-		sess := discordmocks.NewMockSession(ctrl)
-		sess.EXPECT().InteractionRespond(gomock.Any(), gomock.Any()).Return(nil)
+		helper := &fakeHelpers{
+			CreateNewMessageFunc: func(payload interface{}, topic string) (*message.Message, error) {
+				return &message.Message{}, nil
+			},
+		}
 
-		helper := util_mocks.NewMockHelpers(ctrl)
-		helper.EXPECT().CreateNewMessage(gomock.Any(), gomock.Any()).Return(&message.Message{}, nil)
-
-		resolver := gc_mocks.NewMockGuildConfigResolver(ctrl)
-		resolver.EXPECT().GetGuildConfigWithContext(gomock.Any(), "g1").Return(&storage.GuildConfig{}, nil)
+		resolver := &fakeGuildConfigResolver{
+			GetGuildConfigWithContextFunc: func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
+				return &storage.GuildConfig{}, nil
+			},
+		}
 
 		eb := &fakeEventBus{}
 		store := &memStore{}
@@ -125,12 +203,13 @@ func TestHandleClaimTagCommand_Variants(t *testing.T) {
 	})
 
 	t.Run("resolver error", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-		sess := discordmocks.NewMockSession(ctrl)
-		helper := util_mocks.NewMockHelpers(ctrl)
-		resolver := gc_mocks.NewMockGuildConfigResolver(ctrl)
-		resolver.EXPECT().GetGuildConfigWithContext(gomock.Any(), "g1").Return(nil, errors.New("boom"))
+		sess := discord.NewFakeSession()
+		helper := &fakeHelpers{}
+		resolver := &fakeGuildConfigResolver{
+			GetGuildConfigWithContextFunc: func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
+				return nil, errors.New("boom")
+			},
+		}
 		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, &memStore{}, nil, tracer, metrics)
 		res, err := mgr.HandleClaimTagCommand(ctx, base(nil))
 		if err == nil || res.Error == nil {
@@ -139,12 +218,13 @@ func TestHandleClaimTagCommand_Variants(t *testing.T) {
 	})
 
 	t.Run("no option provided", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-		sess := discordmocks.NewMockSession(ctrl)
-		helper := util_mocks.NewMockHelpers(ctrl)
-		resolver := gc_mocks.NewMockGuildConfigResolver(ctrl)
-		resolver.EXPECT().GetGuildConfigWithContext(gomock.Any(), "g1").Return(&storage.GuildConfig{}, nil)
+		sess := discord.NewFakeSession()
+		helper := &fakeHelpers{}
+		resolver := &fakeGuildConfigResolver{
+			GetGuildConfigWithContextFunc: func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
+				return &storage.GuildConfig{}, nil
+			},
+		}
 		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, &memStore{}, nil, tracer, metrics)
 		res, err := mgr.HandleClaimTagCommand(ctx, base(nil))
 		if err != nil || res.Error == nil {
@@ -153,12 +233,13 @@ func TestHandleClaimTagCommand_Variants(t *testing.T) {
 	})
 
 	t.Run("invalid range option", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-		sess := discordmocks.NewMockSession(ctrl)
-		helper := util_mocks.NewMockHelpers(ctrl)
-		resolver := gc_mocks.NewMockGuildConfigResolver(ctrl)
-		resolver.EXPECT().GetGuildConfigWithContext(gomock.Any(), "g1").Return(&storage.GuildConfig{}, nil)
+		sess := discord.NewFakeSession()
+		helper := &fakeHelpers{}
+		resolver := &fakeGuildConfigResolver{
+			GetGuildConfigWithContextFunc: func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
+				return &storage.GuildConfig{}, nil
+			},
+		}
 		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, &memStore{}, nil, tracer, metrics)
 		opt := &discordgo.ApplicationCommandInteractionDataOption{Type: discordgo.ApplicationCommandOptionInteger, Value: float64(0)}
 		res, err := mgr.HandleClaimTagCommand(ctx, base([]*discordgo.ApplicationCommandInteractionDataOption{opt}))
@@ -168,13 +249,16 @@ func TestHandleClaimTagCommand_Variants(t *testing.T) {
 	})
 
 	t.Run("interaction respond error", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-		sess := discordmocks.NewMockSession(ctrl)
-		sess.EXPECT().InteractionRespond(gomock.Any(), gomock.Any()).Return(errors.New("resp err"))
-		helper := util_mocks.NewMockHelpers(ctrl)
-		resolver := gc_mocks.NewMockGuildConfigResolver(ctrl)
-		resolver.EXPECT().GetGuildConfigWithContext(gomock.Any(), "g1").Return(&storage.GuildConfig{}, nil)
+		sess := discord.NewFakeSession()
+		sess.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
+			return errors.New("resp err")
+		}
+		helper := &fakeHelpers{}
+		resolver := &fakeGuildConfigResolver{
+			GetGuildConfigWithContextFunc: func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
+				return &storage.GuildConfig{}, nil
+			},
+		}
 		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, &memStore{}, nil, tracer, metrics)
 		opt := &discordgo.ApplicationCommandInteractionDataOption{Type: discordgo.ApplicationCommandOptionInteger, Value: float64(5)}
 		res, err := mgr.HandleClaimTagCommand(ctx, base([]*discordgo.ApplicationCommandInteractionDataOption{opt}))
@@ -184,14 +268,17 @@ func TestHandleClaimTagCommand_Variants(t *testing.T) {
 	})
 
 	t.Run("store set error", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-		sess := discordmocks.NewMockSession(ctrl)
+		sess := discord.NewFakeSession()
 		// Respond succeeds so we reach Set
-		sess.EXPECT().InteractionRespond(gomock.Any(), gomock.Any()).Return(nil)
-		helper := util_mocks.NewMockHelpers(ctrl)
-		resolver := gc_mocks.NewMockGuildConfigResolver(ctrl)
-		resolver.EXPECT().GetGuildConfigWithContext(gomock.Any(), "g1").Return(&storage.GuildConfig{}, nil)
+		sess.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
+			return nil
+		}
+		helper := &fakeHelpers{}
+		resolver := &fakeGuildConfigResolver{
+			GetGuildConfigWithContextFunc: func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
+				return &storage.GuildConfig{}, nil
+			},
+		}
 		store := &errStore{}
 		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, store, nil, tracer, metrics)
 		opt := &discordgo.ApplicationCommandInteractionDataOption{Type: discordgo.ApplicationCommandOptionInteger, Value: float64(5)}
@@ -202,14 +289,20 @@ func TestHandleClaimTagCommand_Variants(t *testing.T) {
 	})
 
 	t.Run("create message error", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-		sess := discordmocks.NewMockSession(ctrl)
-		sess.EXPECT().InteractionRespond(gomock.Any(), gomock.Any()).Return(nil)
-		helper := util_mocks.NewMockHelpers(ctrl)
-		helper.EXPECT().CreateNewMessage(gomock.Any(), gomock.Any()).Return(nil, errors.New("create err"))
-		resolver := gc_mocks.NewMockGuildConfigResolver(ctrl)
-		resolver.EXPECT().GetGuildConfigWithContext(gomock.Any(), "g1").Return(&storage.GuildConfig{}, nil)
+		sess := discord.NewFakeSession()
+		sess.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
+			return nil
+		}
+		helper := &fakeHelpers{
+			CreateNewMessageFunc: func(payload interface{}, topic string) (*message.Message, error) {
+				return nil, errors.New("create err")
+			},
+		}
+		resolver := &fakeGuildConfigResolver{
+			GetGuildConfigWithContextFunc: func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
+				return &storage.GuildConfig{}, nil
+			},
+		}
 		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, &memStore{}, nil, tracer, metrics)
 		opt := &discordgo.ApplicationCommandInteractionDataOption{Type: discordgo.ApplicationCommandOptionInteger, Value: float64(5)}
 		res, err := mgr.HandleClaimTagCommand(ctx, base([]*discordgo.ApplicationCommandInteractionDataOption{opt}))
@@ -219,14 +312,20 @@ func TestHandleClaimTagCommand_Variants(t *testing.T) {
 	})
 
 	t.Run("publish error", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-		sess := discordmocks.NewMockSession(ctrl)
-		sess.EXPECT().InteractionRespond(gomock.Any(), gomock.Any()).Return(nil)
-		helper := util_mocks.NewMockHelpers(ctrl)
-		helper.EXPECT().CreateNewMessage(gomock.Any(), gomock.Any()).Return(&message.Message{}, nil)
-		resolver := gc_mocks.NewMockGuildConfigResolver(ctrl)
-		resolver.EXPECT().GetGuildConfigWithContext(gomock.Any(), "g1").Return(&storage.GuildConfig{}, nil)
+		sess := discord.NewFakeSession()
+		sess.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
+			return nil
+		}
+		helper := &fakeHelpers{
+			CreateNewMessageFunc: func(payload interface{}, topic string) (*message.Message, error) {
+				return &message.Message{}, nil
+			},
+		}
+		resolver := &fakeGuildConfigResolver{
+			GetGuildConfigWithContextFunc: func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
+				return &storage.GuildConfig{}, nil
+			},
+		}
 		eb := &fakeEventBus{err: errors.New("pub err")}
 		mgr := NewClaimTagManager(sess, eb, logger, helper, cfg, resolver, &memStore{}, nil, tracer, metrics)
 		opt := &discordgo.ApplicationCommandInteractionDataOption{Type: discordgo.ApplicationCommandOptionInteger, Value: float64(5)}
@@ -262,10 +361,10 @@ func TestUpdateInteractionResponse_Variants(t *testing.T) {
 	})
 
 	t.Run("edit error", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-		sess := discordmocks.NewMockSession(ctrl)
-		sess.EXPECT().InteractionResponseEdit(gomock.Any(), gomock.Any()).Return(nil, errors.New("edit err"))
+		sess := discord.NewFakeSession()
+		sess.InteractionResponseEditFunc = func(interaction *discordgo.Interaction, edit *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+			return nil, errors.New("edit err")
+		}
 		store := &memStore{m: map[string]interface{}{"cid": &discordgo.Interaction{}}}
 		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, nil, cfg, nil, store, nil, tracer, metrics)
 		res, err := mgr.UpdateInteractionResponse(ctx, "cid", "done")
@@ -275,10 +374,10 @@ func TestUpdateInteractionResponse_Variants(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-		sess := discordmocks.NewMockSession(ctrl)
-		sess.EXPECT().InteractionResponseEdit(gomock.Any(), gomock.Any()).Return(&discordgo.Message{}, nil)
+		sess := discord.NewFakeSession()
+		sess.InteractionResponseEditFunc = func(interaction *discordgo.Interaction, edit *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+			return &discordgo.Message{}, nil
+		}
 		store := &memStore{m: map[string]interface{}{"cid": &discordgo.Interaction{}}}
 		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, nil, cfg, nil, store, nil, tracer, metrics)
 		res, err := mgr.UpdateInteractionResponse(ctx, "cid", "updated")

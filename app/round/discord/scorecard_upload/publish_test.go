@@ -6,19 +6,15 @@ import (
 	"errors"
 	"testing"
 
-	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/testutils"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/google/uuid"
-	"go.uber.org/mock/gomock"
 )
 
 func Test_scorecardUploadManager_publishScorecardURLEvent_SetsMetadataAndPayload(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	t.Cleanup(ctrl.Finish)
-
-	pub := eventbusmocks.NewMockEventBus(ctrl)
+	fakePublisher := &testutils.FakeEventBus{}
 
 	guildID := sharedtypes.GuildID("g1")
 	roundID := sharedtypes.RoundID(uuid.New())
@@ -28,69 +24,67 @@ func Test_scorecardUploadManager_publishScorecardURLEvent_SetsMetadataAndPayload
 	url := "https://udisc.com/scorecard?id=123"
 	notes := "notes"
 
-	pub.EXPECT().Publish(roundevents.ScorecardURLRequestedV1, gomock.Any()).DoAndReturn(
-		func(topic string, msgs ...*message.Message) error {
-			if topic != roundevents.ScorecardURLRequestedV1 {
-				t.Fatalf("topic mismatch: got %q", topic)
-			}
-			if len(msgs) != 1 {
-				t.Fatalf("expected 1 message, got %d", len(msgs))
-			}
-			msg := msgs[0]
-			if msg.Metadata.Get("event_name") != roundevents.ScorecardURLRequestedV1 {
-				t.Fatalf("expected event_name metadata")
-			}
-			if msg.Metadata.Get("domain") != "scorecard" {
-				t.Fatalf("expected domain metadata")
-			}
-			if msg.Metadata.Get("guild_id") != string(guildID) {
-				t.Fatalf("expected guild_id metadata")
-			}
-			if msg.Metadata.Get("import_id") == "" {
-				t.Fatalf("expected import_id metadata")
-			}
+	fakePublisher.PublishFunc = func(topic string, msgs ...*message.Message) error {
+		if topic != roundevents.ScorecardURLRequestedV1 {
+			t.Fatalf("topic mismatch: got %q", topic)
+		}
+		if len(msgs) != 1 {
+			t.Fatalf("expected 1 message, got %d", len(msgs))
+		}
+		msg := msgs[0]
+		if msg.Metadata.Get("event_name") != roundevents.ScorecardURLRequestedV1 {
+			t.Fatalf("expected event_name metadata")
+		}
+		if msg.Metadata.Get("domain") != "scorecard" {
+			t.Fatalf("expected domain metadata")
+		}
+		if msg.Metadata.Get("guild_id") != string(guildID) {
+			t.Fatalf("expected guild_id metadata")
+		}
+		if msg.Metadata.Get("import_id") == "" {
+			t.Fatalf("expected import_id metadata")
+		}
 
-			var payload roundevents.ScorecardURLRequestedPayloadV1
-			if err := json.Unmarshal(msg.Payload, &payload); err != nil {
-				t.Fatalf("unmarshal payload: %v", err)
-			}
-			if payload.ImportID == "" {
-				t.Fatalf("expected ImportID")
-			}
-			if payload.GuildID != guildID {
-				t.Fatalf("guild mismatch: got %q", payload.GuildID)
-			}
-			if payload.RoundID != roundID {
-				t.Fatalf("round mismatch: got %q", payload.RoundID)
-			}
-			if payload.UserID != userID {
-				t.Fatalf("user mismatch: got %q", payload.UserID)
-			}
-			if payload.ChannelID != channelID {
-				t.Fatalf("channel mismatch: got %q", payload.ChannelID)
-			}
-			if payload.MessageID != messageID {
-				t.Fatalf("message mismatch: got %q", payload.MessageID)
-			}
-			if payload.UDiscURL != url {
-				t.Fatalf("url mismatch: got %q", payload.UDiscURL)
-			}
-			if payload.Notes != notes {
-				t.Fatalf("notes mismatch: got %q", payload.Notes)
-			}
-			if payload.Timestamp.IsZero() {
-				t.Fatalf("expected timestamp")
-			}
+		var payload roundevents.ScorecardURLRequestedPayloadV1
+		if err := json.Unmarshal(msg.Payload, &payload); err != nil {
+			t.Fatalf("unmarshal payload: %v", err)
+		}
+		if payload.ImportID == "" {
+			t.Fatalf("expected ImportID")
+		}
+		if payload.GuildID != guildID {
+			t.Fatalf("guild mismatch: got %q", payload.GuildID)
+		}
+		if payload.RoundID != roundID {
+			t.Fatalf("round mismatch: got %q", payload.RoundID)
+		}
+		if payload.UserID != userID {
+			t.Fatalf("user mismatch: got %q", payload.UserID)
+		}
+		if payload.ChannelID != channelID {
+			t.Fatalf("channel mismatch: got %q", payload.ChannelID)
+		}
+		if payload.MessageID != messageID {
+			t.Fatalf("message mismatch: got %q", payload.MessageID)
+		}
+		if payload.UDiscURL != url {
+			t.Fatalf("url mismatch: got %q", payload.UDiscURL)
+		}
+		if payload.Notes != notes {
+			t.Fatalf("notes mismatch: got %q", payload.Notes)
+		}
+		if payload.Timestamp.IsZero() {
+			t.Fatalf("expected timestamp")
+		}
 
-			// Ensure import_id metadata matches payload
-			if msg.Metadata.Get("import_id") != payload.ImportID {
-				t.Fatalf("import_id metadata mismatch")
-			}
-			return nil
-		},
-	).Times(1)
+		// Ensure import_id metadata matches payload
+		if msg.Metadata.Get("import_id") != payload.ImportID {
+			t.Fatalf("import_id metadata mismatch")
+		}
+		return nil
+	}
 
-	m := &scorecardUploadManager{publisher: pub, logger: discardLogger()}
+	m := &scorecardUploadManager{publisher: fakePublisher, logger: discardLogger()}
 	importID, err := m.publishScorecardURLEvent(context.Background(), guildID, roundID, userID, channelID, messageID, url, notes)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -101,13 +95,12 @@ func Test_scorecardUploadManager_publishScorecardURLEvent_SetsMetadataAndPayload
 }
 
 func Test_scorecardUploadManager_publishScorecardUploadEvent_PublishFailure_ReturnsError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	t.Cleanup(ctrl.Finish)
+	fakePublisher := &testutils.FakeEventBus{}
+	fakePublisher.PublishFunc = func(topic string, msgs ...*message.Message) error {
+		return errors.New("publish failed")
+	}
 
-	pub := eventbusmocks.NewMockEventBus(ctrl)
-	pub.EXPECT().Publish(roundevents.ScorecardUploadedV1, gomock.Any()).Return(errors.New("publish failed")).Times(1)
-
-	m := &scorecardUploadManager{publisher: pub, logger: discardLogger()}
+	m := &scorecardUploadManager{publisher: fakePublisher, logger: discardLogger()}
 	importID, err := m.publishScorecardUploadEvent(
 		context.Background(),
 		sharedtypes.GuildID("g1"),

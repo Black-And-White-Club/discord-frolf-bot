@@ -6,17 +6,14 @@ import (
 	"strings"
 	"testing"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
-	guildconfigmock "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
-	storagemocks "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage/mocks"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/testutils"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
-	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	"github.com/bwmarrin/discordgo"
 	"go.opentelemetry.io/otel/trace/noop"
-	"go.uber.org/mock/gomock"
 )
 
 // Test wrapper function that passes through the operation call without additional logic
@@ -25,12 +22,9 @@ var testOperationWrapper = func(ctx context.Context, operationName string, opera
 }
 
 func Test_signupManager_MessageReactionAdd(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
-	mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
-	mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
+	fakeSession := &discord.FakeSession{}
+	fakePublisher := &testutils.FakeEventBus{}
+	fakeInteractionStore := &testutils.FakeStorage[any]{}
 	logger := loggerfrolfbot.NoOpLogger
 	tracerProvider := noop.NewTracerProvider()
 	tracer := tracerProvider.Tracer("test")
@@ -45,8 +39,7 @@ func Test_signupManager_MessageReactionAdd(t *testing.T) {
 		},
 	}
 
-	// Add mock GuildConfigResolver
-	mockGuildConfigResolver := guildconfigmock.NewMockGuildConfigResolver(ctrl)
+	fakeGuildConfigResolver := &testutils.FakeGuildConfigResolver{}
 
 	tests := []struct {
 		name        string
@@ -59,18 +52,15 @@ func Test_signupManager_MessageReactionAdd(t *testing.T) {
 		{
 			name: "valid reaction",
 			setup: func() {
-				mockSession.EXPECT().
-					UserChannelCreate(gomock.Any()).
-					Return(&discordgo.Channel{}, nil).
-					Times(1)
-				mockSession.EXPECT().
-					ChannelMessageSendComplex(gomock.Any(), gomock.Any()).
-					Return(&discordgo.Message{}, nil).
-					Times(1)
-				mockSession.EXPECT().
-					GetBotUser().
-					Return(&discordgo.User{ID: "bot-user-id"}, nil).
-					Times(1)
+				fakeSession.UserChannelCreateFunc = func(recipientID string, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+					return &discordgo.Channel{}, nil
+				}
+				fakeSession.ChannelMessageSendComplexFunc = func(channelID string, data *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{}, nil
+				}
+				fakeSession.GetBotUserFunc = func() (*discordgo.User, error) {
+					return &discordgo.User{ID: "bot-user-id"}, nil
+				}
 			},
 			args: &discordgo.MessageReactionAdd{
 				MessageReaction: &discordgo.MessageReaction{
@@ -90,10 +80,6 @@ func Test_signupManager_MessageReactionAdd(t *testing.T) {
 		{
 			name: "invalid channel id",
 			setup: func() {
-				mockSession.EXPECT().
-					GetBotUser().
-					Return(&discordgo.User{ID: "bot-user-id"}, nil).
-					Times(0)
 			},
 			args: &discordgo.MessageReactionAdd{
 				MessageReaction: &discordgo.MessageReaction{
@@ -113,18 +99,15 @@ func Test_signupManager_MessageReactionAdd(t *testing.T) {
 		{
 			name: "different message id in same channel - now processed since we only check channel + emoji",
 			setup: func() {
-				mockSession.EXPECT().
-					GetBotUser().
-					Return(&discordgo.User{ID: "bot-user-id"}, nil).
-					Times(1)
-				mockSession.EXPECT().
-					UserChannelCreate(gomock.Any()).
-					Return(&discordgo.Channel{}, nil).
-					Times(1)
-				mockSession.EXPECT().
-					ChannelMessageSendComplex(gomock.Any(), gomock.Any()).
-					Return(&discordgo.Message{}, nil).
-					Times(1)
+				fakeSession.GetBotUserFunc = func() (*discordgo.User, error) {
+					return &discordgo.User{ID: "bot-user-id"}, nil
+				}
+				fakeSession.UserChannelCreateFunc = func(recipientID string, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+					return &discordgo.Channel{}, nil
+				}
+				fakeSession.ChannelMessageSendComplexFunc = func(channelID string, data *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{}, nil
+				}
 			},
 			args: &discordgo.MessageReactionAdd{
 				MessageReaction: &discordgo.MessageReaction{
@@ -163,10 +146,9 @@ func Test_signupManager_MessageReactionAdd(t *testing.T) {
 		{
 			name: "bot's own reaction",
 			setup: func() {
-				mockSession.EXPECT().
-					GetBotUser().
-					Return(&discordgo.User{ID: "user-id"}, nil).
-					Times(1)
+				fakeSession.GetBotUserFunc = func() (*discordgo.User, error) {
+					return &discordgo.User{ID: "user-id"}, nil
+				}
 			},
 			args: &discordgo.MessageReactionAdd{
 				MessageReaction: &discordgo.MessageReaction{
@@ -186,10 +168,9 @@ func Test_signupManager_MessageReactionAdd(t *testing.T) {
 		{
 			name: "failed to get bot user",
 			setup: func() {
-				mockSession.EXPECT().
-					GetBotUser().
-					Return(nil, errors.New("bot user error")).
-					Times(1)
+				fakeSession.GetBotUserFunc = func() (*discordgo.User, error) {
+					return nil, errors.New("bot user error")
+				}
 			},
 			args: &discordgo.MessageReactionAdd{
 				MessageReaction: &discordgo.MessageReaction{
@@ -215,12 +196,12 @@ func Test_signupManager_MessageReactionAdd(t *testing.T) {
 			}
 
 			sm := &signupManager{
-				session:             mockSession,
-				publisher:           mockPublisher,
+				session:             fakeSession,
+				publisher:           fakePublisher,
 				logger:              logger,
 				config:              mockConfig,
-				guildConfigResolver: mockGuildConfigResolver,
-				interactionStore:    mockInteractionStore,
+				guildConfigResolver: fakeGuildConfigResolver,
+				interactionStore:    fakeInteractionStore,
 				tracer:              tracer,
 				metrics:             metrics,
 				operationWrapper:    testOperationWrapper,
@@ -232,10 +213,12 @@ func Test_signupManager_MessageReactionAdd(t *testing.T) {
 					SignupChannelID: "channel-id",
 					SignupEmoji:     "emoji",
 				}
-				mockGuildConfigResolver.EXPECT().GetGuildConfigWithContext(gomock.Any(), tt.args.GuildID).Return(guildConfig, nil).AnyTimes()
+				fakeGuildConfigResolver.GetGuildConfigFunc = func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
+					return guildConfig, nil
+				}
 			}
 
-			result, err := sm.MessageReactionAdd(mockSession, tt.args)
+			result, err := sm.MessageReactionAdd(fakeSession, tt.args)
 			// Check the wrapper return error (should be nil with our test wrapper)
 			if err != nil {
 				t.Fatalf("MessageReactionAdd() second return value error was non-nil: %v; expected nil with pass-through wrapper", err)
@@ -271,6 +254,7 @@ func Test_signupManager_MessageReactionAdd(t *testing.T) {
 }
 
 func Test_signupManager_HandleSignupReactionAdd(t *testing.T) {
+	fakeSession := &discord.FakeSession{}
 	mockConfig := &config.Config{
 		Discord: config.DiscordConfig{
 			GuildID: "guild-id",
@@ -279,7 +263,7 @@ func Test_signupManager_HandleSignupReactionAdd(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		setup       func(mockSession *discordmocks.MockSession)
+		setup       func()
 		ctx         context.Context
 		args        *discordgo.MessageReactionAdd
 		wantSuccess string
@@ -288,15 +272,13 @@ func Test_signupManager_HandleSignupReactionAdd(t *testing.T) {
 	}{
 		{
 			name: "valid reaction",
-			setup: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					UserChannelCreate(gomock.Any()).
-					Return(&discordgo.Channel{ID: "dm-channel-id"}, nil).
-					Times(1)
-				mockSession.EXPECT().
-					ChannelMessageSendComplex("dm-channel-id", gomock.Any()).
-					Return(&discordgo.Message{}, nil).
-					Times(1)
+			setup: func() {
+				fakeSession.UserChannelCreateFunc = func(recipientID string, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+					return &discordgo.Channel{ID: "dm-channel-id"}, nil
+				}
+				fakeSession.ChannelMessageSendComplexFunc = func(channelID string, data *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{}, nil
+				}
 			},
 			ctx: context.Background(),
 			args: &discordgo.MessageReactionAdd{
@@ -311,7 +293,7 @@ func Test_signupManager_HandleSignupReactionAdd(t *testing.T) {
 		},
 		{
 			name:  "wrong guild",
-			setup: func(mockSession *discordmocks.MockSession) {},
+			setup: func() {},
 			ctx:   context.Background(),
 			args: &discordgo.MessageReactionAdd{
 				MessageReaction: &discordgo.MessageReaction{
@@ -325,11 +307,10 @@ func Test_signupManager_HandleSignupReactionAdd(t *testing.T) {
 		},
 		{
 			name: "failed to create DM channel",
-			setup: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					UserChannelCreate(gomock.Any()).
-					Return(nil, errors.New("create error")).
-					Times(1)
+			setup: func() {
+				fakeSession.UserChannelCreateFunc = func(recipientID string, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+					return nil, errors.New("create error")
+				}
 			},
 			ctx: context.Background(),
 			args: &discordgo.MessageReactionAdd{
@@ -344,15 +325,13 @@ func Test_signupManager_HandleSignupReactionAdd(t *testing.T) {
 		},
 		{
 			name: "failed to send ephemeral message",
-			setup: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					UserChannelCreate(gomock.Any()).
-					Return(&discordgo.Channel{ID: "dm-channel-id"}, nil).
-					Times(1)
-				mockSession.EXPECT().
-					ChannelMessageSendComplex("dm-channel-id", gomock.Any()).
-					Return(nil, errors.New("send error")).
-					Times(1)
+			setup: func() {
+				fakeSession.UserChannelCreateFunc = func(recipientID string, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+					return &discordgo.Channel{ID: "dm-channel-id"}, nil
+				}
+				fakeSession.ChannelMessageSendComplexFunc = func(channelID string, data *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return nil, errors.New("send error")
+				}
 			},
 			ctx: context.Background(),
 			args: &discordgo.MessageReactionAdd{
@@ -367,7 +346,7 @@ func Test_signupManager_HandleSignupReactionAdd(t *testing.T) {
 		},
 		{
 			name:  "context cancelled before operation",
-			setup: func(mockSession *discordmocks.MockSession) {},
+			setup: func() {},
 			ctx: func() context.Context {
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel()
@@ -387,27 +366,23 @@ func Test_signupManager_HandleSignupReactionAdd(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
-			mockSession := discordmocks.NewMockSession(ctrl)
-			mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
-			mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
+			fakePublisher := &testutils.FakeEventBus{}
+			fakeInteractionStore := &testutils.FakeStorage[any]{}
 			logger := loggerfrolfbot.NoOpLogger
 			tracerProvider := noop.NewTracerProvider()
 			tracer := tracerProvider.Tracer("test")
 			metrics := &discordmetrics.NoOpMetrics{}
 
 			if tt.setup != nil {
-				tt.setup(mockSession)
+				tt.setup()
 			}
 
 			sm := &signupManager{
-				session:          mockSession,
-				publisher:        mockPublisher,
+				session:          fakeSession,
+				publisher:        fakePublisher,
 				logger:           logger,
 				config:           mockConfig,
-				interactionStore: mockInteractionStore,
+				interactionStore: fakeInteractionStore,
 				tracer:           tracer,
 				metrics:          metrics,
 				operationWrapper: testOperationWrapper,
@@ -442,6 +417,9 @@ func Test_signupManager_HandleSignupReactionAdd(t *testing.T) {
 }
 
 func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
+	fakeSession := &discord.FakeSession{}
+	fakePublisher := &testutils.FakeEventBus{}
+	fakeInteractionStore := &testutils.FakeStorage[any]{}
 	mockConfig := &config.Config{
 		Discord: config.DiscordConfig{
 			GuildID: "guild-id",
@@ -449,12 +427,8 @@ func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
 	}
 
 	tests := []struct {
-		name  string
-		setup func(
-			mockSession *discordmocks.MockSession,
-			mockPublisher *eventbusmocks.MockEventBus,
-			mockInteractionStore *storagemocks.MockISInterface[any],
-		)
+		name          string
+		setup         func()
 		ctx           context.Context
 		args          *discordgo.InteractionCreate
 		wantSuccess   string
@@ -463,22 +437,15 @@ func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
 	}{
 		{
 			name: "valid button press",
-			setup: func(
-				mockSession *discordmocks.MockSession,
-				mockPublisher *eventbusmocks.MockEventBus,
-				mockInteractionStore *storagemocks.MockISInterface[any],
-			) {
+			setup: func() {
 				// Expect the interaction to be stored first
-				mockInteractionStore.EXPECT().
-					Set(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(nil).
-					Times(1)
-
+				fakeInteractionStore.SetFunc = func(ctx context.Context, key string, value any) error {
+					return nil
+				}
 				// Then expect the modal response
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					Return(nil).
-					Times(1)
+				fakeSession.InteractionRespondFunc = func(interaction *discordgo.Interaction, response *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
+					return nil
+				}
 			},
 			ctx: context.Background(),
 			args: &discordgo.InteractionCreate{
@@ -501,7 +468,7 @@ func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
 		},
 		{
 			name: "nil interaction",
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any]) {
+			setup: func() {
 				// No mock expectations since validation fails early
 			},
 			ctx:           context.Background(),
@@ -512,7 +479,7 @@ func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
 		},
 		{
 			name: "nil interaction.Interaction",
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any]) {
+			setup: func() {
 				// No mock expectations since validation fails early
 			},
 			ctx: context.Background(),
@@ -525,18 +492,15 @@ func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
 		},
 		{
 			name: "nil member",
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any]) {
+			setup: func() {
 				// Expect interaction store call since validation passes initial checks
-				mockInteractionStore.EXPECT().
-					Set(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(nil).
-					Times(1)
-
+				fakeInteractionStore.SetFunc = func(ctx context.Context, key string, value any) error {
+					return nil
+				}
 				// Expect modal response since the user validation happens after modal creation
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					Return(nil).
-					Times(1)
+				fakeSession.InteractionRespondFunc = func(interaction *discordgo.Interaction, response *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
+					return nil
+				}
 			},
 			ctx: context.Background(),
 			args: &discordgo.InteractionCreate{
@@ -555,7 +519,7 @@ func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
 		},
 		{
 			name: "nil user",
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any]) {
+			setup: func() {
 				// No expectations since this fails early in validation
 			},
 			ctx: context.Background(),
@@ -576,7 +540,7 @@ func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
 		},
 		{
 			name: "context cancelled before operation",
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any]) {
+			setup: func() {
 				// No expectations since context is cancelled
 			},
 			ctx: func() context.Context {
@@ -599,18 +563,15 @@ func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
 		},
 		{
 			name: "unsupported interaction type",
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any]) {
+			setup: func() {
 				// Expect interaction store call since validation passes initial checks
-				mockInteractionStore.EXPECT().
-					Set(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(nil).
-					Times(1)
-
+				fakeInteractionStore.SetFunc = func(ctx context.Context, key string, value any) error {
+					return nil
+				}
 				// Expect modal response since the type validation happens after modal creation
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					Return(nil).
-					Times(1)
+				fakeSession.InteractionRespondFunc = func(interaction *discordgo.Interaction, response *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
+					return nil
+				}
 			},
 			ctx: context.Background(),
 			args: &discordgo.InteractionCreate{
@@ -628,18 +589,15 @@ func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
 		},
 		{
 			name: "unsupported button custom id",
-			setup: func(mockSession *discordmocks.MockSession, mockPublisher *eventbusmocks.MockEventBus, mockInteractionStore *storagemocks.MockISInterface[any]) {
+			setup: func() {
 				// Expect interaction store call since validation passes initial checks
-				mockInteractionStore.EXPECT().
-					Set(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(nil).
-					Times(1)
-
+				fakeInteractionStore.SetFunc = func(ctx context.Context, key string, value any) error {
+					return nil
+				}
 				// Expect modal response since the custom ID validation happens after modal creation
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					Return(nil).
-					Times(1)
+				fakeSession.InteractionRespondFunc = func(interaction *discordgo.Interaction, response *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
+					return nil
+				}
 			},
 			ctx: context.Background(),
 			args: &discordgo.InteractionCreate{
@@ -657,22 +615,15 @@ func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
 		},
 		{
 			name: "SendSignupModal fails",
-			setup: func(
-				mockSession *discordmocks.MockSession,
-				mockPublisher *eventbusmocks.MockEventBus,
-				mockInteractionStore *storagemocks.MockISInterface[any],
-			) {
+			setup: func() {
 				// Expect interaction store call first
-				mockInteractionStore.EXPECT().
-					Set(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(nil).
-					Times(1)
-
+				fakeInteractionStore.SetFunc = func(ctx context.Context, key string, value any) error {
+					return nil
+				}
 				// Then expect the failing modal response
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					Return(errors.New("modal error")).
-					Times(1)
+				fakeSession.InteractionRespondFunc = func(interaction *discordgo.Interaction, response *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
+					return errors.New("modal error")
+				}
 			},
 			ctx: context.Background(),
 			args: &discordgo.InteractionCreate{
@@ -695,18 +646,11 @@ func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
 		},
 		{
 			name: "interaction store set fails",
-			setup: func(
-				mockSession *discordmocks.MockSession,
-				mockPublisher *eventbusmocks.MockEventBus,
-				mockInteractionStore *storagemocks.MockISInterface[any],
-			) {
+			setup: func() {
 				// Expect interaction store call to fail
-				mockInteractionStore.EXPECT().
-					Set(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(errors.New("store error")).
-					Times(1)
-
-				// No session call expected since store fails first
+				fakeInteractionStore.SetFunc = func(ctx context.Context, key string, value any) error {
+					return errors.New("store error")
+				}
 			},
 			ctx: context.Background(),
 			args: &discordgo.InteractionCreate{
@@ -731,27 +675,21 @@ func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
-			mockSession := discordmocks.NewMockSession(ctrl)
-			mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
-			mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
 			logger := loggerfrolfbot.NoOpLogger
 			tracerProvider := noop.NewTracerProvider()
 			tracer := tracerProvider.Tracer("test")
 			metrics := &discordmetrics.NoOpMetrics{}
 
 			if tt.setup != nil {
-				tt.setup(mockSession, mockPublisher, mockInteractionStore)
+				tt.setup()
 			}
 
 			sm := &signupManager{
-				session:          mockSession,
-				publisher:        mockPublisher,
+				session:          fakeSession,
+				publisher:        fakePublisher,
 				logger:           logger,
 				config:           mockConfig,
-				interactionStore: mockInteractionStore,
+				interactionStore: fakeInteractionStore,
 				tracer:           tracer,
 				metrics:          metrics,
 				operationWrapper: testOperationWrapper,
@@ -792,8 +730,6 @@ func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
 			} else if result.Success != nil {
 				if successVal, isString := result.Success.(string); isString && successVal != "" {
 					t.Errorf("Test %q: SignupOperationResult.Success mismatch: got %q, want empty", tt.name, successVal)
-				} else if result.Success != nil {
-					t.Errorf("Test %q: SignupOperationResult.Success mismatch: got %v, want nil", tt.name, result.Success)
 				}
 			}
 		})

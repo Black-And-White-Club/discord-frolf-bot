@@ -7,10 +7,9 @@ import (
 	"log/slog"
 	"testing"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
-	"go.uber.org/mock/gomock"
 )
 
 func Test_leaderboardUpdateManager_SendLeaderboardEmbed(t *testing.T) {
@@ -18,7 +17,7 @@ func Test_leaderboardUpdateManager_SendLeaderboardEmbed(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		setupMocks    func(mockSession *discordmocks.MockSession)
+		setupFake     func(t *testing.T, fakeSession *discord.FakeSession)
 		leaderboard   []LeaderboardEntry
 		page          int32
 		expectedPage  int32
@@ -27,40 +26,37 @@ func Test_leaderboardUpdateManager_SendLeaderboardEmbed(t *testing.T) {
 	}{
 		{
 			name: "Empty leaderboard",
-			setupMocks: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					ChannelMessageSendComplex(gomock.Eq(channelID), gomock.Any(), gomock.Any()).
-					DoAndReturn(func(channelID string, send *discordgo.MessageSend, options ...any) (*discordgo.Message, error) {
-						// Verify empty leaderboard message
-						if len(send.Embeds) != 1 {
-							t.Errorf("Expected 1 embed, got %d", len(send.Embeds))
-						}
+			setupFake: func(t *testing.T, fakeSession *discord.FakeSession) {
+				fakeSession.ChannelMessageSendComplexFunc = func(chID string, send *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					// Verify empty leaderboard message
+					if len(send.Embeds) != 1 {
+						t.Errorf("Expected 1 embed, got %d", len(send.Embeds))
+					}
 
-						embed := send.Embeds[0]
-						if embed.Title != "🏆 Leaderboard" {
-							t.Errorf("Unexpected title: got %s, want %s", embed.Title, "🏆 Leaderboard")
-						}
+					embed := send.Embeds[0]
+					if embed.Title != "🏆 Leaderboard" {
+						t.Errorf("Unexpected title: got %s, want %s", embed.Title, "🏆 Leaderboard")
+					}
 
-						if embed.Description != "Page 1/1" {
-							t.Errorf("Unexpected description: got %s, want %s", embed.Description, "Page 1/1")
-						}
+					if embed.Description != "Page 1/1" {
+						t.Errorf("Unexpected description: got %s, want %s", embed.Description, "Page 1/1")
+					}
 
-						if len(embed.Fields) != 0 {
-							t.Errorf("Expected 0 fields, got %d", len(embed.Fields))
-						}
+					if len(embed.Fields) != 0 {
+						t.Errorf("Expected 0 fields, got %d", len(embed.Fields))
+					}
 
-						// No pagination buttons for single page
-						if len(send.Components) != 0 {
-							t.Errorf("Expected 0 components, got %d", len(send.Components))
-						}
+					// No pagination buttons for single page
+					if len(send.Components) != 0 {
+						t.Errorf("Expected 0 components, got %d", len(send.Components))
+					}
 
-						return &discordgo.Message{
-							ID:      "test-message-id",
-							Embeds:  send.Embeds,
-							Content: "Test Message",
-						}, nil
-					}).
-					Times(1)
+					return &discordgo.Message{
+						ID:      "test-message-id",
+						Embeds:  send.Embeds,
+						Content: "Test Message",
+					}, nil
+				}
 			},
 			leaderboard:   []LeaderboardEntry{},
 			page:          1,
@@ -70,50 +66,47 @@ func Test_leaderboardUpdateManager_SendLeaderboardEmbed(t *testing.T) {
 		},
 		{
 			name: "Single page leaderboard (less than 10 entries)",
-			setupMocks: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					ChannelMessageSendComplex(gomock.Eq(channelID), gomock.Any(), gomock.Any()).
-					DoAndReturn(func(channelID string, send *discordgo.MessageSend, options ...any) (*discordgo.Message, error) {
-						// Verify single page leaderboard message
-						if len(send.Embeds) != 1 {
-							t.Errorf("Expected 1 embed, got %d", len(send.Embeds))
-						}
+			setupFake: func(t *testing.T, fakeSession *discord.FakeSession) {
+				fakeSession.ChannelMessageSendComplexFunc = func(chID string, send *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					// Verify single page leaderboard message
+					if len(send.Embeds) != 1 {
+						t.Errorf("Expected 1 embed, got %d", len(send.Embeds))
+					}
 
-						embed := send.Embeds[0]
-						if embed.Title != "🏆 Leaderboard" {
-							t.Errorf("Unexpected title: got %s, want %s", embed.Title, "🏆 Leaderboard")
-						}
+					embed := send.Embeds[0]
+					if embed.Title != "🏆 Leaderboard" {
+						t.Errorf("Unexpected title: got %s, want %s", embed.Title, "🏆 Leaderboard")
+					}
 
-						if embed.Description != "Page 1/1" {
-							t.Errorf("Unexpected description: got %s, want %s", embed.Description, "Page 1/1")
-						}
+					if embed.Description != "Page 1/1" {
+						t.Errorf("Unexpected description: got %s, want %s", embed.Description, "Page 1/1")
+					}
 
-						if len(embed.Fields) != 1 {
-							t.Errorf("Expected 1 field, got %d", len(embed.Fields))
-						}
+					if len(embed.Fields) != 1 {
+						t.Errorf("Expected 1 field, got %d", len(embed.Fields))
+					}
 
-						// Check the single Tags field
-						if embed.Fields[0].Name != "Tags" {
-							t.Errorf("Unexpected field name: got %s, want %s", embed.Fields[0].Name, "Tags")
-						}
+					// Check the single Tags field
+					if embed.Fields[0].Name != "Tags" {
+						t.Errorf("Unexpected field name: got %s, want %s", embed.Fields[0].Name, "Tags")
+					}
 
-						expectedValue := "🥇 **Tag #1  ** <@user1>\n🥈 **Tag #2  ** <@user2>\n🥉 **Tag #3  ** <@user3>\n🏷️ **Tag #4  ** <@user4>\n🗑️ **Tag #5  ** <@user5>\n"
-						if embed.Fields[0].Value != expectedValue {
-							t.Errorf("Unexpected field value: got %s, want %s", embed.Fields[0].Value, expectedValue)
-						}
+					expectedValue := "🥇 **Tag #1  ** <@user1>\n🥈 **Tag #2  ** <@user2>\n🥉 **Tag #3  ** <@user3>\n🏷️ **Tag #4  ** <@user4>\n🗑️ **Tag #5  ** <@user5>\n"
+					if embed.Fields[0].Value != expectedValue {
+						t.Errorf("Unexpected field value: got %s, want %s", embed.Fields[0].Value, expectedValue)
+					}
 
-						// No pagination buttons for single page
-						if len(send.Components) != 0 {
-							t.Errorf("Expected 0 components, got %d", len(send.Components))
-						}
+					// No pagination buttons for single page
+					if len(send.Components) != 0 {
+						t.Errorf("Expected 0 components, got %d", len(send.Components))
+					}
 
-						return &discordgo.Message{
-							ID:      "test-message-id",
-							Embeds:  send.Embeds,
-							Content: "Test Message",
-						}, nil
-					}).
-					Times(1)
+					return &discordgo.Message{
+						ID:      "test-message-id",
+						Embeds:  send.Embeds,
+						Content: "Test Message",
+					}, nil
+				}
 			},
 			leaderboard: []LeaderboardEntry{
 				{Rank: 1, UserID: "user1"},
@@ -129,74 +122,71 @@ func Test_leaderboardUpdateManager_SendLeaderboardEmbed(t *testing.T) {
 		},
 		{
 			name: "Multi-page leaderboard (first page)",
-			setupMocks: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					ChannelMessageSendComplex(gomock.Eq(channelID), gomock.Any(), gomock.Any()).
-					DoAndReturn(func(channelID string, send *discordgo.MessageSend, options ...any) (*discordgo.Message, error) {
-						// Verify multi-page leaderboard message (first page)
-						if len(send.Embeds) != 1 {
-							t.Errorf("Expected 1 embed, got %d", len(send.Embeds))
-						}
+			setupFake: func(t *testing.T, fakeSession *discord.FakeSession) {
+				fakeSession.ChannelMessageSendComplexFunc = func(chID string, send *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					// Verify multi-page leaderboard message (first page)
+					if len(send.Embeds) != 1 {
+						t.Errorf("Expected 1 embed, got %d", len(send.Embeds))
+					}
 
-						embed := send.Embeds[0]
-						if embed.Description != "Page 1/2" {
-							t.Errorf("Unexpected description: got %s, want %s", embed.Description, "Page 1/2")
-						}
+					embed := send.Embeds[0]
+					if embed.Description != "Page 1/2" {
+						t.Errorf("Unexpected description: got %s, want %s", embed.Description, "Page 1/2")
+					}
 
-						// Should show exactly 1 field with 10 entries on first page
-						if len(embed.Fields) != 1 {
-							t.Errorf("Expected 1 field, got %d", len(embed.Fields))
-						}
+					// Should show exactly 1 field with 10 entries on first page
+					if len(embed.Fields) != 1 {
+						t.Errorf("Expected 1 field, got %d", len(embed.Fields))
+					}
 
-						// Check the Tags field contains all 10 entries
-						if embed.Fields[0].Name != "Tags" {
-							t.Errorf("Unexpected field name: got %s, want %s", embed.Fields[0].Name, "Tags")
-						}
+					// Check the Tags field contains all 10 entries
+					if embed.Fields[0].Name != "Tags" {
+						t.Errorf("Unexpected field name: got %s, want %s", embed.Fields[0].Name, "Tags")
+					}
 
-						// Should contain entries 1-10 with proper emojis
-						expectedValue := "🥇 **Tag #1  ** <@user1>\n🥈 **Tag #2  ** <@user2>\n🥉 **Tag #3  ** <@user3>\n🏷️ **Tag #4  ** <@user4>\n🏷️ **Tag #5  ** <@user5>\n🏷️ **Tag #6  ** <@user6>\n🏷️ **Tag #7  ** <@user7>\n🏷️ **Tag #8  ** <@user8>\n🏷️ **Tag #9  ** <@user9>\n🏷️ **Tag #10 ** <@user10>\n"
-						if embed.Fields[0].Value != expectedValue {
-							t.Errorf("Unexpected field value: got %s, want %s", embed.Fields[0].Value, expectedValue)
-						}
+					// Should contain entries 1-10 with proper emojis
+					expectedValue := "🥇 **Tag #1  ** <@user1>\n🥈 **Tag #2  ** <@user2>\n🥉 **Tag #3  ** <@user3>\n🏷️ **Tag #4  ** <@user4>\n🏷️ **Tag #5  ** <@user5>\n🏷️ **Tag #6  ** <@user6>\n🏷️ **Tag #7  ** <@user7>\n🏷️ **Tag #8  ** <@user8>\n🏷️ **Tag #9  ** <@user9>\n🏷️ **Tag #10 ** <@user10>\n"
+					if embed.Fields[0].Value != expectedValue {
+						t.Errorf("Unexpected field value: got %s, want %s", embed.Fields[0].Value, expectedValue)
+					}
 
-						// Check pagination buttons
-						if len(send.Components) != 1 {
-							t.Errorf("Expected 1 component row, got %d", len(send.Components))
-							return nil, fmt.Errorf("test failed")
-						}
+					// Check pagination buttons
+					if len(send.Components) != 1 {
+						t.Errorf("Expected 1 component row, got %d", len(send.Components))
+						return nil, fmt.Errorf("test failed")
+					}
 
-						actionRow, ok := send.Components[0].(discordgo.ActionsRow)
-						if !ok {
-							t.Errorf("Expected ActionsRow, got %T", send.Components[0])
-							return nil, fmt.Errorf("test failed")
-						}
+					actionRow, ok := send.Components[0].(discordgo.ActionsRow)
+					if !ok {
+						t.Errorf("Expected ActionsRow, got %T", send.Components[0])
+						return nil, fmt.Errorf("test failed")
+					}
 
-						if len(actionRow.Components) != 2 {
-							t.Errorf("Expected 2 buttons, got %d", len(actionRow.Components))
-							return nil, fmt.Errorf("test failed")
-						}
+					if len(actionRow.Components) != 2 {
+						t.Errorf("Expected 2 buttons, got %d", len(actionRow.Components))
+						return nil, fmt.Errorf("test failed")
+					}
 
-						// Previous button should be disabled, Next enabled
-						prevButton, ok := actionRow.Components[0].(discordgo.Button)
-						if !ok || !prevButton.Disabled {
-							t.Errorf("Expected disabled Previous button")
-							return nil, fmt.Errorf("test failed")
-						}
+					// Previous button should be disabled, Next enabled
+					prevButton, ok := actionRow.Components[0].(discordgo.Button)
+					if !ok || !prevButton.Disabled {
+						t.Errorf("Expected disabled Previous button")
+						return nil, fmt.Errorf("test failed")
+					}
 
-						nextButton, ok := actionRow.Components[1].(discordgo.Button)
-						if !ok || nextButton.Disabled {
-							t.Errorf("Expected enabled Next button")
-							return nil, fmt.Errorf("test failed")
-						}
+					nextButton, ok := actionRow.Components[1].(discordgo.Button)
+					if !ok || nextButton.Disabled {
+						t.Errorf("Expected enabled Next button")
+						return nil, fmt.Errorf("test failed")
+					}
 
-						return &discordgo.Message{
-							ID:         "test-message-id",
-							Embeds:     send.Embeds,
-							Components: send.Components,
-							Content:    "Test Message",
-						}, nil
-					}).
-					Times(1)
+					return &discordgo.Message{
+						ID:         "test-message-id",
+						Embeds:     send.Embeds,
+						Components: send.Components,
+						Content:    "Test Message",
+					}, nil
+				}
 			},
 			leaderboard:   createTestLeaderboard(15),
 			page:          1,
@@ -206,59 +196,56 @@ func Test_leaderboardUpdateManager_SendLeaderboardEmbed(t *testing.T) {
 		},
 		{
 			name: "Multi-page leaderboard (second page)",
-			setupMocks: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					ChannelMessageSendComplex(gomock.Eq(channelID), gomock.Any(), gomock.Any()).
-					DoAndReturn(func(channelID string, send *discordgo.MessageSend, options ...any) (*discordgo.Message, error) {
-						// Verify multi-page leaderboard message (second page)
-						embed := send.Embeds[0]
-						if embed.Description != "Page 2/2" {
-							t.Errorf("Unexpected description: got %s, want %s", embed.Description, "Page 2/2")
-						}
+			setupFake: func(t *testing.T, fakeSession *discord.FakeSession) {
+				fakeSession.ChannelMessageSendComplexFunc = func(chID string, send *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					// Verify multi-page leaderboard message (second page)
+					embed := send.Embeds[0]
+					if embed.Description != "Page 2/2" {
+						t.Errorf("Unexpected description: got %s, want %s", embed.Description, "Page 2/2")
+					}
 
-						// Should show exactly 1 field with 5 entries on second page
-						if len(embed.Fields) != 1 {
-							t.Errorf("Expected 1 field, got %d", len(embed.Fields))
-						}
+					// Should show exactly 1 field with 5 entries on second page
+					if len(embed.Fields) != 1 {
+						t.Errorf("Expected 1 field, got %d", len(embed.Fields))
+					}
 
-						// Check the Tags field contains entries 11-15
-						if embed.Fields[0].Name != "Tags" {
-							t.Errorf("Unexpected field name: got %s, want %s", embed.Fields[0].Name, "Tags")
-						}
+					// Check the Tags field contains entries 11-15
+					if embed.Fields[0].Name != "Tags" {
+						t.Errorf("Unexpected field name: got %s, want %s", embed.Fields[0].Name, "Tags")
+					}
 
-						// Should contain entries 11-15 with last place emoji for #15
-						expectedValue := "🏷️ **Tag #11 ** <@user11>\n🏷️ **Tag #12 ** <@user12>\n🏷️ **Tag #13 ** <@user13>\n🏷️ **Tag #14 ** <@user14>\n🗑️ **Tag #15 ** <@user15>\n"
-						if embed.Fields[0].Value != expectedValue {
-							t.Errorf("Unexpected field value: got %s, want %s", embed.Fields[0].Value, expectedValue)
-						}
+					// Should contain entries 11-15 with last place emoji for #15
+					expectedValue := "🏷️ **Tag #11 ** <@user11>\n🏷️ **Tag #12 ** <@user12>\n🏷️ **Tag #13 ** <@user13>\n🏷️ **Tag #14 ** <@user14>\n🗑️ **Tag #15 ** <@user15>\n"
+					if embed.Fields[0].Value != expectedValue {
+						t.Errorf("Unexpected field value: got %s, want %s", embed.Fields[0].Value, expectedValue)
+					}
 
-						// Previous button should be enabled, Next disabled
-						actionRow, ok := send.Components[0].(discordgo.ActionsRow)
-						if !ok {
-							t.Errorf("Expected ActionsRow, got %T", send.Components[0])
-							return nil, fmt.Errorf("test failed")
-						}
+					// Previous button should be enabled, Next disabled
+					actionRow, ok := send.Components[0].(discordgo.ActionsRow)
+					if !ok {
+						t.Errorf("Expected ActionsRow, got %T", send.Components[0])
+						return nil, fmt.Errorf("test failed")
+					}
 
-						prevButton, ok := actionRow.Components[0].(discordgo.Button)
-						if !ok || prevButton.Disabled {
-							t.Errorf("Expected enabled Previous button")
-							return nil, fmt.Errorf("test failed")
-						}
+					prevButton, ok := actionRow.Components[0].(discordgo.Button)
+					if !ok || prevButton.Disabled {
+						t.Errorf("Expected enabled Previous button")
+						return nil, fmt.Errorf("test failed")
+					}
 
-						nextButton, ok := actionRow.Components[1].(discordgo.Button)
-						if !ok || !nextButton.Disabled {
-							t.Errorf("Expected disabled Next button")
-							return nil, fmt.Errorf("test failed")
-						}
+					nextButton, ok := actionRow.Components[1].(discordgo.Button)
+					if !ok || !nextButton.Disabled {
+						t.Errorf("Expected disabled Next button")
+						return nil, fmt.Errorf("test failed")
+					}
 
-						return &discordgo.Message{
-							ID:         "test-message-id",
-							Embeds:     send.Embeds,
-							Components: send.Components,
-							Content:    "Test Message",
-						}, nil
-					}).
-					Times(1)
+					return &discordgo.Message{
+						ID:         "test-message-id",
+						Embeds:     send.Embeds,
+						Components: send.Components,
+						Content:    "Test Message",
+					}, nil
+				}
 			},
 			leaderboard:   createTestLeaderboard(15),
 			page:          2,
@@ -268,24 +255,21 @@ func Test_leaderboardUpdateManager_SendLeaderboardEmbed(t *testing.T) {
 		},
 		{
 			name: "Page out of range (too low)",
-			setupMocks: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					ChannelMessageSendComplex(gomock.Eq(channelID), gomock.Any(), gomock.Any()).
-					DoAndReturn(func(channelID string, send *discordgo.MessageSend, options ...any) (*discordgo.Message, error) {
-						// Should correct to page 1
-						embed := send.Embeds[0]
-						if embed.Description != "Page 1/2" {
-							t.Errorf("Unexpected description: got %s, want %s", embed.Description, "Page 1/2")
-						}
+			setupFake: func(t *testing.T, fakeSession *discord.FakeSession) {
+				fakeSession.ChannelMessageSendComplexFunc = func(chID string, send *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					// Should correct to page 1
+					embed := send.Embeds[0]
+					if embed.Description != "Page 1/2" {
+						t.Errorf("Unexpected description: got %s, want %s", embed.Description, "Page 1/2")
+					}
 
-						return &discordgo.Message{
-							ID:         "test-message-id",
-							Embeds:     send.Embeds,
-							Components: send.Components,
-							Content:    "Test Message",
-						}, nil
-					}).
-					Times(1)
+					return &discordgo.Message{
+						ID:         "test-message-id",
+						Embeds:     send.Embeds,
+						Components: send.Components,
+						Content:    "Test Message",
+					}, nil
+				}
 			},
 			leaderboard:   createTestLeaderboard(15),
 			page:          0, // Invalid page, should default to 1
@@ -295,24 +279,21 @@ func Test_leaderboardUpdateManager_SendLeaderboardEmbed(t *testing.T) {
 		},
 		{
 			name: "Page out of range (too high)",
-			setupMocks: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					ChannelMessageSendComplex(gomock.Eq(channelID), gomock.Any(), gomock.Any()).
-					DoAndReturn(func(channelID string, send *discordgo.MessageSend, options ...any) (*discordgo.Message, error) {
-						// Should correct to max page (2)
-						embed := send.Embeds[0]
-						if embed.Description != "Page 2/2" {
-							t.Errorf("Unexpected description: got %s, want %s", embed.Description, "Page 2/2")
-						}
+			setupFake: func(t *testing.T, fakeSession *discord.FakeSession) {
+				fakeSession.ChannelMessageSendComplexFunc = func(chID string, send *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					// Should correct to max page (2)
+					embed := send.Embeds[0]
+					if embed.Description != "Page 2/2" {
+						t.Errorf("Unexpected description: got %s, want %s", embed.Description, "Page 2/2")
+					}
 
-						return &discordgo.Message{
-							ID:         "test-message-id",
-							Embeds:     send.Embeds,
-							Components: send.Components,
-							Content:    "Test Message",
-						}, nil
-					}).
-					Times(1)
+					return &discordgo.Message{
+						ID:         "test-message-id",
+						Embeds:     send.Embeds,
+						Components: send.Components,
+						Content:    "Test Message",
+					}, nil
+				}
 			},
 			leaderboard:   createTestLeaderboard(15),
 			page:          10, // Invalid page, should default to max (2)
@@ -322,11 +303,10 @@ func Test_leaderboardUpdateManager_SendLeaderboardEmbed(t *testing.T) {
 		},
 		{
 			name: "Discord API error",
-			setupMocks: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					ChannelMessageSendComplex(gomock.Eq(channelID), gomock.Any()).
-					Return(nil, fmt.Errorf("discord API error")).
-					Times(1)
+			setupFake: func(t *testing.T, fakeSession *discord.FakeSession) {
+				fakeSession.ChannelMessageSendComplexFunc = func(chID string, send *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return nil, fmt.Errorf("discord API error")
+				}
 			},
 			leaderboard: createTestLeaderboard(5),
 			page:        1,
@@ -336,19 +316,16 @@ func Test_leaderboardUpdateManager_SendLeaderboardEmbed(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
-			mockSession := discordmocks.NewMockSession(ctrl)
+			fakeSession := discord.NewFakeSession()
 			mockLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-			if tt.setupMocks != nil {
-				tt.setupMocks(mockSession)
+			if tt.setupFake != nil {
+				tt.setupFake(t, fakeSession)
 			}
 
 			lum := &leaderboardUpdateManager{
 				logger:  mockLogger,
-				session: mockSession,
+				session: fakeSession,
 				operationWrapper: func(ctx context.Context, name string, fn func(ctx context.Context) (LeaderboardUpdateOperationResult, error)) (LeaderboardUpdateOperationResult, error) {
 					return fn(ctx)
 				},

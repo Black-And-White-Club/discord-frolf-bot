@@ -6,23 +6,22 @@ import (
 	"fmt"
 	"testing"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
-	storagemocks "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
-	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
-	util_mocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
 	"go.opentelemetry.io/otel/trace/noop"
-	"go.uber.org/mock/gomock"
 )
 
 func Test_roleManager_EditRoleUpdateResponse(t *testing.T) {
 	// Test cases updated to match implementation
+	fakeSession := &discord.FakeSession{}
+	fakeInteractionStore := &FakeISInterface[any]{}
+
 	tests := []struct {
 		name           string
-		setup          func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any])
+		setup          func()
 		ctx            context.Context
 		correlationID  string
 		content        string
@@ -31,27 +30,24 @@ func Test_roleManager_EditRoleUpdateResponse(t *testing.T) {
 	}{
 		{
 			name: "successful role update response edit",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
-				mockInteractionStore.EXPECT().
-					Get(gomock.Any(), "correlation-id").
-					Return(&discordgo.Interaction{ID: "interaction-id", Token: "test-token"}, nil).
-					Times(1)
-				mockSession.EXPECT().
-					InteractionResponseEdit(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(interaction *discordgo.Interaction, webhook *discordgo.WebhookEdit, options ...any) (*discordgo.Message, error) {
-						if interaction.ID != "interaction-id" {
-							return nil, fmt.Errorf("unexpected interaction ID: %s", interaction.ID)
-						}
-						if webhook.Content == nil || *webhook.Content != "Role updated successfully." {
-							return nil, fmt.Errorf("unexpected content: %v", webhook.Content)
-						}
-						return &discordgo.Message{}, nil
-					}).
-					Times(1)
-				// Expect the stored interaction to be deleted after successful edit
-				mockInteractionStore.EXPECT().
-					Delete(gomock.Any(), "correlation-id").
-					Times(1)
+			setup: func() {
+				fakeInteractionStore.GetFunc = func(ctx context.Context, key string) (any, error) {
+					if key == "correlation-id" {
+						return &discordgo.Interaction{ID: "interaction-id", Token: "test-token"}, nil
+					}
+					return nil, errors.New("not found")
+				}
+				fakeSession.InteractionResponseEditFunc = func(interaction *discordgo.Interaction, webhook *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					if interaction.ID != "interaction-id" {
+						return nil, fmt.Errorf("unexpected interaction ID: %s", interaction.ID)
+					}
+					if webhook.Content == nil || *webhook.Content != "Role updated successfully." {
+						return nil, fmt.Errorf("unexpected content: %v", webhook.Content)
+					}
+					return &discordgo.Message{}, nil
+				}
+				fakeInteractionStore.DeleteFunc = func(ctx context.Context, key string) {
+				}
 			},
 			ctx:            context.Background(),
 			correlationID:  "correlation-id",
@@ -61,60 +57,49 @@ func Test_roleManager_EditRoleUpdateResponse(t *testing.T) {
 		},
 		{
 			name: "failed to get interaction from store",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
-				mockInteractionStore.EXPECT().
-					Get(gomock.Any(), "correlation-id-not-found").
-					Return((*discordgo.Interaction)(nil), errors.New("item not found or expired")).
-					Times(1)
-				// No call to InteractionResponseEdit expected
-				mockSession.EXPECT().InteractionResponseEdit(gomock.Any(), gomock.Any()).Times(0)
+			setup: func() {
+				fakeInteractionStore.GetFunc = func(ctx context.Context, key string) (any, error) {
+					return nil, errors.New("item not found or expired")
+				}
 			},
 			ctx:            context.Background(),
 			correlationID:  "correlation-id-not-found",
 			content:        "Role updated successfully.",
-			wantErr:        false, // Changed from true because error is in result object now
+			wantErr:        false,
 			expectedResult: RoleOperationResult{Error: fmt.Errorf("interaction not found for correlation ID: correlation-id-not-found")},
 		},
 		{
 			name: "stored interaction is not of the expected type",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
-				mockInteractionStore.EXPECT().
-					Get(gomock.Any(), "correlation-id-wrong-type").
-					Return("not an interaction object", nil).
-					Times(1)
-				// No call to InteractionResponseEdit expected
-				mockSession.EXPECT().InteractionResponseEdit(gomock.Any(), gomock.Any()).Times(0)
+			setup: func() {
+				fakeInteractionStore.GetFunc = func(ctx context.Context, key string) (any, error) {
+					return "not an interaction object", nil
+				}
 			},
 			ctx:            context.Background(),
 			correlationID:  "correlation-id-wrong-type",
 			content:        "Role updated successfully.",
-			wantErr:        false, // Changed from true because error is in result object now
+			wantErr:        false,
 			expectedResult: RoleOperationResult{Error: fmt.Errorf("interaction is not of the expected type")},
 		},
 		{
 			name: "failed to edit interaction response",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
-				mockInteractionStore.EXPECT().
-					Get(gomock.Any(), "correlation-id-fail-edit").
-					Return(&discordgo.Interaction{ID: "interaction-id-fail", Token: "test-token"}, nil).
-					Times(1)
-				mockSession.EXPECT().
-					InteractionResponseEdit(gomock.Any(), gomock.Any()).
-					Return(nil, errors.New("discord API error")).
-					Times(1)
+			setup: func() {
+				fakeInteractionStore.GetFunc = func(ctx context.Context, key string) (any, error) {
+					return &discordgo.Interaction{ID: "interaction-id-fail", Token: "test-token"}, nil
+				}
+				fakeSession.InteractionResponseEditFunc = func(interaction *discordgo.Interaction, webhook *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return nil, errors.New("discord API error")
+				}
 			},
 			ctx:            context.Background(),
 			correlationID:  "correlation-id-fail-edit",
 			content:        "Role updated successfully.",
-			wantErr:        false, // Changed from true because error is in result object now
+			wantErr:        false,
 			expectedResult: RoleOperationResult{Error: fmt.Errorf("failed to send result: discord API error")},
 		},
 		{
 			name: "cancelled_context",
-			setup: func(mockSession *discordmocks.MockSession, mockInteractionStore *storagemocks.MockISInterface[any]) {
-				// No mocks expected as the context cancellation should prevent further calls
-				mockInteractionStore.EXPECT().Get(gomock.Any(), gomock.Any()).Times(0)
-				mockSession.EXPECT().InteractionResponseEdit(gomock.Any(), gomock.Any()).Times(0)
+			setup: func() {
 			},
 			ctx: func() context.Context {
 				ctx, cancel := context.WithCancel(context.Background())
@@ -123,7 +108,7 @@ func Test_roleManager_EditRoleUpdateResponse(t *testing.T) {
 			}(),
 			correlationID:  "correlation-id-cancel",
 			content:        "Role updated successfully.",
-			wantErr:        false, // Changed from true because error is in result object now
+			wantErr:        false,
 			expectedResult: RoleOperationResult{Error: context.Canceled},
 		},
 	}
@@ -131,28 +116,15 @@ func Test_roleManager_EditRoleUpdateResponse(t *testing.T) {
 	// Run test cases
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
-			// Create mocks within the test case scope
-			mockSession := discordmocks.NewMockSession(ctrl)
-			mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
-			mockLogger := loggerfrolfbot.NoOpLogger
-			mockConfig := &config.Config{}
-			mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
-			mockHelper := util_mocks.NewMockHelpers(ctrl)
-			tracerProvider := noop.NewTracerProvider()
-			tracer := tracerProvider.Tracer("test-tracer")
-
 			// Instantiate roleManager within the test case scope
 			rm := &roleManager{
-				session:          mockSession,
-				publisher:        mockPublisher,
-				logger:           mockLogger,
-				helper:           mockHelper,
-				config:           mockConfig,
-				interactionStore: mockInteractionStore,
-				tracer:           tracer,
+				session:          fakeSession,
+				publisher:        &FakeEventBus{},
+				logger:           loggerfrolfbot.NoOpLogger,
+				helper:           &FakeHelpers{},
+				config:           &config.Config{},
+				interactionStore: fakeInteractionStore,
+				tracer:           noop.NewTracerProvider().Tracer("test"),
 				operationWrapper: func(ctx context.Context, operationName string, fn func(ctx context.Context) (RoleOperationResult, error)) (RoleOperationResult, error) {
 					return fn(ctx)
 				},
@@ -160,7 +132,7 @@ func Test_roleManager_EditRoleUpdateResponse(t *testing.T) {
 
 			// Setup mocks specific to this test case
 			if tt.setup != nil {
-				tt.setup(mockSession, mockInteractionStore) // Pass mocks to setup func
+				tt.setup()
 			}
 
 			// Execute the method under test
@@ -194,10 +166,12 @@ func Test_roleManager_EditRoleUpdateResponse(t *testing.T) {
 }
 
 func Test_roleManager_AddRoleToUser(t *testing.T) {
+	fakeSession := &discord.FakeSession{}
+
 	// Test cases updated to match implementation
 	tests := []struct {
 		name           string
-		setup          func(mockSession *discordmocks.MockSession)
+		setup          func()
 		guildID        string
 		userID         sharedtypes.DiscordID
 		roleID         string
@@ -206,15 +180,13 @@ func Test_roleManager_AddRoleToUser(t *testing.T) {
 	}{
 		{
 			name: "successful role addition",
-			setup: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					GuildMemberRoleAdd("guild-1", "user-1", "role-1").
-					Return(nil).
-					Times(1)
-				mockSession.EXPECT().
-					GuildMember("guild-1", "user-1").
-					Return(&discordgo.Member{User: &discordgo.User{ID: "user-1"}, Roles: []string{"role-1", "other-role"}}, nil).
-					Times(1)
+			setup: func() {
+				fakeSession.GuildMemberRoleAddFunc = func(guildID, userID, roleID string, options ...discordgo.RequestOption) error {
+					return nil
+				}
+				fakeSession.GuildMemberFunc = func(guildID, userID string, options ...discordgo.RequestOption) (*discordgo.Member, error) {
+					return &discordgo.Member{User: &discordgo.User{ID: userID}, Roles: []string{"role-1", "other-role"}}, nil
+				}
 			},
 			guildID:        "guild-1",
 			userID:         sharedtypes.DiscordID("user-1"),
@@ -224,53 +196,47 @@ func Test_roleManager_AddRoleToUser(t *testing.T) {
 		},
 		{
 			name: "failed to add role - API error",
-			setup: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					GuildMemberRoleAdd("guild-2", "user-2", "role-2").
-					Return(errors.New("discord API error on add")).
-					Times(1)
-				mockSession.EXPECT().GuildMember(gomock.Any(), gomock.Any()).Times(0)
+			setup: func() {
+				fakeSession.GuildMemberRoleAddFunc = func(guildID, userID, roleID string, options ...discordgo.RequestOption) error {
+					return errors.New("discord API error on add")
+				}
 			},
 			guildID:        "guild-2",
 			userID:         sharedtypes.DiscordID("user-2"),
 			roleID:         "role-2",
-			wantErr:        false, // Changed from true because error is in result object now
+			wantErr:        false,
 			expectedResult: RoleOperationResult{Error: errors.New("discord API error on add")},
 		},
 		{
 			name: "failed to fetch member after adding role",
-			setup: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					GuildMemberRoleAdd("guild-3", "user-3", "role-3").
-					Return(nil).
-					Times(1)
-				mockSession.EXPECT().
-					GuildMember("guild-3", "user-3").
-					Return(nil, errors.New("discord API error on fetch")).
-					Times(1)
+			setup: func() {
+				fakeSession.GuildMemberRoleAddFunc = func(guildID, userID, roleID string, options ...discordgo.RequestOption) error {
+					return nil
+				}
+				fakeSession.GuildMemberFunc = func(guildID, userID string, options ...discordgo.RequestOption) (*discordgo.Member, error) {
+					return nil, errors.New("discord API error on fetch")
+				}
 			},
 			guildID:        "guild-3",
 			userID:         sharedtypes.DiscordID("user-3"),
 			roleID:         "role-3",
-			wantErr:        false, // Changed from true because error is in result object now
+			wantErr:        false,
 			expectedResult: RoleOperationResult{Error: errors.New("discord API error on fetch")},
 		},
 		{
 			name: "role check fails after adding role (role not found in member object)",
-			setup: func(mockSession *discordmocks.MockSession) {
-				mockSession.EXPECT().
-					GuildMemberRoleAdd("guild-4", "user-4", "role-4").
-					Return(nil).
-					Times(1)
-				mockSession.EXPECT().
-					GuildMember("guild-4", "user-4").
-					Return(&discordgo.Member{User: &discordgo.User{ID: "user-4"}, Roles: []string{"other-role"}}, nil).
-					Times(1)
+			setup: func() {
+				fakeSession.GuildMemberRoleAddFunc = func(guildID, userID, roleID string, options ...discordgo.RequestOption) error {
+					return nil
+				}
+				fakeSession.GuildMemberFunc = func(guildID, userID string, options ...discordgo.RequestOption) (*discordgo.Member, error) {
+					return &discordgo.Member{User: &discordgo.User{ID: userID}, Roles: []string{"other-role"}}, nil
+				}
 			},
 			guildID:        "guild-4",
 			userID:         sharedtypes.DiscordID("user-4"),
 			roleID:         "role-4",
-			wantErr:        false, // Changed from true because error is in result object now
+			wantErr:        false,
 			expectedResult: RoleOperationResult{Error: fmt.Errorf("role role-4 was not added to user user-4")},
 		},
 	}
@@ -278,28 +244,15 @@ func Test_roleManager_AddRoleToUser(t *testing.T) {
 	// Run test cases
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
-			// Create mocks within the test case scope
-			mockSession := discordmocks.NewMockSession(ctrl)
-			mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
-			mockLogger := loggerfrolfbot.NoOpLogger
-			mockConfig := &config.Config{}
-			mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
-			mockHelper := util_mocks.NewMockHelpers(ctrl)
-			tracerProvider := noop.NewTracerProvider()
-			tracer := tracerProvider.Tracer("test-tracer")
-
 			// Instantiate roleManager within the test case scope
 			rm := &roleManager{
-				session:          mockSession,
-				publisher:        mockPublisher,
-				logger:           mockLogger,
-				helper:           mockHelper,
-				config:           mockConfig,
-				interactionStore: mockInteractionStore,
-				tracer:           tracer,
+				session:          fakeSession,
+				publisher:        &FakeEventBus{},
+				logger:           loggerfrolfbot.NoOpLogger,
+				helper:           &FakeHelpers{},
+				config:           &config.Config{},
+				interactionStore: &FakeISInterface[any]{},
+				tracer:           noop.NewTracerProvider().Tracer("test"),
 				operationWrapper: func(ctx context.Context, operationName string, fn func(ctx context.Context) (RoleOperationResult, error)) (RoleOperationResult, error) {
 					return fn(ctx) // Ignore the wrapper for testing
 				},
@@ -307,7 +260,7 @@ func Test_roleManager_AddRoleToUser(t *testing.T) {
 
 			// Setup mocks specific to this test case
 			if tt.setup != nil {
-				tt.setup(mockSession)
+				tt.setup()
 			}
 
 			// Execute the method under test

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
@@ -15,7 +15,6 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 )
 
 func TestTransformRoundToFinalizedScorecard(t *testing.T) {
@@ -111,36 +110,24 @@ func TestTransformRoundToFinalizedScorecard(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
+			fakeSession := discord.NewFakeSession()
 
-			mockSession := discordmocks.NewMockSession(ctrl)
-
-			for id, name := range tt.mockUsers {
-				mockSession.EXPECT().
-					User(id).
-					Return(&discordgo.User{Username: name}, nil)
+			fakeSession.UserFunc = func(id string, options ...discordgo.RequestOption) (*discordgo.User, error) {
+				if name, ok := tt.mockUsers[id]; ok {
+					return &discordgo.User{Username: name}, nil
+				}
+				return nil, fmt.Errorf("user not found")
 			}
 
-			for id, nick := range tt.mockNicks {
-				mockSession.EXPECT().
-					GuildMember("guild-id", id).
-					Return(&discordgo.Member{Nick: nick}, nil)
+			fakeSession.GuildMemberFunc = func(guildID, id string, options ...discordgo.RequestOption) (*discordgo.Member, error) {
+				if nick, ok := tt.mockNicks[id]; ok {
+					return &discordgo.Member{Nick: nick}, nil
+				}
+				return nil, fmt.Errorf("member not found")
 			}
-
-			// Allow other User/GuildMember calls (e.g. missing users or members) to return errors
-			mockSession.EXPECT().
-				User(gomock.Any()).
-				AnyTimes().
-				Return(nil, fmt.Errorf("user not found"))
-
-			mockSession.EXPECT().
-				GuildMember(gomock.Any(), gomock.Any()).
-				AnyTimes().
-				Return(nil, fmt.Errorf("member not found"))
 
 			frm := &finalizeRoundManager{
-				session: mockSession,
+				session: fakeSession,
 				logger:  loggerfrolfbot.NoOpLogger,
 				config: &config.Config{
 					Discord: config.DiscordConfig{GuildID: "guild-id"},

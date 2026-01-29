@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	discordgo "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
@@ -13,17 +12,14 @@ import (
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"go.opentelemetry.io/otel"
-	"go.uber.org/mock/gomock"
 )
 
 // Minimal nil-safe construction test; should not invoke external calls.
 func TestNewRoundDiscord_ConstructsAndExposesManagers(t *testing.T) {
 	ctx := context.Background()
 
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	var session discordgo.Session = discordmocks.NewMockSession(ctrl)
+	// Use FakeSession instead of mock
+	session := discordgo.NewFakeSession()
 	var publisher eventbus.EventBus = nil
 	var helper utils.Helpers = nil
 	cfg := &config.Config{}

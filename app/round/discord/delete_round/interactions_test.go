@@ -6,28 +6,20 @@ import (
 	"strings"
 	"testing"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/testutils"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
-	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
-	discordroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
-	helpersmocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
-	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/bwmarrin/discordgo"
-	"github.com/google/uuid"
-	"go.uber.org/mock/gomock"
 )
 
 func Test_deleteRoundManager_HandleDeleteRoundButton(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
-	mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
-	mockHelper := helpersmocks.NewMockHelpers(ctrl)
-	mockConfig := &config.Config{}
+	fakeSession := discord.NewFakeSession()
+	fakePublisher := &testutils.FakeEventBus{}
+	fakeHelper := &testutils.FakeHelpers{}
+	fakeConfig := &config.Config{}
 	metrics := &discordmetrics.NoOpMetrics{}
 	logger := loggerfrolfbot.NoOpLogger
 
@@ -54,17 +46,6 @@ func Test_deleteRoundManager_HandleDeleteRoundButton(t *testing.T) {
 		}
 	}
 
-	// Helper function to create an expected backend round delete request payload
-	createExpectedPayload := func(roundID sharedtypes.RoundID) discordroundevents.RoundDeleteRequestDiscordPayloadV1 {
-		return discordroundevents.RoundDeleteRequestDiscordPayloadV1{
-			RoundID:   roundID,
-			UserID:    sharedtypes.DiscordID("user-456"),
-			ChannelID: "",
-			MessageID: "message-123",
-			GuildID:   "",
-		}
-	}
-
 	tests := []struct {
 		name  string
 		setup func()
@@ -79,29 +60,17 @@ func Test_deleteRoundManager_HandleDeleteRoundButton(t *testing.T) {
 		{
 			name: "successful delete request",
 			setup: func() {
-				// Mock InteractionRespond call
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					Return(nil).
-					Times(1)
+				fakeHelper.CreateResultMessageFunc = func(originalMsg *message.Message, payload interface{}, topic string) (*message.Message, error) {
+					return &message.Message{UUID: "msg-456"}, nil
+				}
 
-				roundUUID := uuid.MustParse("00000000-0000-0000-0000-0000000003b1") // Example UUID
-				expectedPayload := createExpectedPayload(sharedtypes.RoundID(roundUUID))
+				fakePublisher.PublishFunc = func(topic string, messages ...*message.Message) error {
+					return nil
+				}
 
-				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Eq(expectedPayload), gomock.Eq(discordroundevents.RoundDeleteRequestDiscordV1)).
-					Return(&message.Message{UUID: "msg-456"}, nil).
-					Times(1)
-
-				mockPublisher.EXPECT().
-					Publish(gomock.Eq(discordroundevents.RoundDeleteRequestDiscordV1), gomock.Any()).
-					Return(nil).
-					Times(1)
-
-				mockSession.EXPECT().
-					FollowupMessageCreate(gomock.Any(), gomock.Eq(true), gomock.Any()).
-					Return(&discordgo.Message{ID: "message-456"}, nil).
-					Times(1)
+				fakeSession.FollowupMessageCreateFunc = func(i *discordgo.Interaction, wait bool, data *discordgo.WebhookParams, opts ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{ID: "message-456"}, nil
+				}
 			},
 			args: struct {
 				ctx context.Context
@@ -116,7 +85,7 @@ func Test_deleteRoundManager_HandleDeleteRoundButton(t *testing.T) {
 		{
 			name: "invalid custom ID format",
 			setup: func() {
-				// No mock expectations for this test case
+				// No fake expectations for this test case
 			},
 			args: struct {
 				ctx context.Context
@@ -131,10 +100,9 @@ func Test_deleteRoundManager_HandleDeleteRoundButton(t *testing.T) {
 		{
 			name: "invalid round ID",
 			setup: func() {
-				mockSession.EXPECT().
-					FollowupMessageCreate(gomock.Any(), gomock.Eq(true), gomock.Any()).
-					Return(&discordgo.Message{ID: "message-456"}, nil).
-					Times(1)
+				fakeSession.FollowupMessageCreateFunc = func(i *discordgo.Interaction, wait bool, data *discordgo.WebhookParams, opts ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{ID: "message-456"}, nil
+				}
 			},
 			args: struct {
 				ctx context.Context
@@ -149,11 +117,10 @@ func Test_deleteRoundManager_HandleDeleteRoundButton(t *testing.T) {
 		{
 			name: "interaction respond error",
 			setup: func() {
-				// Mock InteractionRespond call with error
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					Return(errors.New("failed to respond to interaction")).
-					Times(1)
+				// Fake InteractionRespond call with error
+				fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return errors.New("failed to respond to interaction")
+				}
 			},
 			args: struct {
 				ctx context.Context
@@ -168,20 +135,17 @@ func Test_deleteRoundManager_HandleDeleteRoundButton(t *testing.T) {
 		{
 			name: "create result message error",
 			setup: func() {
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					Return(nil).
-					Times(1)
+				fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return nil
+				}
 
-				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(discordroundevents.RoundDeleteRequestDiscordV1)).
-					Return(nil, errors.New("failed to create result message")).
-					Times(1)
+				fakeHelper.CreateResultMessageFunc = func(originalMsg *message.Message, payload interface{}, topic string) (*message.Message, error) {
+					return nil, errors.New("failed to create result message")
+				}
 
-				mockSession.EXPECT().
-					FollowupMessageCreate(gomock.Any(), gomock.Eq(true), gomock.Any()).
-					Return(&discordgo.Message{ID: "message-456"}, nil).
-					Times(1)
+				fakeSession.FollowupMessageCreateFunc = func(i *discordgo.Interaction, wait bool, data *discordgo.WebhookParams, opts ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{ID: "message-456"}, nil
+				}
 			},
 			args: struct {
 				ctx context.Context
@@ -196,25 +160,21 @@ func Test_deleteRoundManager_HandleDeleteRoundButton(t *testing.T) {
 		{
 			name: "publish error",
 			setup: func() {
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					Return(nil).
-					Times(1)
+				fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return nil
+				}
 
-				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(discordroundevents.RoundDeleteRequestDiscordV1)).
-					Return(&message.Message{UUID: "msg-456"}, nil).
-					Times(1)
+				fakeHelper.CreateResultMessageFunc = func(originalMsg *message.Message, payload interface{}, topic string) (*message.Message, error) {
+					return &message.Message{UUID: "msg-456"}, nil
+				}
 
-				mockPublisher.EXPECT().
-					Publish(gomock.Eq(discordroundevents.RoundDeleteRequestDiscordV1), gomock.Any()).
-					Return(errors.New("failed to publish message")).
-					Times(1)
+				fakePublisher.PublishFunc = func(topic string, messages ...*message.Message) error {
+					return errors.New("failed to publish message")
+				}
 
-				mockSession.EXPECT().
-					FollowupMessageCreate(gomock.Any(), gomock.Eq(true), gomock.Any()).
-					Return(&discordgo.Message{ID: "message-456"}, nil).
-					Times(1)
+				fakeSession.FollowupMessageCreateFunc = func(i *discordgo.Interaction, wait bool, data *discordgo.WebhookParams, opts ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{ID: "message-456"}, nil
+				}
 			},
 			args: struct {
 				ctx context.Context
@@ -229,25 +189,21 @@ func Test_deleteRoundManager_HandleDeleteRoundButton(t *testing.T) {
 		{
 			name: "followup message error",
 			setup: func() {
-				mockSession.EXPECT().
-					InteractionRespond(gomock.Any(), gomock.Any()).
-					Return(nil).
-					Times(1)
+				fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return nil
+				}
 
-				mockHelper.EXPECT().
-					CreateResultMessage(gomock.Any(), gomock.Any(), gomock.Eq(discordroundevents.RoundDeleteRequestDiscordV1)).
-					Return(&message.Message{UUID: "msg-456"}, nil).
-					Times(1)
+				fakeHelper.CreateResultMessageFunc = func(originalMsg *message.Message, payload interface{}, topic string) (*message.Message, error) {
+					return &message.Message{UUID: "msg-456"}, nil
+				}
 
-				mockPublisher.EXPECT().
-					Publish(gomock.Eq(discordroundevents.RoundDeleteRequestDiscordV1), gomock.Any()).
-					Return(nil).
-					Times(1)
+				fakePublisher.PublishFunc = func(topic string, messages ...*message.Message) error {
+					return nil
+				}
 
-				mockSession.EXPECT().
-					FollowupMessageCreate(gomock.Any(), gomock.Eq(true), gomock.Any()).
-					Return(nil, errors.New("failed to send followup message")).
-					Times(1)
+				fakeSession.FollowupMessageCreateFunc = func(i *discordgo.Interaction, wait bool, data *discordgo.WebhookParams, opts ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return nil, errors.New("failed to send followup message")
+				}
 			},
 			args: struct {
 				ctx context.Context
@@ -268,11 +224,11 @@ func Test_deleteRoundManager_HandleDeleteRoundButton(t *testing.T) {
 			}
 
 			drm := &deleteRoundManager{
-				session:   mockSession,
-				publisher: mockPublisher,
+				session:   fakeSession,
+				publisher: fakePublisher,
 				logger:    logger,
-				helper:    mockHelper,
-				config:    mockConfig,
+				helper:    fakeHelper,
+				config:    fakeConfig,
 				operationWrapper: func(ctx context.Context, operationName string, operationFunc func(ctx context.Context) (DeleteRoundOperationResult, error)) (DeleteRoundOperationResult, error) {
 					return operationFunc(ctx)
 				},

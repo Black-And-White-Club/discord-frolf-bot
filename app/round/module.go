@@ -15,8 +15,8 @@ import (
 	scoreround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/score_round"
 	scorecardupload "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/scorecard_upload"
 	updateround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/update_round"
-	roundrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/round/watermill"
-	roundhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/round/watermill/handlers"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/round/handlers"
+	roundrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/round/router"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
@@ -74,7 +74,7 @@ func InitializeRoundModule(
 	scorecardupload.RegisterHandlers(interactionRegistry, messageRegistry, roundDiscord.GetScorecardUploadManager())
 
 	// Build Watermill Handlers
-	roundHandlers := roundhandlers.NewRoundHandlers(
+	roundHandlers := handlers.NewRoundHandlers(
 		logger,
 		cfg,
 		helper,
@@ -83,7 +83,7 @@ func InitializeRoundModule(
 	)
 
 	// Setup Watermill router
-	roundRouter := roundrouter.NewRoundRouter(
+	rr := roundrouter.NewRoundRouter(
 		logger,
 		router,
 		eventBus,
@@ -93,11 +93,11 @@ func InitializeRoundModule(
 		tracer,
 	)
 
-	if err := roundRouter.Configure(ctx, roundHandlers); err != nil {
+	if err := rr.Configure(ctx, roundHandlers); err != nil {
 		logger.ErrorContext(ctx, "Failed to configure round router", attr.Error(err))
 		return nil, fmt.Errorf("failed to configure round router: %w", err)
 	}
 
 	logger.InfoContext(ctx, "Round module initialized successfully")
-	return roundRouter, nil
+	return rr, nil
 }

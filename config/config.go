@@ -15,6 +15,7 @@ type Config struct {
 	Discord       DiscordConfig       `yaml:"discord"`
 	Service       ServiceConfig       `yaml:"service"`
 	Observability ObservabilityConfig `yaml:"observability"`
+	PWA           PWAConfig           `yaml:"pwa"`
 	DatabaseURL   string              `yaml:"database_url"` // PostgreSQL connection string
 
 	// Internal state management
@@ -60,6 +61,12 @@ type ObservabilityConfig struct {
 	OTLPEndpoint    string  `yaml:"otlp_endpoint"`
 	OTLPTransport   string  `yaml:"otlp_transport"`
 	OTLPLogsEnabled bool    `yaml:"otlp_logs_enabled"`
+}
+
+// PWAConfig holds PWA integration configuration
+type PWAConfig struct {
+	BaseURL        string `yaml:"base_url"`        // PWA frontend URL (for logging/display only)
+	RequestTimeout int    `yaml:"request_timeout"` // Timeout in seconds for magic link requests
 }
 
 // LoadConfigFromEnvironment loads configuration from environment variables only
@@ -120,6 +127,10 @@ func LoadConfigFromEnvironment() (*Config, error) {
 		}
 	}
 
+	// PWA config
+	cfg.PWA.BaseURL = getEnvOrDefault("PWA_BASE_URL", "https://pwa.frolf-bot.com")
+	cfg.PWA.RequestTimeout = getIntEnvOrDefault("PWA_REQUEST_TIMEOUT", 5)
+
 	// Role mappings from environment variables (JSON format)
 	// This could be extended to parse JSON if needed
 	cfg.Discord.RoleMappings = make(map[string]string)
@@ -157,6 +168,10 @@ func LoadBaseConfig() (*Config, error) {
 		NATS: NATSConfig{
 			URL: getEnvOrDefault("NATS_URL", "nats://localhost:4222"),
 		},
+		PWA: PWAConfig{
+			BaseURL:        getEnvOrDefault("PWA_BASE_URL", "https://pwa.frolf-bot.com"),
+			RequestTimeout: getIntEnvOrDefault("PWA_REQUEST_TIMEOUT", 5),
+		},
 	}
 
 	// Parse float for sample rate
@@ -182,6 +197,16 @@ func getEnvOrError(key string) string {
 func getEnvOrDefault(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
+	}
+	return defaultValue
+}
+
+// Helper function to get integer environment variable with default
+func getIntEnvOrDefault(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return intValue
+		}
 	}
 	return defaultValue
 }
@@ -296,6 +321,16 @@ func applyEnvironmentOverrides(cfg *Config) {
 	if sampleRate := os.Getenv("TEMPO_SAMPLE_RATE"); sampleRate != "" {
 		if rate, err := strconv.ParseFloat(sampleRate, 64); err == nil {
 			cfg.Observability.TempoSampleRate = rate
+		}
+	}
+
+	// PWA overrides
+	if pwaBaseURL := os.Getenv("PWA_BASE_URL"); pwaBaseURL != "" {
+		cfg.PWA.BaseURL = pwaBaseURL
+	}
+	if pwaTimeout := os.Getenv("PWA_REQUEST_TIMEOUT"); pwaTimeout != "" {
+		if timeout, err := strconv.Atoi(pwaTimeout); err == nil {
+			cfg.PWA.RequestTimeout = timeout
 		}
 	}
 }

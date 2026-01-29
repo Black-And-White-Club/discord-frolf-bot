@@ -6,11 +6,9 @@ import (
 	"testing"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/interactions"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
 	"github.com/bwmarrin/discordgo"
-	"go.uber.org/mock/gomock"
 )
 
 type fakeScorecardUploadManager struct {
@@ -56,9 +54,6 @@ func (a *testDiscordgoAdder) AddHandler(handler interface{}) func() {
 }
 
 func TestRegisterHandlers_wiresButtonModalAndMessageHandlers(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	t.Cleanup(ctrl.Finish)
-
 	registry := interactions.NewRegistry()
 	testHandler := loggerfrolfbot.NewTestHandler()
 	logger := slog.New(testHandler)
@@ -92,8 +87,8 @@ func TestRegisterHandlers_wiresButtonModalAndMessageHandlers(t *testing.T) {
 	}
 
 	// MessageCreate handler is wired through MessageRegistry.
-	wrapperSession := discordmocks.NewMockSession(ctrl)
-	wrapper := discord.Session(wrapperSession)
+	fakeSession := discord.NewFakeSession()
+	wrapper := discord.Session(fakeSession)
 
 	adder := &testDiscordgoAdder{}
 	messageRegistry.RegisterWithSession(adder, wrapper)

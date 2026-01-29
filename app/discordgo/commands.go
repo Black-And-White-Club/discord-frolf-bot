@@ -164,5 +164,14 @@ func RegisterCommands(s Session, logger *slog.Logger, guildID string) error {
 		return fmt.Errorf("failed to create '/set-udisc-name' command: %w", err)
 	}
 
+	err = createIfMissing(&discordgo.ApplicationCommand{
+		Name:        "dashboard",
+		Description: "Get a link to access the Frolf PWA dashboard",
+	})
+	if err != nil {
+		logger.Error("Failed to create '/dashboard' command", attr.Error(err))
+		return fmt.Errorf("failed to create '/dashboard' command: %w", err)
+	}
+
 	return nil
 }

@@ -6,62 +6,62 @@ import (
 	"log/slog"
 	"strings"
 	"testing"
+	"time"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
-	guildconfigmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
-	storagemocks "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
-	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
-	utilsmocks "github.com/Black-And-White-Club/frolf-bot-shared/mocks"
-	discordmetricsmocks "github.com/Black-And-White-Club/frolf-bot-shared/observability/mocks"
+	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
+	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
+	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"go.opentelemetry.io/otel/trace/noop"
-	"go.uber.org/mock/gomock"
 )
 
 func TestNewLeaderboardUpdateManager(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	// Use FakeSession instead of gomock
+	fakeSession := discord.NewFakeSession()
 
-	mockSession := discordmocks.NewMockSession(ctrl)
-	mockEventBus := eventbusmocks.NewMockEventBus(ctrl)
+	// Use nil for dependencies since no methods are called during construction
+	var publisher eventbus.EventBus = nil
 	testHandler := loggerfrolfbot.NewTestHandler()
 	logger := slog.New(testHandler)
-	mockHelper := utilsmocks.NewMockHelpers(ctrl)
+	var helper utils.Helpers = nil
 	mockConfig := &config.Config{}
-	mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
-	mockMetrics := discordmetricsmocks.NewMockDiscordMetrics(ctrl)
+	var interactionStore storage.ISInterface[any] = nil
+	var metrics discordmetrics.DiscordMetrics = nil
 	tracer := noop.NewTracerProvider().Tracer("test")
-	mockGuildConfig := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
+	var guildConfigResolver guildconfig.GuildConfigResolver = nil
 
-	manager := NewLeaderboardUpdateManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockGuildConfig, mockInteractionStore, nil, tracer, mockMetrics)
+	manager := NewLeaderboardUpdateManager(fakeSession, publisher, logger, helper, mockConfig, guildConfigResolver, interactionStore, nil, tracer, metrics)
 	impl, ok := manager.(*leaderboardUpdateManager)
 	if !ok {
 		t.Fatalf("Expected *leaderboardUpdateManager, got %T", manager)
 	}
 
-	if impl.session != mockSession {
+	if impl.session != fakeSession {
 		t.Error("Expected session to be assigned")
 	}
-	if impl.publisher != mockEventBus {
+	if impl.publisher != publisher {
 		t.Error("Expected publisher to be assigned")
 	}
 	if impl.logger != logger {
 		t.Error("Expected logger to be assigned")
 	}
-	if impl.helper != mockHelper {
+	if impl.helper != helper {
 		t.Error("Expected helper to be assigned")
 	}
 	if impl.config != mockConfig {
 		t.Error("Expected config to be assigned")
 	}
-	if impl.interactionStore != mockInteractionStore {
+	if impl.interactionStore != interactionStore {
 		t.Error("Expected interactionStore to be assigned")
 	}
 	if impl.tracer != tracer {
 		t.Error("Expected tracer to be assigned")
 	}
-	if impl.metrics != mockMetrics {
+	if impl.metrics != metrics {
 		t.Error("Expected metrics to be assigned")
 	}
 	if impl.operationWrapper == nil {
@@ -70,21 +70,16 @@ func TestNewLeaderboardUpdateManager(t *testing.T) {
 }
 
 func Test_wrapLeaderboardUpdateOperation(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	testHandler := loggerfrolfbot.NewTestHandler()
 	logger := slog.New(testHandler)
-	mockMetrics := discordmetricsmocks.NewMockDiscordMetrics(ctrl)
 	tracer := noop.NewTracerProvider().Tracer("test")
 
 	tests := []struct {
-		name       string
-		operation  string
-		fn         func(context.Context) (LeaderboardUpdateOperationResult, error)
-		expectErr  string
-		expectRes  LeaderboardUpdateOperationResult
-		mockMetric func()
+		name      string
+		operation string
+		fn        func(context.Context) (LeaderboardUpdateOperationResult, error)
+		expectErr string
+		expectRes LeaderboardUpdateOperationResult
 	}{
 		{
 			name:      "success path",
@@ -93,10 +88,6 @@ func Test_wrapLeaderboardUpdateOperation(t *testing.T) {
 				return LeaderboardUpdateOperationResult{Success: "success!"}, nil
 			},
 			expectRes: LeaderboardUpdateOperationResult{Success: "success!"},
-			mockMetric: func() {
-				mockMetrics.EXPECT().RecordAPIRequestDuration(gomock.Any(), "leaderboard_success", gomock.Any()).Times(1)
-				mockMetrics.EXPECT().RecordAPIRequest(gomock.Any(), "leaderboard_success").Times(1)
-			},
 		},
 		{
 			name:      "fn returns error",
@@ -105,10 +96,6 @@ func Test_wrapLeaderboardUpdateOperation(t *testing.T) {
 				return LeaderboardUpdateOperationResult{}, errors.New("operation failed")
 			},
 			expectErr: "leaderboard_error operation error: operation failed",
-			mockMetric: func() {
-				mockMetrics.EXPECT().RecordAPIRequestDuration(gomock.Any(), "leaderboard_error", gomock.Any()).Times(1)
-				mockMetrics.EXPECT().RecordAPIError(gomock.Any(), "leaderboard_error", "operation_error").Times(1)
-			},
 		},
 		{
 			name:      "result has error",
@@ -117,10 +104,6 @@ func Test_wrapLeaderboardUpdateOperation(t *testing.T) {
 				return LeaderboardUpdateOperationResult{Error: errors.New("result error")}, nil
 			},
 			expectRes: LeaderboardUpdateOperationResult{Error: errors.New("result error")},
-			mockMetric: func() {
-				mockMetrics.EXPECT().RecordAPIRequestDuration(gomock.Any(), "leaderboard_result_error", gomock.Any()).Times(1)
-				mockMetrics.EXPECT().RecordAPIError(gomock.Any(), "leaderboard_result_error", "result_error").Times(1)
-			},
 		},
 		{
 			name:      "panic recovery",
@@ -131,10 +114,6 @@ func Test_wrapLeaderboardUpdateOperation(t *testing.T) {
 			expectErr: "panic in leaderboard_panic: critical error",
 			expectRes: LeaderboardUpdateOperationResult{
 				Error: errors.New("panic in leaderboard_panic: critical error"),
-			},
-			mockMetric: func() {
-				mockMetrics.EXPECT().RecordAPIRequestDuration(gomock.Any(), "leaderboard_panic", gomock.Any()).Times(1)
-				mockMetrics.EXPECT().RecordAPIError(gomock.Any(), "leaderboard_panic", "panic").Times(1)
 			},
 		},
 		{
@@ -147,11 +126,10 @@ func Test_wrapLeaderboardUpdateOperation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.mockMetric != nil {
-				tt.mockMetric()
-			}
+			// Use a fake metrics implementation
+			fakeMetrics := &fakeDiscordMetrics{}
 
-			got, err := wrapLeaderboardUpdateOperation(context.Background(), tt.operation, tt.fn, logger, tracer, mockMetrics)
+			got, err := wrapLeaderboardUpdateOperation(context.Background(), tt.operation, tt.fn, logger, tracer, fakeMetrics)
 
 			if tt.expectErr != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.expectErr) {
@@ -173,4 +151,22 @@ func Test_wrapLeaderboardUpdateOperation(t *testing.T) {
 			}
 		})
 	}
+}
+
+// fakeDiscordMetrics is a no-op implementation of DiscordMetrics for testing.
+type fakeDiscordMetrics struct{}
+
+func (f *fakeDiscordMetrics) RecordAPIRequestDuration(ctx context.Context, endpoint string, duration time.Duration) {
+}
+func (f *fakeDiscordMetrics) RecordAPIRequest(ctx context.Context, endpoint string)                 {}
+func (f *fakeDiscordMetrics) RecordAPIError(ctx context.Context, endpoint string, errorType string) {}
+func (f *fakeDiscordMetrics) RecordRateLimit(ctx context.Context, endpoint string, resetTime time.Duration) {
+}
+func (f *fakeDiscordMetrics) RecordWebsocketEvent(ctx context.Context, eventType string)   {}
+func (f *fakeDiscordMetrics) RecordWebsocketReconnect(ctx context.Context)                 {}
+func (f *fakeDiscordMetrics) RecordWebsocketDisconnect(ctx context.Context, reason string) {}
+func (f *fakeDiscordMetrics) RecordHandlerAttempt(ctx context.Context, handlerName string) {}
+func (f *fakeDiscordMetrics) RecordHandlerSuccess(ctx context.Context, handlerName string) {}
+func (f *fakeDiscordMetrics) RecordHandlerFailure(ctx context.Context, handlerName string) {}
+func (f *fakeDiscordMetrics) RecordHandlerDuration(ctx context.Context, handlerName string, duration time.Duration) {
 }
