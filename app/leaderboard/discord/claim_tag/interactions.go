@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/discordutils"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/utils"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
@@ -21,6 +22,9 @@ func (ctm *claimTagManager) HandleClaimTagCommand(ctx context.Context, i *discor
 
 	ctm.logger.InfoContext(ctx, "Handling claim tag command",
 		attr.UserID(sharedtypes.DiscordID(i.Member.User.ID)))
+
+	// Publish user profile asynchronously
+	go utils.PublishUserProfile(context.WithoutCancel(ctx), ctm.eventBus, ctm.logger, i.Member.User, i.Member, i.GuildID)
 
 	// Fetch per-guild config using guildConfigResolver
 	_, err := ctm.guildConfigResolver.GetGuildConfigWithContext(ctx, i.GuildID)

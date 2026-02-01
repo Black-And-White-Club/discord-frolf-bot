@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/discordutils"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/utils"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
@@ -17,6 +18,9 @@ func (crm *createRoundManager) HandleCreateRoundCommand(ctx context.Context, i *
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.UserIDKey, i.Member.User.ID)
 
 	crm.logger.InfoContext(ctx, "Handling create round command", attr.UserID(sharedtypes.DiscordID(i.Member.User.ID)))
+
+	// Publish user profile asynchronously
+	go utils.PublishUserProfile(context.WithoutCancel(ctx), crm.publisher, crm.logger, i.Member.User, i.Member, i.GuildID)
 
 	return crm.operationWrapper(ctx, "handle_create_round_command", func(ctx context.Context) (CreateRoundOperationResult, error) {
 		result, err := crm.SendCreateRoundModal(ctx, i)

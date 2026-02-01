@@ -1,7 +1,7 @@
 .PHONY: test-all test-verbose test-with-summary test-quick test-silent test-json test-module
 .PHONY: test-count coverage-all coverage-html clean-coverage
 .PHONY: build-coverage build-version run setup clean-all help
-.PHONY: mocks-user mocks-leaderboard mocks-round mocks-score mocks-all generate-mocks
+
 
 # --- Discord Bot Specific Targets ---
 run:
@@ -177,102 +177,7 @@ clean-all: clean-coverage
 	-rm -rf ./tmp/*
 	-rm -rf ./bin/*
 
-# --- Mock Generation Targets ---
-# --- Mock Generation Targets ---
-MOCKGEN := mockgen
-USER_DIR := ./app/user
-ROUND_DIR := ./app/round
-LB_DIR := ./app/leaderboard
-SCORE_DIR := ./app/score
-GUILD_DIR := ./app/guild
 
-# Generate mocks for the discordgo interfaces
-generate-mocks:
-	$(MOCKGEN) -source=./app/discordgo/discord.go -destination=./app/discordgo/mocks/mock_discord.go -package=discordmocks
-	$(MOCKGEN) -source=./app/discordgo/operations.go -destination=./app/discordgo/mocks/mock_discord_operations.go -package=discordmocks
-	$(MOCKGEN) -source=./app/shared/storage/storage.go -destination=./app/shared/storage/mocks/mock_storage.go -package=storagemocks
-
-# Mocks for User Domain
-mocks-user: mocks-user-discord mocks-user-handlers mocks-user-role-manager mocks-user-signup-manager
-mocks-round: mocks-create-round-manager mocks-round-rsvp-manager mocks-round-discord mocks-round-reminder-manager mocks-start-round-manager mocks-score-round-manager mocks-finalize-round-manager mocks-delete-round-manager mocks-update-round-manager mocks-tag-update-manager mocks-round-handlers
-mocks-leaderboard: mocks-leaderboard-discord mocks-leaderboard-update-manager mocks-leaderboard-tag-claim mocks-leaderboard-handlers
-mocks-score: mocks-score-handlers mocks-score-discord
-mocks-guild: mocks-guild-discord mocks-guild-handlers mocks-guild-setup-manager mocks-guild-reset mocks-guildconfig
-
-mocks-user-discord:
-	$(MOCKGEN) -source=$(USER_DIR)/discord/discord.go -destination=$(USER_DIR)/mocks/mock_user_discord.go -package=mocks
-mocks-user-handlers:
-	$(MOCKGEN) -source=$(USER_DIR)/watermill/handlers/handlers.go -destination=$(USER_DIR)/mocks/mock_handlers.go -package=mocks
-mocks-user-role-manager:
-	$(MOCKGEN) -source=$(USER_DIR)/discord/role/role.go -destination=$(USER_DIR)/mocks/mock_role_manager.go -package=mocks
-mocks-user-signup-manager:
-	$(MOCKGEN) -source=$(USER_DIR)/discord/signup/signup.go -destination=$(USER_DIR)/mocks/mock_signup_manager.go -package=mocks
-
-# Mocks for Round Domain
-mocks-round-discord:
-	$(MOCKGEN) -source=$(ROUND_DIR)/discord/discord.go -destination=$(ROUND_DIR)/mocks/mock_round_discord.go -package=mocks
-mocks-create-round-manager:
-	$(MOCKGEN) -source=$(ROUND_DIR)/discord/create_round/create_round.go -destination=$(ROUND_DIR)/mocks/mock_create_round_manager.go -package=mocks
-mocks-round-rsvp-manager:
-	$(MOCKGEN) -source=$(ROUND_DIR)/discord/round_rsvp/round_rsvp.go -destination=$(ROUND_DIR)/mocks/mock_round_rsvp_manager.go -package=mocks
-mocks-round-reminder-manager:
-	$(MOCKGEN) -source=$(ROUND_DIR)/discord/round_reminder/round_reminder.go -destination=$(ROUND_DIR)/mocks/mock_round_reminder_manager.go -package=mocks
-mocks-start-round-manager:
-	$(MOCKGEN) -source=$(ROUND_DIR)/discord/start_round/start_round.go -destination=$(ROUND_DIR)/mocks/mock_start_round_manager.go -package=mocks
-mocks-score-round-manager:
-	$(MOCKGEN) -source=$(ROUND_DIR)/discord/score_round/score_round.go -destination=$(ROUND_DIR)/mocks/mock_score_round_manager.go -package=mocks
-mocks-finalize-round-manager:
-	$(MOCKGEN) -source=$(ROUND_DIR)/discord/finalize_round/finalize_round.go -destination=$(ROUND_DIR)/mocks/mock_finalize_round_manager.go -package=mocks
-mocks-delete-round-manager:
-	$(MOCKGEN) -source=$(ROUND_DIR)/discord/delete_round/delete_round.go -destination=$(ROUND_DIR)/mocks/mock_delete_round_manager.go -package=mocks
-mocks-update-round-manager:
-	$(MOCKGEN) -source=$(ROUND_DIR)/discord/update_round/update_round.go -destination=$(ROUND_DIR)/mocks/mock_update_round_manager.go -package=mocks
-mocks-tag-update-manager:
-	$(MOCKGEN) -source=$(ROUND_DIR)/discord/tag_updates/tag_updates.go -destination=$(ROUND_DIR)/mocks/mock_tag_update_manager.go -package=mocks
-
-# Mock the round watermill handlers (consistent with other modules)
-mocks-round-handlers:
-	$(MOCKGEN) -source=$(ROUND_DIR)/watermill/handlers/handlers.go -destination=$(ROUND_DIR)/mocks/mock_handlers.go -package=mocks
-
-# Mocks for Leaderboard Domain
-mocks-leaderboard-discord:
-	$(MOCKGEN) -source=$(LB_DIR)/discord/discord.go -destination=$(LB_DIR)/mocks/mock_leaderboard_discord.go -package=mocks
-mocks-leaderboard-update-manager:
-	$(MOCKGEN) -source=$(LB_DIR)/discord/leaderboard_updated/leaderboard_updated.go -destination=$(LB_DIR)/mocks/mock_leaderboard_updated_manager.go -package=mocks
-mocks-leaderboard-tag-claim:
-	$(MOCKGEN) -source=$(LB_DIR)/discord/claim_tag/claim_tag.go -destination=$(LB_DIR)/mocks/mock_claim_tag.go -package=mocks
-
-# Mocks for Leaderboard handlers (watermill)
-mocks-leaderboard-handlers:
-	$(MOCKGEN) -source=$(LB_DIR)/watermill/handlers/handlers.go -destination=$(LB_DIR)/mocks/mock_handlers.go -package=mocks
-
-# Mocks for Score Domain  
-mocks-score-handlers:
-	$(MOCKGEN) -source=$(SCORE_DIR)/watermill/handlers/handlers.go -destination=$(SCORE_DIR)/mocks/mock_handlers.go -package=mocks
-
-# Mocks for Score Discord interfaces
-mocks-score-discord:
-	$(MOCKGEN) -source=$(SCORE_DIR)/watermill/handlers/handlers.go -destination=$(SCORE_DIR)/mocks/handlers.go -package=mocks
-
-# Mocks for GuildConfig Resolver (caching interface)
-mocks-guildconfig:
-	$(MOCKGEN) -source=./app/guildconfig/interface.go -destination=./app/guildconfig/mocks/mock_guildconfig_resolver.go -package=mocks
-
-# Mocks for Guild Domain (aggregate)
-mocks-guild: mocks-guild-discord mocks-guild-handlers mocks-guild-setup-manager mocks-guildconfig mocks-guild-reset
-mocks-guild-discord:
-	$(MOCKGEN) -source=$(GUILD_DIR)/discord/discord.go -destination=$(GUILD_DIR)/mocks/mock_guild_discord.go -package=mocks
-mocks-guild-handlers:
-	$(MOCKGEN) -source=$(GUILD_DIR)/watermill/handlers/interface.go -destination=$(GUILD_DIR)/mocks/mock_guild_handlers.go -package=mocks
-mocks-guild-setup-manager:
-	$(MOCKGEN) -source=$(GUILD_DIR)/discord/setup/setup_config_manager.go -destination=$(GUILD_DIR)/mocks/mock_setup_manager.go -package=mocks
-
-# Mocks for Guild Reset Manager (delete resources, reset flow)
-mocks-guild-reset:
-	$(MOCKGEN) -source=$(GUILD_DIR)/discord/reset/reset.go -destination=$(GUILD_DIR)/mocks/mock_reset_manager.go -package=mocks
-
-
-mocks-all: mocks-user mocks-round mocks-leaderboard mocks-guild generate-mocks mocks-score-discord
 
 # --- Build Targets ---
 build_version_ldflags := -X 'main.Version=$(shell git describe --tags --always)'
@@ -303,15 +208,7 @@ help:
 	@echo "  coverage-all          - Run tests with coverage"
 	@echo "  coverage-html         - Generate HTML coverage report"
 	@echo ""
-	@echo "Mocks:"
-	@echo "  mocks-all             - Generate all mocks"
-	@echo "  mocks-user            - Generate user domain mocks"
-	@echo "  mocks-round           - Generate round domain mocks"
-	@echo "  mocks-leaderboard     - Generate leaderboard domain mocks"
-	@echo "  mocks-score           - Generate score domain mocks"
-	@echo "  mocks-guild           - Generate guild domain mocks"
-	@echo "  generate-mocks        - Generate core interface mocks"
-	@echo ""
+
 	@echo "Development:"
 	@echo "  build-version         - Build with version info"
 	@echo "  clean-all             - Clean all generated files"

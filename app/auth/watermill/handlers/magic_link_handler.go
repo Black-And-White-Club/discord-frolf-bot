@@ -113,8 +113,22 @@ func (h *AuthHandlers) sendMagicLinkDM(ctx context.Context, userID, guildID, url
 		},
 	}
 
+	// Create the button component
+	components := []discordgo.MessageComponent{
+		discordgo.ActionsRow{
+			Components: []discordgo.MessageComponent{
+				discordgo.Button{
+					Label: "Open Dashboard",
+					Style: discordgo.LinkButton,
+					URL:   url,
+				},
+			},
+		},
+	}
+
 	_, err = h.session.ChannelMessageSendComplex(channel.ID, &discordgo.MessageSend{
-		Embeds: []*discordgo.MessageEmbed{embed},
+		Embeds:     []*discordgo.MessageEmbed{embed},
+		Components: components,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to send DM: %w", err)
@@ -124,6 +138,19 @@ func (h *AuthHandlers) sendMagicLinkDM(ctx context.Context, userID, guildID, url
 }
 
 func (h *AuthHandlers) sendMagicLinkFollowup(interaction *discordgo.Interaction, url string) error {
+	// Create the button component
+	components := []discordgo.MessageComponent{
+		discordgo.ActionsRow{
+			Components: []discordgo.MessageComponent{
+				discordgo.Button{
+					Label: "Open Dashboard",
+					Style: discordgo.LinkButton,
+					URL:   url,
+				},
+			},
+		},
+	}
+
 	_, err := h.session.FollowupMessageCreate(interaction, true, &discordgo.WebhookParams{
 		Flags: discordgo.MessageFlagsEphemeral,
 		Embeds: []*discordgo.MessageEmbed{
@@ -142,6 +169,7 @@ func (h *AuthHandlers) sendMagicLinkFollowup(interaction *discordgo.Interaction,
 				},
 			},
 		},
+		Components: components,
 	})
 	return err
 }

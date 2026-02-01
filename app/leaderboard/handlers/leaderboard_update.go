@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"sort"
 
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
@@ -120,6 +121,35 @@ func (h *LeaderboardHandlers) HandleBatchTagAssigned(ctx context.Context,
 		attr.String("guild_id", guildID),
 		attr.String("channel_id", channelID),
 	)
+
+	// Retrieve correlation ID from context to update the original interaction
+	var correlationID string
+	if val := ctx.Value("correlation_id"); val != nil {
+		if corr, ok := val.(string); ok {
+			correlationID = corr
+		}
+	}
+
+	// Update the interaction if this was initiated by a user command
+	if correlationID != "" {
+		successMessage := fmt.Sprintf("✅ Successfully assigned %d tags!", batchPayload.AssignmentCount)
+		// We use fmt to maximize compatibility since we need to import fmt
+		if h.service != nil {
+			claimTagManager := h.service.GetClaimTagManager()
+			if claimTagManager != nil {
+				res, err := claimTagManager.UpdateInteractionResponse(ctx, correlationID, successMessage)
+				if err != nil {
+					h.logger.ErrorContext(ctx, "Failed to update Discord interaction for batch success",
+						attr.String("correlation_id", correlationID),
+						attr.Error(err))
+				} else {
+					h.logger.InfoContext(ctx, "Successfully updated Discord interaction for batch success",
+						attr.String("correlation_id", correlationID),
+						attr.String("result", fmt.Sprintf("%v", res.Success)))
+				}
+			}
+		}
+	}
 
 	// We don't return a trace event here because returning a Result causes
 	// Watermill to attempt to publish it. If no consumer/stream exists for

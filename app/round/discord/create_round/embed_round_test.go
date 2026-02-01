@@ -3,6 +3,7 @@ package createround
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -98,6 +99,7 @@ func Test_createRoundManager_SendRoundEventEmbed(t *testing.T) {
 				operationWrapper: func(ctx context.Context, name string, fn func(context.Context) (CreateRoundOperationResult, error)) (CreateRoundOperationResult, error) {
 					return fn(ctx)
 				},
+				logger: slog.Default(),
 			}
 
 			result, err := manager.SendRoundEventEmbed(
