@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/utils"
 	discordroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	"github.com/google/uuid"
 
@@ -57,6 +58,9 @@ func (rrm *roundRsvpManager) HandleRoundResponse(ctx context.Context, i *discord
 		} else {
 			return RoundRsvpOperationResult{Error: fmt.Errorf("unable to determine user from interaction")}, nil
 		}
+
+		// Publish user profile asynchronously
+		go utils.PublishUserProfile(context.WithoutCancel(ctx), rrm.publisher, rrm.logger, user, i.Member, i.GuildID)
 
 		customID := i.MessageComponentData().CustomID
 		parts := strings.Split(customID, "|")
@@ -170,6 +174,9 @@ func (rrm *roundRsvpManager) InteractionJoinRoundLate(ctx context.Context, i *di
 		} else {
 			return RoundRsvpOperationResult{Error: fmt.Errorf("unable to determine user from interaction")}, nil
 		}
+
+		// Publish user profile asynchronously
+		go utils.PublishUserProfile(context.WithoutCancel(ctx), rrm.publisher, rrm.logger, user, i.Member, i.GuildID)
 
 		customID := i.MessageComponentData().CustomID
 		parts := strings.Split(customID, "|")

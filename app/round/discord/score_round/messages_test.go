@@ -6,19 +6,15 @@ import (
 	"fmt"
 	"testing"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
-	"go.uber.org/mock/gomock"
 )
 
 func Test_scoreRoundManager_SendScoreUpdateConfirmation(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
+	fakeSession := discord.NewFakeSession()
 	mockLogger := loggerfrolfbot.NoOpLogger
 	mockConfig := &config.Config{}
 
@@ -37,18 +33,17 @@ func Test_scoreRoundManager_SendScoreUpdateConfirmation(t *testing.T) {
 		{
 			name: "successfully sends score update confirmation",
 			setup: func() {
-				score := sharedtypes.Score(42)
-				expectedMsg := fmt.Sprintf("<@%s> Your score of %d has been recorded!", "user-123", score)
-
-				mockSession.EXPECT().ChannelMessageSendComplex(
-					gomock.Eq("channel-123"),
-					gomock.Eq(&discordgo.MessageSend{
-						Content: expectedMsg,
-						AllowedMentions: &discordgo.MessageAllowedMentions{
-							Users: []string{"user-123"},
-						},
-					}),
-				).Return(&discordgo.Message{}, nil).Times(1)
+				fakeSession.ChannelMessageSendComplexFunc = func(channelID string, data *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					score := sharedtypes.Score(42)
+					expectedMsg := fmt.Sprintf("<@%s> Your score of %d has been recorded!", "user-123", score)
+					if channelID != "channel-123" {
+						t.Errorf("expected channel-123, got %s", channelID)
+					}
+					if data.Content != expectedMsg {
+						t.Errorf("expected content %q, got %q", expectedMsg, data.Content)
+					}
+					return &discordgo.Message{}, nil
+				}
 			},
 			args: args{
 				channelID: "channel-123",
@@ -60,18 +55,9 @@ func Test_scoreRoundManager_SendScoreUpdateConfirmation(t *testing.T) {
 		{
 			name: "handles error when sending message fails",
 			setup: func() {
-				score := sharedtypes.Score(75)
-				expectedMsg := fmt.Sprintf("<@%s> Your score of %d has been recorded!", "user-456", score)
-
-				mockSession.EXPECT().ChannelMessageSendComplex(
-					gomock.Eq("channel-456"),
-					gomock.Eq(&discordgo.MessageSend{
-						Content: expectedMsg,
-						AllowedMentions: &discordgo.MessageAllowedMentions{
-							Users: []string{"user-456"},
-						},
-					}),
-				).Return(nil, errors.New("discord api error")).Times(1)
+				fakeSession.ChannelMessageSendComplexFunc = func(channelID string, data *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return nil, errors.New("discord api error")
+				}
 			},
 			args: args{
 				channelID: "channel-456",
@@ -89,7 +75,7 @@ func Test_scoreRoundManager_SendScoreUpdateConfirmation(t *testing.T) {
 			}
 
 			srm := &scoreRoundManager{
-				session: mockSession,
+				session: fakeSession,
 				logger:  mockLogger,
 				config:  mockConfig,
 			}
@@ -108,10 +94,7 @@ func Test_scoreRoundManager_SendScoreUpdateConfirmation(t *testing.T) {
 }
 
 func Test_scoreRoundManager_SendScoreUpdateError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
+	fakeSession := discord.NewFakeSession()
 	mockLogger := loggerfrolfbot.NoOpLogger
 	mockConfig := &config.Config{}
 
@@ -129,17 +112,23 @@ func Test_scoreRoundManager_SendScoreUpdateError(t *testing.T) {
 		{
 			name: "successfully sends error message in DM",
 			setup: func() {
-				expectedMsg := "We encountered an error updating your score: Invalid score format"
+				fakeSession.UserChannelCreateFunc = func(recipientID string, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+					if recipientID != "user-123" {
+						t.Errorf("expected recipient user-123, got %s", recipientID)
+					}
+					return &discordgo.Channel{ID: "dm-channel-123"}, nil
+				}
 
-				mockSession.EXPECT().
-					UserChannelCreate("user-123").
-					Return(&discordgo.Channel{ID: "dm-channel-123"}, nil).
-					Times(1)
-
-				mockSession.EXPECT().ChannelMessageSend(
-					gomock.Eq("dm-channel-123"),
-					gomock.Eq(expectedMsg),
-				).Return(&discordgo.Message{}, nil).Times(1)
+				fakeSession.ChannelMessageSendFunc = func(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					expectedMsg := "We encountered an error updating your score: Invalid score format"
+					if channelID != "dm-channel-123" {
+						t.Errorf("expected channel dm-channel-123, got %s", channelID)
+					}
+					if content != expectedMsg {
+						t.Errorf("expected content %q, got %q", expectedMsg, content)
+					}
+					return &discordgo.Message{}, nil
+				}
 			},
 			args: args{
 				userID:       "user-123",
@@ -150,10 +139,9 @@ func Test_scoreRoundManager_SendScoreUpdateError(t *testing.T) {
 		{
 			name: "handles error when DM channel creation fails",
 			setup: func() {
-				mockSession.EXPECT().
-					UserChannelCreate("user-456").
-					Return(nil, errors.New("failed to create DM channel")).
-					Times(1)
+				fakeSession.UserChannelCreateFunc = func(recipientID string, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+					return nil, errors.New("failed to create DM channel")
+				}
 			},
 			args: args{
 				userID:       "user-456",
@@ -164,17 +152,13 @@ func Test_scoreRoundManager_SendScoreUpdateError(t *testing.T) {
 		{
 			name: "handles error when sending DM message fails",
 			setup: func() {
-				expectedMsg := "We encountered an error updating your score: Invalid input"
+				fakeSession.UserChannelCreateFunc = func(recipientID string, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+					return &discordgo.Channel{ID: "dm-channel-789"}, nil
+				}
 
-				mockSession.EXPECT().
-					UserChannelCreate("user-789").
-					Return(&discordgo.Channel{ID: "dm-channel-789"}, nil).
-					Times(1)
-
-				mockSession.EXPECT().ChannelMessageSend(
-					gomock.Eq("dm-channel-789"),
-					gomock.Eq(expectedMsg),
-				).Return(nil, errors.New("failed to send DM")).Times(1)
+				fakeSession.ChannelMessageSendFunc = func(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return nil, errors.New("failed to send DM")
+				}
 			},
 			args: args{
 				userID:       "user-789",
@@ -191,7 +175,7 @@ func Test_scoreRoundManager_SendScoreUpdateError(t *testing.T) {
 			}
 
 			srm := &scoreRoundManager{
-				session: mockSession,
+				session: fakeSession,
 				logger:  mockLogger,
 				config:  mockConfig,
 			}

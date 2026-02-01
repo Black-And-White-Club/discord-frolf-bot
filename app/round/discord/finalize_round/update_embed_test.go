@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
@@ -15,7 +15,6 @@ import (
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
 	"github.com/google/uuid"
-	"go.uber.org/mock/gomock"
 )
 
 func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
@@ -40,7 +39,7 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		setup     func(*finalizeRoundManager, *discordmocks.MockSession)
+		setup     func(*finalizeRoundManager, *discord.FakeSession)
 		payload   roundevents.RoundFinalizedEmbedUpdatePayloadV1
 		channelID string
 		messageID string
@@ -48,29 +47,27 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 	}{
 		{
 			name: "successfully preserves location when payload missing",
-			setup: func(frm *finalizeRoundManager, m *discordmocks.MockSession) {
-				m.EXPECT().
-					ChannelMessage("test-channel", testRoundID.String()).
-					Return(baseMessage(), nil)
+			setup: func(frm *finalizeRoundManager, m *discord.FakeSession) {
+				m.ChannelMessageFunc = func(channelID, messageID string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return baseMessage(), nil
+				}
 
-				m.EXPECT().
-					ChannelMessageEditComplex(gomock.Any()).
-					DoAndReturn(func(edit *discordgo.MessageEdit, _ ...discordgo.RequestOption) (*discordgo.Message, error) {
-						embed := (*edit.Embeds)[0]
-						found := false
-						for _, f := range embed.Fields {
-							if strings.Contains(strings.ToLower(f.Name), "location") {
-								found = true
-								if f.Value != "Preserved Course" {
-									t.Fatalf("location not preserved, got %q", f.Value)
-								}
+				m.ChannelMessageEditComplexFunc = func(edit *discordgo.MessageEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					embed := (*edit.Embeds)[0]
+					found := false
+					for _, f := range embed.Fields {
+						if strings.Contains(strings.ToLower(f.Name), "location") {
+							found = true
+							if f.Value != "Preserved Course" {
+								t.Errorf("location not preserved, got %q", f.Value)
 							}
 						}
-						if !found {
-							t.Fatal("location field missing in edited embed")
-						}
-						return &discordgo.Message{ID: edit.ID}, nil
-					})
+					}
+					if !found {
+						t.Error("location field missing in edited embed")
+					}
+					return &discordgo.Message{ID: edit.ID}, nil
+				}
 			},
 			payload: roundevents.RoundFinalizedEmbedUpdatePayloadV1{
 				RoundID:      testRoundID,
@@ -84,10 +81,10 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 		},
 		{
 			name: "fails when ChannelMessage fetch fails",
-			setup: func(frm *finalizeRoundManager, m *discordmocks.MockSession) {
-				m.EXPECT().
-					ChannelMessage("test-channel", testRoundID.String()).
-					Return(nil, fmt.Errorf("discord error"))
+			setup: func(frm *finalizeRoundManager, m *discord.FakeSession) {
+				m.ChannelMessageFunc = func(channelID, messageID string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return nil, fmt.Errorf("discord error")
+				}
 			},
 			payload: roundevents.RoundFinalizedEmbedUpdatePayloadV1{
 				RoundID: testRoundID,
@@ -99,7 +96,7 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 		},
 		{
 			name:  "fails with empty message ID",
-			setup: func(frm *finalizeRoundManager, m *discordmocks.MockSession) {},
+			setup: func(frm *finalizeRoundManager, m *discord.FakeSession) {},
 			payload: roundevents.RoundFinalizedEmbedUpdatePayloadV1{
 				RoundID: testRoundID,
 			},
@@ -109,7 +106,7 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 		},
 		{
 			name: "fails with nil session",
-			setup: func(frm *finalizeRoundManager, m *discordmocks.MockSession) {
+			setup: func(frm *finalizeRoundManager, m *discord.FakeSession) {
 				frm.session = nil
 			},
 			payload: roundevents.RoundFinalizedEmbedUpdatePayloadV1{
@@ -123,13 +120,10 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
-			mockSession := discordmocks.NewMockSession(ctrl)
+			fakeSession := discord.NewFakeSession()
 
 			frm := &finalizeRoundManager{
-				session: mockSession,
+				session: fakeSession,
 				logger:  loggerfrolfbot.NoOpLogger,
 				config: &config.Config{
 					Discord: config.DiscordConfig{GuildID: "guild-id"},
@@ -144,7 +138,7 @@ func Test_finalizeRoundManager_FinalizeScorecardEmbed(t *testing.T) {
 			}
 
 			if tt.setup != nil {
-				tt.setup(frm, mockSession)
+				tt.setup(frm, fakeSession)
 			}
 
 			res, err := frm.FinalizeScorecardEmbed(

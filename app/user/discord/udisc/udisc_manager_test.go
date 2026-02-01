@@ -7,21 +7,17 @@ import (
 	"log/slog"
 	"testing"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
-	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/testutils"
 	"go.opentelemetry.io/otel/trace/noop"
-	"go.uber.org/mock/gomock"
 )
 
 func TestNewUDiscManager_defaultsTracerWhenNil(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	t.Cleanup(ctrl.Finish)
-
 	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{}))
 
 	mgr := NewUDiscManager(
-		discordmocks.NewMockSession(ctrl),
-		eventbusmocks.NewMockEventBus(ctrl),
+		&discord.FakeSession{},
+		&testutils.FakeEventBus{},
 		logger,
 		nil, // cfg
 		nil, // interactionStore

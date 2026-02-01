@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
@@ -12,6 +13,28 @@ import (
 
 func (crm *createRoundManager) SendRoundEventEmbed(guildID string, channelID string, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, creatorID sharedtypes.DiscordID, roundID sharedtypes.RoundID) (CreateRoundOperationResult, error) {
 	return crm.operationWrapper(context.Background(), "SendRoundEventEmbed", func(ctx context.Context) (CreateRoundOperationResult, error) {
+		// Validate channel type to debug HTTP 405 errors
+		channel, err := crm.session.GetChannel(channelID)
+		if err != nil {
+			// Just log warning, try to proceed anyway in case it's a transient permission issue
+			// preventing us from seeing the channel but not posting to it (unlikely but safe)
+			// Actually, if we can't see it, we probably can't post to it.
+			crm.logger.WarnContext(ctx, "Failed to inspect channel before sending embed", attr.Error(err), attr.String("channel_id", channelID))
+		} else {
+			crm.logger.InfoContext(ctx, "Inspecting target channel",
+				attr.String("channel_id", channel.ID),
+				attr.String("channel_name", channel.Name),
+				attr.Int("channel_type", int(channel.Type)),
+			)
+
+			// 0 = GuildText, 2 = GuildVoice, 4 = GuildCategory, 5 = GuildNews, 10-12 = Threads
+			if channel.Type == discordgo.ChannelTypeGuildCategory || channel.Type == discordgo.ChannelTypeGuildVoice {
+				return CreateRoundOperationResult{
+					Error: fmt.Errorf("invalid channel type for events: %d (Category/Voice)", channel.Type),
+				}, nil
+			}
+		}
+
 		timeValue := time.Time(startTime)
 		unixTimestamp := timeValue.Unix()
 

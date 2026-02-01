@@ -8,13 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/testutils"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
-	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
 	userevents "github.com/Black-And-White-Club/frolf-bot-shared/events/user"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/bwmarrin/discordgo"
-	"go.uber.org/mock/gomock"
 )
 
 func udiscDiscardLogger() *slog.Logger {
@@ -22,11 +21,8 @@ func udiscDiscardLogger() *slog.Logger {
 }
 
 func Test_udiscManager_HandleSetUDiscNameCommand_EmptyFields_EphemeralError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
-	mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
+	fakeSession := &discord.FakeSession{}
+	fakePublisher := &testutils.FakeEventBus{}
 
 	i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
 		ID:      "interaction-id",
@@ -39,25 +35,25 @@ func Test_udiscManager_HandleSetUDiscNameCommand_EmptyFields_EphemeralError(t *t
 		},
 	}}
 
-	mockSession.EXPECT().
-		InteractionRespond(gomock.Eq(i.Interaction), gomock.Any()).
-		DoAndReturn(func(_ *discordgo.Interaction, resp *discordgo.InteractionResponse, _ ...discordgo.RequestOption) error {
-			if resp.Data == nil {
-				t.Fatalf("expected response data")
-			}
-			if resp.Data.Flags != discordgo.MessageFlagsEphemeral {
-				t.Fatalf("expected ephemeral response")
-			}
-			if !strings.Contains(resp.Data.Content, "Please provide") {
-				t.Fatalf("unexpected content: %q", resp.Data.Content)
-			}
-			return nil
-		}).
-		Times(1)
+	fakeSession.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+		if interaction.ID != i.Interaction.ID {
+			t.Errorf("expected interaction ID %q, got %q", i.Interaction.ID, interaction.ID)
+		}
+		if resp.Data == nil {
+			t.Fatalf("expected response data")
+		}
+		if resp.Data.Flags != discordgo.MessageFlagsEphemeral {
+			t.Fatalf("expected ephemeral response")
+		}
+		if !strings.Contains(resp.Data.Content, "Please provide") {
+			t.Fatalf("unexpected content: %q", resp.Data.Content)
+		}
+		return nil
+	}
 
 	m := &udiscManager{
-		session:   mockSession,
-		publisher: mockPublisher,
+		session:   fakeSession,
+		publisher: fakePublisher,
 		logger:    udiscDiscardLogger(),
 		config:    &config.Config{Discord: config.DiscordConfig{GuildID: "guild-id"}},
 		operationWrapper: func(ctx context.Context, _ string, fn func(context.Context) (UDiscOperationResult, error)) (UDiscOperationResult, error) {
@@ -75,11 +71,8 @@ func Test_udiscManager_HandleSetUDiscNameCommand_EmptyFields_EphemeralError(t *t
 }
 
 func Test_udiscManager_HandleSetUDiscNameCommand_PublishesAndConfirms_UsesConfigGuildFallback(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
-	mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
+	fakeSession := &discord.FakeSession{}
+	fakePublisher := &testutils.FakeEventBus{}
 
 	cfgGuildID := "cfg-guild"
 	userID := "user-id"
@@ -100,63 +93,67 @@ func Test_udiscManager_HandleSetUDiscNameCommand_PublishesAndConfirms_UsesConfig
 		},
 	}}
 
-	mockPublisher.EXPECT().
-		Publish(gomock.Eq(userevents.UpdateUDiscIdentityRequestedV1), gomock.Any()).
-		DoAndReturn(func(_ string, msg *message.Message) error {
-			var payload userevents.UpdateUDiscIdentityRequestedPayloadV1
-			if err := json.Unmarshal(msg.Payload, &payload); err != nil {
-				t.Fatalf("failed to unmarshal payload: %v", err)
-			}
-			if string(payload.GuildID) != cfgGuildID {
-				t.Fatalf("guild_id mismatch: got %q want %q", payload.GuildID, cfgGuildID)
-			}
-			if string(payload.UserID) != userID {
-				t.Fatalf("user_id mismatch: got %q want %q", payload.UserID, userID)
-			}
-			if payload.Username == nil || *payload.Username != strings.TrimSpace(username) {
-				t.Fatalf("username mismatch: got %v", payload.Username)
-			}
-			if payload.Name == nil || *payload.Name != strings.TrimSpace(name) {
-				t.Fatalf("name mismatch: got %v", payload.Name)
-			}
-			if msg.Metadata.Get("user_id") != userID {
-				t.Fatalf("expected metadata user_id")
-			}
-			if msg.Metadata.Get("guild_id") != cfgGuildID {
-				t.Fatalf("expected metadata guild_id")
-			}
-			if msg.Metadata.Get("correlation_id") == "" {
-				t.Fatalf("expected metadata correlation_id")
-			}
-			return nil
-		}).
-		Times(1)
+	fakePublisher.PublishFunc = func(topic string, messages ...*message.Message) error {
+		if topic != userevents.UpdateUDiscIdentityRequestedV1 {
+			t.Errorf("expected topic %q, got %q", userevents.UpdateUDiscIdentityRequestedV1, topic)
+		}
+		if len(messages) != 1 {
+			t.Fatalf("expected 1 message, got %d", len(messages))
+		}
+		msg := messages[0]
+		var payload userevents.UpdateUDiscIdentityRequestedPayloadV1
+		if err := json.Unmarshal(msg.Payload, &payload); err != nil {
+			t.Fatalf("failed to unmarshal payload: %v", err)
+		}
+		if string(payload.GuildID) != cfgGuildID {
+			t.Fatalf("guild_id mismatch: got %q want %q", payload.GuildID, cfgGuildID)
+		}
+		if string(payload.UserID) != userID {
+			t.Fatalf("user_id mismatch: got %q want %q", payload.UserID, userID)
+		}
+		if payload.Username == nil || *payload.Username != strings.TrimSpace(username) {
+			t.Fatalf("username mismatch: got %v", payload.Username)
+		}
+		if payload.Name == nil || *payload.Name != strings.TrimSpace(name) {
+			t.Fatalf("name mismatch: got %v", payload.Name)
+		}
+		if msg.Metadata.Get("user_id") != userID {
+			t.Fatalf("expected metadata user_id")
+		}
+		if msg.Metadata.Get("guild_id") != cfgGuildID {
+			t.Fatalf("expected metadata guild_id")
+		}
+		if msg.Metadata.Get("correlation_id") == "" {
+			t.Fatalf("expected metadata correlation_id")
+		}
+		return nil
+	}
 
-	mockSession.EXPECT().
-		InteractionRespond(gomock.Eq(i.Interaction), gomock.Any()).
-		DoAndReturn(func(_ *discordgo.Interaction, resp *discordgo.InteractionResponse, _ ...discordgo.RequestOption) error {
-			if resp.Data == nil {
-				t.Fatalf("expected response data")
-			}
-			if resp.Data.Flags != discordgo.MessageFlagsEphemeral {
-				t.Fatalf("expected ephemeral response")
-			}
-			if !strings.Contains(resp.Data.Content, "UDisc identity updated") {
-				t.Fatalf("unexpected content: %q", resp.Data.Content)
-			}
-			if !strings.Contains(resp.Data.Content, strings.TrimSpace(username)) {
-				t.Fatalf("expected username in content: %q", resp.Data.Content)
-			}
-			if !strings.Contains(resp.Data.Content, strings.TrimSpace(name)) {
-				t.Fatalf("expected name in content: %q", resp.Data.Content)
-			}
-			return nil
-		}).
-		Times(1)
+	fakeSession.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+		if interaction.ID != i.Interaction.ID {
+			t.Errorf("expected interaction ID %q, got %q", i.Interaction.ID, interaction.ID)
+		}
+		if resp.Data == nil {
+			t.Fatalf("expected response data")
+		}
+		if resp.Data.Flags != discordgo.MessageFlagsEphemeral {
+			t.Fatalf("expected ephemeral response")
+		}
+		if !strings.Contains(resp.Data.Content, "UDisc identity updated") {
+			t.Fatalf("unexpected content: %q", resp.Data.Content)
+		}
+		if !strings.Contains(resp.Data.Content, strings.TrimSpace(username)) {
+			t.Fatalf("expected username in content: %q", resp.Data.Content)
+		}
+		if !strings.Contains(resp.Data.Content, strings.TrimSpace(name)) {
+			t.Fatalf("expected name in content: %q", resp.Data.Content)
+		}
+		return nil
+	}
 
 	m := &udiscManager{
-		session:   mockSession,
-		publisher: mockPublisher,
+		session:   fakeSession,
+		publisher: fakePublisher,
 		logger:    udiscDiscardLogger(),
 		config:    &config.Config{Discord: config.DiscordConfig{GuildID: cfgGuildID}},
 		operationWrapper: func(ctx context.Context, _ string, fn func(context.Context) (UDiscOperationResult, error)) (UDiscOperationResult, error) {

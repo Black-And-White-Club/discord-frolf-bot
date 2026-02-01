@@ -8,90 +8,80 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
-	guildconfigmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
-	storagemocks "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage/mocks"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/testutils"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
-	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
-	"github.com/Black-And-White-Club/frolf-bot-shared/mocks"
-	discordmetricsmocks "github.com/Black-And-White-Club/frolf-bot-shared/observability/mocks"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
 	"go.opentelemetry.io/otel/trace/noop"
-	"go.uber.org/mock/gomock"
 )
 
 func TestNewFinalizeRoundManager(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
-	mockEventBus := eventbusmocks.NewMockEventBus(ctrl)
+	fakeSession := discord.NewFakeSession()
+	fakeEventBus := &testutils.FakeEventBus{}
 	testHandler := loggerfrolfbot.NewTestHandler()
 	logger := slog.New(testHandler)
-	mockHelper := mocks.NewMockHelpers(ctrl)
-	mockConfig := &config.Config{}
-	mockTracer := noop.NewTracerProvider().Tracer("test")
-	mockMetrics := discordmetricsmocks.NewMockDiscordMetrics(ctrl)
-	mockGuildConfigResolver := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
-	mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
-	mockGuildConfigCache := storagemocks.NewMockISInterface[storage.GuildConfig](ctrl)
+	fakeHelper := &testutils.FakeHelpers{}
+	fakeConfig := &config.Config{}
+	fakeTracer := noop.NewTracerProvider().Tracer("test")
+	fakeMetrics := &testutils.FakeDiscordMetrics{}
+	fakeGuildConfigResolver := &testutils.FakeGuildConfigResolver{}
+	fakeInteractionStore := &testutils.FakeStorage[any]{}
+	fakeGuildConfigCache := &testutils.FakeStorage[storage.GuildConfig]{}
 
-	manager := NewFinalizeRoundManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockInteractionStore, mockGuildConfigCache, mockTracer, mockMetrics, mockGuildConfigResolver)
+	manager := NewFinalizeRoundManager(fakeSession, fakeEventBus, logger, fakeHelper, fakeConfig, fakeInteractionStore, fakeGuildConfigCache, fakeTracer, fakeMetrics, fakeGuildConfigResolver)
 	impl, ok := manager.(*finalizeRoundManager)
 	if !ok {
 		t.Fatalf("Expected *finalizeRoundManager, got %T", manager)
 	}
 
-	if impl.session != mockSession {
+	if impl.session != fakeSession {
 		t.Error("Expected session to be assigned")
 	}
-	if impl.publisher != mockEventBus {
+	if impl.publisher != fakeEventBus {
 		t.Error("Expected publisher to be assigned")
 	}
 	if impl.logger != logger {
 		t.Error("Expected logger to be assigned")
 	}
-	if impl.helper != mockHelper {
+	if impl.helper != fakeHelper {
 		t.Error("Expected helper to be assigned")
 	}
-	if impl.config != mockConfig {
+	if impl.config != fakeConfig {
 		t.Error("Expected config to be assigned")
 	}
-	if impl.tracer != mockTracer {
+	if impl.tracer != fakeTracer {
 		t.Error("Expected tracer to be assigned")
 	}
-	if impl.metrics != mockMetrics {
+	if impl.metrics != fakeMetrics {
 		t.Error("Expected metrics to be assigned")
 	}
 	if impl.operationWrapper == nil {
 		t.Error("Expected operationWrapper to be set")
 	}
-	if impl.interactionStore != mockInteractionStore {
+	if impl.interactionStore != fakeInteractionStore {
 		t.Error("Expected interactionStore to be assigned")
 	}
-	if impl.guildConfigCache != mockGuildConfigCache {
+	if impl.guildConfigCache != fakeGuildConfigCache {
 		t.Error("Expected guildConfigCache to be assigned")
 	}
 }
 
 func Test_wrapFinalizeRoundOperation(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	testHandler := loggerfrolfbot.NewTestHandler()
 	logger := slog.New(testHandler)
-	mockMetrics := discordmetricsmocks.NewMockDiscordMetrics(ctrl)
+	fakeMetrics := &testutils.FakeDiscordMetrics{}
 	tracer := noop.NewTracerProvider().Tracer("test")
 
 	tests := []struct {
-		name       string
-		operation  string
-		fn         func(context.Context) (FinalizeRoundOperationResult, error)
-		expectErr  string
-		expectRes  FinalizeRoundOperationResult
-		mockMetric func()
+		name      string
+		operation string
+		fn        func(context.Context) (FinalizeRoundOperationResult, error)
+		expectErr string
+		expectRes FinalizeRoundOperationResult
+		setup     func()
 	}{
 		{
 			name:      "success path",
@@ -100,9 +90,17 @@ func Test_wrapFinalizeRoundOperation(t *testing.T) {
 				return FinalizeRoundOperationResult{Success: "yay!"}, nil
 			},
 			expectRes: FinalizeRoundOperationResult{Success: "yay!"},
-			mockMetric: func() {
-				mockMetrics.EXPECT().RecordAPIRequestDuration(gomock.Any(), "finalize_success", gomock.Any()).Times(1)
-				mockMetrics.EXPECT().RecordAPIRequest(gomock.Any(), "finalize_success").Times(1)
+			setup: func() {
+				fakeMetrics.RecordAPIRequestDurationFunc = func(ctx context.Context, operation string, duration time.Duration) {
+					if operation != "finalize_success" {
+						t.Errorf("expected operation finalize_success, got %s", operation)
+					}
+				}
+				fakeMetrics.RecordAPIRequestFunc = func(ctx context.Context, operation string) {
+					if operation != "finalize_success" {
+						t.Errorf("expected operation finalize_success, got %s", operation)
+					}
+				}
 			},
 		},
 		{
@@ -113,9 +111,17 @@ func Test_wrapFinalizeRoundOperation(t *testing.T) {
 			},
 			expectErr: "finalize_error operation error: bad op",
 			expectRes: FinalizeRoundOperationResult{Error: fmt.Errorf("finalize_error operation error: bad op")},
-			mockMetric: func() {
-				mockMetrics.EXPECT().RecordAPIRequestDuration(gomock.Any(), "finalize_error", gomock.Any()).Times(1)
-				mockMetrics.EXPECT().RecordAPIError(gomock.Any(), "finalize_error", "operation_error").Times(1)
+			setup: func() {
+				fakeMetrics.RecordAPIRequestDurationFunc = func(ctx context.Context, operation string, duration time.Duration) {
+					if operation != "finalize_error" {
+						t.Errorf("expected operation finalize_error, got %s", operation)
+					}
+				}
+				fakeMetrics.RecordAPIErrorFunc = func(ctx context.Context, operation, errorType string) {
+					if operation != "finalize_error" || errorType != "operation_error" {
+						t.Errorf("expected operation finalize_error and errorType operation_error, got %s, %s", operation, errorType)
+					}
+				}
 			},
 		},
 		{
@@ -125,9 +131,17 @@ func Test_wrapFinalizeRoundOperation(t *testing.T) {
 				return FinalizeRoundOperationResult{Error: errors.New("oopsie")}, nil
 			},
 			expectRes: FinalizeRoundOperationResult{Error: errors.New("oopsie")},
-			mockMetric: func() {
-				mockMetrics.EXPECT().RecordAPIRequestDuration(gomock.Any(), "finalize_result_error", gomock.Any()).Times(1)
-				mockMetrics.EXPECT().RecordAPIError(gomock.Any(), "finalize_result_error", "result_error").Times(1)
+			setup: func() {
+				fakeMetrics.RecordAPIRequestDurationFunc = func(ctx context.Context, operation string, duration time.Duration) {
+					if operation != "finalize_result_error" {
+						t.Errorf("expected operation finalize_result_error, got %s", operation)
+					}
+				}
+				fakeMetrics.RecordAPIErrorFunc = func(ctx context.Context, operation, errorType string) {
+					if operation != "finalize_result_error" || errorType != "result_error" {
+						t.Errorf("expected operation finalize_result_error and errorType result_error, got %s, %s", operation, errorType)
+					}
+				}
 			},
 		},
 		{
@@ -138,9 +152,17 @@ func Test_wrapFinalizeRoundOperation(t *testing.T) {
 			},
 			expectErr: "",                                       // The outer function returns nil error on panic recovery
 			expectRes: FinalizeRoundOperationResult{Error: nil}, // The struct's Error field is nil on panic recovery before assignment
-			mockMetric: func() {
-				mockMetrics.EXPECT().RecordAPIRequestDuration(gomock.Any(), "finalize_panic", gomock.Any()).Times(1)
-				mockMetrics.EXPECT().RecordAPIError(gomock.Any(), "finalize_panic", "panic").Times(1)
+			setup: func() {
+				fakeMetrics.RecordAPIRequestDurationFunc = func(ctx context.Context, operation string, duration time.Duration) {
+					if operation != "finalize_panic" {
+						t.Errorf("expected operation finalize_panic, got %s", operation)
+					}
+				}
+				fakeMetrics.RecordAPIErrorFunc = func(ctx context.Context, operation, errorType string) {
+					if operation != "finalize_panic" || errorType != "panic" {
+						t.Errorf("expected operation finalize_panic and errorType panic, got %s, %s", operation, errorType)
+					}
+				}
 			},
 		},
 		{
@@ -153,10 +175,10 @@ func Test_wrapFinalizeRoundOperation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.mockMetric != nil {
-				tt.mockMetric()
+			if tt.setup != nil {
+				tt.setup()
 			}
-			got, err := wrapFinalizeRoundOperation(context.Background(), tt.operation, tt.fn, logger, tracer, mockMetrics)
+			got, err := wrapFinalizeRoundOperation(context.Background(), tt.operation, tt.fn, logger, tracer, fakeMetrics)
 
 			if tt.expectErr != "" {
 				if err == nil || err.Error() != tt.expectErr {

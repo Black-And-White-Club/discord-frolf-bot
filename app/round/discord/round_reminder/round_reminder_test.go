@@ -8,61 +8,55 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
-	guildconfigmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/testutils"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
-	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
-	"github.com/Black-And-White-Club/frolf-bot-shared/mocks"
-	discordmetricsmocks "github.com/Black-And-White-Club/frolf-bot-shared/observability/mocks"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	"go.opentelemetry.io/otel/trace/noop"
-	"go.uber.org/mock/gomock"
 )
 
 func TestNewRoundReminderManager(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
-	mockEventBus := eventbusmocks.NewMockEventBus(ctrl)
+	fakeSession := discord.NewFakeSession()
+	fakeEventBus := &testutils.FakeEventBus{}
 	testHandler := loggerfrolfbot.NewTestHandler()
 	logger := slog.New(testHandler)
-	mockHelper := mocks.NewMockHelpers(ctrl)
-	mockConfig := &config.Config{}
-	mockTracer := noop.NewTracerProvider().Tracer("test")
-	mockMetrics := discordmetricsmocks.NewMockDiscordMetrics(ctrl)
-	mockGuildConfigResolver := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
+	fakeHelper := &testutils.FakeHelpers{}
+	fakeConfig := &config.Config{}
+	fakeTracer := noop.NewTracerProvider().Tracer("test")
+	fakeMetrics := &testutils.FakeDiscordMetrics{}
+	fakeGuildConfigResolver := &testutils.FakeGuildConfigResolver{}
 
 	var nilStoreAny storage.ISInterface[any] = nil
 	var nilStoreGuild storage.ISInterface[storage.GuildConfig] = nil
-	manager := NewRoundReminderManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, nilStoreAny, nilStoreGuild, mockTracer, mockMetrics, mockGuildConfigResolver)
+	manager := NewRoundReminderManager(fakeSession, fakeEventBus, logger, fakeHelper, fakeConfig, nilStoreAny, nilStoreGuild, fakeTracer, fakeMetrics, fakeGuildConfigResolver)
 	impl, ok := manager.(*roundReminderManager)
 	if !ok {
 		t.Fatalf("Expected *roundReminderManager, got %T", manager)
 	}
 
-	if impl.session != mockSession {
+	if impl.session != fakeSession {
 		t.Error("Expected session to be assigned")
 	}
-	if impl.publisher != mockEventBus {
+	if impl.publisher != fakeEventBus {
 		t.Error("Expected publisher to be assigned")
 	}
 	if impl.logger != logger {
 		t.Error("Expected logger to be assigned")
 	}
-	if impl.helper != mockHelper {
+	if impl.helper != fakeHelper {
 		t.Error("Expected helper to be assigned")
 	}
-	if impl.config != mockConfig {
+	if impl.config != fakeConfig {
 		t.Error("Expected config to be assigned")
 	}
-	if impl.tracer != mockTracer {
+	if impl.tracer != fakeTracer {
 		t.Error("Expected tracer to be assigned")
 	}
-	if impl.metrics != mockMetrics {
+	if impl.metrics != fakeMetrics {
 		t.Error("Expected metrics to be assigned")
 	}
 	if impl.operationWrapper == nil {
@@ -71,42 +65,36 @@ func TestNewRoundReminderManager(t *testing.T) {
 }
 
 func TestNewRoundReminderManager_WithNilLogger(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
-	mockEventBus := eventbusmocks.NewMockEventBus(ctrl)
-	mockHelper := mocks.NewMockHelpers(ctrl)
-	mockConfig := &config.Config{}
-	mockTracer := noop.NewTracerProvider().Tracer("test")
-	mockMetrics := discordmetricsmocks.NewMockDiscordMetrics(ctrl)
-	mockGuildConfigResolver := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
+	fakeSession := discord.NewFakeSession()
+	fakeEventBus := &testutils.FakeEventBus{}
+	fakeHelper := &testutils.FakeHelpers{}
+	fakeConfig := &config.Config{}
+	fakeTracer := noop.NewTracerProvider().Tracer("test")
+	fakeMetrics := &testutils.FakeDiscordMetrics{}
+	fakeGuildConfigResolver := &testutils.FakeGuildConfigResolver{}
 
 	// Test with nil logger
 	var nilStoreAny storage.ISInterface[any] = nil
 	var nilStoreGuild storage.ISInterface[storage.GuildConfig] = nil
-	manager := NewRoundReminderManager(mockSession, mockEventBus, nil, mockHelper, mockConfig, nilStoreAny, nilStoreGuild, mockTracer, mockMetrics, mockGuildConfigResolver)
+	manager := NewRoundReminderManager(fakeSession, fakeEventBus, nil, fakeHelper, fakeConfig, nilStoreAny, nilStoreGuild, fakeTracer, fakeMetrics, fakeGuildConfigResolver)
 	if manager == nil {
 		t.Fatal("Expected manager to be created even with nil logger")
 	}
 }
 
 func Test_wrapRoundReminderOperation(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	testHandler := loggerfrolfbot.NewTestHandler()
 	logger := slog.New(testHandler)
-	mockMetrics := discordmetricsmocks.NewMockDiscordMetrics(ctrl)
+	fakeMetrics := &testutils.FakeDiscordMetrics{}
 	tracer := noop.NewTracerProvider().Tracer("test")
 
 	tests := []struct {
-		name       string
-		operation  string
-		fn         func(context.Context) (RoundReminderOperationResult, error)
-		expectErr  string
-		expectRes  RoundReminderOperationResult
-		mockMetric func()
+		name      string
+		operation string
+		fn        func(context.Context) (RoundReminderOperationResult, error)
+		expectErr string
+		expectRes RoundReminderOperationResult
+		setup     func()
 	}{
 		{
 			name:      "success path",
@@ -115,9 +103,17 @@ func Test_wrapRoundReminderOperation(t *testing.T) {
 				return RoundReminderOperationResult{Success: "success"}, nil
 			},
 			expectRes: RoundReminderOperationResult{Success: "success"},
-			mockMetric: func() {
-				mockMetrics.EXPECT().RecordAPIRequestDuration(gomock.Any(), "reminder_success", gomock.Any()).Times(1)
-				mockMetrics.EXPECT().RecordAPIRequest(gomock.Any(), "reminder_success").Times(1)
+			setup: func() {
+				fakeMetrics.RecordAPIRequestDurationFunc = func(ctx context.Context, operation string, duration time.Duration) {
+					if operation != "reminder_success" {
+						t.Errorf("expected operation reminder_success, got %s", operation)
+					}
+				}
+				fakeMetrics.RecordAPIRequestFunc = func(ctx context.Context, operation string) {
+					if operation != "reminder_success" {
+						t.Errorf("expected operation reminder_success, got %s", operation)
+					}
+				}
 			},
 		},
 		{
@@ -128,9 +124,17 @@ func Test_wrapRoundReminderOperation(t *testing.T) {
 			},
 			expectErr: "reminder_error operation error: operation failed",
 			expectRes: RoundReminderOperationResult{Error: fmt.Errorf("reminder_error operation error: operation failed")},
-			mockMetric: func() {
-				mockMetrics.EXPECT().RecordAPIRequestDuration(gomock.Any(), "reminder_error", gomock.Any()).Times(1)
-				mockMetrics.EXPECT().RecordAPIError(gomock.Any(), "reminder_error", "operation_error").Times(1)
+			setup: func() {
+				fakeMetrics.RecordAPIRequestDurationFunc = func(ctx context.Context, operation string, duration time.Duration) {
+					if operation != "reminder_error" {
+						t.Errorf("expected operation reminder_error, got %s", operation)
+					}
+				}
+				fakeMetrics.RecordAPIErrorFunc = func(ctx context.Context, operation, errorType string) {
+					if operation != "reminder_error" || errorType != "operation_error" {
+						t.Errorf("expected operation reminder_error and errorType operation_error, got %s, %s", operation, errorType)
+					}
+				}
 			},
 		},
 		{
@@ -140,9 +144,17 @@ func Test_wrapRoundReminderOperation(t *testing.T) {
 				return RoundReminderOperationResult{Error: errors.New("result error")}, nil
 			},
 			expectRes: RoundReminderOperationResult{Error: errors.New("result error")},
-			mockMetric: func() {
-				mockMetrics.EXPECT().RecordAPIRequestDuration(gomock.Any(), "reminder_result_error", gomock.Any()).Times(1)
-				mockMetrics.EXPECT().RecordAPIError(gomock.Any(), "reminder_result_error", "result_error").Times(1)
+			setup: func() {
+				fakeMetrics.RecordAPIRequestDurationFunc = func(ctx context.Context, operation string, duration time.Duration) {
+					if operation != "reminder_result_error" {
+						t.Errorf("expected operation reminder_result_error, got %s", operation)
+					}
+				}
+				fakeMetrics.RecordAPIErrorFunc = func(ctx context.Context, operation, errorType string) {
+					if operation != "reminder_result_error" || errorType != "result_error" {
+						t.Errorf("expected operation reminder_result_error and errorType result_error, got %s, %s", operation, errorType)
+					}
+				}
 			},
 		},
 		{
@@ -153,9 +165,17 @@ func Test_wrapRoundReminderOperation(t *testing.T) {
 			},
 			expectErr: "",                                       // The outer function returns nil error on panic recovery
 			expectRes: RoundReminderOperationResult{Error: nil}, // The struct's Error field is nil on panic recovery before assignment
-			mockMetric: func() {
-				mockMetrics.EXPECT().RecordAPIRequestDuration(gomock.Any(), "reminder_panic", gomock.Any()).Times(1)
-				mockMetrics.EXPECT().RecordAPIError(gomock.Any(), "reminder_panic", "panic").Times(1)
+			setup: func() {
+				fakeMetrics.RecordAPIRequestDurationFunc = func(ctx context.Context, operation string, duration time.Duration) {
+					if operation != "reminder_panic" {
+						t.Errorf("expected operation reminder_panic, got %s", operation)
+					}
+				}
+				fakeMetrics.RecordAPIErrorFunc = func(ctx context.Context, operation, errorType string) {
+					if operation != "reminder_panic" || errorType != "panic" {
+						t.Errorf("expected operation reminder_panic and errorType panic, got %s, %s", operation, errorType)
+					}
+				}
 			},
 		},
 		{
@@ -171,9 +191,17 @@ func Test_wrapRoundReminderOperation(t *testing.T) {
 				return RoundReminderOperationResult{Success: "success with nil tracer"}, nil
 			},
 			expectRes: RoundReminderOperationResult{Success: "success with nil tracer"},
-			mockMetric: func() {
-				mockMetrics.EXPECT().RecordAPIRequestDuration(gomock.Any(), "reminder_nil_tracer", gomock.Any()).Times(1)
-				mockMetrics.EXPECT().RecordAPIRequest(gomock.Any(), "reminder_nil_tracer").Times(1)
+			setup: func() {
+				fakeMetrics.RecordAPIRequestDurationFunc = func(ctx context.Context, operation string, duration time.Duration) {
+					if operation != "reminder_nil_tracer" {
+						t.Errorf("expected operation reminder_nil_tracer, got %s", operation)
+					}
+				}
+				fakeMetrics.RecordAPIRequestFunc = func(ctx context.Context, operation string) {
+					if operation != "reminder_nil_tracer" {
+						t.Errorf("expected operation reminder_nil_tracer, got %s", operation)
+					}
+				}
 			},
 		},
 		{
@@ -183,7 +211,7 @@ func Test_wrapRoundReminderOperation(t *testing.T) {
 				return RoundReminderOperationResult{Success: "success with nil metrics"}, nil
 			},
 			expectRes: RoundReminderOperationResult{Success: "success with nil metrics"},
-			// No mockMetric function for nil metrics case
+			// No setup for nil metrics case
 		},
 	}
 
@@ -193,9 +221,9 @@ func Test_wrapRoundReminderOperation(t *testing.T) {
 			if tt.name == "nil metrics" {
 				metricsToUse = nil
 			} else {
-				metricsToUse = mockMetrics
-				if tt.mockMetric != nil {
-					tt.mockMetric()
+				metricsToUse = fakeMetrics
+				if tt.setup != nil {
+					tt.setup()
 				}
 			}
 

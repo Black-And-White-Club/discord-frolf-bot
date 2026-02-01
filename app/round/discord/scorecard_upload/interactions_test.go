@@ -11,21 +11,17 @@ import (
 	"strings"
 	"testing"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
-	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/testutils"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/bwmarrin/discordgo"
 	"github.com/google/uuid"
-	"go.uber.org/mock/gomock"
 )
 
 func Test_scorecardUploadManager_HandleScorecardUploadModalSubmit_MissingRoundID_ReturnsError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
+	fakeSession := discord.NewFakeSession()
 
 	i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
 		ID:        "interaction-id",
@@ -45,7 +41,7 @@ func Test_scorecardUploadManager_HandleScorecardUploadModalSubmit_MissingRoundID
 	}}
 
 	m := &scorecardUploadManager{
-		session: mockSession,
+		session: fakeSession,
 		logger:  discardLogger(),
 		operationWrapper: func(ctx context.Context, _ string, fn func(context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error) {
 			return fn(ctx)
@@ -63,10 +59,7 @@ func Test_scorecardUploadManager_HandleScorecardUploadModalSubmit_MissingRoundID
 }
 
 func Test_scorecardUploadManager_HandleScorecardUploadModalSubmit_InvalidRoundIDFormat_ReturnsError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
+	fakeSession := discord.NewFakeSession()
 
 	i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
 		ID:        "interaction-id",
@@ -86,7 +79,7 @@ func Test_scorecardUploadManager_HandleScorecardUploadModalSubmit_InvalidRoundID
 	}}
 
 	m := &scorecardUploadManager{
-		session: mockSession,
+		session: fakeSession,
 		logger:  discardLogger(),
 		operationWrapper: func(ctx context.Context, _ string, fn func(context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error) {
 			return fn(ctx)
@@ -104,11 +97,8 @@ func Test_scorecardUploadManager_HandleScorecardUploadModalSubmit_InvalidRoundID
 }
 
 func Test_scorecardUploadManager_HandleScorecardUploadModalSubmit_URLFlow_PublishError_Propagates(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
-	mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
+	fakeSession := discord.NewFakeSession()
+	fakePublisher := &testutils.FakeEventBus{}
 
 	roundID := uuid.New()
 	i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
@@ -131,31 +121,27 @@ func Test_scorecardUploadManager_HandleScorecardUploadModalSubmit_URLFlow_Publis
 		},
 	}}
 
-	mockPublisher.EXPECT().
-		Publish(gomock.Eq(roundevents.ScorecardURLRequestedV1), gomock.Any()).
-		Return(fmt.Errorf("publish failed")).
-		Times(1)
+	fakePublisher.PublishFunc = func(topic string, messages ...*message.Message) error {
+		return fmt.Errorf("publish failed")
+	}
 
 	// Publish failures should respond ephemerally with an error message (best-effort)
 	// and still return the publish error to the caller.
-	mockSession.EXPECT().
-		InteractionRespond(gomock.Eq(i.Interaction), gomock.Any()).
-		DoAndReturn(func(_ *discordgo.Interaction, resp *discordgo.InteractionResponse, _ ...discordgo.RequestOption) error {
-			if resp == nil || resp.Data == nil {
-				t.Fatalf("expected non-nil response data")
-			}
-			if resp.Data.Flags&discordgo.MessageFlagsEphemeral == 0 {
-				t.Fatalf("expected ephemeral response")
-			}
-			if !strings.Contains(resp.Data.Content, "Failed to upload scorecard from URL") {
-				t.Fatalf("unexpected error content: %q", resp.Data.Content)
-			}
-			return nil
-		}).
-		Times(1)
+	fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, resp *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+		if resp == nil || resp.Data == nil {
+			t.Fatalf("expected non-nil response data")
+		}
+		if resp.Data.Flags&discordgo.MessageFlagsEphemeral == 0 {
+			t.Fatalf("expected ephemeral response")
+		}
+		if !strings.Contains(resp.Data.Content, "Failed to upload scorecard from URL") {
+			t.Fatalf("unexpected error content: %q", resp.Data.Content)
+		}
+		return nil
+	}
 	m := &scorecardUploadManager{
-		session:   mockSession,
-		publisher: mockPublisher,
+		session:   fakeSession,
+		publisher: fakePublisher,
 		logger:    discardLogger(),
 		operationWrapper: func(ctx context.Context, _ string, fn func(context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error) {
 			return fn(ctx)
@@ -170,10 +156,7 @@ func Test_scorecardUploadManager_HandleScorecardUploadModalSubmit_URLFlow_Publis
 }
 
 func Test_scorecardUploadManager_HandleScorecardUploadButton_RespondError_Propagates(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
+	fakeSession := discord.NewFakeSession()
 
 	roundID := uuid.New().String()
 	i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
@@ -187,13 +170,12 @@ func Test_scorecardUploadManager_HandleScorecardUploadButton_RespondError_Propag
 		},
 	}}
 
-	mockSession.EXPECT().
-		InteractionRespond(gomock.Eq(i.Interaction), gomock.Any()).
-		Return(fmt.Errorf("respond failed")).
-		Times(1)
+	fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+		return fmt.Errorf("respond failed")
+	}
 
 	m := &scorecardUploadManager{
-		session: mockSession,
+		session: fakeSession,
 		logger:  discardLogger(),
 		operationWrapper: func(ctx context.Context, _ string, fn func(context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error) {
 			return fn(ctx)
@@ -211,11 +193,8 @@ func Test_scorecardUploadManager_HandleScorecardUploadButton_RespondError_Propag
 }
 
 func Test_scorecardUploadManager_HandleFileUploadMessage_PendingExists_PublishesAndConfirms(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
-	mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
+	fakeSession := discord.NewFakeSession()
+	fakePublisher := &testutils.FakeEventBus{}
 
 	serverData := []byte("hello scorecard")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -243,8 +222,8 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_PendingExists_Publishes
 	}}
 
 	m := &scorecardUploadManager{
-		session:   mockSession,
-		publisher: mockPublisher,
+		session:   fakeSession,
+		publisher: fakePublisher,
 		logger:    discardLogger(),
 		operationWrapper: func(ctx context.Context, _ string, fn func(context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error) {
 			return fn(ctx)
@@ -259,58 +238,61 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_PendingExists_Publishes
 		},
 	}
 
-	mockPublisher.EXPECT().
-		Publish(gomock.Eq(roundevents.ScorecardUploadedV1), gomock.Any()).
-		DoAndReturn(func(_ string, msg *message.Message) error {
-			var payload roundevents.ScorecardUploadedPayloadV1
-			if err := json.Unmarshal(msg.Payload, &payload); err != nil {
-				t.Fatalf("failed to unmarshal payload: %v", err)
-			}
-			if string(payload.GuildID) != guildID {
-				t.Fatalf("guild_id mismatch: got %q want %q", payload.GuildID, guildID)
-			}
-			if string(payload.UserID) != userID {
-				t.Fatalf("user_id mismatch: got %q want %q", payload.UserID, userID)
-			}
-			if payload.ChannelID != channelID {
-				t.Fatalf("channel_id mismatch: got %q want %q", payload.ChannelID, channelID)
-			}
-			if payload.MessageID != messageID {
-				t.Fatalf("message_id mismatch: got %q want %q", payload.MessageID, messageID)
-			}
-			if payload.RoundID.String() != roundUUID.String() {
-				t.Fatalf("round_id mismatch: got %q want %q", payload.RoundID.String(), roundUUID.String())
-			}
-			if payload.FileName != fileName {
-				t.Fatalf("filename mismatch: got %q want %q", payload.FileName, fileName)
-			}
-			if string(payload.FileData) != string(serverData) {
-				t.Fatalf("file data mismatch: got %q want %q", string(payload.FileData), string(serverData))
-			}
-			if payload.Notes != notes {
-				t.Fatalf("notes mismatch: got %q want %q", payload.Notes, notes)
-			}
-			if payload.ImportID == "" {
-				t.Fatalf("expected import_id to be set")
-			}
-			return nil
-		}).
-		Times(1)
+	fakePublisher.PublishFunc = func(topic string, messages ...*message.Message) error {
+		if topic != roundevents.ScorecardUploadedV1 {
+			t.Fatalf("unexpected topic: %q", topic)
+		}
+		if len(messages) != 1 {
+			t.Fatalf("expected 1 message")
+		}
+		var payload roundevents.ScorecardUploadedPayloadV1
+		if err := json.Unmarshal(messages[0].Payload, &payload); err != nil {
+			t.Fatalf("failed to unmarshal payload: %v", err)
+		}
+		if string(payload.GuildID) != guildID {
+			t.Fatalf("guild_id mismatch: got %q want %q", payload.GuildID, guildID)
+		}
+		if string(payload.UserID) != userID {
+			t.Fatalf("user_id mismatch: got %q want %q", payload.UserID, userID)
+		}
+		if payload.ChannelID != channelID {
+			t.Fatalf("channel_id mismatch: got %q want %q", payload.ChannelID, channelID)
+		}
+		if payload.MessageID != messageID {
+			t.Fatalf("message_id mismatch: got %q want %q", payload.MessageID, messageID)
+		}
+		if payload.RoundID.String() != roundUUID.String() {
+			t.Fatalf("round_id mismatch: got %q want %q", payload.RoundID.String(), roundUUID.String())
+		}
+		if payload.FileName != fileName {
+			t.Fatalf("filename mismatch: got %q want %q", payload.FileName, fileName)
+		}
+		if string(payload.FileData) != string(serverData) {
+			t.Fatalf("file data mismatch: got %q want %q", string(payload.FileData), string(serverData))
+		}
+		if payload.Notes != notes {
+			t.Fatalf("notes mismatch: got %q want %q", payload.Notes, notes)
+		}
+		if payload.ImportID == "" {
+			t.Fatalf("expected import_id to be set")
+		}
+		return nil
+	}
 
-	mockSession.EXPECT().
-		ChannelMessageSend(gomock.Eq(channelID), gomock.Any()).
-		DoAndReturn(func(_ string, content string, _ ...discordgo.RequestOption) (*discordgo.Message, error) {
-			if !strings.Contains(content, "Scorecard uploaded successfully") {
-				t.Fatalf("unexpected confirmation content: %q", content)
-			}
-			if !strings.Contains(content, "Import ID") {
-				t.Fatalf("expected import id in confirmation: %q", content)
-			}
-			return &discordgo.Message{ID: "confirmation"}, nil
-		}).
-		Times(1)
+	fakeSession.ChannelMessageSendFunc = func(cID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+		if cID != channelID {
+			t.Fatalf("channel_id mismatch: got %q want %q", cID, channelID)
+		}
+		if !strings.Contains(content, "Scorecard uploaded successfully") {
+			t.Fatalf("unexpected confirmation content: %q", content)
+		}
+		if !strings.Contains(content, "Import ID") {
+			t.Fatalf("expected import id in confirmation: %q", content)
+		}
+		return &discordgo.Message{ID: "confirmation"}, nil
+	}
 
-	m.HandleFileUploadMessage(mockSession, msg)
+	m.HandleFileUploadMessage(fakeSession, msg)
 
 	// Pending should be consumed
 	key := fmt.Sprintf("%s:%s", userID, channelID)
@@ -323,10 +305,7 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_PendingExists_Publishes
 }
 
 func Test_scorecardUploadManager_HandleFileUploadMessage_DownloadFailure_SendsError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
+	fakeSession := discord.NewFakeSession()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -344,18 +323,15 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_DownloadFailure_SendsEr
 		},
 	}}
 
-	mockSession.EXPECT().
-		ChannelMessageSend(gomock.Eq("channel-id"), gomock.Any()).
-		DoAndReturn(func(_ string, content string, _ ...discordgo.RequestOption) (*discordgo.Message, error) {
-			if !strings.Contains(content, "Failed to download file") {
-				t.Fatalf("unexpected error content: %q", content)
-			}
-			return &discordgo.Message{ID: "err"}, nil
-		}).
-		Times(1)
+	fakeSession.ChannelMessageSendFunc = func(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+		if !strings.Contains(content, "Failed to download file") {
+			t.Fatalf("unexpected error content: %q", content)
+		}
+		return &discordgo.Message{ID: "err"}, nil
+	}
 
 	m := &scorecardUploadManager{
-		session: mockSession,
+		session: fakeSession,
 		logger:  discardLogger(),
 		operationWrapper: func(ctx context.Context, _ string, fn func(context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error) {
 			return fn(ctx)
@@ -363,14 +339,11 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_DownloadFailure_SendsEr
 		pendingUploads: make(map[string]*pendingUpload),
 	}
 
-	m.HandleFileUploadMessage(mockSession, msg)
+	m.HandleFileUploadMessage(fakeSession, msg)
 }
 
 func Test_scorecardUploadManager_HandleFileUploadMessage_FileTooLarge_SendsError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
+	fakeSession := discord.NewFakeSession()
 
 	const maxFileSize = 10 * 1024 * 1024
 	big := make([]byte, maxFileSize+1)
@@ -390,18 +363,15 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_FileTooLarge_SendsError
 		},
 	}}
 
-	mockSession.EXPECT().
-		ChannelMessageSend(gomock.Eq("channel-id"), gomock.Any()).
-		DoAndReturn(func(_ string, content string, _ ...discordgo.RequestOption) (*discordgo.Message, error) {
-			if !strings.Contains(content, "File too large") {
-				t.Fatalf("unexpected error content: %q", content)
-			}
-			return &discordgo.Message{ID: "err"}, nil
-		}).
-		Times(1)
+	fakeSession.ChannelMessageSendFunc = func(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+		if !strings.Contains(content, "File too large") {
+			t.Fatalf("unexpected error content: %q", content)
+		}
+		return &discordgo.Message{ID: "err"}, nil
+	}
 
 	m := &scorecardUploadManager{
-		session: mockSession,
+		session: fakeSession,
 		logger:  discardLogger(),
 		operationWrapper: func(ctx context.Context, _ string, fn func(context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error) {
 			return fn(ctx)
@@ -409,15 +379,12 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_FileTooLarge_SendsError
 		pendingUploads: make(map[string]*pendingUpload),
 	}
 
-	m.HandleFileUploadMessage(mockSession, msg)
+	m.HandleFileUploadMessage(fakeSession, msg)
 }
 
 func Test_scorecardUploadManager_HandleFileUploadMessage_PublishError_SendsErrorAndConsumesPending(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
-	mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
+	fakeSession := discord.NewFakeSession()
+	fakePublisher := &testutils.FakeEventBus{}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -439,24 +406,20 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_PublishError_SendsError
 		},
 	}}
 
-	mockPublisher.EXPECT().
-		Publish(gomock.Eq(roundevents.ScorecardUploadedV1), gomock.Any()).
-		Return(fmt.Errorf("publish failed")).
-		Times(1)
+	fakePublisher.PublishFunc = func(topic string, messages ...*message.Message) error {
+		return fmt.Errorf("publish failed")
+	}
 
-	mockSession.EXPECT().
-		ChannelMessageSend(gomock.Eq(channelID), gomock.Any()).
-		DoAndReturn(func(_ string, content string, _ ...discordgo.RequestOption) (*discordgo.Message, error) {
-			if !strings.Contains(content, "Failed to process scorecard upload") {
-				t.Fatalf("unexpected error content: %q", content)
-			}
-			return &discordgo.Message{ID: "err"}, nil
-		}).
-		Times(1)
+	fakeSession.ChannelMessageSendFunc = func(cID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+		if !strings.Contains(content, "Failed to process scorecard upload") {
+			t.Fatalf("unexpected error content: %q", content)
+		}
+		return &discordgo.Message{ID: "err"}, nil
+	}
 
 	m := &scorecardUploadManager{
-		session:   mockSession,
-		publisher: mockPublisher,
+		session:   fakeSession,
+		publisher: fakePublisher,
 		logger:    discardLogger(),
 		operationWrapper: func(ctx context.Context, _ string, fn func(context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error) {
 			return fn(ctx)
@@ -466,7 +429,7 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_PublishError_SendsError
 		},
 	}
 
-	m.HandleFileUploadMessage(mockSession, msg)
+	m.HandleFileUploadMessage(fakeSession, msg)
 
 	m.pendingMutex.RLock()
 	_, stillThere := m.pendingUploads[key]
@@ -477,10 +440,7 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_PublishError_SendsError
 }
 
 func Test_scorecardUploadManager_HandleFileUploadMessage_BotOrNoAttachments_Ignored(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
+	fakeSession := discord.NewFakeSession()
 
 	botMsg := &discordgo.MessageCreate{Message: &discordgo.Message{
 		ID:        "message-id",
@@ -501,7 +461,7 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_BotOrNoAttachments_Igno
 	}}
 
 	m := &scorecardUploadManager{
-		session: mockSession,
+		session: fakeSession,
 		logger:  discardLogger(),
 		operationWrapper: func(ctx context.Context, _ string, fn func(context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error) {
 			return fn(ctx)
@@ -510,15 +470,12 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_BotOrNoAttachments_Igno
 	}
 
 	// No expectations; these should return early.
-	m.HandleFileUploadMessage(mockSession, botMsg)
-	m.HandleFileUploadMessage(mockSession, noAttachMsg)
+	m.HandleFileUploadMessage(fakeSession, botMsg)
+	m.HandleFileUploadMessage(fakeSession, noAttachMsg)
 }
 
 func Test_scorecardUploadManager_HandleFileUploadMessage_NoPending_SendsError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
+	fakeSession := discord.NewFakeSession()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -536,18 +493,15 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_NoPending_SendsError(t 
 		},
 	}}
 
-	mockSession.EXPECT().
-		ChannelMessageSend(gomock.Eq("channel-id"), gomock.Any()).
-		DoAndReturn(func(_ string, content string, _ ...discordgo.RequestOption) (*discordgo.Message, error) {
-			if !strings.Contains(content, "No pending scorecard upload found") {
-				t.Fatalf("unexpected error content: %q", content)
-			}
-			return &discordgo.Message{ID: "err"}, nil
-		}).
-		Times(1)
+	fakeSession.ChannelMessageSendFunc = func(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+		if !strings.Contains(content, "No pending scorecard upload found") {
+			t.Fatalf("unexpected error content: %q", content)
+		}
+		return &discordgo.Message{ID: "err"}, nil
+	}
 
 	m := &scorecardUploadManager{
-		session: mockSession,
+		session: fakeSession,
 		logger:  discardLogger(),
 		operationWrapper: func(ctx context.Context, _ string, fn func(context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error) {
 			return fn(ctx)
@@ -555,14 +509,11 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_NoPending_SendsError(t 
 		pendingUploads: make(map[string]*pendingUpload),
 	}
 
-	m.HandleFileUploadMessage(mockSession, msg)
+	m.HandleFileUploadMessage(fakeSession, msg)
 }
 
 func Test_scorecardUploadManager_HandleFileUploadMessage_NonScorecardAttachment_Ignored(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
+	fakeSession := discord.NewFakeSession()
 
 	msg := &discordgo.MessageCreate{Message: &discordgo.Message{
 		ID:        "message-id",
@@ -575,7 +526,7 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_NonScorecardAttachment_
 	}}
 
 	m := &scorecardUploadManager{
-		session: mockSession,
+		session: fakeSession,
 		logger:  discardLogger(),
 		operationWrapper: func(ctx context.Context, _ string, fn func(context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error) {
 			return fn(ctx)
@@ -584,7 +535,7 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_NonScorecardAttachment_
 	}
 
 	// No expectations: should return early without sending anything.
-	m.HandleFileUploadMessage(mockSession, msg)
+	m.HandleFileUploadMessage(fakeSession, msg)
 }
 
 func discardLogger() *slog.Logger {
@@ -592,10 +543,7 @@ func discardLogger() *slog.Logger {
 }
 
 func Test_scorecardUploadManager_HandleScorecardUploadButton_SendsModal(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
+	fakeSession := discord.NewFakeSession()
 
 	roundID := uuid.New().String()
 	i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
@@ -609,31 +557,28 @@ func Test_scorecardUploadManager_HandleScorecardUploadButton_SendsModal(t *testi
 		},
 	}}
 
-	mockSession.EXPECT().
-		InteractionRespond(gomock.Eq(i.Interaction), gomock.Any()).
-		DoAndReturn(func(_ *discordgo.Interaction, resp *discordgo.InteractionResponse, _ ...discordgo.RequestOption) error {
-			if resp.Type != discordgo.InteractionResponseModal {
-				t.Fatalf("expected modal response type, got %v", resp.Type)
-			}
-			if resp.Data == nil {
-				t.Fatalf("expected response data")
-			}
-			if want := fmt.Sprintf("scorecard_upload_modal|%s", roundID); resp.Data.CustomID != want {
-				t.Fatalf("customID mismatch: got %q want %q", resp.Data.CustomID, want)
-			}
-			if resp.Data.Title != "Upload Scorecard" {
-				t.Fatalf("title mismatch: got %q", resp.Data.Title)
-			}
-			// Basic shape: 2 action rows with expected text input IDs.
-			if len(resp.Data.Components) != 2 {
-				t.Fatalf("expected 2 components (action rows), got %d", len(resp.Data.Components))
-			}
-			return nil
-		}).
-		Times(1)
+	fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, resp *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+		if resp.Type != discordgo.InteractionResponseModal {
+			t.Fatalf("expected modal response type, got %v", resp.Type)
+		}
+		if resp.Data == nil {
+			t.Fatalf("expected response data")
+		}
+		if want := fmt.Sprintf("scorecard_upload_modal|%s", roundID); resp.Data.CustomID != want {
+			t.Fatalf("customID mismatch: got %q want %q", resp.Data.CustomID, want)
+		}
+		if resp.Data.Title != "Upload Scorecard" {
+			t.Fatalf("title mismatch: got %q", resp.Data.Title)
+		}
+		// Basic shape: 2 action rows with expected text input IDs.
+		if len(resp.Data.Components) != 2 {
+			t.Fatalf("expected 2 components (action rows), got %d", len(resp.Data.Components))
+		}
+		return nil
+	}
 
 	m := &scorecardUploadManager{
-		session: mockSession,
+		session: fakeSession,
 		logger:  discardLogger(),
 		operationWrapper: func(ctx context.Context, _ string, fn func(context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error) {
 			return fn(ctx)
@@ -654,11 +599,8 @@ func Test_scorecardUploadManager_HandleScorecardUploadButton_SendsModal(t *testi
 }
 
 func Test_scorecardUploadManager_HandleScorecardUploadModalSubmit_URLFlow_PublishesAndConfirms(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
-	mockPublisher := eventbusmocks.NewMockEventBus(ctrl)
+	fakeSession := discord.NewFakeSession()
+	fakePublisher := &testutils.FakeEventBus{}
 
 	roundID := uuid.New()
 	guildID := "guild-id"
@@ -688,63 +630,63 @@ func Test_scorecardUploadManager_HandleScorecardUploadModalSubmit_URLFlow_Publis
 		},
 	}}
 
-	mockPublisher.EXPECT().
-		Publish(gomock.Eq(roundevents.ScorecardURLRequestedV1), gomock.Any()).
-		DoAndReturn(func(_ string, msg *message.Message) error {
-			var payload roundevents.ScorecardURLRequestedPayloadV1
-			if err := json.Unmarshal(msg.Payload, &payload); err != nil {
-				t.Fatalf("failed to unmarshal payload: %v", err)
-			}
-			if string(payload.GuildID) != guildID {
-				t.Fatalf("guild_id mismatch: got %q want %q", payload.GuildID, guildID)
-			}
-			if string(payload.UserID) != userID {
-				t.Fatalf("user_id mismatch: got %q want %q", payload.UserID, userID)
-			}
-			if payload.ChannelID != channelID {
-				t.Fatalf("channel_id mismatch: got %q want %q", payload.ChannelID, channelID)
-			}
-			if payload.MessageID != messageID {
-				t.Fatalf("message_id mismatch: got %q want %q", payload.MessageID, messageID)
-			}
-			if payload.RoundID.String() != roundID.String() {
-				t.Fatalf("round_id mismatch: got %q want %q", payload.RoundID.String(), roundID.String())
-			}
-			if payload.UDiscURL != url {
-				t.Fatalf("udisc_url mismatch: got %q want %q", payload.UDiscURL, url)
-			}
-			if payload.Notes != notes {
-				t.Fatalf("notes mismatch: got %q want %q", payload.Notes, notes)
-			}
-			if payload.ImportID == "" {
-				t.Fatalf("expected import_id to be set")
-			}
-			return nil
-		}).
-		Times(1)
+	fakePublisher.PublishFunc = func(topic string, messages ...*message.Message) error {
+		if topic != roundevents.ScorecardURLRequestedV1 {
+			t.Fatalf("unexpected topic: %q", topic)
+		}
+		if len(messages) != 1 {
+			t.Fatalf("expected 1 message")
+		}
+		var payload roundevents.ScorecardURLRequestedPayloadV1
+		if err := json.Unmarshal(messages[0].Payload, &payload); err != nil {
+			t.Fatalf("failed to unmarshal payload: %v", err)
+		}
+		if string(payload.GuildID) != guildID {
+			t.Fatalf("guild_id mismatch: got %q want %q", payload.GuildID, guildID)
+		}
+		if string(payload.UserID) != userID {
+			t.Fatalf("user_id mismatch: got %q want %q", payload.UserID, userID)
+		}
+		if payload.ChannelID != channelID {
+			t.Fatalf("channel_id mismatch: got %q want %q", payload.ChannelID, channelID)
+		}
+		if payload.MessageID != messageID {
+			t.Fatalf("message_id mismatch: got %q want %q", payload.MessageID, messageID)
+		}
+		if payload.RoundID.String() != roundID.String() {
+			t.Fatalf("round_id mismatch: got %q want %q", payload.RoundID.String(), roundID.String())
+		}
+		if payload.UDiscURL != url {
+			t.Fatalf("udisc_url mismatch: got %q want %q", payload.UDiscURL, url)
+		}
+		if payload.Notes != notes {
+			t.Fatalf("notes mismatch: got %q want %q", payload.Notes, notes)
+		}
+		if payload.ImportID == "" {
+			t.Fatalf("expected import_id to be set")
+		}
+		return nil
+	}
 
-	mockSession.EXPECT().
-		InteractionRespond(gomock.Eq(i.Interaction), gomock.Any()).
-		DoAndReturn(func(_ *discordgo.Interaction, resp *discordgo.InteractionResponse, _ ...discordgo.RequestOption) error {
-			if resp.Data == nil {
-				t.Fatalf("expected response data")
-			}
-			if resp.Data.Flags != discordgo.MessageFlagsEphemeral {
-				t.Fatalf("expected ephemeral response")
-			}
-			if !strings.Contains(resp.Data.Content, "Scorecard import started") {
-				t.Fatalf("expected confirmation message, got %q", resp.Data.Content)
-			}
-			if !strings.Contains(resp.Data.Content, "Import ID") {
-				t.Fatalf("expected import id in message, got %q", resp.Data.Content)
-			}
-			return nil
-		}).
-		Times(1)
+	fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, resp *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+		if resp.Data == nil {
+			t.Fatalf("expected response data")
+		}
+		if resp.Data.Flags != discordgo.MessageFlagsEphemeral {
+			t.Fatalf("expected ephemeral response")
+		}
+		if !strings.Contains(resp.Data.Content, "Scorecard import started") {
+			t.Fatalf("expected confirmation message, got %q", resp.Data.Content)
+		}
+		if !strings.Contains(resp.Data.Content, "Import ID") {
+			t.Fatalf("expected import id in message, got %q", resp.Data.Content)
+		}
+		return nil
+	}
 
 	m := &scorecardUploadManager{
-		session:   mockSession,
-		publisher: mockPublisher,
+		session:   fakeSession,
+		publisher: fakePublisher,
 		logger:    discardLogger(),
 		operationWrapper: func(ctx context.Context, _ string, fn func(context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error) {
 			return fn(ctx)
@@ -765,10 +707,7 @@ func Test_scorecardUploadManager_HandleScorecardUploadModalSubmit_URLFlow_Publis
 }
 
 func Test_scorecardUploadManager_HandleScorecardUploadModalSubmit_FileFlow_PromptsAndStoresPending(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
+	fakeSession := discord.NewFakeSession()
 
 	roundID := uuid.New()
 	guildID := "guild-id"
@@ -797,31 +736,38 @@ func Test_scorecardUploadManager_HandleScorecardUploadModalSubmit_FileFlow_Promp
 		},
 	}}
 
-	mockSession.EXPECT().
-		InteractionRespond(gomock.Eq(i.Interaction), gomock.Any()).
-		DoAndReturn(func(_ *discordgo.Interaction, resp *discordgo.InteractionResponse, _ ...discordgo.RequestOption) error {
-			if resp.Data == nil {
-				t.Fatalf("expected response data")
-			}
-			if resp.Data.Flags != discordgo.MessageFlagsEphemeral {
-				t.Fatalf("expected ephemeral prompt")
-			}
-			if !strings.Contains(resp.Data.Content, "I've sent you a DM") {
-				t.Fatalf("unexpected prompt content: %q", resp.Data.Content)
-			}
-			return nil
-		}).
-		Times(1)
+	fakeSession.UserChannelCreateFunc = func(recipientID string, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+		if recipientID != userID {
+			t.Fatalf("expected DM channel creation for user %q, got %q", userID, recipientID)
+		}
+		return &discordgo.Channel{ID: "dm-channel-id"}, nil
+	}
 
-	// Expect DM channel creation
-	dmChannel := &discordgo.Channel{ID: "dm-channel-id"}
-	mockSession.EXPECT().UserChannelCreate(userID).Return(dmChannel, nil).Times(1)
+	fakeSession.ChannelMessageSendFunc = func(cID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+		if cID != "dm-channel-id" {
+			t.Fatalf("expected DM message to channel %q, got %q", "dm-channel-id", cID)
+		}
+		if !strings.Contains(content, "Please upload your scorecard file") {
+			t.Fatalf("unexpected DM content: %q", content)
+		}
+		return &discordgo.Message{}, nil
+	}
 
-	// Expect DM message
-	mockSession.EXPECT().ChannelMessageSend("dm-channel-id", gomock.Any()).Return(&discordgo.Message{}, nil).Times(1)
+	fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, resp *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+		if resp.Data == nil {
+			t.Fatalf("expected response data")
+		}
+		if resp.Data.Flags != discordgo.MessageFlagsEphemeral {
+			t.Fatalf("expected ephemeral prompt")
+		}
+		if !strings.Contains(resp.Data.Content, "I've sent you a DM") {
+			t.Fatalf("unexpected prompt content: %q", resp.Data.Content)
+		}
+		return nil
+	}
 
 	m := &scorecardUploadManager{
-		session: mockSession,
+		session: fakeSession,
 		logger:  discardLogger(),
 		operationWrapper: func(ctx context.Context, _ string, fn func(context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error) {
 			return fn(ctx)

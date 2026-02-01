@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
@@ -15,14 +15,10 @@ import (
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
 	"github.com/google/uuid"
-	"go.uber.org/mock/gomock"
 )
 
 func Test_roundReminderManager_SendRoundReminder(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
+	fakeSession := discord.NewFakeSession()
 	mockLogger := loggerfrolfbot.NoOpLogger
 	mockConfig := &config.Config{
 		Discord: config.DiscordConfig{
@@ -56,17 +52,21 @@ func Test_roundReminderManager_SendRoundReminder(t *testing.T) {
 		{
 			name: "successful reminder with new thread",
 			setup: func() {
-				mockSession.EXPECT().GetChannel("channel-123").Return(&discordgo.Channel{}, nil)
-				mockSession.EXPECT().ChannelMessage("channel-123", "12345").
-					Return(&discordgo.Message{ID: "12345"}, nil)
-				mockSession.EXPECT().ThreadsActive("channel-123").
-					Return(&discordgo.ThreadsList{}, nil)
-				mockSession.EXPECT().
-					MessageThreadStartComplex("channel-123", "12345", gomock.Any()).
-					Return(&discordgo.Channel{ID: "thread-123"}, nil)
-				mockSession.EXPECT().
-					ChannelMessageSend("thread-123", gomock.Any()).
-					Return(&discordgo.Message{}, nil)
+				fakeSession.GetChannelFunc = func(channelID string, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+					return &discordgo.Channel{}, nil
+				}
+				fakeSession.ChannelMessageFunc = func(channelID, messageID string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{ID: "12345"}, nil
+				}
+				fakeSession.ThreadsActiveFunc = func(channelID string, options ...discordgo.RequestOption) (*discordgo.ThreadsList, error) {
+					return &discordgo.ThreadsList{}, nil
+				}
+				fakeSession.MessageThreadStartComplexFunc = func(channelID, messageID string, data *discordgo.ThreadStart, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+					return &discordgo.Channel{ID: "thread-123"}, nil
+				}
+				fakeSession.ChannelMessageSendFunc = func(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{}, nil
+				}
 			},
 			payload: samplePayload,
 			want:    RoundReminderOperationResult{Success: true},
@@ -74,9 +74,9 @@ func Test_roundReminderManager_SendRoundReminder(t *testing.T) {
 		{
 			name: "failed to get channel",
 			setup: func() {
-				mockSession.EXPECT().
-					GetChannel("channel-123").
-					Return(nil, errors.New("channel not found"))
+				fakeSession.GetChannelFunc = func(channelID string, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+					return nil, errors.New("channel not found")
+				}
 			},
 			payload: samplePayload,
 			want:    RoundReminderOperationResult{Error: errors.New("failed to get channel")},
@@ -85,17 +85,21 @@ func Test_roundReminderManager_SendRoundReminder(t *testing.T) {
 		{
 			name: "thread creation fails and falls back to main channel",
 			setup: func() {
-				mockSession.EXPECT().GetChannel("channel-123").Return(&discordgo.Channel{}, nil)
-				mockSession.EXPECT().ChannelMessage("channel-123", "12345").
-					Return(&discordgo.Message{ID: "12345"}, nil)
-				mockSession.EXPECT().ThreadsActive("channel-123").
-					Return(&discordgo.ThreadsList{}, nil)
-				mockSession.EXPECT().
-					MessageThreadStartComplex("channel-123", "12345", gomock.Any()).
-					Return(nil, errors.New("thread create failed"))
-				mockSession.EXPECT().
-					ChannelMessageSend("channel-123", gomock.Any()).
-					Return(&discordgo.Message{}, nil)
+				fakeSession.GetChannelFunc = func(channelID string, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+					return &discordgo.Channel{}, nil
+				}
+				fakeSession.ChannelMessageFunc = func(channelID, messageID string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{ID: "12345"}, nil
+				}
+				fakeSession.ThreadsActiveFunc = func(channelID string, options ...discordgo.RequestOption) (*discordgo.ThreadsList, error) {
+					return &discordgo.ThreadsList{}, nil
+				}
+				fakeSession.MessageThreadStartComplexFunc = func(channelID, messageID string, data *discordgo.ThreadStart, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+					return nil, errors.New("thread create failed")
+				}
+				fakeSession.ChannelMessageSendFunc = func(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{}, nil
+				}
 			},
 			payload: samplePayload,
 			want:    RoundReminderOperationResult{Success: true},
@@ -103,17 +107,21 @@ func Test_roundReminderManager_SendRoundReminder(t *testing.T) {
 		{
 			name: "send to thread fails",
 			setup: func() {
-				mockSession.EXPECT().GetChannel("channel-123").Return(&discordgo.Channel{}, nil)
-				mockSession.EXPECT().ChannelMessage("channel-123", "12345").
-					Return(&discordgo.Message{ID: "12345"}, nil)
-				mockSession.EXPECT().ThreadsActive("channel-123").
-					Return(&discordgo.ThreadsList{}, nil)
-				mockSession.EXPECT().
-					MessageThreadStartComplex("channel-123", "12345", gomock.Any()).
-					Return(&discordgo.Channel{ID: "thread-123"}, nil)
-				mockSession.EXPECT().
-					ChannelMessageSend("thread-123", gomock.Any()).
-					Return(nil, errors.New("send failed"))
+				fakeSession.GetChannelFunc = func(channelID string, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+					return &discordgo.Channel{}, nil
+				}
+				fakeSession.ChannelMessageFunc = func(channelID, messageID string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{ID: "12345"}, nil
+				}
+				fakeSession.ThreadsActiveFunc = func(channelID string, options ...discordgo.RequestOption) (*discordgo.ThreadsList, error) {
+					return &discordgo.ThreadsList{}, nil
+				}
+				fakeSession.MessageThreadStartComplexFunc = func(channelID, messageID string, data *discordgo.ThreadStart, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+					return &discordgo.Channel{ID: "thread-123"}, nil
+				}
+				fakeSession.ChannelMessageSendFunc = func(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return nil, errors.New("send failed")
+				}
 			},
 			payload: samplePayload,
 			want:    RoundReminderOperationResult{Error: errors.New("failed to send reminder message")},
@@ -122,22 +130,28 @@ func Test_roundReminderManager_SendRoundReminder(t *testing.T) {
 		{
 			name: "thread already exists via race condition",
 			setup: func() {
-				mockSession.EXPECT().GetChannel("channel-123").Return(&discordgo.Channel{}, nil)
-				mockSession.EXPECT().ChannelMessage("channel-123", "12345").
-					Return(&discordgo.Message{ID: "12345"}, nil)
-				mockSession.EXPECT().ThreadsActive("channel-123").
-					Return(&discordgo.ThreadsList{}, nil)
-				mockSession.EXPECT().
-					MessageThreadStartComplex("channel-123", "12345", gomock.Any()).
-					Return(nil, errors.New("Thread already exists"))
-				mockSession.EXPECT().
-					ChannelMessage("channel-123", "12345").
-					Return(&discordgo.Message{
+				fakeSession.GetChannelFunc = func(channelID string, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+					return &discordgo.Channel{}, nil
+				}
+				firstMessageCall := true
+				fakeSession.ChannelMessageFunc = func(channelID, messageID string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					if firstMessageCall {
+						firstMessageCall = false
+						return &discordgo.Message{ID: "12345"}, nil
+					}
+					return &discordgo.Message{
 						Thread: &discordgo.Channel{ID: "thread-123"},
-					}, nil)
-				mockSession.EXPECT().
-					ChannelMessageSend("thread-123", gomock.Any()).
-					Return(&discordgo.Message{}, nil)
+					}, nil
+				}
+				fakeSession.ThreadsActiveFunc = func(channelID string, options ...discordgo.RequestOption) (*discordgo.ThreadsList, error) {
+					return &discordgo.ThreadsList{}, nil
+				}
+				fakeSession.MessageThreadStartComplexFunc = func(channelID, messageID string, data *discordgo.ThreadStart, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+					return nil, errors.New("Thread already exists")
+				}
+				fakeSession.ChannelMessageSendFunc = func(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{}, nil
+				}
 			},
 			payload: samplePayload,
 			want:    RoundReminderOperationResult{Success: true},
@@ -162,7 +176,7 @@ func Test_roundReminderManager_SendRoundReminder(t *testing.T) {
 			}
 
 			rm := &roundReminderManager{
-				session: mockSession,
+				session: fakeSession,
 				config:  mockConfig,
 				logger:  mockLogger,
 				operationWrapper: func(ctx context.Context, _ string,

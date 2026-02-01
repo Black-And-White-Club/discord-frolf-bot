@@ -6,11 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
-	storagemocks "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/testutils"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
 	"github.com/bwmarrin/discordgo"
-	"go.uber.org/mock/gomock"
 )
 
 func Test_signupManager_SendSignupResult(t *testing.T) {
@@ -21,7 +20,7 @@ func Test_signupManager_SendSignupResult(t *testing.T) {
 	tests := []struct {
 		name        string
 		args        args
-		setup       func(mockStore *storagemocks.MockISInterface[any], mockDiscord *discordmocks.MockSession)
+		setup       func(fakeStore *testutils.FakeStorage[any], fakeDiscord *discord.FakeSession)
 		wantSuccess string
 		wantErr     bool
 		wantErrMsg  string
@@ -32,12 +31,16 @@ func Test_signupManager_SendSignupResult(t *testing.T) {
 				correlationID: "valid_id",
 				success:       true,
 			},
-			setup: func(mockStore *storagemocks.MockISInterface[any], mockDiscord *discordmocks.MockSession) {
+			setup: func(fakeStore *testutils.FakeStorage[any], fakeDiscord *discord.FakeSession) {
 				interaction := &discordgo.Interaction{}
-				mockStore.EXPECT().Get(gomock.Any(), "valid_id").Return(interaction, nil)
-				mockDiscord.EXPECT().InteractionResponseEdit(gomock.Any(), gomock.Any()).Return(&discordgo.Message{}, nil)
-				// Expect stored interaction to be deleted after sending the follow-up
-				mockStore.EXPECT().Delete(gomock.Any(), "valid_id").Times(1)
+				fakeStore.GetFunc = func(ctx context.Context, key string) (any, error) {
+					return interaction, nil
+				}
+				fakeDiscord.InteractionResponseEditFunc = func(interaction *discordgo.Interaction, response *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{}, nil
+				}
+				fakeStore.DeleteFunc = func(ctx context.Context, key string) {
+				}
 			},
 			wantSuccess: "🎉 Signup successful! Welcome!",
 			wantErr:     false,
@@ -49,12 +52,16 @@ func Test_signupManager_SendSignupResult(t *testing.T) {
 				correlationID: "valid_id",
 				success:       false,
 			},
-			setup: func(mockStore *storagemocks.MockISInterface[any], mockDiscord *discordmocks.MockSession) {
+			setup: func(fakeStore *testutils.FakeStorage[any], fakeDiscord *discord.FakeSession) {
 				interaction := &discordgo.Interaction{}
-				mockStore.EXPECT().Get(gomock.Any(), "valid_id").Return(interaction, nil)
-				mockDiscord.EXPECT().InteractionResponseEdit(gomock.Any(), gomock.Any()).Return(&discordgo.Message{}, nil)
-				// Expect stored interaction to be deleted after sending the follow-up
-				mockStore.EXPECT().Delete(gomock.Any(), "valid_id").Times(1)
+				fakeStore.GetFunc = func(ctx context.Context, key string) (any, error) {
+					return interaction, nil
+				}
+				fakeDiscord.InteractionResponseEditFunc = func(interaction *discordgo.Interaction, response *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{}, nil
+				}
+				fakeStore.DeleteFunc = func(ctx context.Context, key string) {
+				}
 			},
 			wantSuccess: "❌ Signup failed. Please try again.",
 			wantErr:     false,
@@ -66,8 +73,10 @@ func Test_signupManager_SendSignupResult(t *testing.T) {
 				correlationID: "invalid_id",
 				success:       true,
 			},
-			setup: func(mockStore *storagemocks.MockISInterface[any], mockDiscord *discordmocks.MockSession) {
-				mockStore.EXPECT().Get(gomock.Any(), "invalid_id").Return(nil, errors.New("item not found or expired"))
+			setup: func(fakeStore *testutils.FakeStorage[any], fakeDiscord *discord.FakeSession) {
+				fakeStore.GetFunc = func(ctx context.Context, key string) (any, error) {
+					return nil, errors.New("item not found or expired")
+				}
 			},
 			wantSuccess: "",
 			wantErr:     false,
@@ -79,8 +88,10 @@ func Test_signupManager_SendSignupResult(t *testing.T) {
 				correlationID: "invalid_type_id",
 				success:       true,
 			},
-			setup: func(mockStore *storagemocks.MockISInterface[any], mockDiscord *discordmocks.MockSession) {
-				mockStore.EXPECT().Get(gomock.Any(), "invalid_type_id").Return("not_an_interaction", nil)
+			setup: func(fakeStore *testutils.FakeStorage[any], fakeDiscord *discord.FakeSession) {
+				fakeStore.GetFunc = func(ctx context.Context, key string) (any, error) {
+					return "not_an_interaction", nil
+				}
 			},
 			wantSuccess: "",
 			wantErr:     false,
@@ -92,10 +103,14 @@ func Test_signupManager_SendSignupResult(t *testing.T) {
 				correlationID: "edit_error_id",
 				success:       true,
 			},
-			setup: func(mockStore *storagemocks.MockISInterface[any], mockDiscord *discordmocks.MockSession) {
+			setup: func(fakeStore *testutils.FakeStorage[any], fakeDiscord *discord.FakeSession) {
 				interaction := &discordgo.Interaction{}
-				mockStore.EXPECT().Get(gomock.Any(), "edit_error_id").Return(interaction, nil)
-				mockDiscord.EXPECT().InteractionResponseEdit(gomock.Any(), gomock.Any()).Return(nil, errors.New("edit error"))
+				fakeStore.GetFunc = func(ctx context.Context, key string) (any, error) {
+					return interaction, nil
+				}
+				fakeDiscord.InteractionResponseEditFunc = func(interaction *discordgo.Interaction, response *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return nil, errors.New("edit error")
+				}
 			},
 			wantSuccess: "",
 			wantErr:     true,
@@ -105,22 +120,19 @@ func Test_signupManager_SendSignupResult(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create new mock instances for each test
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-			mockSession := discordmocks.NewMockSession(ctrl)
-			mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
+			fakeSession := &discord.FakeSession{}
+			fakeInteractionStore := &testutils.FakeStorage[any]{}
 			logger := loggerfrolfbot.NoOpLogger
 
 			sm := &signupManager{
-				session:          mockSession,
-				interactionStore: mockInteractionStore,
+				session:          fakeSession,
+				interactionStore: fakeInteractionStore,
 				logger:           logger,
 				operationWrapper: testOperationWrapper,
 			}
 
 			if tt.setup != nil {
-				tt.setup(mockInteractionStore, mockSession)
+				tt.setup(fakeInteractionStore, fakeSession)
 			}
 
 			ctx := context.Background()

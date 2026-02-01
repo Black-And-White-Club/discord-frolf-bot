@@ -8,62 +8,55 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
-	guildconfigmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
-	storagemocks "github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage/mocks"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/testutils"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
-	eventbusmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
-	"github.com/Black-And-White-Club/frolf-bot-shared/mocks"
-	discordmetricsmocks "github.com/Black-And-White-Club/frolf-bot-shared/observability/mocks"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
 	"go.opentelemetry.io/otel/trace/noop"
-	"go.uber.org/mock/gomock"
 )
 
 func TestNewStartRoundManager(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockSession := discordmocks.NewMockSession(ctrl)
-	mockEventBus := eventbusmocks.NewMockEventBus(ctrl)
+	fakeSession := discord.NewFakeSession()
+	fakeEventBus := &testutils.FakeEventBus{}
 	testHandler := loggerfrolfbot.NewTestHandler()
 	logger := slog.New(testHandler)
-	mockHelper := mocks.NewMockHelpers(ctrl)
-	mockConfig := &config.Config{}
-	mockInteractionStore := storagemocks.NewMockISInterface[any](ctrl)
-	mockGuildConfigCache := storagemocks.NewMockISInterface[storage.GuildConfig](ctrl)
+	fakeHelper := &testutils.FakeHelpers{}
+	fakeConfig := &config.Config{}
+	fakeInteractionStore := &testutils.FakeStorage[any]{}
+	fakeGuildConfigCache := &testutils.FakeStorage[storage.GuildConfig]{}
 
-	mockTracer := noop.NewTracerProvider().Tracer("test")
-	mockMetrics := discordmetricsmocks.NewMockDiscordMetrics(ctrl)
-	mockGuildConfig := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
+	fakeTracer := noop.NewTracerProvider().Tracer("test")
+	fakeMetrics := &testutils.FakeDiscordMetrics{}
+	fakeGuildConfig := &testutils.FakeGuildConfigResolver{}
 
-	manager := NewStartRoundManager(mockSession, mockEventBus, logger, mockHelper, mockConfig, mockInteractionStore, mockGuildConfigCache, mockTracer, mockMetrics, mockGuildConfig)
+	manager := NewStartRoundManager(fakeSession, fakeEventBus, logger, fakeHelper, fakeConfig, fakeInteractionStore, fakeGuildConfigCache, fakeTracer, fakeMetrics, fakeGuildConfig)
 	impl, ok := manager.(*startRoundManager)
 	if !ok {
 		t.Fatalf("Expected *startRoundManager, got %T", manager)
 	}
 
-	if impl.session != mockSession {
+	if impl.session != fakeSession {
 		t.Error("Expected session to be assigned")
 	}
-	if impl.publisher != mockEventBus {
+	if impl.publisher != fakeEventBus {
 		t.Error("Expected publisher to be assigned")
 	}
 	if impl.logger != logger {
 		t.Error("Expected logger to be assigned")
 	}
-	if impl.helper != mockHelper {
+	if impl.helper != fakeHelper {
 		t.Error("Expected helper to be assigned")
 	}
-	if impl.config != mockConfig {
+	if impl.config != fakeConfig {
 		t.Error("Expected config to be assigned")
 	}
-	if impl.tracer != mockTracer {
+	if impl.tracer != fakeTracer {
 		t.Error("Expected tracer to be assigned")
 	}
-	if impl.metrics != mockMetrics {
+	if impl.metrics != fakeMetrics {
 		t.Error("Expected metrics to be assigned")
 	}
 	if impl.operationWrapper == nil {
@@ -72,12 +65,9 @@ func TestNewStartRoundManager(t *testing.T) {
 }
 
 func Test_wrapStartRoundOperation(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	testHandler := loggerfrolfbot.NewTestHandler()
 	logger := slog.New(testHandler)
-	mockMetrics := discordmetricsmocks.NewMockDiscordMetrics(ctrl)
+	fakeMetrics := &testutils.FakeDiscordMetrics{}
 	tracer := noop.NewTracerProvider().Tracer("test")
 
 	tests := []struct {
@@ -96,8 +86,25 @@ func Test_wrapStartRoundOperation(t *testing.T) {
 			},
 			expectRes: StartRoundOperationResult{Success: "yay!"},
 			mockMetric: func() {
-				mockMetrics.EXPECT().RecordAPIRequestDuration(gomock.Any(), "start_success", gomock.Any()).Times(1)
-				mockMetrics.EXPECT().RecordAPIRequest(gomock.Any(), "start_success").Times(1)
+				var durCalled, reqCalled bool
+				fakeMetrics.RecordAPIRequestDurationFunc = func(ctx context.Context, op string, d time.Duration) {
+					if op == "start_success" {
+						durCalled = true
+					}
+				}
+				fakeMetrics.RecordAPIRequestFunc = func(ctx context.Context, op string) {
+					if op == "start_success" {
+						reqCalled = true
+					}
+				}
+				t.Cleanup(func() {
+					if !durCalled {
+						t.Errorf("expected RecordAPIRequestDuration called for start_success")
+					}
+					if !reqCalled {
+						t.Errorf("expected RecordAPIRequest called for start_success")
+					}
+				})
 			},
 		},
 		{
@@ -109,8 +116,25 @@ func Test_wrapStartRoundOperation(t *testing.T) {
 			expectErr: "start_error operation error: bad op",
 			expectRes: StartRoundOperationResult{Error: fmt.Errorf("start_error operation error: bad op")},
 			mockMetric: func() {
-				mockMetrics.EXPECT().RecordAPIRequestDuration(gomock.Any(), "start_error", gomock.Any()).Times(1)
-				mockMetrics.EXPECT().RecordAPIError(gomock.Any(), "start_error", "operation_error").Times(1)
+				var durCalled, errCalled bool
+				fakeMetrics.RecordAPIRequestDurationFunc = func(ctx context.Context, op string, d time.Duration) {
+					if op == "start_error" {
+						durCalled = true
+					}
+				}
+				fakeMetrics.RecordAPIErrorFunc = func(ctx context.Context, op, errType string) {
+					if op == "start_error" && errType == "operation_error" {
+						errCalled = true
+					}
+				}
+				t.Cleanup(func() {
+					if !durCalled {
+						t.Errorf("expected RecordAPIRequestDuration called for start_error")
+					}
+					if !errCalled {
+						t.Errorf("expected RecordAPIError called for start_error")
+					}
+				})
 			},
 		},
 		{
@@ -121,8 +145,25 @@ func Test_wrapStartRoundOperation(t *testing.T) {
 			},
 			expectRes: StartRoundOperationResult{Error: errors.New("oopsie")},
 			mockMetric: func() {
-				mockMetrics.EXPECT().RecordAPIRequestDuration(gomock.Any(), "start_result_error", gomock.Any()).Times(1)
-				mockMetrics.EXPECT().RecordAPIError(gomock.Any(), "start_result_error", "result_error").Times(1)
+				var durCalled, errCalled bool
+				fakeMetrics.RecordAPIRequestDurationFunc = func(ctx context.Context, op string, d time.Duration) {
+					if op == "start_result_error" {
+						durCalled = true
+					}
+				}
+				fakeMetrics.RecordAPIErrorFunc = func(ctx context.Context, op, errType string) {
+					if op == "start_result_error" && errType == "result_error" {
+						errCalled = true
+					}
+				}
+				t.Cleanup(func() {
+					if !durCalled {
+						t.Errorf("expected RecordAPIRequestDuration called for start_result_error")
+					}
+					if !errCalled {
+						t.Errorf("expected RecordAPIError called for start_result_error")
+					}
+				})
 			},
 		},
 		{
@@ -134,8 +175,25 @@ func Test_wrapStartRoundOperation(t *testing.T) {
 			expectErr: "",                                    // The outer function returns nil error on panic recovery
 			expectRes: StartRoundOperationResult{Error: nil}, // The struct's Error field is nil on panic recovery before assignment
 			mockMetric: func() {
-				mockMetrics.EXPECT().RecordAPIRequestDuration(gomock.Any(), "start_panic", gomock.Any()).Times(1)
-				mockMetrics.EXPECT().RecordAPIError(gomock.Any(), "start_panic", "panic").Times(1)
+				var durCalled, errCalled bool
+				fakeMetrics.RecordAPIRequestDurationFunc = func(ctx context.Context, op string, d time.Duration) {
+					if op == "start_panic" {
+						durCalled = true
+					}
+				}
+				fakeMetrics.RecordAPIErrorFunc = func(ctx context.Context, op, errType string) {
+					if op == "start_panic" && errType == "panic" {
+						errCalled = true
+					}
+				}
+				t.Cleanup(func() {
+					if !durCalled {
+						t.Errorf("expected RecordAPIRequestDuration called for start_panic")
+					}
+					if !errCalled {
+						t.Errorf("expected RecordAPIError called for start_panic")
+					}
+				})
 			},
 		},
 		{
@@ -145,7 +203,17 @@ func Test_wrapStartRoundOperation(t *testing.T) {
 			expectErr: "operation function is nil",
 			expectRes: StartRoundOperationResult{Error: errors.New("operation function is nil")},
 			mockMetric: func() {
-				mockMetrics.EXPECT().RecordAPIError(gomock.Any(), "start_nil", "nil_function").Times(1)
+				var errCalled bool
+				fakeMetrics.RecordAPIErrorFunc = func(ctx context.Context, op, errType string) {
+					if op == "start_nil" && errType == "nil_function" {
+						errCalled = true
+					}
+				}
+				t.Cleanup(func() {
+					if !errCalled {
+						t.Errorf("expected RecordAPIError called for start_nil")
+					}
+				})
 			},
 		},
 	}
@@ -155,7 +223,7 @@ func Test_wrapStartRoundOperation(t *testing.T) {
 			if tt.mockMetric != nil {
 				tt.mockMetric()
 			}
-			got, err := wrapStartRoundOperation(context.Background(), tt.operation, tt.fn, logger, tracer, mockMetrics)
+			got, err := wrapStartRoundOperation(context.Background(), tt.operation, tt.fn, logger, tracer, fakeMetrics)
 
 			if tt.expectErr != "" {
 				if err == nil || err.Error() != tt.expectErr {

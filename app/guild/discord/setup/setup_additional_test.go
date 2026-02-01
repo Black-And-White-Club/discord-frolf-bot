@@ -8,14 +8,13 @@ import (
 	"log/slog"
 	"testing"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
-	sharedmocks "github.com/Black-And-White-Club/frolf-bot-shared/eventbus/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/testutils"
 	guildevents "github.com/Black-And-White-Club/frolf-bot-shared/events/guild"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/bwmarrin/discordgo"
 	"github.com/google/uuid"
-	"go.uber.org/mock/gomock"
 )
 
 func discardLogger() *slog.Logger {
@@ -23,22 +22,18 @@ func discardLogger() *slog.Logger {
 }
 
 func TestSendSetupModal_HappyPath(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	ms := discordmocks.NewMockSession(ctrl)
+	fakeSession := discord.NewFakeSession()
 
 	// Expect a modal response
-	ms.EXPECT().InteractionRespond(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-		func(inter *discordgo.Interaction, resp *discordgo.InteractionResponse, _ ...discordgo.RequestOption) error {
-			if resp == nil || resp.Type != discordgo.InteractionResponseModal {
-				t.Fatalf("expected modal response, got: %#v", resp)
-			}
-			return nil
-		},
-	)
+	fakeSession.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
+		if resp == nil || resp.Type != discordgo.InteractionResponseModal {
+			t.Fatalf("expected modal response, got: %#v", resp)
+		}
+		return nil
+	}
 
 	m := &setupManager{
-		session: ms,
+		session: fakeSession,
 		logger:  discardLogger(),
 		operationWrapper: func(ctx context.Context, _ string, fn func(ctx context.Context) error) error {
 			return fn(ctx)
@@ -52,14 +47,14 @@ func TestSendSetupModal_HappyPath(t *testing.T) {
 }
 
 func TestSendSetupModal_ErrorRespond(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	ms := discordmocks.NewMockSession(ctrl)
+	fakeSession := discord.NewFakeSession()
 
-	ms.EXPECT().InteractionRespond(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("fail"))
+	fakeSession.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
+		return fmt.Errorf("fail")
+	}
 
 	m := &setupManager{
-		session: ms,
+		session: fakeSession,
 		logger:  discardLogger(),
 		operationWrapper: func(ctx context.Context, _ string, fn func(ctx context.Context) error) error {
 			return fn(ctx)
@@ -72,15 +67,15 @@ func TestSendSetupModal_ErrorRespond(t *testing.T) {
 }
 
 func TestHandleSetupModalSubmit_MissingComponents(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	ms := discordmocks.NewMockSession(ctrl)
+	fakeSession := discord.NewFakeSession()
 
 	// Expect an error response (ephemeral message)
-	ms.EXPECT().InteractionRespond(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+	fakeSession.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
+		return nil
+	}
 
 	m := &setupManager{
-		session: ms,
+		session: fakeSession,
 		logger:  discardLogger(),
 		operationWrapper: func(ctx context.Context, _ string, fn func(ctx context.Context) error) error {
 			return fn(ctx)
@@ -101,16 +96,18 @@ func TestHandleSetupModalSubmit_MissingComponents(t *testing.T) {
 }
 
 func TestHandleSetupModalSubmit_GuildFetchError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	ms := discordmocks.NewMockSession(ctrl)
+	fakeSession := discord.NewFakeSession()
 
 	// Fail guild lookup, then respond error
-	ms.EXPECT().Guild("g1", gomock.Any()).Return(nil, errors.New("no guild"))
-	ms.EXPECT().InteractionRespond(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+	fakeSession.GuildFunc = func(guildID string, options ...discordgo.RequestOption) (*discordgo.Guild, error) {
+		return nil, errors.New("no guild")
+	}
+	fakeSession.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
+		return nil
+	}
 
 	m := &setupManager{
-		session:          ms,
+		session:          fakeSession,
 		logger:           discardLogger(),
 		operationWrapper: func(ctx context.Context, _ string, fn func(ctx context.Context) error) error { return fn(ctx) },
 	}
@@ -132,16 +129,9 @@ func TestHandleSetupModalSubmit_GuildFetchError(t *testing.T) {
 }
 
 func TestSendFollowups(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	ms := discordmocks.NewMockSession(ctrl)
+	fakeSession := discord.NewFakeSession()
 
-	// Error followup
-	ms.EXPECT().FollowupMessageCreate(gomock.Any(), true, gomock.Any(), gomock.Any()).Return(&discordgo.Message{ID: "e1"}, nil)
-	// Success followup
-	ms.EXPECT().FollowupMessageCreate(gomock.Any(), true, gomock.Any(), gomock.Any()).Return(&discordgo.Message{ID: "s1"}, nil)
-
-	m := &setupManager{session: ms, logger: discardLogger()}
+	m := &setupManager{session: fakeSession, logger: discardLogger()}
 	i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{ID: uuid.New().String()}}
 
 	if err := m.sendFollowupError(i, "oops"); err != nil {
@@ -153,16 +143,21 @@ func TestSendFollowups(t *testing.T) {
 }
 
 func TestPublishSetupEvent_Success(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	ms := discordmocks.NewMockSession(ctrl)
-	eb := sharedmocks.NewMockEventBus(ctrl)
+	fakeSession := discord.NewFakeSession()
+	eb := &testutils.FakeEventBus{}
 
-	ms.EXPECT().Guild("g1", gomock.Any()).Return(&discordgo.Guild{ID: "g1", Name: "Guild"}, nil)
-	eb.EXPECT().Publish(guildevents.GuildConfigCreationRequestedV1, gomock.Any()).Return(nil)
+	fakeSession.GuildFunc = func(guildID string, options ...discordgo.RequestOption) (*discordgo.Guild, error) {
+		return &discordgo.Guild{ID: "g1", Name: "Guild"}, nil
+	}
+	eb.PublishFunc = func(topic string, msgs ...*message.Message) error {
+		if topic != guildevents.GuildConfigCreationRequestedV1 {
+			return fmt.Errorf("unexpected topic: %s", topic)
+		}
+		return nil
+	}
 
 	m := &setupManager{
-		session:   ms,
+		session:   fakeSession,
 		publisher: eb,
 		logger:    discardLogger(),
 		helper:    utils.NewHelper(discardLogger()),
@@ -200,10 +195,8 @@ func (fakeHelpers) CreateNewMessage(_ interface{}, _ string) (*message.Message, 
 func (fakeHelpers) UnmarshalPayload(_ *message.Message, _ interface{}) error { return nil }
 
 func TestPublishSetupEvent_Errors(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	ms := discordmocks.NewMockSession(ctrl)
-	eb := sharedmocks.NewMockEventBus(ctrl)
+	fakeSession := discord.NewFakeSession()
+	eb := &testutils.FakeEventBus{}
 
 	// Case 1: missing user role id -> immediate error
 	m1 := &setupManager{}
@@ -213,29 +206,35 @@ func TestPublishSetupEvent_Errors(t *testing.T) {
 	}
 
 	// Case 2: helper CreateNewMessage fails
-	ms.EXPECT().Guild("g1", gomock.Any()).Return(&discordgo.Guild{ID: "g1", Name: "Guild"}, nil)
-	m2 := &setupManager{session: ms, publisher: eb, logger: discardLogger(), helper: fakeHelpers{}}
+	fakeSession.GuildFunc = func(guildID string, options ...discordgo.RequestOption) (*discordgo.Guild, error) {
+		return &discordgo.Guild{ID: "g1", Name: "Guild"}, nil
+	}
+	m2 := &setupManager{session: fakeSession, publisher: eb, logger: discardLogger(), helper: fakeHelpers{}}
 	if err := m2.publishSetupEvent(i, &SetupResult{UserRoleID: "u", EditorRoleID: "e", AdminRoleID: "a"}); err == nil {
 		t.Fatalf("expected error when helper fails")
 	}
 
 	// Case 3: publish fails
-	ms.EXPECT().Guild("g1", gomock.Any()).Return(&discordgo.Guild{ID: "g1", Name: "Guild"}, nil)
-	eb.EXPECT().Publish(guildevents.GuildConfigCreationRequestedV1, gomock.Any()).Return(fmt.Errorf("pub fail"))
-	m3 := &setupManager{session: ms, publisher: eb, logger: discardLogger(), helper: utils.NewHelper(discardLogger())}
+	fakeSession.GuildFunc = func(guildID string, options ...discordgo.RequestOption) (*discordgo.Guild, error) {
+		return &discordgo.Guild{ID: "g1", Name: "Guild"}, nil
+	}
+	eb.PublishFunc = func(topic string, msgs ...*message.Message) error {
+		return fmt.Errorf("pub fail")
+	}
+	m3 := &setupManager{session: fakeSession, publisher: eb, logger: discardLogger(), helper: utils.NewHelper(discardLogger())}
 	if err := m3.publishSetupEvent(i, &SetupResult{UserRoleID: "u", EditorRoleID: "e", AdminRoleID: "a"}); err == nil {
 		t.Fatalf("expected error when publish fails")
 	}
 }
 
 func TestCreateOrFindChannel_Existing(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	ms := discordmocks.NewMockSession(ctrl)
+	fakeSession := discord.NewFakeSession()
 
-	ms.EXPECT().GuildChannels("g1", gomock.Any()).Return([]*discordgo.Channel{{ID: "c1", Name: "frolf-events", Type: discordgo.ChannelTypeGuildText}}, nil)
+	fakeSession.GuildChannelsFunc = func(guildID string, options ...discordgo.RequestOption) ([]*discordgo.Channel, error) {
+		return []*discordgo.Channel{{ID: "c1", Name: "frolf-events", Type: discordgo.ChannelTypeGuildText}}, nil
+	}
 
-	m := &setupManager{session: ms}
+	m := &setupManager{session: fakeSession}
 	id, err := m.createOrFindChannel("g1", "frolf-events", "📊")
 	if err != nil {
 		t.Fatalf("createOrFindChannel error: %v", err)
@@ -246,11 +245,9 @@ func TestCreateOrFindChannel_Existing(t *testing.T) {
 }
 
 func TestCreateOrFindRole_Existing(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	ms := discordmocks.NewMockSession(ctrl)
+	fakeSession := discord.NewFakeSession()
 
-	m := &setupManager{session: ms}
+	m := &setupManager{session: fakeSession}
 	gid := &discordgo.Guild{ID: "g1", Roles: []*discordgo.Role{{ID: "r1", Name: "Player"}}}
 
 	id, err := m.createOrFindRole(gid, "Player", 0x00ff00)
@@ -263,10 +260,8 @@ func TestCreateOrFindRole_Existing(t *testing.T) {
 }
 
 func TestCreateOrFindRole_EdgeCases(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	ms := discordmocks.NewMockSession(ctrl)
-	m := &setupManager{session: ms}
+	fakeSession := discord.NewFakeSession()
+	m := &setupManager{session: fakeSession}
 
 	// Existing role with empty ID -> error
 	gid := &discordgo.Guild{ID: "g1", Roles: []*discordgo.Role{{ID: "", Name: "Player"}}}
@@ -276,30 +271,30 @@ func TestCreateOrFindRole_EdgeCases(t *testing.T) {
 
 	// Creation returns empty ID -> error
 	gid2 := &discordgo.Guild{ID: "g1", Roles: []*discordgo.Role{}}
-	ms.EXPECT().GuildRoleCreate("g1", gomock.Any(), gomock.Any()).Return(&discordgo.Role{Name: "Player", ID: ""}, nil)
+	fakeSession.GuildRoleCreateFunc = func(guildID string, params *discordgo.RoleParams, options ...discordgo.RequestOption) (*discordgo.Role, error) {
+		return &discordgo.Role{Name: "Player", ID: ""}, nil
+	}
 	if _, err := m.createOrFindRole(gid2, "Player", 0x00ff00); err == nil {
 		t.Fatalf("expected error for empty created role id")
 	}
 }
 
 func TestCreateSignupMessage_DefaultsAndReactionError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	ms := discordmocks.NewMockSession(ctrl)
+	fakeSession := discord.NewFakeSession()
 
 	// Send with empty content and emoji to trigger defaults
-	ms.EXPECT().ChannelMessageSend("ch1", gomock.Any(), gomock.Any()).DoAndReturn(
-		func(cid, content string, _ ...discordgo.RequestOption) (*discordgo.Message, error) {
-			if content == "" {
-				t.Fatalf("content should not be empty (default should apply)")
-			}
-			return &discordgo.Message{ID: "m1"}, nil
-		},
-	)
+	fakeSession.ChannelMessageSendFunc = func(cid, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+		if content == "" {
+			t.Fatalf("content should not be empty (default should apply)")
+		}
+		return &discordgo.Message{ID: "m1"}, nil
+	}
 	// Reaction add fails, but function should still return message ID
-	ms.EXPECT().MessageReactionAdd("ch1", "m1", gomock.Any()).Return(fmt.Errorf("react fail")).AnyTimes()
+	fakeSession.MessageReactionAddFunc = func(channelID, messageID, emojiID string) error {
+		return fmt.Errorf("react fail")
+	}
 
-	m := &setupManager{session: ms, logger: discardLogger()}
+	m := &setupManager{session: fakeSession, logger: discardLogger()}
 	mid, err := m.createSignupMessage(context.Background(), "g1", "ch1", "", "")
 	if err != nil {
 		t.Fatalf("createSignupMessage unexpected error: %v", err)
@@ -310,11 +305,11 @@ func TestCreateSignupMessage_DefaultsAndReactionError(t *testing.T) {
 }
 
 func TestCreateSignupMessage_SendError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	ms := discordmocks.NewMockSession(ctrl)
-	ms.EXPECT().ChannelMessageSend("ch1", gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("send fail"))
-	m := &setupManager{session: ms, logger: discardLogger()}
+	fakeSession := discord.NewFakeSession()
+	fakeSession.ChannelMessageSendFunc = func(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+		return nil, fmt.Errorf("send fail")
+	}
+	m := &setupManager{session: fakeSession, logger: discardLogger()}
 	if _, err := m.createSignupMessage(context.Background(), "g1", "ch1", "m", "🥏"); err == nil {
 		t.Fatalf("expected error when ChannelMessageSend fails")
 	}

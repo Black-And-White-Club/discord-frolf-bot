@@ -6,12 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	discordmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo/mocks"
-	guildconfigmocks "github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig/mocks"
+	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/bwmarrin/discordgo"
 	"github.com/google/uuid"
-	"go.uber.org/mock/gomock"
 )
 
 func Test_setupManager_SendSetupModal(t *testing.T) {
@@ -121,42 +120,43 @@ func Test_setupManager_HandleSetupModalSubmit(t *testing.T) {
 }
 
 func TestHandleSetupModalSubmit_SkipsWhenAlreadyConfigured(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	interaction := validSetupInteraction("frolf", "Frolf Player", "Frolf Admin", "React!", "🥏")
 
-	sessionMock := discordmocks.NewMockSession(ctrl)
-	resolverMock := guildconfigmocks.NewMockGuildConfigResolver(ctrl)
+	fakeSession := discord.NewFakeSession()
+	fakeResolver := &guildconfig.FakeGuildConfigResolver{}
 
-	sessionMock.EXPECT().Guild(interaction.GuildID).Return(&discordgo.Guild{ID: interaction.GuildID, Name: "Test Guild"}, nil)
-	sessionMock.EXPECT().InteractionRespond(interaction.Interaction, gomock.Any()).Return(nil)
+	fakeSession.GuildFunc = func(guildID string, options ...discordgo.RequestOption) (*discordgo.Guild, error) {
+		return &discordgo.Guild{ID: guildID, Name: "Test Guild"}, nil
+	}
+	fakeSession.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
+		return nil
+	}
 
-	resolverMock.EXPECT().GetGuildConfigWithContext(gomock.Any(), interaction.GuildID).Return(&storage.GuildConfig{
-		GuildID:              interaction.GuildID,
-		SignupChannelID:      "signup",
-		EventChannelID:       "events",
-		LeaderboardChannelID: "leaders",
-		RegisteredRoleID:     "role-player",
-		EditorRoleID:         "role-editor",
-		AdminRoleID:          "role-admin",
-		SignupMessageID:      "msg-123",
-		SignupEmoji:          "🥏",
-	}, nil)
+	fakeResolver.GetGuildConfigWithContextFunc = func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
+		return &storage.GuildConfig{
+			GuildID:              guildID,
+			SignupChannelID:      "signup",
+			EventChannelID:       "events",
+			LeaderboardChannelID: "leaders",
+			RegisteredRoleID:     "role-player",
+			EditorRoleID:         "role-editor",
+			AdminRoleID:          "role-admin",
+			SignupMessageID:      "msg-123",
+			SignupEmoji:          "🥏",
+		}, nil
+	}
 
-	sessionMock.EXPECT().FollowupMessageCreate(interaction.Interaction, true, gomock.Any()).DoAndReturn(
-		func(_ *discordgo.Interaction, wait bool, params *discordgo.WebhookParams, _ ...discordgo.RequestOption) (*discordgo.Message, error) {
-			if params == nil || !strings.Contains(params.Content, "already configured") {
-				t.Fatalf("expected follow-up content to mention existing configuration, got %v", params)
-			}
-			return &discordgo.Message{ID: "ok"}, nil
-		},
-	)
+	fakeSession.FollowupMessageCreateFunc = func(interaction *discordgo.Interaction, wait bool, params *discordgo.WebhookParams, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+		if params == nil || !strings.Contains(params.Content, "already configured") {
+			t.Fatalf("expected follow-up content to mention existing configuration, got %v", params)
+		}
+		return &discordgo.Message{ID: "ok"}, nil
+	}
 
 	sm := &setupManager{
-		session:             sessionMock,
+		session:             fakeSession,
 		logger:              discardLogger(),
-		guildConfigResolver: resolverMock,
+		guildConfigResolver: fakeResolver,
 		operationWrapper: func(ctx context.Context, _ string, fn func(ctx context.Context) error) error {
 			return fn(ctx)
 		},
