@@ -23,7 +23,7 @@ func PublishUserProfile(
 	member *discordgo.Member,
 	guildID string,
 ) {
-	if user == nil {
+	if user == nil || eventBus == nil {
 		return
 	}
 
