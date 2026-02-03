@@ -8,6 +8,33 @@ import (
 	"time"
 )
 
+func TestFakeStorage_BasicCRUD(t *testing.T) {
+	fs := NewFakeStorage[string]()
+	ctx := context.Background()
+
+	// Set
+	err := fs.Set(ctx, "test-key", "test-value")
+	if err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+
+	// Get
+	val, err := fs.Get(ctx, "test-key")
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if val != "test-value" {
+		t.Errorf("Expected test-value, got %s", val)
+	}
+
+	// Delete
+	fs.Delete(ctx, "test-key")
+	_, err = fs.Get(ctx, "test-key")
+	if err == nil {
+		t.Error("Expected error after Delete, got nil")
+	}
+}
+
 func TestFakeStorage_Concurrency(t *testing.T) {
 	fs := NewFakeStorage[string]()
 	ctx := context.Background()
