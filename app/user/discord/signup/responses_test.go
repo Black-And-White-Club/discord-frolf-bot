@@ -121,7 +121,7 @@ func Test_signupManager_SendSignupResult(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			fakeSession := &discord.FakeSession{}
-			fakeInteractionStore := &testutils.FakeStorage[any]{}
+			fakeInteractionStore := testutils.NewFakeStorage[any]()
 			logger := loggerfrolfbot.NoOpLogger
 
 			sm := &signupManager{

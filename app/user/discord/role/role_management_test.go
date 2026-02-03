@@ -17,7 +17,7 @@ import (
 func Test_roleManager_EditRoleUpdateResponse(t *testing.T) {
 	// Test cases updated to match implementation
 	fakeSession := &discord.FakeSession{}
-	fakeInteractionStore := &FakeISInterface[any]{}
+	fakeInteractionStore := NewFakeISInterface[any]()
 
 	tests := []struct {
 		name           string
@@ -251,7 +251,7 @@ func Test_roleManager_AddRoleToUser(t *testing.T) {
 				logger:           loggerfrolfbot.NoOpLogger,
 				helper:           &FakeHelpers{},
 				config:           &config.Config{},
-				interactionStore: &FakeISInterface[any]{},
+				interactionStore: NewFakeISInterface[any](),
 				tracer:           noop.NewTracerProvider().Tracer("test"),
 				operationWrapper: func(ctx context.Context, operationName string, fn func(ctx context.Context) (RoleOperationResult, error)) (RoleOperationResult, error) {
 					return fn(ctx) // Ignore the wrapper for testing

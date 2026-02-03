@@ -36,7 +36,7 @@ func Test_roleManager_RespondToRoleRequest(t *testing.T) {
 			},
 		},
 	}
-	fakeInteractionStore := &FakeISInterface[any]{}
+	fakeInteractionStore := NewFakeISInterface[any]()
 	fakeHelper := &FakeHelpers{}
 	tracerProvider := noop.NewTracerProvider()
 	tracer := tracerProvider.Tracer("test")
@@ -167,7 +167,7 @@ func Test_roleManager_RespondToRoleButtonPress(t *testing.T) {
 			},
 		},
 	}
-	fakeInteractionStore := &FakeISInterface[any]{}
+	fakeInteractionStore := NewFakeISInterface[any]()
 	fakeHelper := &FakeHelpers{}
 	tracerProvider := noop.NewTracerProvider()
 	tracer := tracerProvider.Tracer("test")
@@ -305,7 +305,7 @@ func Test_roleManager_HandleRoleRequestCommand(t *testing.T) {
 			},
 		},
 	}
-	fakeInteractionStore := &FakeISInterface[any]{}
+	fakeInteractionStore := NewFakeISInterface[any]()
 	fakeHelper := &FakeHelpers{}
 	metrics := &discordmetrics.NoOpMetrics{}
 
@@ -414,7 +414,7 @@ func Test_roleManager_HandleRoleButtonPress(t *testing.T) {
 			},
 		},
 	}
-	fakeInteractionStore := &FakeISInterface[any]{}
+	fakeInteractionStore := NewFakeISInterface[any]()
 	fakeHelper := &FakeHelpers{}
 	metrics := &discordmetrics.NoOpMetrics{}
 	tracerProvider := noop.NewTracerProvider()
@@ -660,7 +660,7 @@ func Test_roleManager_HandleRoleCancelButton(t *testing.T) {
 	fakePublisher := &FakeEventBus{}
 	logger := loggerfrolfbot.NoOpLogger
 	mockConfig := &config.Config{}
-	fakeInteractionStore := &FakeISInterface[any]{}
+	fakeInteractionStore := NewFakeISInterface[any]()
 	fakeHelper := &FakeHelpers{}
 	tracerProvider := noop.NewTracerProvider()
 	tracer := tracerProvider.Tracer("test")

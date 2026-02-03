@@ -107,7 +107,7 @@ func Test_createRoundManager_SendCreateRoundModal(t *testing.T) {
 			crm := &createRoundManager{
 				session:          fakeSession,
 				logger:           testutils.NoOpLogger(),
-				interactionStore: &testutils.FakeStorage[any]{},
+				interactionStore: testutils.NewFakeStorage[any](),
 				tracer:           noop.NewTracerProvider().Tracer("test"),
 				metrics:          &testutils.FakeDiscordMetrics{},
 				operationWrapper: testOperationWrapper,
@@ -195,7 +195,7 @@ func Test_createRoundManager_HandleCreateRoundModalSubmit(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			fakeSession := discord.NewFakeSession()
 			fakePublisher := &testutils.FakeEventBus{}
-			fakeStorage := &testutils.FakeStorage[any]{}
+			fakeStorage := testutils.NewFakeStorage[any]()
 			if tt.setup != nil {
 				tt.setup(fakeSession, fakePublisher, fakeStorage)
 			}
@@ -270,7 +270,7 @@ func Test_createRoundManager_HandleCreateRoundModalCancel(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			fakeSession := discord.NewFakeSession()
-			fakeStorage := &testutils.FakeStorage[any]{}
+			fakeStorage := testutils.NewFakeStorage[any]()
 			if tt.setup != nil {
 				tt.setup(fakeSession, fakeStorage)
 			}

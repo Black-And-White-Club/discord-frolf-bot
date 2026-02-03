@@ -28,8 +28,8 @@ func TestNewFinalizeRoundManager(t *testing.T) {
 	fakeTracer := noop.NewTracerProvider().Tracer("test")
 	fakeMetrics := &testutils.FakeDiscordMetrics{}
 	fakeGuildConfigResolver := &testutils.FakeGuildConfigResolver{}
-	fakeInteractionStore := &testutils.FakeStorage[any]{}
-	fakeGuildConfigCache := &testutils.FakeStorage[storage.GuildConfig]{}
+	fakeInteractionStore := testutils.NewFakeStorage[any]()
+	fakeGuildConfigCache := testutils.NewFakeStorage[storage.GuildConfig]()
 
 	manager := NewFinalizeRoundManager(fakeSession, fakeEventBus, logger, fakeHelper, fakeConfig, fakeInteractionStore, fakeGuildConfigCache, fakeTracer, fakeMetrics, fakeGuildConfigResolver)
 	impl, ok := manager.(*finalizeRoundManager)

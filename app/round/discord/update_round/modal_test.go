@@ -154,7 +154,7 @@ func Test_updateRoundManager_SendupdateRoundModal(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			fakeSession := discord.NewFakeSession()
 			mockLogger := loggerfrolfbot.NoOpLogger
-			fakeInteractionStore := &testutils.FakeStorage[any]{}
+			fakeInteractionStore := testutils.NewFakeStorage[any]()
 			tracerProvider := noop.NewTracerProvider()
 			tracer := tracerProvider.Tracer("test")
 			metrics := &discordmetrics.NoOpMetrics{}
@@ -423,7 +423,7 @@ func Test_updateRoundManager_HandleUpdateRoundModalSubmit(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			fakeSession := discord.NewFakeSession()
 			fakePublisher := &testutils.FakeEventBus{}
-			fakeInteractionStore := &testutils.FakeStorage[any]{}
+			fakeInteractionStore := testutils.NewFakeStorage[any]()
 			mockLogger := loggerfrolfbot.NoOpLogger
 			fakeHelper := &testutils.FakeHelpers{}
 
@@ -579,7 +579,7 @@ func Test_updateRoundManager_HandleUpdateRoundModalCancel(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			fakeSession := discord.NewFakeSession()
-			fakeInteractionStore := &testutils.FakeStorage[any]{}
+			fakeInteractionStore := testutils.NewFakeStorage[any]()
 			mockLogger := loggerfrolfbot.NoOpLogger
 
 			tt.setupSession(fakeSession)

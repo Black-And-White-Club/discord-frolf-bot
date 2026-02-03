@@ -22,7 +22,7 @@ func TestInitializeUserModule_Succeeds(t *testing.T) {
 	logger := slog.New(loggerfrolfbot.NewTestHandler())
 	helper := &testutils.FakeHelpers{}
 	cfg := &config.Config{}
-	interactionStore := &testutils.FakeStorage[any]{}
+	interactionStore := testutils.NewFakeStorage[any]()
 	metrics := &discordmetrics.NoOpMetrics{}
 	guildCfg := &testutils.FakeGuildConfigResolver{}
 

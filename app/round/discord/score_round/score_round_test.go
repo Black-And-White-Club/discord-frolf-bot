@@ -29,8 +29,8 @@ func TestNewScoreRoundManager(t *testing.T) {
 	mockTracer := noop.NewTracerProvider().Tracer("test")
 	fakeMetrics := &testutils.FakeDiscordMetrics{}
 	fakeGuildConfigResolver := &testutils.FakeGuildConfigResolver{}
-	fakeInteractionStore := &testutils.FakeStorage[any]{}
-	fakeGuildConfigCache := &testutils.FakeStorage[storage.GuildConfig]{}
+	fakeInteractionStore := testutils.NewFakeStorage[any]()
+	fakeGuildConfigCache := testutils.NewFakeStorage[storage.GuildConfig]()
 
 	manager := NewScoreRoundManager(fakeSession, fakeEventBus, logger, fakeHelper, fakeConfig, fakeInteractionStore, fakeGuildConfigCache, mockTracer, fakeMetrics, fakeGuildConfigResolver)
 	impl, ok := manager.(*scoreRoundManager)
@@ -211,8 +211,8 @@ func Test_HandleScoreButton(t *testing.T) {
 	fakeHelper := &testutils.FakeHelpers{}
 	fakeConfig := &config.Config{}
 	tracer := noop.NewTracerProvider().Tracer("test")
-	fakeInteractionStore := &testutils.FakeStorage[any]{}
-	fakeGuildConfigCache := &testutils.FakeStorage[storage.GuildConfig]{}
+	fakeInteractionStore := testutils.NewFakeStorage[any]()
+	fakeGuildConfigCache := testutils.NewFakeStorage[storage.GuildConfig]()
 	fakeGuildCfg := &testutils.FakeGuildConfigResolver{}
 
 	// Pass nil metrics so wrapper doesn't record metrics during tests
@@ -317,8 +317,8 @@ func Test_HandleScoreSubmission_Single(t *testing.T) {
 	fakeHelper := &testutils.FakeHelpers{}
 	fakeConfig := &config.Config{}
 	tracer := noop.NewTracerProvider().Tracer("test")
-	fakeInteractionStore := &testutils.FakeStorage[any]{}
-	fakeGuildConfigCache := &testutils.FakeStorage[storage.GuildConfig]{}
+	fakeInteractionStore := testutils.NewFakeStorage[any]()
+	fakeGuildConfigCache := testutils.NewFakeStorage[storage.GuildConfig]()
 	fakeGuildCfg := &testutils.FakeGuildConfigResolver{}
 
 	// Pass nil metrics so wrapper doesn't record metrics during tests
@@ -443,8 +443,8 @@ func Test_HandleScoreSubmission_Bulk(t *testing.T) {
 	fakeHelper := &testutils.FakeHelpers{}
 	fakeConfig := &config.Config{}
 	tracer := noop.NewTracerProvider().Tracer("test")
-	fakeInteractionStore := &testutils.FakeStorage[any]{}
-	fakeGuildConfigCache := &testutils.FakeStorage[storage.GuildConfig]{}
+	fakeInteractionStore := testutils.NewFakeStorage[any]()
+	fakeGuildConfigCache := testutils.NewFakeStorage[storage.GuildConfig]()
 	fakeGuildCfg := &testutils.FakeGuildConfigResolver{}
 
 	// Pass nil metrics so wrapper doesn't record metrics during tests

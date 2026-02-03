@@ -21,7 +21,7 @@ import (
 func Test_signupManager_SendSignupModal(t *testing.T) {
 	fakeSession := &discord.FakeSession{}
 	fakePublisher := &testutils.FakeEventBus{}
-	fakeInteractionStore := &testutils.FakeStorage[any]{}
+	fakeInteractionStore := testutils.NewFakeStorage[any]()
 	mockConfig := &config.Config{
 		Discord: config.DiscordConfig{
 			GuildID: "guild_123",
@@ -202,7 +202,7 @@ func Test_signupManager_SendSignupModal(t *testing.T) {
 func Test_signupManager_HandleSignupModalSubmit(t *testing.T) {
 	fakeSession := &discord.FakeSession{}
 	fakePublisher := &testutils.FakeEventBus{}
-	fakeInteractionStore := &testutils.FakeStorage[any]{}
+	fakeInteractionStore := testutils.NewFakeStorage[any]()
 	mockConfig := &config.Config{
 		Discord: config.DiscordConfig{
 			GuildID: "guild_123",

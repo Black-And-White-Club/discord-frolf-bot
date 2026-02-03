@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"errors"
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/auth/discord/dashboard"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
@@ -11,59 +10,26 @@ import (
 
 // FakeInteractionStore is a programmable fake for storage.ISInterface[any]
 type FakeInteractionStore struct {
-	SetFunc    func(ctx context.Context, correlationID string, interaction any) error
-	DeleteFunc func(ctx context.Context, correlationID string)
-	GetFunc    func(ctx context.Context, correlationID string) (any, error)
-
-	// Track calls for verification
-	calls []string
+	*storage.FakeStorage[any]
 }
 
 func NewFakeInteractionStore() *FakeInteractionStore {
-	return &FakeInteractionStore{
-		calls: []string{},
+	f := &FakeInteractionStore{
+		FakeStorage: storage.NewFakeStorage[any](),
 	}
-}
-
-func (f *FakeInteractionStore) record(method string) {
-	f.calls = append(f.calls, method)
+	f.GetFunc = func(ctx context.Context, correlationID string) (any, error) {
+		f.FakeStorage.RecordCall("Get")
+		return dashboard.DashboardInteractionData{
+			InteractionToken: "fake-token",
+			UserID:           "user-123",
+			GuildID:          "guild-123",
+		}, nil
+	}
+	return f
 }
 
 func (f *FakeInteractionStore) Calls() []string {
-	out := make([]string, len(f.calls))
-	copy(out, f.calls)
-	return out
-}
-
-func (f *FakeInteractionStore) Set(ctx context.Context, correlationID string, interaction any) error {
-	f.record("Set")
-	if f.SetFunc != nil {
-		return f.SetFunc(ctx, correlationID, interaction)
-	}
-	if correlationID == "" {
-		return errors.New("correlation ID is empty")
-	}
-	return nil
-}
-
-func (f *FakeInteractionStore) Delete(ctx context.Context, correlationID string) {
-	f.record("Delete")
-	if f.DeleteFunc != nil {
-		f.DeleteFunc(ctx, correlationID)
-	}
-}
-
-func (f *FakeInteractionStore) Get(ctx context.Context, correlationID string) (any, error) {
-	f.record("Get")
-	if f.GetFunc != nil {
-		return f.GetFunc(ctx, correlationID)
-	}
-	// Default: return valid dashboard interaction data
-	return dashboard.DashboardInteractionData{
-		InteractionToken: "fake-token",
-		UserID:           "user-123",
-		GuildID:          "guild-123",
-	}, nil
+	return f.GetCalls()
 }
 
 // Interface assertion

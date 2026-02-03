@@ -185,7 +185,7 @@ func Test_createRoundManager_HandleRetryCreateRound(t *testing.T) {
 
 func Test_createRoundManager_UpdateInteractionResponse(t *testing.T) {
 	fakeSession := discord.NewFakeSession()
-	fakeInteractionStore := &testutils.FakeStorage[any]{}
+	fakeInteractionStore := testutils.NewFakeStorage[any]()
 	logger := slog.Default()
 	fakeHelper := &testutils.FakeHelpers{}
 	mockConfig := &config.Config{}
@@ -369,7 +369,7 @@ func Test_createRoundManager_UpdateInteractionResponse(t *testing.T) {
 
 func Test_createRoundManager_UpdateInteractionResponseWithRetryButton(t *testing.T) {
 	fakeSession := discord.NewFakeSession()
-	fakeInteractionStore := &testutils.FakeStorage[any]{}
+	fakeInteractionStore := testutils.NewFakeStorage[any]()
 	logger := slog.Default()
 	fakeHelper := &testutils.FakeHelpers{}
 	mockConfig := &config.Config{}

@@ -2,9 +2,9 @@ package role
 
 import (
 	"context"
-	"errors"
 	"time"
 
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/nats-io/nats.go"
@@ -84,34 +84,21 @@ var _ eventbus.EventBus = (*FakeEventBus)(nil)
 
 // FakeISInterface is a programmable fake for storage.ISInterface
 type FakeISInterface[T any] struct {
-	SetFunc    func(ctx context.Context, correlationID string, interaction T) error
-	DeleteFunc func(ctx context.Context, correlationID string)
-	GetFunc    func(ctx context.Context, correlationID string) (T, error)
+	*storage.FakeStorage[T]
 }
 
-func (f *FakeISInterface[T]) Set(ctx context.Context, correlationID string, interaction T) error {
-	if f.SetFunc != nil {
-		return f.SetFunc(ctx, correlationID, interaction)
-	}
-	if correlationID == "" {
-		return errors.New("correlation ID is empty")
-	}
-	return nil
-}
-
-func (f *FakeISInterface[T]) Delete(ctx context.Context, correlationID string) {
-	if f.DeleteFunc != nil {
-		f.DeleteFunc(ctx, correlationID)
+func NewFakeISInterface[T any]() *FakeISInterface[T] {
+	return &FakeISInterface[T]{
+		FakeStorage: storage.NewFakeStorage[T](),
 	}
 }
 
-func (f *FakeISInterface[T]) Get(ctx context.Context, correlationID string) (T, error) {
-	if f.GetFunc != nil {
-		return f.GetFunc(ctx, correlationID)
-	}
-	var zero T
-	return zero, nil
+func (f *FakeISInterface[T]) RecordFunc(method string) {
+	f.FakeStorage.RecordCall(method)
 }
+
+// Ensure interface compliance
+var _ storage.ISInterface[any] = (*FakeISInterface[any])(nil)
 
 // FakeHelpers is a programmable fake for utils.Helpers
 type FakeHelpers struct {

@@ -23,8 +23,8 @@ func TestNewDeleteRoundManager(t *testing.T) {
 	logger := slog.New(testHandler)
 	fakeHelper := &testutils.FakeHelpers{}
 	fakeConfig := &config.Config{}
-	fakeInteractionStore := &testutils.FakeStorage[any]{}
-	fakeGuildConfigCache := &testutils.FakeStorage[storage.GuildConfig]{}
+	fakeInteractionStore := testutils.NewFakeStorage[any]()
+	fakeGuildConfigCache := testutils.NewFakeStorage[storage.GuildConfig]()
 	fakeMetrics := &testutils.FakeDiscordMetrics{}
 	tracer := noop.NewTracerProvider().Tracer("test")
 	fakeGuildConfigResolver := &testutils.FakeGuildConfigResolver{}
