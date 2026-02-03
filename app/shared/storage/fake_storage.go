@@ -32,6 +32,7 @@ func NewFakeStorage[T any]() *FakeStorage[T] {
 	return &FakeStorage[T]{
 		data:       make(map[string]item[T]),
 		DefaultTTL: 1 * time.Hour,
+		Calls:      make([]string, 0),
 	}
 }
 
