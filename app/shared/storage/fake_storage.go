@@ -22,13 +22,16 @@ func (f *FakeStorage[T]) Get(ctx context.Context, correlationID string) (T, erro
 	val, ok := f.data[correlationID]
 	if !ok {
 		var zero T
-		return zero, errors.New("interaction not found")
+		return zero, errors.New("item not found or expired")
 	}
 	return val, nil
 }
 
 // Set stores the item in the in-memory map.
 func (f *FakeStorage[T]) Set(ctx context.Context, correlationID string, interaction T) error {
+	if correlationID == "" {
+		return errors.New("correlation ID is empty")
+	}
 	f.data[correlationID] = interaction
 	return nil
 }

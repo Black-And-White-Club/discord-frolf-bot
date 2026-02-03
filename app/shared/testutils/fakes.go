@@ -2,6 +2,7 @@ package testutils
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"io"
@@ -102,12 +103,15 @@ func (f *FakeStorage[T]) Get(ctx context.Context, key string) (T, error) {
 		return f.GetFunc(ctx, key)
 	}
 	var zero T
-	return zero, nil
+	return zero, errors.New("item not found or expired")
 }
 
 func (f *FakeStorage[T]) Set(ctx context.Context, key string, value T) error {
 	if f.SetFunc != nil {
 		return f.SetFunc(ctx, key, value)
+	}
+	if key == "" {
+		return errors.New("correlation ID is empty")
 	}
 	return nil
 }

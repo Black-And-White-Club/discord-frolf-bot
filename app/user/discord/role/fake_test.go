@@ -2,6 +2,7 @@ package role
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
@@ -91,6 +92,9 @@ type FakeISInterface[T any] struct {
 func (f *FakeISInterface[T]) Set(ctx context.Context, correlationID string, interaction T) error {
 	if f.SetFunc != nil {
 		return f.SetFunc(ctx, correlationID, interaction)
+	}
+	if correlationID == "" {
+		return errors.New("correlation ID is empty")
 	}
 	return nil
 }

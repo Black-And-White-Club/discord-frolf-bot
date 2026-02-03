@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/auth/discord/dashboard"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
@@ -38,6 +39,9 @@ func (f *FakeInteractionStore) Set(ctx context.Context, correlationID string, in
 	f.record("Set")
 	if f.SetFunc != nil {
 		return f.SetFunc(ctx, correlationID, interaction)
+	}
+	if correlationID == "" {
+		return errors.New("correlation ID is empty")
 	}
 	return nil
 }
