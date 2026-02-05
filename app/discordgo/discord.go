@@ -1,10 +1,20 @@
 package discord
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/bwmarrin/discordgo"
 )
+
+// GuildIconURL returns the CDN URL for a guild icon, or nil if no icon is set.
+func GuildIconURL(guildID, iconHash string) *string {
+	if iconHash == "" {
+		return nil
+	}
+	url := fmt.Sprintf("https://cdn.discordapp.com/icons/%s/%s.png", guildID, iconHash)
+	return &url
+}
 
 // Session defines the interface for interacting with Discord.
 // This interface contains only the methods that are actually used in the codebase.

@@ -5,17 +5,18 @@ import (
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/auth/discord/dashboard"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/testutils"
 	"github.com/bwmarrin/discordgo"
 )
 
 // FakeInteractionStore is a programmable fake for storage.ISInterface[any]
 type FakeInteractionStore struct {
-	*storage.FakeStorage[any]
+	*testutils.FakeStorage[any]
 }
 
 func NewFakeInteractionStore() *FakeInteractionStore {
 	f := &FakeInteractionStore{
-		FakeStorage: storage.NewFakeStorage[any](),
+		FakeStorage: testutils.NewFakeStorage[any](),
 	}
 	f.GetFunc = func(ctx context.Context, correlationID string) (any, error) {
 		return dashboard.DashboardInteractionData{

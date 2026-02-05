@@ -2,14 +2,17 @@ package signup
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
+	"strings"
 	"sync"
 	"testing"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/testutils"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
+	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/bwmarrin/discordgo"
 	"go.opentelemetry.io/otel/trace/noop"
@@ -42,6 +45,20 @@ func (t *trackingEventBus) PublishedMessages() []*message.Message {
 	out := make([]*message.Message, len(t.messages))
 	copy(out, t.messages)
 	return out
+}
+
+func newTestHelper() *testutils.FakeHelpers {
+	return &testutils.FakeHelpers{
+		CreateNewMessageFunc: func(payload any, topic string) (*message.Message, error) {
+			data, err := json.Marshal(payload)
+			if err != nil {
+				return nil, err
+			}
+			msg := message.NewMessage(watermill.NewUUID(), data)
+			msg.Metadata.Set("topic", topic)
+			return msg, nil
+		},
+	}
 }
 
 func TestSignupManager_SyncMember(t *testing.T) {
@@ -144,6 +161,7 @@ func TestSignupManager_SyncMember(t *testing.T) {
 				session:          fakeSession,
 				publisher:        fakeEventBus,
 				logger:           slog.Default(),
+				helper:           newTestHelper(),
 				interactionStore: fakeInteractionStore,
 				tracer:           noop.NewTracerProvider().Tracer("test"),
 				metrics:          &discordmetrics.NoOpMetrics{},
@@ -156,7 +174,7 @@ func TestSignupManager_SyncMember(t *testing.T) {
 					t.Errorf("SyncMember() expected error but got nil")
 					return
 				}
-				if tt.wantErrMsg != "" && !containsString(err.Error(), tt.wantErrMsg) {
+				if tt.wantErrMsg != "" && !strings.Contains(err.Error(), tt.wantErrMsg) {
 					t.Errorf("SyncMember() error = %v, want error containing %q", err, tt.wantErrMsg)
 				}
 			} else {
@@ -172,7 +190,7 @@ func TestSignupManager_SyncMember(t *testing.T) {
 	}
 }
 
-func TestResolveDisplayName(t *testing.T) {
+func TestGuildNickname(t *testing.T) {
 	tests := []struct {
 		name   string
 		member *discordgo.Member
@@ -204,20 +222,19 @@ func TestResolveDisplayName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := resolveDisplayName(tt.member)
+			got := guildNickname(tt.member)
 			if got != tt.want {
-				t.Errorf("resolveDisplayName() = %q, want %q", got, tt.want)
+				t.Errorf("guildNickname() = %q, want %q", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestPublishUserProfileFromMember(t *testing.T) {
+func TestPublishUserProfile(t *testing.T) {
 	tests := []struct {
 		name        string
 		member      *discordgo.Member
 		guildID     string
-		useEventBus bool
 		wantPublish bool
 	}{
 		{
@@ -231,14 +248,12 @@ func TestPublishUserProfileFromMember(t *testing.T) {
 				},
 			},
 			guildID:     "guild-456",
-			useEventBus: true,
 			wantPublish: true,
 		},
 		{
 			name:        "nil member does not publish",
 			member:      nil,
 			guildID:     "guild-456",
-			useEventBus: true,
 			wantPublish: false,
 		},
 		{
@@ -248,52 +263,33 @@ func TestPublishUserProfileFromMember(t *testing.T) {
 				User: nil,
 			},
 			guildID:     "guild-456",
-			useEventBus: true,
-			wantPublish: false,
-		},
-		{
-			name: "nil eventBus does not crash",
-			member: &discordgo.Member{
-				Nick: "TestNick",
-				User: &discordgo.User{
-					ID:       "user-123",
-					Username: "testuser",
-				},
-			},
-			guildID:     "guild-456",
-			useEventBus: false,
 			wantPublish: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
-			logger := slog.Default()
+			eventBus := newTrackingEventBus()
+			sm := &signupManager{
+				session:          &discord.FakeSession{},
+				publisher:        eventBus,
+				logger:           slog.Default(),
+				helper:           newTestHelper(),
+				interactionStore: testutils.NewFakeStorage[any](),
+				tracer:           noop.NewTracerProvider().Tracer("test"),
+				metrics:          &discordmetrics.NoOpMetrics{},
+			}
 
-			if tt.useEventBus {
-				eventBus := newTrackingEventBus()
-				publishUserProfileFromMember(ctx, eventBus, logger, tt.member, tt.guildID)
-				if tt.wantPublish {
-					if len(eventBus.PublishedMessages()) == 0 {
-						t.Error("expected event to be published but none were")
-					}
-				}
-			} else {
-				// Pass explicit nil to avoid typed nil pointer issue
-				publishUserProfileFromMember(ctx, nil, logger, tt.member, tt.guildID)
-				// No assertion needed - just verifying no panic
+			sm.publishUserProfile(context.Background(), tt.member, tt.guildID)
+
+			published := len(eventBus.PublishedMessages()) > 0
+			if tt.wantPublish && !published {
+				t.Error("expected event to be published but none were")
+			}
+			if !tt.wantPublish && published {
+				t.Error("expected no event to be published but one was")
 			}
 		})
 	}
 }
 
-// containsString checks if s contains substr
-func containsString(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}

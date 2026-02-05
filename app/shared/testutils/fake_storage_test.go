@@ -1,4 +1,4 @@
-package storage
+package testutils
 
 import (
 	"context"
@@ -82,7 +82,7 @@ func TestFakeStorage_Concurrency(t *testing.T) {
 
 func TestFakeStorage_Expiration(t *testing.T) {
 	fs := NewFakeStorage[string]()
-	fs.DefaultTTL = 10 * time.Millisecond
+	fs.DefaultTTL = 50 * time.Millisecond
 	ctx := context.Background()
 
 	fs.Set(ctx, "short-lived", "value")
@@ -92,7 +92,7 @@ func TestFakeStorage_Expiration(t *testing.T) {
 		t.Errorf("Expected value, got error: %v", err)
 	}
 
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	_, err = fs.Get(ctx, "short-lived")
 	if err == nil {
@@ -112,5 +112,22 @@ func TestFakeStorage_EmptyCorrelationID(t *testing.T) {
 	_, err = fs.Get(ctx, "")
 	if err == nil {
 		t.Error("Expected error for empty correlation ID in Get, got nil")
+	}
+}
+
+func TestFakeStorage_CallTracking(t *testing.T) {
+	fs := NewFakeStorage[string]()
+	ctx := context.Background()
+
+	fs.Set(ctx, "k", "v")
+	fs.Get(ctx, "k")
+	fs.Delete(ctx, "k")
+
+	calls := fs.GetCalls()
+	if len(calls) != 3 {
+		t.Fatalf("expected 3 calls, got %d", len(calls))
+	}
+	if calls[0] != "Set" || calls[1] != "Get" || calls[2] != "Delete" {
+		t.Errorf("unexpected calls: %v", calls)
 	}
 }

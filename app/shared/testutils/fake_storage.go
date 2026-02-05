@@ -1,4 +1,4 @@
-package storage
+package testutils
 
 import (
 	"context"
@@ -12,7 +12,7 @@ type item[T any] struct {
 	expiresAt time.Time
 }
 
-// FakeStorage is a modular fake implementation of ISInterface for testing.
+// FakeStorage is a generic in-memory fake implementation of storage.ISInterface for testing.
 type FakeStorage[T any] struct {
 	data map[string]item[T]
 	mu   sync.RWMutex
@@ -23,7 +23,7 @@ type FakeStorage[T any] struct {
 	DeleteFunc func(ctx context.Context, correlationID string)
 
 	DefaultTTL time.Duration
-	Calls      []string
+	calls      []string
 	muCalls    sync.Mutex
 }
 
@@ -32,21 +32,21 @@ func NewFakeStorage[T any]() *FakeStorage[T] {
 	return &FakeStorage[T]{
 		data:       make(map[string]item[T]),
 		DefaultTTL: 1 * time.Hour,
-		Calls:      make([]string, 0),
+		calls:      make([]string, 0),
 	}
 }
 
 func (f *FakeStorage[T]) RecordCall(method string) {
 	f.muCalls.Lock()
 	defer f.muCalls.Unlock()
-	f.Calls = append(f.Calls, method)
+	f.calls = append(f.calls, method)
 }
 
 func (f *FakeStorage[T]) GetCalls() []string {
 	f.muCalls.Lock()
 	defer f.muCalls.Unlock()
-	out := make([]string, len(f.Calls))
-	copy(out, f.Calls)
+	out := make([]string, len(f.calls))
+	copy(out, f.calls)
 	return out
 }
 
