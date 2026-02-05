@@ -14,8 +14,10 @@ import (
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
+	userevents "github.com/Black-And-White-Club/frolf-bot-shared/events/user"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
@@ -35,6 +37,8 @@ type SignupManager interface {
 	SendSignupResult(ctx context.Context, interactionToken string, success bool, failureReason ...string) (SignupOperationResult, error)
 	// TrackChannelForReactions registers a channel to have its reactions processed
 	TrackChannelForReactions(channelID string)
+	// SyncMember fetches a guild member from Discord and publishes a profile update event.
+	SyncMember(ctx context.Context, guildID, userID string) error
 }
 
 type signupManager struct {
@@ -199,6 +203,101 @@ func (sm *signupManager) TrackChannelForReactions(channelID string) {
 		return
 	}
 	sm.trackedChannels.Store(channelID, true)
+}
+
+// SyncMember fetches a guild member from Discord and publishes a profile update event.
+// This enables self-healing data when club memberships have empty display names.
+func (sm *signupManager) SyncMember(ctx context.Context, guildID, userID string) error {
+	ctx, span := sm.tracer.Start(ctx, "SignupManager.SyncMember", trace.WithAttributes(
+		attribute.String("guild_id", guildID),
+		attribute.String("user_id", userID),
+	))
+	defer span.End()
+
+	member, err := sm.session.GuildMember(guildID, userID)
+	if err != nil {
+		sm.logger.WarnContext(ctx, "Failed to fetch guild member for profile sync",
+			attr.Error(err),
+			attr.String("guild_id", guildID),
+			attr.String("user_id", userID),
+		)
+		span.RecordError(err)
+		return fmt.Errorf("failed to fetch guild member: %w", err)
+	}
+
+	if member == nil || member.User == nil {
+		sm.logger.WarnContext(ctx, "Guild member or user is nil",
+			attr.String("guild_id", guildID),
+			attr.String("user_id", userID),
+		)
+		return fmt.Errorf("member not found in guild")
+	}
+
+	// Publish profile update event using shared utility
+	publishUserProfileFromMember(ctx, sm.publisher, sm.logger, member, guildID)
+
+	sm.logger.InfoContext(ctx, "Profile sync completed",
+		attr.String("guild_id", guildID),
+		attr.String("user_id", userID),
+		attr.String("display_name", resolveDisplayName(member)),
+	)
+
+	return nil
+}
+
+// publishUserProfileFromMember publishes a profile update event from a guild member.
+func publishUserProfileFromMember(
+	ctx context.Context,
+	eventBus eventbus.EventBus,
+	logger *slog.Logger,
+	member *discordgo.Member,
+	guildID string,
+) {
+	if member == nil || member.User == nil || eventBus == nil {
+		return
+	}
+
+	user := member.User
+	displayName := resolveDisplayName(member)
+	avatarHash := ""
+	if user.Avatar != "" {
+		avatarHash = user.Avatar
+	}
+
+	payload := &userevents.UserProfileUpdatedPayloadV1{
+		UserID:      sharedtypes.DiscordID(user.ID),
+		GuildID:     sharedtypes.GuildID(guildID),
+		Username:    user.Username,
+		DisplayName: displayName,
+		AvatarHash:  avatarHash,
+	}
+
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		logger.WarnContext(ctx, "Failed to marshal user profile payload", attr.Error(err))
+		return
+	}
+
+	msg := message.NewMessage(watermill.NewUUID(), payloadBytes)
+	msg.Metadata.Set("user_id", user.ID)
+	msg.Metadata.Set("guild_id", guildID)
+	msg.Metadata.Set("topic", userevents.UserProfileUpdatedV1)
+
+	if err := eventBus.Publish(userevents.UserProfileUpdatedV1, msg); err != nil {
+		logger.WarnContext(ctx, "Failed to publish user profile event",
+			attr.Error(err),
+			attr.String("user_id", user.ID),
+			attr.String("guild_id", guildID),
+		)
+	}
+}
+
+// resolveDisplayName returns the guild nickname only.
+// Returns empty string if no server-specific nickname is set.
+// This allows the frontend to use the global display name as fallback
+// while still knowing whether a sync has occurred (NULL = not synced, empty = synced but no nickname).
+func resolveDisplayName(member *discordgo.Member) string {
+	return member.Nick
 }
 
 type SignupOperationResult struct {

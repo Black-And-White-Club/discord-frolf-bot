@@ -150,7 +150,7 @@ func TestPublishSetupEvent_Success(t *testing.T) {
 		return &discordgo.Guild{ID: "g1", Name: "Guild"}, nil
 	}
 	eb.PublishFunc = func(topic string, msgs ...*message.Message) error {
-		if topic != guildevents.GuildConfigCreationRequestedV1 {
+		if topic != guildevents.GuildSetupRequestedV1 {
 			return fmt.Errorf("unexpected topic: %s", topic)
 		}
 		return nil

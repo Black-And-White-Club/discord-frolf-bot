@@ -100,10 +100,17 @@ func (s *setupManager) publishSetupEvent(i *discordgo.InteractionCreate, result 
 		return fmt.Errorf("admin role ID is required but empty")
 	}
 
-	// Get guild info to validate guild exists
-	_, err := s.session.Guild(i.GuildID)
+	// Get guild info for name and icon
+	guild, err := s.session.Guild(i.GuildID)
 	if err != nil {
 		return fmt.Errorf("failed to get guild info: %w", err)
+	}
+
+	// Build icon URL if available
+	var iconURL *string
+	if guild.Icon != "" {
+		url := fmt.Sprintf("https://cdn.discordapp.com/icons/%s/%s.png", guild.ID, guild.Icon)
+		iconURL = &url
 	}
 
 	// Create the guild setup event
@@ -113,8 +120,10 @@ func (s *setupManager) publishSetupEvent(i *discordgo.InteractionCreate, result 
 		signupEmoji = "🥏" // Default fallback
 	}
 
-	payload := guildevents.GuildConfigCreationRequestedPayloadV1{
+	payload := guildevents.GuildSetupPayloadV1{
 		GuildID:              sharedtypes.GuildID(i.GuildID),
+		GuildName:            guild.Name,
+		IconURL:              iconURL,
 		SignupChannelID:      result.SignupChannelID,
 		SignupMessageID:      result.SignupMessageID,
 		EventChannelID:       result.EventChannelID,
@@ -128,14 +137,14 @@ func (s *setupManager) publishSetupEvent(i *discordgo.InteractionCreate, result 
 	}
 
 	// Create and publish the message using the helper
-	msg, err := s.helper.CreateNewMessage(payload, guildevents.GuildConfigCreationRequestedV1)
+	msg, err := s.helper.CreateNewMessage(payload, guildevents.GuildSetupRequestedV1)
 	if err != nil {
 		return fmt.Errorf("failed to create setup event message: %w", err)
 	}
 
 	msg.Metadata.Set("guild_id", i.GuildID)
 
-	return s.publisher.Publish(guildevents.GuildConfigCreationRequestedV1, msg)
+	return s.publisher.Publish(guildevents.GuildSetupRequestedV1, msg)
 }
 
 // createOrFindChannel creates a new channel or finds an existing one

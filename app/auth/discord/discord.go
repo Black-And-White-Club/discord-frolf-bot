@@ -4,10 +4,10 @@ import (
 	"context"
 	"log/slog"
 
-	discordpkg "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
-	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/auth/discord/dashboard"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/auth/permission"
+	discordpkg "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"

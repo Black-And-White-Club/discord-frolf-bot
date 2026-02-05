@@ -133,6 +133,7 @@ func (r *UserRouter) registerHandlers(handlers userhandlers.Handlers) error {
 	registerHandler(deps, discorduserevents.RoleUpdateButtonPressV1, handlers.HandleRoleUpdateButtonPress)
 	registerHandler(deps, userevents.UserRoleUpdatedV1, handlers.HandleRoleUpdated)
 	registerHandler(deps, userevents.UserRoleUpdateFailedV1, handlers.HandleRoleUpdateFailed)
+	registerHandler(deps, userevents.UserProfileSyncRequestTopicV1, handlers.HandleProfileSyncRequest)
 
 	return nil
 }

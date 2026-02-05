@@ -19,4 +19,5 @@ type Handlers interface {
 	HandleRoleUpdateButtonPress(ctx context.Context, payload *discorduserevents.RoleUpdateButtonPressPayloadV1) ([]handlerwrapper.Result, error)
 	HandleRoleUpdated(ctx context.Context, payload *userevents.UserRoleUpdatedPayloadV1) ([]handlerwrapper.Result, error)
 	HandleRoleUpdateFailed(ctx context.Context, payload *userevents.UserRoleUpdateFailedPayloadV1) ([]handlerwrapper.Result, error)
+	HandleProfileSyncRequest(ctx context.Context, payload *userevents.UserProfileSyncRequestPayloadV1) ([]handlerwrapper.Result, error)
 }

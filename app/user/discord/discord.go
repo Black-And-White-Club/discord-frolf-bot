@@ -22,6 +22,7 @@ type UserDiscordInterface interface {
 	GetRoleManager() role.RoleManager
 	GetSignupManager() signup.SignupManager
 	GetUDiscManager() udisc.UDiscManager
+	SyncGuildMember(ctx context.Context, guildID, userID string) error
 }
 
 // UserDiscord encapsulates all user Discord services.
@@ -76,4 +77,15 @@ func (ud *UserDiscord) GetSignupManager() signup.SignupManager {
 // GetUDiscManager returns the UDiscManager.
 func (ud *UserDiscord) GetUDiscManager() udisc.UDiscManager {
 	return ud.UDiscManager
+}
+
+// SyncGuildMember fetches a guild member from Discord and publishes a profile update event.
+func (ud *UserDiscord) SyncGuildMember(ctx context.Context, guildID, userID string) error {
+	// Re-use logic from SignupManager or RoleManager, or access session directly if possible.
+	// Since SignupManager handles profile updates, we can delegate or duplicate the logic.
+	// However, looking at the struct, we have separate managers.
+	// The cleanest way is to add this method to UserDiscord which has access to sub-managers,
+	// OR use the SignupManager which is likely responsible for profile stuff.
+	// Let's delegate to SignupManager as it handles member fetching/onboarding.
+	return ud.SignupManager.SyncMember(ctx, guildID, userID)
 }
