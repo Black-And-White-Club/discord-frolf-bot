@@ -24,7 +24,7 @@ var testOperationWrapper = func(ctx context.Context, operationName string, opera
 func Test_signupManager_MessageReactionAdd(t *testing.T) {
 	fakeSession := &discord.FakeSession{}
 	fakePublisher := &testutils.FakeEventBus{}
-	fakeInteractionStore := &testutils.FakeStorage[any]{}
+	fakeInteractionStore := testutils.NewFakeStorage[any]()
 	logger := loggerfrolfbot.NoOpLogger
 	tracerProvider := noop.NewTracerProvider()
 	tracer := tracerProvider.Tracer("test")
@@ -367,7 +367,7 @@ func Test_signupManager_HandleSignupReactionAdd(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			fakePublisher := &testutils.FakeEventBus{}
-			fakeInteractionStore := &testutils.FakeStorage[any]{}
+			fakeInteractionStore := testutils.NewFakeStorage[any]()
 			logger := loggerfrolfbot.NoOpLogger
 			tracerProvider := noop.NewTracerProvider()
 			tracer := tracerProvider.Tracer("test")
@@ -419,7 +419,7 @@ func Test_signupManager_HandleSignupReactionAdd(t *testing.T) {
 func Test_signupManager_HandleSignupButtonPress(t *testing.T) {
 	fakeSession := &discord.FakeSession{}
 	fakePublisher := &testutils.FakeEventBus{}
-	fakeInteractionStore := &testutils.FakeStorage[any]{}
+	fakeInteractionStore := testutils.NewFakeStorage[any]()
 	mockConfig := &config.Config{
 		Discord: config.DiscordConfig{
 			GuildID: "guild-id",

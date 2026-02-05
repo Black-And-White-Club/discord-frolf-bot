@@ -90,40 +90,19 @@ func (f *FakeHelpers) UnmarshalPayload(msg *message.Message, payload interface{}
 }
 
 // FakeStorage is a generic programmable fake for storage interfaces
+// Deprecated: use storage.FakeStorage instead.
 type FakeStorage[T any] struct {
-	GetFunc    func(ctx context.Context, key string) (T, error)
-	SetFunc    func(ctx context.Context, key string, value T) error
-	DeleteFunc func(ctx context.Context, key string)
-	ListFunc   func(ctx context.Context) ([]T, error)
+	*storage.FakeStorage[T]
 }
 
-func (f *FakeStorage[T]) Get(ctx context.Context, key string) (T, error) {
-	if f.GetFunc != nil {
-		return f.GetFunc(ctx, key)
-	}
-	var zero T
-	return zero, nil
-}
-
-func (f *FakeStorage[T]) Set(ctx context.Context, key string, value T) error {
-	if f.SetFunc != nil {
-		return f.SetFunc(ctx, key, value)
-	}
-	return nil
-}
-
-func (f *FakeStorage[T]) Delete(ctx context.Context, key string) {
-	if f.DeleteFunc != nil {
-		f.DeleteFunc(ctx, key)
+func NewFakeStorage[T any]() *FakeStorage[T] {
+	return &FakeStorage[T]{
+		FakeStorage: storage.NewFakeStorage[T](),
 	}
 }
 
-func (f *FakeStorage[T]) List(ctx context.Context) ([]T, error) {
-	if f.ListFunc != nil {
-		return f.ListFunc(ctx)
-	}
-	return nil, nil
-}
+// Ensure ListFunc exists in the struct or just keep it for now if needed.
+// Actually, let's just make it a clean wrap or alias if possible.
 
 // FakeGuildConfigResolver is a programmable fake for GuildConfigResolver
 type FakeGuildConfigResolver struct {

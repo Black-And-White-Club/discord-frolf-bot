@@ -199,8 +199,25 @@ func (sm *signupManager) HandleSignupModalSubmit(ctx context.Context, i *discord
 			_ = sm.sendFollowupMessage(i.Interaction, "Error: Could not determine guild ID. Please try again or contact support.")
 			return SignupOperationResult{Error: errors.New("guildID is empty")}, errors.New("guildID is empty")
 		}
+
+		// Fetch Guild info for Name and Icon
+		var guildName string
+		var iconURL *string
+		guild, err := sm.session.Guild(guildID)
+		if err != nil {
+			sm.logger.WarnContext(ctx, "Failed to fetch guild info, proceeding without name/icon", attr.Error(err))
+		} else {
+			guildName = guild.Name
+			if guild.Icon != "" {
+				url := fmt.Sprintf("https://cdn.discordapp.com/icons/%s/%s.png", guild.ID, guild.Icon)
+				iconURL = &url
+			}
+		}
+
 		payload := userevents.UserSignupRequestedPayloadV1{
 			GuildID:       sharedtypes.GuildID(guildID),
+			GuildName:     guildName,
+			IconURL:       iconURL,
 			UserID:        sharedtypes.DiscordID(userID),
 			TagNumber:     tagNumberPtr,
 			UDiscUsername: udiscUsername,

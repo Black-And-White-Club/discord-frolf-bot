@@ -33,8 +33,8 @@ func TestNewSignupManager(t *testing.T) {
 				logger := slog.New(testHandler)
 				fakeHelper := &testutils.FakeHelpers{}
 				mockConfig := &config.Config{}
-				fakeInteractionStore := &testutils.FakeStorage[any]{}
-				fakeGuildConfigCache := &testutils.FakeStorage[storage.GuildConfig]{}
+				fakeInteractionStore := testutils.NewFakeStorage[any]()
+				fakeGuildConfigCache := testutils.NewFakeStorage[storage.GuildConfig]()
 				metrics := &discordmetrics.NoOpMetrics{}
 				tracer := noop.NewTracerProvider().Tracer("test")
 
@@ -276,7 +276,7 @@ func Test_signupManager_createEvent(t *testing.T) {
 	mockConfig := &config.Config{}
 	mockConfig.Discord.GuildID = "test-guild-id"
 
-	fakeInteractionStore := &testutils.FakeStorage[any]{}
+	fakeInteractionStore := testutils.NewFakeStorage[any]()
 	metrics := &discordmetrics.NoOpMetrics{}
 	tracer := noop.NewTracerProvider().Tracer("test")
 

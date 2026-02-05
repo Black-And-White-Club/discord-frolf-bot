@@ -25,8 +25,8 @@ func TestNewStartRoundManager(t *testing.T) {
 	logger := slog.New(testHandler)
 	fakeHelper := &testutils.FakeHelpers{}
 	fakeConfig := &config.Config{}
-	fakeInteractionStore := &testutils.FakeStorage[any]{}
-	fakeGuildConfigCache := &testutils.FakeStorage[storage.GuildConfig]{}
+	fakeInteractionStore := testutils.NewFakeStorage[any]()
+	fakeGuildConfigCache := testutils.NewFakeStorage[storage.GuildConfig]()
 
 	fakeTracer := noop.NewTracerProvider().Tracer("test")
 	fakeMetrics := &testutils.FakeDiscordMetrics{}

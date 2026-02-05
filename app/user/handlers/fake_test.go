@@ -17,6 +17,7 @@ type FakeUserDiscord struct {
 	GetRoleManagerFunc   func() role.RoleManager
 	GetSignupManagerFunc func() signup.SignupManager
 	GetUDiscManagerFunc  func() udisc.UDiscManager
+	SyncGuildMemberFunc  func(ctx context.Context, guildID, userID string) error
 
 	// Holds the sub-fakes
 	RoleManager   FakeRoleManager
@@ -43,6 +44,13 @@ func (f *FakeUserDiscord) GetUDiscManager() udisc.UDiscManager {
 		return f.GetUDiscManagerFunc()
 	}
 	return &f.UDiscManager
+}
+
+func (f *FakeUserDiscord) SyncGuildMember(ctx context.Context, guildID, userID string) error {
+	if f.SyncGuildMemberFunc != nil {
+		return f.SyncGuildMemberFunc(ctx, guildID, userID)
+	}
+	return nil
 }
 
 // FakeRoleManager implements role.RoleManager
@@ -114,6 +122,7 @@ type FakeSignupManager struct {
 	HandleSignupButtonPressFunc  func(ctx context.Context, i *discordgo.InteractionCreate) (signup.SignupOperationResult, error)
 	SendSignupResultFunc         func(ctx context.Context, interactionToken string, success bool, failureReason ...string) (signup.SignupOperationResult, error)
 	TrackChannelForReactionsFunc func(channelID string)
+	SyncMemberFunc               func(ctx context.Context, guildID, userID string) error
 }
 
 func (f *FakeSignupManager) SendSignupModal(ctx context.Context, i *discordgo.InteractionCreate) (signup.SignupOperationResult, error) {
@@ -162,6 +171,13 @@ func (f *FakeSignupManager) TrackChannelForReactions(channelID string) {
 	if f.TrackChannelForReactionsFunc != nil {
 		f.TrackChannelForReactionsFunc(channelID)
 	}
+}
+
+func (f *FakeSignupManager) SyncMember(ctx context.Context, guildID, userID string) error {
+	if f.SyncMemberFunc != nil {
+		return f.SyncMemberFunc(ctx, guildID, userID)
+	}
+	return nil
 }
 
 // FakeUDiscManager implements udisc.UDiscManager

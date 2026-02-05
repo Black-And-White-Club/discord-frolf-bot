@@ -46,16 +46,13 @@ func (h *AuthHandlers) HandleMagicLinkGenerated(
 		return nil, nil
 	}
 
-	// 2. Clean up stored interaction
-	h.interactionStore.Delete(ctx, payload.CorrelationID)
-
-	// 3. Build interaction for followup
+	// 2. Build interaction for followup
 	interaction := &discordgo.Interaction{
 		Token: interactionData.InteractionToken,
 		AppID: h.cfg.Discord.AppID,
 	}
 
-	// 4. Handle error response from backend
+	// 3. Handle error response from backend
 	if !payload.Success {
 		h.logger.WarnContext(ctx, "Backend returned error for magic link",
 			attr.String("error", payload.Error),
@@ -65,24 +62,32 @@ func (h *AuthHandlers) HandleMagicLinkGenerated(
 			Flags:   discordgo.MessageFlagsEphemeral,
 			Content: fmt.Sprintf("Unable to generate dashboard link: %s", payload.Error),
 		})
+		h.interactionStore.Delete(ctx, payload.CorrelationID)
 		return nil, nil
 	}
 
-	// 5. Try to send via DM first
+	// 4. Try to send via DM first
 	if err := h.sendMagicLinkDM(ctx, payload.UserID, payload.GuildID, payload.URL); err != nil {
 		h.logger.WarnContext(ctx, "Could not DM user, sending ephemeral",
 			attr.Error(err),
 			attr.String("user_id", payload.UserID),
 		)
-		// Fallback to ephemeral followup
-		return nil, h.sendMagicLinkFollowup(interaction, payload.URL)
+		// Fallback to ephemeral followup; if this also fails, don't delete
+		// the interaction so the message can be retried.
+		if err := h.sendMagicLinkFollowup(interaction, payload.URL); err != nil {
+			return nil, err
+		}
+		h.interactionStore.Delete(ctx, payload.CorrelationID)
+		return nil, nil
 	}
 
-	// 6. Confirm DM sent via ephemeral followup
+	// 5. Confirm DM sent via ephemeral followup
 	_, _ = h.session.FollowupMessageCreate(interaction, true, &discordgo.WebhookParams{
 		Flags:   discordgo.MessageFlagsEphemeral,
 		Content: "Check your DMs for your dashboard link.",
 	})
+
+	h.interactionStore.Delete(ctx, payload.CorrelationID)
 
 	h.logger.InfoContext(ctx, "Magic link sent successfully",
 		attr.String("user_id", payload.UserID),

@@ -27,8 +27,8 @@ func TestNewTagUpdateManager_Constructs(t *testing.T) {
 	metrics := &testutils.FakeDiscordMetrics{}
 	resolver := &testutils.FakeGuildConfigResolver{}
 
-	fakeInteractionStore := &testutils.FakeStorage[any]{}
-	fakeGuildConfigCache := &testutils.FakeStorage[storage.GuildConfig]{}
+	fakeInteractionStore := testutils.NewFakeStorage[any]()
+	fakeGuildConfigCache := testutils.NewFakeStorage[storage.GuildConfig]()
 
 	mgr := NewTagUpdateManager(sess, bus, logger, helper, cfg, fakeInteractionStore, fakeGuildConfigCache, tracer, metrics, resolver)
 	if mgr == nil {

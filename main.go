@@ -7,6 +7,7 @@ import (
 	pprof "net/http/pprof"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -158,12 +159,21 @@ func runStandaloneMode(ctx context.Context) {
 		}()
 	}
 
+	healthPort := os.Getenv("HEALTH_PORT")
+	if healthPort == "" {
+		healthPort = ":8080"
+	}
+	if !strings.HasPrefix(healthPort, ":") {
+		healthPort = ":" + healthPort
+	}
+
 	healthServer := &http.Server{
-		Addr:    ":8080",
+		Addr:    healthPort,
 		Handler: healthMux,
 	}
 
 	go func() {
+		logger.Info("Starting health server", attr.String("addr", healthPort))
 		if err := healthServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Error("Health server failed", attr.Error(err))
 		}

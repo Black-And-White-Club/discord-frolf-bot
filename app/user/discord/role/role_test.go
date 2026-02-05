@@ -30,7 +30,7 @@ func TestNewRoleManager(t *testing.T) {
 				logger := slog.New(testHandler)
 				fakeHelper := &FakeHelpers{}
 				mockConfig := &config.Config{}
-				fakeInteractionStore := &FakeISInterface[any]{}
+				fakeInteractionStore := NewFakeISInterface[any]()
 				fakeMetrics := &FakeDiscordMetrics{}
 				tracer := noop.NewTracerProvider().Tracer("test")
 				fakeGuildConfig := &guildconfig.FakeGuildConfigResolver{}
