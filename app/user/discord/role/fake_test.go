@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/testutils"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/nats-io/nats.go"
@@ -84,18 +85,17 @@ var _ eventbus.EventBus = (*FakeEventBus)(nil)
 
 // FakeISInterface is a programmable fake for storage.ISInterface
 type FakeISInterface[T any] struct {
-	*storage.FakeStorage[T]
+	*testutils.FakeStorage[T]
 }
 
 func NewFakeISInterface[T any]() *FakeISInterface[T] {
 	return &FakeISInterface[T]{
-		FakeStorage: storage.NewFakeStorage[T](),
+		FakeStorage: testutils.NewFakeStorage[T](),
 	}
 }
 
-func (f *FakeISInterface[T]) RecordFunc(method string) {
-	f.FakeStorage.RecordCall(method)
-}
+// Ensure interface compliance
+var _ storage.ISInterface[any] = (*FakeISInterface[any])(nil)
 
 // Ensure interface compliance
 var _ storage.ISInterface[any] = (*FakeISInterface[any])(nil)

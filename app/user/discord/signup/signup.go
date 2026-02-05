@@ -233,58 +233,44 @@ func (sm *signupManager) SyncMember(ctx context.Context, guildID, userID string)
 		return fmt.Errorf("member not found in guild")
 	}
 
-	// Publish profile update event using shared utility
-	publishUserProfileFromMember(ctx, sm.publisher, sm.logger, member, guildID)
+	sm.publishUserProfile(ctx, member, guildID)
 
 	sm.logger.InfoContext(ctx, "Profile sync completed",
 		attr.String("guild_id", guildID),
 		attr.String("user_id", userID),
-		attr.String("display_name", resolveDisplayName(member)),
+		attr.String("display_name", guildNickname(member)),
 	)
 
 	return nil
 }
 
-// publishUserProfileFromMember publishes a profile update event from a guild member.
-func publishUserProfileFromMember(
-	ctx context.Context,
-	eventBus eventbus.EventBus,
-	logger *slog.Logger,
-	member *discordgo.Member,
-	guildID string,
-) {
-	if member == nil || member.User == nil || eventBus == nil {
+// publishUserProfile publishes a profile update event from a guild member.
+func (sm *signupManager) publishUserProfile(ctx context.Context, member *discordgo.Member, guildID string) {
+	if member == nil || member.User == nil {
 		return
 	}
 
 	user := member.User
-	displayName := resolveDisplayName(member)
-	avatarHash := ""
-	if user.Avatar != "" {
-		avatarHash = user.Avatar
-	}
 
 	payload := &userevents.UserProfileUpdatedPayloadV1{
 		UserID:      sharedtypes.DiscordID(user.ID),
 		GuildID:     sharedtypes.GuildID(guildID),
 		Username:    user.Username,
-		DisplayName: displayName,
-		AvatarHash:  avatarHash,
+		DisplayName: guildNickname(member),
+		AvatarHash:  user.Avatar,
 	}
 
-	payloadBytes, err := json.Marshal(payload)
-	if err != nil {
-		logger.WarnContext(ctx, "Failed to marshal user profile payload", attr.Error(err))
+	msg, err := sm.helper.CreateNewMessage(payload, userevents.UserProfileUpdatedV1)
+	if err != nil || msg == nil {
+		sm.logger.WarnContext(ctx, "Failed to create user profile message", attr.Error(err))
 		return
 	}
 
-	msg := message.NewMessage(watermill.NewUUID(), payloadBytes)
 	msg.Metadata.Set("user_id", user.ID)
 	msg.Metadata.Set("guild_id", guildID)
-	msg.Metadata.Set("topic", userevents.UserProfileUpdatedV1)
 
-	if err := eventBus.Publish(userevents.UserProfileUpdatedV1, msg); err != nil {
-		logger.WarnContext(ctx, "Failed to publish user profile event",
+	if err := sm.publisher.Publish(userevents.UserProfileUpdatedV1, msg); err != nil {
+		sm.logger.WarnContext(ctx, "Failed to publish user profile event",
 			attr.Error(err),
 			attr.String("user_id", user.ID),
 			attr.String("guild_id", guildID),
@@ -292,11 +278,8 @@ func publishUserProfileFromMember(
 	}
 }
 
-// resolveDisplayName returns the guild nickname only.
-// Returns empty string if no server-specific nickname is set.
-// This allows the frontend to use the global display name as fallback
-// while still knowing whether a sync has occurred (NULL = not synced, empty = synced but no nickname).
-func resolveDisplayName(member *discordgo.Member) string {
+// guildNickname returns the member's server-specific nickname, or empty string if none is set.
+func guildNickname(member *discordgo.Member) string {
 	return member.Nick
 }
 

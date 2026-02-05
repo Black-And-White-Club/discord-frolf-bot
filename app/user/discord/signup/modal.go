@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	discordpkg "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	userevents "github.com/Black-And-White-Club/frolf-bot-shared/events/user"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
@@ -208,10 +209,7 @@ func (sm *signupManager) HandleSignupModalSubmit(ctx context.Context, i *discord
 			sm.logger.WarnContext(ctx, "Failed to fetch guild info, proceeding without name/icon", attr.Error(err))
 		} else {
 			guildName = guild.Name
-			if guild.Icon != "" {
-				url := fmt.Sprintf("https://cdn.discordapp.com/icons/%s/%s.png", guild.ID, guild.Icon)
-				iconURL = &url
-			}
+			iconURL = discordpkg.GuildIconURL(guild.ID, guild.Icon)
 		}
 
 		payload := userevents.UserSignupRequestedPayloadV1{

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	discordpkg "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	guildevents "github.com/Black-And-White-Club/frolf-bot-shared/events/guild"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
@@ -106,12 +107,7 @@ func (s *setupManager) publishSetupEvent(i *discordgo.InteractionCreate, result 
 		return fmt.Errorf("failed to get guild info: %w", err)
 	}
 
-	// Build icon URL if available
-	var iconURL *string
-	if guild.Icon != "" {
-		url := fmt.Sprintf("https://cdn.discordapp.com/icons/%s/%s.png", guild.ID, guild.Icon)
-		iconURL = &url
-	}
+	iconURL := discordpkg.GuildIconURL(guild.ID, guild.Icon)
 
 	// Create the guild setup event
 	setupTime := time.Now()

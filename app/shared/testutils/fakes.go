@@ -89,21 +89,6 @@ func (f *FakeHelpers) UnmarshalPayload(msg *message.Message, payload interface{}
 	return nil
 }
 
-// FakeStorage is a generic programmable fake for storage interfaces
-// Deprecated: use storage.FakeStorage instead.
-type FakeStorage[T any] struct {
-	*storage.FakeStorage[T]
-}
-
-func NewFakeStorage[T any]() *FakeStorage[T] {
-	return &FakeStorage[T]{
-		FakeStorage: storage.NewFakeStorage[T](),
-	}
-}
-
-// Ensure ListFunc exists in the struct or just keep it for now if needed.
-// Actually, let's just make it a clean wrap or alias if possible.
-
 // FakeGuildConfigResolver is a programmable fake for GuildConfigResolver
 type FakeGuildConfigResolver struct {
 	GetGuildConfigFunc       func(ctx context.Context, guildID string) (*storage.GuildConfig, error)
