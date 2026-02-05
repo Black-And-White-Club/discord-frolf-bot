@@ -55,9 +55,9 @@ func runStandaloneMode(ctx context.Context) {
 	var cfg *config.Config
 	var err error
 
-	cfg, err = config.LoadConfig("config.local.yaml")
+	cfg, err = config.LoadBaseConfig()
 	if err != nil {
-		fmt.Printf("Failed to load configuration: %v\n", err)
+		fmt.Printf("Failed to load base config: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -213,9 +213,9 @@ func runStandaloneMode(ctx context.Context) {
 func runSetup(ctx context.Context, guildID string) {
 	fmt.Printf("Running setup for guild: %s\n", guildID)
 
-	cfg, err := config.LoadConfig("config.local.yaml")
+	cfg, err := config.LoadBaseConfig()
 	if err != nil {
-		fmt.Printf("Failed to load configuration: %v\n", err)
+		fmt.Printf("Failed to load base config: %v\n", err)
 		os.Exit(1)
 	}
 

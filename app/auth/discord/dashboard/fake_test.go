@@ -18,7 +18,6 @@ func NewFakeInteractionStore() *FakeInteractionStore {
 		FakeStorage: storage.NewFakeStorage[any](),
 	}
 	f.GetFunc = func(ctx context.Context, correlationID string) (any, error) {
-		f.FakeStorage.RecordCall("Get") // Fixed name
 		return DashboardInteractionData{
 			InteractionToken: "fake-token",
 			UserID:           "user-123",
