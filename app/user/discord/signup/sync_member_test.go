@@ -292,4 +292,3 @@ func TestPublishUserProfile(t *testing.T) {
 		})
 	}
 }
-

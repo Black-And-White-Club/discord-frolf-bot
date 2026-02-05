@@ -97,6 +97,9 @@ func NewFakeISInterface[T any]() *FakeISInterface[T] {
 // Ensure interface compliance
 var _ storage.ISInterface[any] = (*FakeISInterface[any])(nil)
 
+// Ensure interface compliance
+var _ storage.ISInterface[any] = (*FakeISInterface[any])(nil)
+
 // FakeHelpers is a programmable fake for utils.Helpers
 type FakeHelpers struct {
 	CreateNewMessageFunc    func(payload interface{}, topic string) (*message.Message, error)
