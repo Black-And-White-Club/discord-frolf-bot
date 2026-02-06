@@ -66,7 +66,21 @@ func (h *AuthHandlers) HandleMagicLinkGenerated(
 		return nil, nil
 	}
 
-	// 4. Try to send via DM first
+	// 4. Validate URL before attempting to send
+	if payload.URL == "" {
+		h.logger.ErrorContext(ctx, "Magic link URL is empty despite success=true",
+			attr.String("user_id", payload.UserID),
+			attr.String("correlation_id", payload.CorrelationID),
+		)
+		_, _ = h.session.FollowupMessageCreate(interaction, true, &discordgo.WebhookParams{
+			Flags:   discordgo.MessageFlagsEphemeral,
+			Content: "Unable to generate dashboard link. Please try again.",
+		})
+		h.interactionStore.Delete(ctx, payload.CorrelationID)
+		return nil, nil
+	}
+
+	// 5. Try to send via DM first
 	if err := h.sendMagicLinkDM(ctx, payload.UserID, payload.GuildID, payload.URL); err != nil {
 		h.logger.WarnContext(ctx, "Could not DM user, sending ephemeral",
 			attr.Error(err),
