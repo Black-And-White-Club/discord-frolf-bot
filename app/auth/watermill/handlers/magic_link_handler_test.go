@@ -136,6 +136,43 @@ func TestAuthHandlers_HandleMagicLinkGenerated_Success(t *testing.T) {
 			},
 		},
 		{
+			name: "success with empty URL - sends error message",
+			payload: &authevents.MagicLinkGeneratedPayload{
+				Success:       true,
+				URL:           "",
+				UserID:        "user-123",
+				GuildID:       "guild-123",
+				CorrelationID: "corr-123",
+			},
+			wantErr: false,
+			setupStore: func(store *FakeInteractionStore) {
+				store.GetFunc = func(ctx context.Context, correlationID string) (any, error) {
+					return dashboard.DashboardInteractionData{
+						InteractionToken: "test-token",
+						UserID:           "user-123",
+						GuildID:          "guild-123",
+					}, nil
+				}
+			},
+			verifySession: func(t *testing.T, session *discordpkg.FakeSession) {
+				trace := session.Trace()
+				// Should not attempt DM with empty URL
+				if contains(trace, "UserChannelCreate") {
+					t.Error("should not attempt DM with empty URL")
+				}
+				// Should send error followup
+				if !contains(trace, "FollowupMessageCreate") {
+					t.Error("expected FollowupMessageCreate with error message for empty URL")
+				}
+			},
+			verifyStore: func(t *testing.T, store *FakeInteractionStore) {
+				calls := store.Calls()
+				if !contains(calls, "Delete") {
+					t.Error("expected Delete to be called to clean up")
+				}
+			},
+		},
+		{
 			name: "interaction data not found - silent failure",
 			payload: &authevents.MagicLinkGeneratedPayload{
 				Success:       true,
