@@ -15,6 +15,7 @@ import (
 	scoreround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/score_round"
 	scorecardupload "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/scorecard_upload"
 	updateround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/update_round"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/round/gateway"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/round/handlers"
 	roundrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/round/router"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
@@ -26,6 +27,12 @@ import (
 	"github.com/ThreeDotsLabs/watermill/message"
 	"go.opentelemetry.io/otel"
 )
+
+// RoundModuleResult contains the results of initializing the round module.
+type RoundModuleResult struct {
+	Router         *roundrouter.RoundRouter
+	NativeEventMap rounddiscord.NativeEventMap
+}
 
 // InitializeRoundModule initializes the Round domain module.
 func InitializeRoundModule(
@@ -43,7 +50,7 @@ func InitializeRoundModule(
 	guildConfigCache storage.ISInterface[storage.GuildConfig],
 	discordMetrics discordmetrics.DiscordMetrics,
 	guildConfig guildconfig.GuildConfigResolver,
-) (*roundrouter.RoundRouter, error) {
+) (*RoundModuleResult, error) {
 	tracer := otel.Tracer("round-module")
 
 	// Initialize Discord services
@@ -73,6 +80,15 @@ func InitializeRoundModule(
 	updateround.RegisterHandlers(interactionRegistry, roundDiscord.GetUpdateRoundManager())
 	scorecardupload.RegisterHandlers(interactionRegistry, messageRegistry, roundDiscord.GetScorecardUploadManager())
 
+	// Register Native Event RSVP gateway listeners (GuildScheduledEventUserAdd/Remove)
+	rsvpListener := gateway.NewScheduledEventRSVPListener(
+		roundDiscord.GetNativeEventMap(),
+		eventBus,
+		helper,
+		logger.With("component", "scheduled-event-rsvp"),
+	)
+	rsvpListener.RegisterGatewayHandlers(session)
+
 	// Build Watermill Handlers
 	roundHandlers := handlers.NewRoundHandlers(
 		logger,
@@ -99,5 +115,8 @@ func InitializeRoundModule(
 	}
 
 	logger.InfoContext(ctx, "Round module initialized successfully")
-	return rr, nil
+	return &RoundModuleResult{
+		Router:         rr,
+		NativeEventMap: roundDiscord.GetNativeEventMap(),
+	}, nil
 }

@@ -46,6 +46,21 @@ func (h *RoundHandlers) HandleRoundDeleted(ctx context.Context, payload *roundev
 		return nil, fmt.Errorf("unexpected type for result.Success in DeleteRoundEventEmbed result for round %s", payload.RoundID.String())
 	}
 
+	// Delete the native Discord Scheduled Event (best-effort).
+	if payload.DiscordEventID != "" {
+		session := h.service.GetSession()
+		if err := session.GuildScheduledEventDelete(string(payload.GuildID), payload.DiscordEventID); err != nil {
+			h.logger.WarnContext(ctx, "failed to delete native event",
+				"discord_event_id", payload.DiscordEventID,
+				"error", err,
+			)
+		}
+		// Clean up the NativeEventMap entry.
+		if nativeEventMap := h.service.GetNativeEventMap(); nativeEventMap != nil {
+			nativeEventMap.Delete(payload.RoundID)
+		}
+	}
+
 	// Avoid returning trace events here to prevent publish failures from
 	// causing the handler to be retried (which would duplicate embed
 	// deletion attempts). An empty result list acknowledges successful

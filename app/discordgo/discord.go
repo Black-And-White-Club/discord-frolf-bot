@@ -68,8 +68,10 @@ type Session interface {
 	WebhookMessageEdit(webhookID, token, messageID string, data *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error)
 
 	// --- Scheduled Event Methods ---
+	GuildScheduledEvents(guildID string, userCount bool, options ...discordgo.RequestOption) ([]*discordgo.GuildScheduledEvent, error)
 	GuildScheduledEventCreate(guildID string, params *discordgo.GuildScheduledEventParams, options ...discordgo.RequestOption) (*discordgo.GuildScheduledEvent, error)
 	GuildScheduledEventEdit(guildID, eventID string, params *discordgo.GuildScheduledEventParams, options ...discordgo.RequestOption) (*discordgo.GuildScheduledEvent, error)
+	GuildScheduledEventDelete(guildID, eventID string, options ...discordgo.RequestOption) error
 
 	// --- Application Command Methods ---
 	ApplicationCommandCreate(appID, guildID string, cmd *discordgo.ApplicationCommand, options ...discordgo.RequestOption) (*discordgo.ApplicationCommand, error)
@@ -210,6 +212,11 @@ func (d *DiscordSession) ChannelMessageSendComplex(channelID string, data *disco
 	return d.session.ChannelMessageSendComplex(channelID, data, options...)
 }
 
+// GuildScheduledEvents returns a list of scheduled events for a guild.
+func (d *DiscordSession) GuildScheduledEvents(guildID string, userCount bool, options ...discordgo.RequestOption) ([]*discordgo.GuildScheduledEvent, error) {
+	return d.session.GuildScheduledEvents(guildID, userCount, options...)
+}
+
 // GuildScheduledEventCreate creates a scheduled event for a guild.
 func (d *DiscordSession) GuildScheduledEventCreate(guildID string, params *discordgo.GuildScheduledEventParams, options ...discordgo.RequestOption) (*discordgo.GuildScheduledEvent, error) {
 	return d.session.GuildScheduledEventCreate(guildID, params, options...)
@@ -218,6 +225,11 @@ func (d *DiscordSession) GuildScheduledEventCreate(guildID string, params *disco
 // GuildScheduledEventEdit edits a scheduled event.
 func (d *DiscordSession) GuildScheduledEventEdit(guildID, eventID string, params *discordgo.GuildScheduledEventParams, options ...discordgo.RequestOption) (*discordgo.GuildScheduledEvent, error) {
 	return d.session.GuildScheduledEventEdit(guildID, eventID, params, options...)
+}
+
+// GuildScheduledEventDelete deletes a scheduled event.
+func (d *DiscordSession) GuildScheduledEventDelete(guildID, eventID string, options ...discordgo.RequestOption) error {
+	return d.session.GuildScheduledEventDelete(guildID, eventID, options...)
 }
 
 func (d *DiscordSession) ThreadsActive(channelID string, options ...discordgo.RequestOption) (threads *discordgo.ThreadsList, err error) {

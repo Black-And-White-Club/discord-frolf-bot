@@ -117,6 +117,14 @@ func (f *FakeRoundDiscord) GetScorecardUploadManager() scorecardupload.Scorecard
 	return &f.ScorecardUploadManager
 }
 
+func (f *FakeRoundDiscord) GetSession() discord.Session {
+	return nil
+}
+
+func (f *FakeRoundDiscord) GetNativeEventMap() rounddiscord.NativeEventMap {
+	return nil
+}
+
 // FakeCreateRoundManager
 type FakeCreateRoundManager struct {
 	HandleCreateRoundCommandFunc                 func(ctx context.Context, i *discordgo.InteractionCreate) (createround.CreateRoundOperationResult, error)

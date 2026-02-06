@@ -130,6 +130,10 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers handlers.Ha
 	// Creation flow
 	registerHandler(deps, discordroundevents.RoundCreateModalSubmittedV1, handlers.HandleRoundCreateRequested)
 	registerHandler(deps, roundevents.RoundCreatedV1, handlers.HandleRoundCreated)
+
+	// Native Event Creation (parallel to embed creation, independent consumer group)
+	registerHandler(deps, roundevents.RoundCreatedV1, handlers.HandleRoundCreatedForNativeEvent)
+
 	registerHandler(deps, roundevents.RoundCreationFailedV1, handlers.HandleRoundCreationFailed)
 	registerHandler(deps, roundevents.RoundValidationFailedV1, handlers.HandleRoundValidationFailed)
 
