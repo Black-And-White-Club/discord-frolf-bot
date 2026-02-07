@@ -38,9 +38,7 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 		Fields: []*discordgo.MessageEmbedField{
 			{Name: "📅 Time", Value: "Test Time"},
 			{Name: "📍 Location", Value: "Test Location"},
-			{Name: "✅ Accepted", Value: "-"},
-			{Name: "❌ Declined", Value: "-"},
-			{Name: "🤔 Tentative", Value: "-"},
+			{Name: "👥 Participants", Value: "-"},
 		},
 	}
 
@@ -49,9 +47,7 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 		setup         func()
 		channelID     string
 		messageID     string
-		accepted      []roundtypes.Participant
-		declined      []roundtypes.Participant
-		tentative     []roundtypes.Participant
+		participants  []roundtypes.Participant
 		expectedError string
 	}{
 		{
@@ -78,11 +74,9 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 			},
 			channelID: "channel-123",
 			messageID: "12345",
-			accepted: []roundtypes.Participant{
+			participants: []roundtypes.Participant{
 				{UserID: "user-123", TagNumber: intPtr(1)},
 			},
-			declined:  []roundtypes.Participant{},
-			tentative: []roundtypes.Participant{},
 		},
 		{
 			name: "channel message fetch failure",
@@ -93,9 +87,7 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 			},
 			channelID:     "channel-123",
 			messageID:     "12345",
-			accepted:      []roundtypes.Participant{},
-			declined:      []roundtypes.Participant{},
-			tentative:     []roundtypes.Participant{},
+			participants:  []roundtypes.Participant{},
 			expectedError: "failed to fetch message",
 		},
 		{
@@ -107,9 +99,7 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 			},
 			channelID:     "channel-123",
 			messageID:     "12345",
-			accepted:      []roundtypes.Participant{},
-			declined:      []roundtypes.Participant{},
-			tentative:     []roundtypes.Participant{},
+			participants:  []roundtypes.Participant{},
 			expectedError: "no embeds found in message",
 		},
 		{
@@ -124,9 +114,7 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 			},
 			channelID:     "channel-123",
 			messageID:     "12345",
-			accepted:      []roundtypes.Participant{},
-			declined:      []roundtypes.Participant{},
-			tentative:     []roundtypes.Participant{},
+			participants:  []roundtypes.Participant{},
 			expectedError: "embed does not have expected fields",
 		},
 		{
@@ -145,9 +133,7 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 			},
 			channelID:     "channel-123",
 			messageID:     "12345",
-			accepted:      []roundtypes.Participant{},
-			declined:      []roundtypes.Participant{},
-			tentative:     []roundtypes.Participant{},
+			participants:  []roundtypes.Participant{},
 			expectedError: "failed to update embed",
 		},
 		{
@@ -170,11 +156,9 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 			},
 			channelID: "channel-123",
 			messageID: "12345",
-			accepted: []roundtypes.Participant{
+			participants: []roundtypes.Participant{
 				{UserID: "user-123", TagNumber: intPtr(1)},
 			},
-			declined:      []roundtypes.Participant{},
-			tentative:     []roundtypes.Participant{},
 			expectedError: "",
 		},
 		{
@@ -201,11 +185,9 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 			},
 			channelID: "channel-123",
 			messageID: "12345",
-			accepted: []roundtypes.Participant{
+			participants: []roundtypes.Participant{
 				{UserID: "user-123", TagNumber: intPtr(1)},
 			},
-			declined:  []roundtypes.Participant{},
-			tentative: []roundtypes.Participant{},
 		},
 	}
 
@@ -228,9 +210,7 @@ func Test_roundRsvpManager_UpdateRoundEventEmbed(t *testing.T) {
 				context.Background(),
 				tt.channelID,
 				tt.messageID,
-				tt.accepted,
-				tt.declined,
-				tt.tentative,
+				tt.participants,
 			)
 
 			if tt.expectedError != "" {

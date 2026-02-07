@@ -33,6 +33,7 @@ type FakeRoundDiscord struct {
 	GetUpdateRoundManagerFunc     func() updateround.UpdateRoundManager
 	GetTagUpdateManagerFunc       func() tagupdates.TagUpdateManager
 	GetScorecardUploadManagerFunc func() scorecardupload.ScorecardUploadManager
+	GetMessageMapFunc             func() rounddiscord.MessageMap
 
 	// Holds the sub-fakes
 	CreateRoundManager     FakeCreateRoundManager
@@ -45,6 +46,7 @@ type FakeRoundDiscord struct {
 	UpdateRoundManager     FakeUpdateRoundManager
 	TagUpdateManager       FakeTagUpdateManager
 	ScorecardUploadManager FakeScorecardUploadManager
+	MessageMap             FakeMessageMap
 }
 
 func (f *FakeRoundDiscord) GetCreateRoundManager() createround.CreateRoundManager {
@@ -115,6 +117,51 @@ func (f *FakeRoundDiscord) GetScorecardUploadManager() scorecardupload.Scorecard
 		return f.GetScorecardUploadManagerFunc()
 	}
 	return &f.ScorecardUploadManager
+}
+
+func (f *FakeRoundDiscord) GetSession() discord.Session {
+	return nil
+}
+
+func (f *FakeRoundDiscord) GetNativeEventMap() rounddiscord.NativeEventMap {
+	return nil
+}
+
+func (f *FakeRoundDiscord) GetPendingNativeEventMap() rounddiscord.PendingNativeEventMap {
+	return rounddiscord.NewPendingNativeEventMap()
+}
+
+func (f *FakeRoundDiscord) GetMessageMap() rounddiscord.MessageMap {
+	if f.GetMessageMapFunc != nil {
+		return f.GetMessageMapFunc()
+	}
+	return &f.MessageMap
+}
+
+// FakeMessageMap
+type FakeMessageMap struct {
+	StoreFunc  func(roundID sharedtypes.RoundID, messageID string)
+	LoadFunc   func(roundID sharedtypes.RoundID) (string, bool)
+	DeleteFunc func(roundID sharedtypes.RoundID)
+}
+
+func (f *FakeMessageMap) Store(roundID sharedtypes.RoundID, messageID string) {
+	if f.StoreFunc != nil {
+		f.StoreFunc(roundID, messageID)
+	}
+}
+
+func (f *FakeMessageMap) Load(roundID sharedtypes.RoundID) (string, bool) {
+	if f.LoadFunc != nil {
+		return f.LoadFunc(roundID)
+	}
+	return "", false
+}
+
+func (f *FakeMessageMap) Delete(roundID sharedtypes.RoundID) {
+	if f.DeleteFunc != nil {
+		f.DeleteFunc(roundID)
+	}
 }
 
 // FakeCreateRoundManager
@@ -190,7 +237,7 @@ type FakeRoundRsvpManager struct {
 	HandleRoundResponseFunc      func(ctx context.Context, i *discordgo.InteractionCreate) (roundrsvp.RoundRsvpOperationResult, error)
 	HandleRsvpJoinButtonFunc     func(ctx context.Context, i *discordgo.InteractionCreate) (roundrsvp.RoundRsvpOperationResult, error)
 	HandleRsvpLeaveButtonFunc    func(ctx context.Context, i *discordgo.InteractionCreate) (roundrsvp.RoundRsvpOperationResult, error)
-	UpdateRoundEventEmbedFunc    func(ctx context.Context, channelID, messageID string, acceptedParticipants, declinedParticipants, tentativeParticipants []roundtypes.Participant) (roundrsvp.RoundRsvpOperationResult, error)
+	UpdateRoundEventEmbedFunc    func(ctx context.Context, channelID, messageID string, participants []roundtypes.Participant) (roundrsvp.RoundRsvpOperationResult, error)
 	InteractionJoinRoundLateFunc func(ctx context.Context, i *discordgo.InteractionCreate) (roundrsvp.RoundRsvpOperationResult, error)
 }
 
@@ -215,9 +262,9 @@ func (f *FakeRoundRsvpManager) HandleRsvpLeaveButton(ctx context.Context, i *dis
 	return roundrsvp.RoundRsvpOperationResult{}, nil
 }
 
-func (f *FakeRoundRsvpManager) UpdateRoundEventEmbed(ctx context.Context, channelID, messageID string, acceptedParticipants, declinedParticipants, tentativeParticipants []roundtypes.Participant) (roundrsvp.RoundRsvpOperationResult, error) {
+func (f *FakeRoundRsvpManager) UpdateRoundEventEmbed(ctx context.Context, channelID, messageID string, participants []roundtypes.Participant) (roundrsvp.RoundRsvpOperationResult, error) {
 	if f.UpdateRoundEventEmbedFunc != nil {
-		return f.UpdateRoundEventEmbedFunc(ctx, channelID, messageID, acceptedParticipants, declinedParticipants, tentativeParticipants)
+		return f.UpdateRoundEventEmbedFunc(ctx, channelID, messageID, participants)
 	}
 	return roundrsvp.RoundRsvpOperationResult{}, nil
 }
@@ -472,3 +519,4 @@ var _ deleteround.DeleteRoundManager = (*FakeDeleteRoundManager)(nil)
 var _ updateround.UpdateRoundManager = (*FakeUpdateRoundManager)(nil)
 var _ tagupdates.TagUpdateManager = (*FakeTagUpdateManager)(nil)
 var _ scorecardupload.ScorecardUploadManager = (*FakeScorecardUploadManager)(nil)
+var _ rounddiscord.MessageMap = (*FakeMessageMap)(nil)

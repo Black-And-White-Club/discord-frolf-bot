@@ -36,7 +36,7 @@ func (rm *roundReminderManager) SendRoundReminder(ctx context.Context, payload *
 		threadName := fmt.Sprintf("⏰ 1 Hour Reminder: %s", payload.RoundTitle)
 
 		// Find or create the thread
-		thread, err := rm.findOrCreateThread(ctx, resolvedChannelID, payload.EventMessageID, threadName)
+		thread, created, err := rm.findOrCreateThread(ctx, resolvedChannelID, payload.EventMessageID, threadName)
 		if err != nil {
 			// If thread creation fails, fallback to sending to main channel
 			rm.logger.WarnContext(ctx, "Thread unavailable, sending to main channel as fallback")
@@ -45,6 +45,16 @@ func (rm *roundReminderManager) SendRoundReminder(ctx context.Context, payload *
 				rm.logger.ErrorContext(ctx, err.Error())
 				return RoundReminderOperationResult{Error: err}, err
 			}
+			return RoundReminderOperationResult{Success: true}, nil
+		}
+
+		// Idempotency Check: If thread was NOT created (meaning it already existed),
+		// it implies the reminder was already sent (or at least the thread for it exists).
+		// We treat this as a success and do not re-send the message.
+		if !created {
+			rm.logger.InfoContext(ctx, "Reminder thread already exists, skipping duplicate reminder",
+				attr.RoundID("round_id", payload.RoundID),
+				attr.String("thread_id", thread.ID))
 			return RoundReminderOperationResult{Success: true}, nil
 		}
 
@@ -148,11 +158,12 @@ func (rm *roundReminderManager) buildReminderMessage(payload *roundevents.Discor
 }
 
 // findOrCreateThread finds an existing thread or creates a new one
-func (rm *roundReminderManager) findOrCreateThread(ctx context.Context, channelID, messageID, threadName string) (*discordgo.Channel, error) {
+// Returns: thread, created (bool), error
+func (rm *roundReminderManager) findOrCreateThread(ctx context.Context, channelID, messageID, threadName string) (*discordgo.Channel, bool, error) {
 	// Check if the message already has a thread
 	if message, err := rm.session.ChannelMessage(channelID, messageID); err == nil && message.Thread != nil {
 		rm.logger.InfoContext(ctx, "Found existing thread via message", attr.String("thread_id", message.Thread.ID))
-		return message.Thread, nil
+		return message.Thread, false, nil
 	}
 
 	// Search active threads in the guild
@@ -160,7 +171,7 @@ func (rm *roundReminderManager) findOrCreateThread(ctx context.Context, channelI
 		for _, t := range threadsResp.Threads {
 			if t.ParentID == channelID && t.Name == threadName {
 				rm.logger.InfoContext(ctx, "Found existing thread via search", attr.String("thread_id", t.ID))
-				return t, nil
+				return t, false, nil
 			}
 		}
 	}
@@ -175,15 +186,15 @@ func (rm *roundReminderManager) findOrCreateThread(ctx context.Context, channelI
 			// Attempt to fetch again after race condition
 			if message, msgErr := rm.session.ChannelMessage(channelID, messageID); msgErr == nil && message.Thread != nil {
 				rm.logger.InfoContext(ctx, "Found thread after creation race", attr.String("thread_id", message.Thread.ID))
-				return message.Thread, nil
+				return message.Thread, false, nil
 			}
-			return nil, fmt.Errorf("thread exists but cannot be retrieved: %w", err)
+			return nil, false, fmt.Errorf("thread exists but cannot be retrieved: %w", err)
 		}
-		return nil, fmt.Errorf("failed to create thread: %w", err)
+		return nil, false, fmt.Errorf("failed to create thread: %w", err)
 	}
 
 	rm.logger.InfoContext(ctx, "Successfully created new thread", attr.String("thread_id", newThread.ID))
-	return newThread, nil
+	return newThread, true, nil
 }
 
 // sendMessageToChannel sends a message to the given Discord channel ID

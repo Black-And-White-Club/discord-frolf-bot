@@ -3,12 +3,14 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"time"
 
 	discordroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
+	"github.com/bwmarrin/discordgo"
 )
 
 func (h *RoundHandlers) HandleRoundUpdateRequested(ctx context.Context, payload *discordroundevents.RoundUpdateModalSubmittedPayloadV1) ([]handlerwrapper.Result, error) {
@@ -101,6 +103,41 @@ func (h *RoundHandlers) HandleRoundUpdated(ctx context.Context, payload *roundev
 
 	if result.Error != nil {
 		return nil, fmt.Errorf("update round event embed operation failed: %w", result.Error)
+	}
+
+	// Update the native Discord Scheduled Event details (best-effort).
+	if round.DiscordEventID != "" {
+		eventParams := &discordgo.GuildScheduledEventParams{}
+		hasChanges := false
+
+		if round.Title != "" {
+			eventParams.Name = string(round.Title)
+			hasChanges = true
+		}
+		if round.Location != "" {
+			eventParams.EntityMetadata = &discordgo.GuildScheduledEventEntityMetadata{
+				Location: string(round.Location),
+			}
+			hasChanges = true
+		}
+		if round.StartTime != nil {
+			startTimeValue := time.Time(*round.StartTime)
+			endTimeValue := startTimeValue.Add(3 * time.Hour)
+			eventParams.ScheduledStartTime = &startTimeValue
+			eventParams.ScheduledEndTime = &endTimeValue
+			hasChanges = true
+		}
+
+		if hasChanges {
+			session := h.service.GetSession()
+			_, err := session.GuildScheduledEventEdit(string(payload.GuildID), round.DiscordEventID, eventParams)
+			if err != nil {
+				h.logger.WarnContext(ctx, "failed to update native event",
+					"discord_event_id", round.DiscordEventID,
+					"error", err,
+				)
+			}
+		}
 	}
 
 	return nil, nil

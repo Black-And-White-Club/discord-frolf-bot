@@ -18,6 +18,8 @@ import (
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard"
 	leaderboardrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/router"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/round"
+	rounddiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/round/gateway"
 	roundrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/round/router"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/score"
 	scorerouter "github.com/Black-And-White-Club/discord-frolf-bot/app/score/watermill"
@@ -64,6 +66,7 @@ type DiscordBot struct {
 	// Module routers
 	UserRouter        *userrouter.UserRouter
 	RoundRouter       *roundrouter.RoundRouter
+	NativeEventMap    rounddiscord.NativeEventMap
 	ScoreRouter       *scorerouter.ScoreRouter
 	LeaderboardRouter *leaderboardrouter.LeaderboardRouter
 	GuildRouter       *guildrouter.GuildRouter
@@ -229,7 +232,7 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 		return fmt.Errorf("user module initialization failed: %w", err)
 	}
 
-	bot.RoundRouter, err = round.InitializeRoundModule(
+	roundResult, err := round.InitializeRoundModule(
 		ctx,
 		bot.Session,
 		bot.RoundWatermillRouter,
@@ -248,6 +251,8 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("round module initialization failed: %w", err)
 	}
+	bot.RoundRouter = roundResult.Router
+	bot.NativeEventMap = roundResult.NativeEventMap
 
 	bot.ScoreRouter, err = score.InitializeScoreModule(
 		ctx,
@@ -359,6 +364,15 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 					attr.Error(err))
 			}
 		}
+
+		// Reconcile NativeEventMap from active Guild Scheduled Events (post-restart).
+		// This ensures RSVP gateway listeners can resolve events immediately.
+		// Note: Orphaned native event cleanup (CleanupOrphanedNativeEvents) is available
+		// but not run on startup — the NativeEventMap is freshly populated and cannot
+		// distinguish orphans without a backend round-existence check. Orphaned events
+		// expire naturally via their ScheduledEndTime for V1.
+		go gateway.ReconcileNativeEventMap(bot.Session, bot.NativeEventMap, r.Guilds, bot.Logger)
+
 		commandSyncOnce.Do(func() {
 			go bot.syncGuildCommands(ctx, r.Guilds)
 		})

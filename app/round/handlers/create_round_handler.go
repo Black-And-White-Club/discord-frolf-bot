@@ -16,10 +16,11 @@ import (
 
 func (h *RoundHandlers) HandleRoundCreateRequested(ctx context.Context, payload *discordroundevents.CreateRoundModalPayloadV1) ([]handlerwrapper.Result, error) {
 	// Convert to backend payload and set GuildID
+	desc := payload.Description
 	backendPayload := roundevents.CreateRoundRequestedPayloadV1{
 		GuildID:     sharedtypes.GuildID(payload.GuildID),
 		Title:       payload.Title,
-		Description: payload.Description,
+		Description: &desc,
 		StartTime:   payload.StartTime,
 		Location:    payload.Location,
 		UserID:      payload.UserID,
@@ -71,6 +72,9 @@ func (h *RoundHandlers) HandleRoundCreated(ctx context.Context, payload *roundev
 	}
 
 	discordMessageID := discordMsg.ID
+
+	// Store the message ID in the map for future lookups (workaround for missing backend persistence)
+	h.service.GetMessageMap().Store(roundID, discordMessageID)
 
 	// Ensure GuildID is always set in the payload
 	finalGuildID := payload.GuildID

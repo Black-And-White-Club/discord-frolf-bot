@@ -19,7 +19,8 @@ const (
 )
 
 // UpdateRoundEventEmbed updates the round event embed with new participant information.
-func (rrm *roundRsvpManager) UpdateRoundEventEmbed(ctx context.Context, channelID string, messageID string, acceptedParticipants, declinedParticipants, tentativeParticipants []roundtypes.Participant) (RoundRsvpOperationResult, error) {
+// PRESERVED: old signature was (ctx, channelID, messageID, acceptedParticipants, declinedParticipants, tentativeParticipants []Participant) — may be reused in PWA
+func (rrm *roundRsvpManager) UpdateRoundEventEmbed(ctx context.Context, channelID string, messageID string, participants []roundtypes.Participant) (RoundRsvpOperationResult, error) {
 	// Multi-tenant support: resolve channelID from guild config if not provided
 	resolvedChannelID := channelID
 	if resolvedChannelID == "" {
@@ -62,8 +63,8 @@ func (rrm *roundRsvpManager) UpdateRoundEventEmbed(ctx context.Context, channelI
 
 		embed := msg.Embeds[0]
 
-		if len(embed.Fields) < 5 { // Assuming fields are in a consistent order: 0,1,2=Accepted,3=Declined,4=Tentative
-			err := fmt.Errorf("embed does not have expected fields (expected at least 5, got %d)", len(embed.Fields))
+		if len(embed.Fields) < 3 { // Fields: 0=Time, 1=Location, 2=Participants
+			err := fmt.Errorf("embed does not have expected fields (expected at least 3, got %d)", len(embed.Fields))
 			rrm.logger.ErrorContext(ctx, "Embed doesn't have expected fields",
 				attr.String("channel_id", resolvedChannelID),
 				attr.String("discord_message_id", messageID),
@@ -71,10 +72,13 @@ func (rrm *roundRsvpManager) UpdateRoundEventEmbed(ctx context.Context, channelI
 			return RoundRsvpOperationResult{Error: err}, err
 		}
 
-		// Update the Value of the fields at known indexes
-		embed.Fields[2].Value = rrm.formatParticipants(ctx, acceptedParticipants)
-		embed.Fields[3].Value = rrm.formatParticipants(ctx, declinedParticipants)
-		embed.Fields[4].Value = rrm.formatParticipants(ctx, tentativeParticipants)
+		// Update the single Participants field at index 2
+		embed.Fields[2].Value = rrm.formatParticipants(ctx, participants)
+
+		// PRESERVED: old 3-field update — may be reused in PWA
+		// embed.Fields[2].Value = rrm.formatParticipants(ctx, acceptedParticipants)
+		// embed.Fields[3].Value = rrm.formatParticipants(ctx, declinedParticipants)
+		// embed.Fields[4].Value = rrm.formatParticipants(ctx, tentativeParticipants)
 
 		// Update the message in the channel
 		updatedMsg, err := rrm.session.ChannelMessageEditEmbed(resolvedChannelID, messageID, embed)
@@ -90,9 +94,7 @@ func (rrm *roundRsvpManager) UpdateRoundEventEmbed(ctx context.Context, channelI
 		rrm.logger.InfoContext(ctx, "Successfully updated round event embed",
 			attr.String("channel_id", resolvedChannelID),
 			attr.String("discord_message_id", messageID),
-			attr.Int("accepted_count", len(acceptedParticipants)),
-			attr.Int("declined_count", len(declinedParticipants)),
-			attr.Int("tentative_count", len(tentativeParticipants)))
+			attr.Int("participant_count", len(participants)))
 
 		return RoundRsvpOperationResult{Success: updatedMsg}, nil
 	})

@@ -3,6 +3,7 @@ package rounddiscord
 import (
 	"context"
 	"log/slog"
+	"sync"
 
 	discordgo "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
@@ -20,9 +21,152 @@ import (
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"go.opentelemetry.io/otel/trace"
 )
+
+// Import used in NativeEventMap type definitions
+var _ = sharedtypes.RoundID{}
+
+// PendingNativeEventMap tracks user-created Discord events awaiting backend round creation.
+type PendingNativeEventMap interface {
+	Store(key string, discordEventID string)
+	LoadAndDelete(key string) (discordEventID string, ok bool)
+}
+
+// DefaultPendingNativeEventMap is a thread-safe map backed by sync.Map.
+type DefaultPendingNativeEventMap struct {
+	m sync.Map
+}
+
+// NewPendingNativeEventMap creates a new PendingNativeEventMap.
+func NewPendingNativeEventMap() PendingNativeEventMap {
+	return &DefaultPendingNativeEventMap{}
+}
+
+// Store saves a discordEventID for a pending key (guildID|title).
+func (p *DefaultPendingNativeEventMap) Store(key string, discordEventID string) {
+	p.m.Store(key, discordEventID)
+}
+
+// LoadAndDelete atomically loads and deletes a pending entry.
+func (p *DefaultPendingNativeEventMap) LoadAndDelete(key string) (string, bool) {
+	val, ok := p.m.LoadAndDelete(key)
+	if !ok {
+		return "", false
+	}
+	return val.(string), true
+}
+
+// NativeEventMap defines the interface for resolving Discord Event IDs to Round IDs.
+type NativeEventMap interface {
+	Store(discordEventID string, roundID sharedtypes.RoundID, guildID sharedtypes.GuildID, creatorID sharedtypes.DiscordID)
+	LookupByDiscordEventID(discordEventID string) (roundID sharedtypes.RoundID, guildID sharedtypes.GuildID, creatorID sharedtypes.DiscordID, ok bool)
+	LookupByRoundID(roundID sharedtypes.RoundID) (discordEventID string, ok bool)
+	Delete(roundID sharedtypes.RoundID)
+}
+
+// DefaultNativeEventMap is a thread-safe bidirectional map for resolving
+// Discord Event IDs to Round IDs and vice versa.
+type DefaultNativeEventMap struct {
+	// discordEventIDToRound maps DiscordEventID -> eventMapping
+	discordEventIDToRound sync.Map
+
+	// roundIDToDiscordEventID maps RoundID -> DiscordEventID
+	roundIDToDiscordEventID sync.Map
+}
+
+// NewNativeEventMap creates a new thread-safe NativeEventMap.
+func NewNativeEventMap() NativeEventMap {
+	return &DefaultNativeEventMap{}
+}
+
+// Store adds or updates a mapping from DiscordEventID to RoundID.
+func (m *DefaultNativeEventMap) Store(discordEventID string, roundID sharedtypes.RoundID, guildID sharedtypes.GuildID, creatorID sharedtypes.DiscordID) {
+	m.discordEventIDToRound.Store(discordEventID, &eventMapping{
+		roundID:   roundID,
+		guildID:   guildID,
+		creatorID: creatorID,
+	})
+	m.roundIDToDiscordEventID.Store(roundID.String(), discordEventID)
+}
+
+// LookupByDiscordEventID looks up a RoundID and GuildID by DiscordEventID.
+// Returns the RoundID, GuildID, CreatorID and a boolean indicating if the lookup was successful.
+func (m *DefaultNativeEventMap) LookupByDiscordEventID(discordEventID string) (sharedtypes.RoundID, sharedtypes.GuildID, sharedtypes.DiscordID, bool) {
+	val, ok := m.discordEventIDToRound.Load(discordEventID)
+	if !ok {
+		return sharedtypes.RoundID{}, sharedtypes.GuildID(""), sharedtypes.DiscordID(""), false
+	}
+	mapping := val.(*eventMapping)
+	return mapping.roundID, mapping.guildID, mapping.creatorID, true
+}
+
+// LookupByRoundID looks up a DiscordEventID by RoundID.
+// Returns the DiscordEventID and a boolean indicating if the lookup was successful.
+func (m *DefaultNativeEventMap) LookupByRoundID(roundID sharedtypes.RoundID) (string, bool) {
+	val, ok := m.roundIDToDiscordEventID.Load(roundID.String())
+	if !ok {
+		return "", false
+	}
+	return val.(string), true
+}
+
+// Delete removes all mappings for a given RoundID.
+func (m *DefaultNativeEventMap) Delete(roundID sharedtypes.RoundID) {
+	// Look up the DiscordEventID first
+	discordEventID, ok := m.LookupByRoundID(roundID)
+	if ok {
+		m.discordEventIDToRound.Delete(discordEventID)
+	}
+	// Delete the RoundID mapping
+	m.roundIDToDiscordEventID.Delete(roundID.String())
+}
+
+// eventMapping holds the round and guild information for a native event.
+type eventMapping struct {
+	roundID   sharedtypes.RoundID
+	guildID   sharedtypes.GuildID
+	creatorID sharedtypes.DiscordID
+}
+
+// MessageMap defines the interface for storing Round Message IDs.
+type MessageMap interface {
+	Store(roundID sharedtypes.RoundID, messageID string)
+	Load(roundID sharedtypes.RoundID) (string, bool)
+	Delete(roundID sharedtypes.RoundID)
+}
+
+// DefaultMessageMap is a thread-safe map for storing Round Message IDs.
+type DefaultMessageMap struct {
+	// roundIDToMessageID maps RoundID -> MessageID
+	roundIDToMessageID sync.Map
+}
+
+// NewMessageMap creates a new thread-safe MessageMap.
+func NewMessageMap() MessageMap {
+	return &DefaultMessageMap{}
+}
+
+// Store saves a MessageID for a RoundID.
+func (m *DefaultMessageMap) Store(roundID sharedtypes.RoundID, messageID string) {
+	m.roundIDToMessageID.Store(roundID.String(), messageID)
+}
+
+// Load retrieves a MessageID for a RoundID.
+func (m *DefaultMessageMap) Load(roundID sharedtypes.RoundID) (string, bool) {
+	val, ok := m.roundIDToMessageID.Load(roundID.String())
+	if !ok {
+		return "", false
+	}
+	return val.(string), true
+}
+
+// Delete removes a mapping for a RoundID.
+func (m *DefaultMessageMap) Delete(roundID sharedtypes.RoundID) {
+	m.roundIDToMessageID.Delete(roundID.String())
+}
 
 // RoundDiscordInterface defines the interface for RoundDiscord.
 type RoundDiscordInterface interface {
@@ -36,11 +180,18 @@ type RoundDiscordInterface interface {
 	GetUpdateRoundManager() updateround.UpdateRoundManager
 	GetTagUpdateManager() tagupdates.TagUpdateManager
 	GetScorecardUploadManager() scorecardupload.ScorecardUploadManager
+	GetSession() discordgo.Session
+	GetNativeEventMap() NativeEventMap
+	GetMessageMap() MessageMap
+	GetPendingNativeEventMap() PendingNativeEventMap
 }
 
 // RoundDiscord encapsulates all Round Discord services.
 type RoundDiscord struct {
 	session                discordgo.Session
+	nativeEventMap         NativeEventMap
+	messageMap             MessageMap
+	pendingNativeEventMap  PendingNativeEventMap
 	CreateRoundManager     createround.CreateRoundManager
 	RoundRsvpManager       roundrsvp.RoundRsvpManager
 	RoundReminderManager   roundreminder.RoundReminderManager
@@ -82,6 +233,9 @@ func NewRoundDiscord(
 
 	return &RoundDiscord{
 		session:                session,
+		nativeEventMap:         NewNativeEventMap(),
+		messageMap:             NewMessageMap(),
+		pendingNativeEventMap:  NewPendingNativeEventMap(),
 		CreateRoundManager:     createRoundManager,
 		RoundRsvpManager:       roundRsvpManager,
 		RoundReminderManager:   roundReminderManager,
@@ -142,4 +296,24 @@ func (rd *RoundDiscord) GetTagUpdateManager() tagupdates.TagUpdateManager {
 // GetScorecardUploadManager returns the ScorecardUploadManager.
 func (rd *RoundDiscord) GetScorecardUploadManager() scorecardupload.ScorecardUploadManager {
 	return rd.ScorecardUploadManager
+}
+
+// GetSession returns the Discord session.
+func (rd *RoundDiscord) GetSession() discordgo.Session {
+	return rd.session
+}
+
+// GetNativeEventMap returns the NativeEventMap for resolving Discord Event IDs.
+func (rd *RoundDiscord) GetNativeEventMap() NativeEventMap {
+	return rd.nativeEventMap
+}
+
+// GetMessageMap returns the MessageMap for resolving Round Message IDs.
+func (rd *RoundDiscord) GetMessageMap() MessageMap {
+	return rd.messageMap
+}
+
+// GetPendingNativeEventMap returns the PendingNativeEventMap for tracking user-created Discord events.
+func (rd *RoundDiscord) GetPendingNativeEventMap() PendingNativeEventMap {
+	return rd.pendingNativeEventMap
 }

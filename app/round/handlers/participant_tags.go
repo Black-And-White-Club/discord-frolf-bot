@@ -6,7 +6,6 @@ import (
 
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
-	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 )
@@ -65,24 +64,8 @@ func (h *RoundHandlers) HandleRoundParticipantsUpdated(ctx context.Context, payl
 		return []handlerwrapper.Result{}, nil
 	}
 
-	// Categorize participants by response
-	accepted := []roundtypes.Participant{}
-	declined := []roundtypes.Participant{}
-	tentative := []roundtypes.Participant{}
-
-	for _, participant := range payload.Round.Participants {
-		switch participant.Response {
-		case roundtypes.ResponseAccept:
-			accepted = append(accepted, participant)
-		case roundtypes.ResponseDecline:
-			declined = append(declined, participant)
-		case roundtypes.ResponseTentative:
-			tentative = append(tentative, participant)
-		}
-	}
-
-	// Update the Discord embed using the RoundRsvpManager
-	result, err := h.service.GetRoundRsvpManager().UpdateRoundEventEmbed(ctx, guildConfig.EventChannelID, payload.Round.EventMessageID, accepted, declined, tentative)
+	// Update the Discord embed using the RoundRsvpManager with all participants merged
+	result, err := h.service.GetRoundRsvpManager().UpdateRoundEventEmbed(ctx, guildConfig.EventChannelID, payload.Round.EventMessageID, payload.Round.Participants)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update Discord embed for round %s: %w", payload.RoundID, err)
 	}

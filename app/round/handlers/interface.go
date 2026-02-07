@@ -14,6 +14,7 @@ type Handlers interface {
 	// Creation flow
 	HandleRoundCreateRequested(ctx context.Context, payload *discordroundevents.CreateRoundModalPayloadV1) ([]handlerwrapper.Result, error)
 	HandleRoundCreated(ctx context.Context, payload *roundevents.RoundCreatedPayloadV1) ([]handlerwrapper.Result, error)
+	HandleRoundCreatedForNativeEvent(ctx context.Context, payload *roundevents.RoundCreatedPayloadV1) ([]handlerwrapper.Result, error)
 	HandleRoundCreationFailed(ctx context.Context, payload *roundevents.RoundCreationFailedPayloadV1) ([]handlerwrapper.Result, error)
 	HandleRoundValidationFailed(ctx context.Context, payload *roundevents.RoundValidationFailedPayloadV1) ([]handlerwrapper.Result, error)
 

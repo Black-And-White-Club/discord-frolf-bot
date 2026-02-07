@@ -122,6 +122,12 @@ func (srm *scoreRoundManager) handleBulkScoreSubmission(ctx context.Context, i *
 			})
 		}
 		bulkPayload := sharedevents.ScoreBulkUpdateRequestedPayloadV1{GuildID: sharedtypes.GuildID(i.GuildID), RoundID: sharedtypes.RoundID(roundUUID), Updates: bulkUpdates}
+
+		srm.logger.InfoContext(ctx, "Publishing ScoreBulkUpdateRequestedV1",
+			"round_id", roundUUID.String(),
+			"update_count", len(bulkUpdates),
+			"updates", fmt.Sprintf("%+v", bulkUpdates))
+
 		msg := message.NewMessage(watermill.NewUUID(), nil)
 		if msg.Metadata == nil {
 			msg.Metadata = message.Metadata{}

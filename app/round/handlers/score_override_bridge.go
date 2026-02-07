@@ -26,6 +26,13 @@ func (h *RoundHandlers) HandleScoreOverrideSuccess(ctx context.Context, payload 
 		channelID = "" // optional; Update handler falls back to config if empty
 	}
 
+	// Fall back to MessageMap if modal submit didn't provide a messageID
+	if messageID == "" {
+		if id, found := h.service.GetMessageMap().Load(payload.RoundID); found {
+			messageID = id
+		}
+	}
+
 	participantPayload := &roundevents.ParticipantScoreUpdatedPayloadV1{
 		GuildID:        payload.GuildID,
 		RoundID:        payload.RoundID,

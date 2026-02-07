@@ -15,6 +15,7 @@ import (
 	scoreround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/score_round"
 	scorecardupload "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/scorecard_upload"
 	updateround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/update_round"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/round/gateway"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/round/handlers"
 	roundrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/round/router"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
@@ -26,6 +27,12 @@ import (
 	"github.com/ThreeDotsLabs/watermill/message"
 	"go.opentelemetry.io/otel"
 )
+
+// RoundModuleResult contains the results of initializing the round module.
+type RoundModuleResult struct {
+	Router         *roundrouter.RoundRouter
+	NativeEventMap rounddiscord.NativeEventMap
+}
 
 // InitializeRoundModule initializes the Round domain module.
 func InitializeRoundModule(
@@ -43,7 +50,7 @@ func InitializeRoundModule(
 	guildConfigCache storage.ISInterface[storage.GuildConfig],
 	discordMetrics discordmetrics.DiscordMetrics,
 	guildConfig guildconfig.GuildConfigResolver,
-) (*roundrouter.RoundRouter, error) {
+) (*RoundModuleResult, error) {
 	tracer := otel.Tracer("round-module")
 
 	// Initialize Discord services
@@ -73,6 +80,19 @@ func InitializeRoundModule(
 	updateround.RegisterHandlers(interactionRegistry, roundDiscord.GetUpdateRoundManager())
 	scorecardupload.RegisterHandlers(interactionRegistry, messageRegistry, roundDiscord.GetScorecardUploadManager())
 
+	// Register Native Event RSVP gateway listeners (GuildScheduledEventUserAdd/Remove)
+	rsvpListener := gateway.NewScheduledEventRSVPListener(
+		roundDiscord.GetNativeEventMap(),
+		roundDiscord.GetMessageMap(),
+		roundDiscord.GetPendingNativeEventMap(),
+		session,
+		cfg,
+		eventBus,
+		helper,
+		logger.With("component", "scheduled-event-rsvp"),
+	)
+	rsvpListener.RegisterGatewayHandlers(session)
+
 	// Build Watermill Handlers
 	roundHandlers := handlers.NewRoundHandlers(
 		logger,
@@ -82,12 +102,25 @@ func InitializeRoundModule(
 		guildConfig,
 	)
 
+	// Create a separate subscriber for native-event fan-out handlers.
+	// This gives native-event handlers their own NATS consumer group
+	// ("discord-native-...") so they receive messages independently of the
+	// embed handlers that share the primary "discord-..." consumer group.
+	nativeConsumerMgr := eventbus.NewConsumerManager(eventBus.GetJetStream(), logger, nil)
+	nativeSubscriber := eventbus.NewJetStreamSubscriberAdapter(
+		eventBus.GetJetStream(),
+		nativeConsumerMgr,
+		"discord-native",
+		logger,
+	)
+
 	// Setup Watermill router
 	rr := roundrouter.NewRoundRouter(
 		logger,
 		router,
 		eventBus,
 		eventBus,
+		nativeSubscriber,
 		cfg,
 		helper,
 		tracer,
@@ -99,5 +132,8 @@ func InitializeRoundModule(
 	}
 
 	logger.InfoContext(ctx, "Round module initialized successfully")
-	return rr, nil
+	return &RoundModuleResult{
+		Router:         rr,
+		NativeEventMap: roundDiscord.GetNativeEventMap(),
+	}, nil
 }

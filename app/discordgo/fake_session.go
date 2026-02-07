@@ -59,8 +59,10 @@ type FakeSession struct {
 	WebhookMessageEditFunc func(webhookID, token, messageID string, data *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error)
 
 	// --- Scheduled Event Methods ---
+	GuildScheduledEventsFunc      func(guildID string, userCount bool, options ...discordgo.RequestOption) ([]*discordgo.GuildScheduledEvent, error)
 	GuildScheduledEventCreateFunc func(guildID string, params *discordgo.GuildScheduledEventParams, options ...discordgo.RequestOption) (*discordgo.GuildScheduledEvent, error)
 	GuildScheduledEventEditFunc   func(guildID, eventID string, params *discordgo.GuildScheduledEventParams, options ...discordgo.RequestOption) (*discordgo.GuildScheduledEvent, error)
+	GuildScheduledEventDeleteFunc func(guildID, eventID string, options ...discordgo.RequestOption) error
 
 	// --- Application Command Methods ---
 	ApplicationCommandCreateFunc          func(appID, guildID string, cmd *discordgo.ApplicationCommand, options ...discordgo.RequestOption) (*discordgo.ApplicationCommand, error)
@@ -369,6 +371,14 @@ func (f *FakeSession) WebhookMessageEdit(webhookID, token, messageID string, dat
 
 // --- Scheduled Event Methods Implementation ---
 
+func (f *FakeSession) GuildScheduledEvents(guildID string, userCount bool, options ...discordgo.RequestOption) ([]*discordgo.GuildScheduledEvent, error) {
+	f.record("GuildScheduledEvents")
+	if f.GuildScheduledEventsFunc != nil {
+		return f.GuildScheduledEventsFunc(guildID, userCount, options...)
+	}
+	return []*discordgo.GuildScheduledEvent{}, nil
+}
+
 func (f *FakeSession) GuildScheduledEventCreate(guildID string, params *discordgo.GuildScheduledEventParams, options ...discordgo.RequestOption) (*discordgo.GuildScheduledEvent, error) {
 	f.record("GuildScheduledEventCreate")
 	if f.GuildScheduledEventCreateFunc != nil {
@@ -383,6 +393,14 @@ func (f *FakeSession) GuildScheduledEventEdit(guildID, eventID string, params *d
 		return f.GuildScheduledEventEditFunc(guildID, eventID, params, options...)
 	}
 	return &discordgo.GuildScheduledEvent{ID: eventID}, nil
+}
+
+func (f *FakeSession) GuildScheduledEventDelete(guildID, eventID string, options ...discordgo.RequestOption) error {
+	f.record("GuildScheduledEventDelete")
+	if f.GuildScheduledEventDeleteFunc != nil {
+		return f.GuildScheduledEventDeleteFunc(guildID, eventID, options...)
+	}
+	return nil
 }
 
 // --- Application Command Methods Implementation ---

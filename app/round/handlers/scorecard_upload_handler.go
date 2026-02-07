@@ -88,6 +88,11 @@ func (rh *RoundHandlers) HandleScorecardUploaded(ctx context.Context, payload *r
 
 // HandleScorecardParseFailed handles scorecard parse failed events.
 func (rh *RoundHandlers) HandleScorecardParseFailed(ctx context.Context, payload *roundevents.ScorecardParseFailedPayloadV1) ([]handlerwrapper.Result, error) {
+	rh.logger.ErrorContext(ctx, "Scorecard parsing failed",
+		"import_id", payload.ImportID,
+		"user_id", payload.UserID,
+		"error", payload.Error)
+
 	// Notify user in Discord about parsing failure
 	// If guild channel, sends DM to user instead of public message
 	if payload.ChannelID != "" {
@@ -102,6 +107,11 @@ func (rh *RoundHandlers) HandleScorecardParseFailed(ctx context.Context, payload
 
 // HandleImportFailed handles import failed events.
 func (rh *RoundHandlers) HandleImportFailed(ctx context.Context, payload *roundevents.ImportFailedPayloadV1) ([]handlerwrapper.Result, error) {
+	rh.logger.ErrorContext(ctx, "Scorecard import failed",
+		"import_id", payload.ImportID,
+		"user_id", payload.UserID,
+		"error", payload.Error)
+
 	// Notify user in Discord about import failure
 	// If guild channel, sends DM to user instead of public message
 	if payload.ChannelID != "" {

@@ -6,6 +6,7 @@ import (
 
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
+	"github.com/bwmarrin/discordgo"
 )
 
 // HandleRoundFinalized handles the DiscordRoundFinalized event and updates the Discord embed
@@ -46,6 +47,20 @@ func (h *RoundHandlers) HandleRoundFinalized(ctx context.Context, payload *round
 
 	if finalizeResult.Error != nil {
 		return nil, fmt.Errorf("finalize scorecard embed operation failed: %w", finalizeResult.Error)
+	}
+
+	// Set the native Discord Scheduled Event to COMPLETED (best-effort).
+	if payload.DiscordEventID != "" {
+		session := h.service.GetSession()
+		_, err = session.GuildScheduledEventEdit(string(payload.GuildID), payload.DiscordEventID, &discordgo.GuildScheduledEventParams{
+			Status: discordgo.GuildScheduledEventStatusCompleted,
+		})
+		if err != nil {
+			h.logger.WarnContext(ctx, "failed to set native event to COMPLETED",
+				"discord_event_id", payload.DiscordEventID,
+				"error", err,
+			)
+		}
 	}
 
 	// We intentionally do not emit a trace event here. Returning result

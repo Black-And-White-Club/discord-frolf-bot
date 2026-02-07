@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	discordroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
@@ -33,7 +34,12 @@ func (h *RoundHandlers) HandleRoundDeleted(ctx context.Context, payload *roundev
 	// Get message ID from context (set by wrapper from message metadata)
 	discordMessageID, ok := ctx.Value("discord_message_id").(string)
 	if !ok || discordMessageID == "" {
-		return nil, fmt.Errorf("discord_message_id not found or is empty in message metadata for round %s", payload.RoundID.String())
+		// Fallback: try to look up message ID from the map if metadata is missing
+		if msgID, found := h.service.GetMessageMap().Load(payload.RoundID); found {
+			discordMessageID = msgID
+		} else {
+			return nil, fmt.Errorf("discord_message_id not found or is empty in message metadata for round %s", payload.RoundID.String())
+		}
 	}
 
 	result, err := h.service.GetDeleteRoundManager().DeleteRoundEventEmbed(ctx, discordMessageID, h.config.GetEventChannelID())
@@ -44,6 +50,24 @@ func (h *RoundHandlers) HandleRoundDeleted(ctx context.Context, payload *roundev
 	_, ok = result.Success.(bool)
 	if !ok {
 		return nil, fmt.Errorf("unexpected type for result.Success in DeleteRoundEventEmbed result for round %s", payload.RoundID.String())
+	}
+
+	// Delete the native Discord Scheduled Event (best-effort).
+	if payload.DiscordEventID != "" {
+		session := h.service.GetSession()
+		if err := session.GuildScheduledEventDelete(string(payload.GuildID), payload.DiscordEventID); err != nil {
+			// Ignore 404 (Unknown Guild Scheduled Event) as it likely means the user already deleted it
+			if !strings.Contains(err.Error(), "10070") { // 10070 = Unknown Guild Scheduled Event
+				h.logger.WarnContext(ctx, "failed to delete native event",
+					"discord_event_id", payload.DiscordEventID,
+					"error", err,
+				)
+			}
+		}
+		// Clean up the NativeEventMap entry.
+		if nativeEventMap := h.service.GetNativeEventMap(); nativeEventMap != nil {
+			nativeEventMap.Delete(payload.RoundID)
+		}
 	}
 
 	// Avoid returning trace events here to prevent publish failures from

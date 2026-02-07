@@ -6,6 +6,7 @@ import (
 
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
+	"github.com/bwmarrin/discordgo"
 )
 
 // HandleRoundStarted updates the Discord embed when a round starts.
@@ -30,6 +31,20 @@ func (h *RoundHandlers) HandleRoundStarted(ctx context.Context, payload *roundev
 	_, err := h.service.GetStartRoundManager().UpdateRoundToScorecard(ctx, channelID, eventMessageID, payload)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update round to scorecard: %w", err)
+	}
+
+	// Set the native Discord Scheduled Event to ACTIVE (best-effort).
+	if payload.DiscordEventID != "" {
+		session := h.service.GetSession()
+		_, err := session.GuildScheduledEventEdit(string(payload.GuildID), payload.DiscordEventID, &discordgo.GuildScheduledEventParams{
+			Status: discordgo.GuildScheduledEventStatusActive,
+		})
+		if err != nil {
+			h.logger.WarnContext(ctx, "failed to set native event to ACTIVE",
+				"discord_event_id", payload.DiscordEventID,
+				"error", err,
+			)
+		}
 	}
 
 	// We don't return a trace event here to avoid downstream publish

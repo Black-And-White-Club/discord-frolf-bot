@@ -132,6 +132,11 @@ func (m *scorecardUploadManager) HandleFileUploadMessage(s discord.Session, msg 
 // SendUploadError sends an error message. If the channel is a guild channel,
 // sends a DM to the user instead to avoid leaking import errors publicly.
 func (m *scorecardUploadManager) SendUploadError(ctx context.Context, channelID, userID, errorMsg string) error {
+	// Fallback for empty error message
+	if errorMsg == "" {
+		errorMsg = "An unknown error occurred while processing the scorecard."
+	}
+
 	// Get channel info to determine if it's a DM or guild channel
 	channel, err := m.session.GetChannel(channelID)
 	if err != nil {
