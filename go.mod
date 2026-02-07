@@ -3,7 +3,7 @@ module github.com/Black-And-White-Club/discord-frolf-bot
 go 1.25
 
 require (
-	github.com/Black-And-White-Club/frolf-bot-shared v0.1.3
+	github.com/Black-And-White-Club/frolf-bot-shared v0.1.4
 	github.com/ThreeDotsLabs/watermill v1.5.1
 	github.com/bwmarrin/discordgo v0.29.0
 	github.com/google/uuid v1.6.0
@@ -53,4 +53,4 @@ require (
 	google.golang.org/protobuf v1.36.11 // indirect
 )
 
-replace github.com/Black-And-White-Club/frolf-bot-shared => ../frolf-bot-shared
+// replace github.com/Black-And-White-Club/frolf-bot-shared => ../frolf-bot-shared
