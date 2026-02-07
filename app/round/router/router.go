@@ -26,6 +26,7 @@ type RoundRouter struct {
 	Router           *message.Router
 	subscriber       eventbus.EventBus
 	publisher        eventbus.EventBus
+	nativeSubscriber message.Subscriber // separate consumer group for fan-out handlers
 	config           *config.Config
 	helper           utils.Helpers
 	tracer           trace.Tracer
@@ -38,6 +39,7 @@ func NewRoundRouter(
 	router *message.Router,
 	subscriber eventbus.EventBus,
 	publisher eventbus.EventBus,
+	nativeSubscriber message.Subscriber,
 	config *config.Config,
 	helper utils.Helpers,
 	tracer trace.Tracer,
@@ -47,6 +49,7 @@ func NewRoundRouter(
 		Router:           router,
 		subscriber:       subscriber,
 		publisher:        publisher,
+		nativeSubscriber: nativeSubscriber,
 		config:           config,
 		helper:           helper,
 		tracer:           tracer,
@@ -70,14 +73,50 @@ func registerHandler[T any](
 	deps handlerDeps,
 	topic string,
 	handler func(context.Context, *T) ([]handlerwrapper.Result, error),
+	suffix ...string,
 ) {
 	handlerName := "discord-round." + topic
+	if len(suffix) > 0 {
+		handlerName += suffix[0]
+	}
 
 	deps.router.AddHandler(
 		handlerName,
 		topic,
 		deps.subscriber,
 		"", // Watermill reads topic from message metadata when empty
+		deps.publisher,
+		handlerwrapper.WrapTransformingTyped(
+			handlerName,
+			deps.logger,
+			deps.tracer,
+			deps.helper,
+			deps.metrics,
+			handler,
+		),
+	)
+}
+
+// registerHandlerWithSub registers a handler using an explicit subscriber.
+// Used for fan-out patterns where multiple handlers need independent consumer
+// groups on the same topic.
+func registerHandlerWithSub[T any](
+	deps handlerDeps,
+	sub message.Subscriber,
+	topic string,
+	handler func(context.Context, *T) ([]handlerwrapper.Result, error),
+	suffix ...string,
+) {
+	handlerName := "discord-round." + topic
+	if len(suffix) > 0 {
+		handlerName += suffix[0]
+	}
+
+	deps.router.AddHandler(
+		handlerName,
+		topic,
+		sub,
+		"",
 		deps.publisher,
 		handlerwrapper.WrapTransformingTyped(
 			handlerName,
@@ -131,8 +170,10 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers handlers.Ha
 	registerHandler(deps, discordroundevents.RoundCreateModalSubmittedV1, handlers.HandleRoundCreateRequested)
 	registerHandler(deps, roundevents.RoundCreatedV1, handlers.HandleRoundCreated)
 
-	// Native Event Creation (parallel to embed creation, independent consumer group)
-	registerHandler(deps, roundevents.RoundCreatedV1, handlers.HandleRoundCreatedForNativeEvent)
+	// Native Event Creation (parallel to embed creation, independent consumer group).
+	// Uses a separate subscriber with its own NATS consumer so both this handler
+	// and the embed handler above each receive every RoundCreatedV1 message (fan-out).
+	registerHandlerWithSub(deps, r.nativeSubscriber, roundevents.RoundCreatedV1, handlers.HandleRoundCreatedForNativeEvent, ".native")
 
 	registerHandler(deps, roundevents.RoundCreationFailedV1, handlers.HandleRoundCreationFailed)
 	registerHandler(deps, roundevents.RoundValidationFailedV1, handlers.HandleRoundValidationFailed)
@@ -196,7 +237,13 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers handlers.Ha
 	return nil
 }
 
-// Close stops the router.
+// Close stops the router and its subscriber resources.
 func (r *RoundRouter) Close() error {
-	return r.Router.Close()
+	err := r.Router.Close()
+	if r.nativeSubscriber != nil {
+		if closeErr := r.nativeSubscriber.Close(); closeErr != nil {
+			r.logger.Error("Failed to close native subscriber", "error", closeErr)
+		}
+	}
+	return err
 }

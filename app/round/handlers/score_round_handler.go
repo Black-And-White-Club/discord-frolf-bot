@@ -17,16 +17,24 @@ func (h *RoundHandlers) HandleParticipantScoreUpdated(ctx context.Context, paylo
 		channelID = h.config.GetEventChannelID()
 	}
 
+	// Resolve messageID: prefer payload, fall back to MessageMap
+	messageID := payload.EventMessageID
+	if messageID == "" {
+		if id, found := h.service.GetMessageMap().Load(payload.RoundID); found {
+			messageID = id
+		}
+	}
+
 	// Get the ScoreRoundManager
 	scoreRoundManager := h.service.GetScoreRoundManager()
 
 	// Call UpdateScoreEmbed with the specific user's updated score
 	updateResult, err := scoreRoundManager.UpdateScoreEmbed(
 		ctx,
-		channelID,              // Pass channel ID
-		payload.EventMessageID, // Pass message ID of the scorecard
-		payload.UserID,         // Pass the UserID of the updated participant
-		&payload.Score,         // Pass a pointer to the updated score
+		channelID,      // Pass channel ID
+		messageID,      // Pass message ID of the scorecard
+		payload.UserID, // Pass the UserID of the updated participant
+		&payload.Score, // Pass a pointer to the updated score
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call UpdateScoreEmbed: %w", err)
@@ -47,11 +55,24 @@ func (h *RoundHandlers) HandleScoresBulkUpdated(ctx context.Context, payload *ro
 		channelID = h.config.GetEventChannelID()
 	}
 
+	// Resolve messageID: prefer payload, fall back to MessageMap
+	messageID := payload.EventMessageID
+	if messageID == "" {
+		if id, found := h.service.GetMessageMap().Load(payload.RoundID); found {
+			messageID = id
+		}
+	}
+
+	h.logger.InfoContext(ctx, "HandleScoresBulkUpdated",
+		"channel_id", channelID,
+		"message_id", messageID,
+		"participant_count", len(payload.Participants))
+
 	scoreRoundManager := h.service.GetScoreRoundManager()
 	updateResult, err := scoreRoundManager.UpdateScoreEmbedBulk(
 		ctx,
 		channelID,
-		payload.EventMessageID,
+		messageID,
 		payload.Participants,
 	)
 	if err != nil {

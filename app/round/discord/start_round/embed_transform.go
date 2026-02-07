@@ -18,10 +18,12 @@ import (
 )
 
 const (
-	fieldNameStarted   = "📅 Started"
-	fieldNameLocation  = "📍 Location"
-	fieldNameAccepted  = "✅ Accepted"
-	fieldNameTentative = "🤔 Tentative"
+	fieldNameStarted  = "📅 Started"
+	fieldNameLocation = "📍 Location"
+	// PRESERVED: old field names — may be reused in PWA
+	// fieldNameAccepted  = "✅ Accepted"
+	// fieldNameTentative = "🤔 Tentative"
+	fieldNameParticipants = "👥 Participants"
 
 	placeholderNoParticipants  = "*No participants*"
 	placeholderUnknownLocation = "Unknown Location"
@@ -101,6 +103,8 @@ func responseFromFieldName(name string) roundtypes.Response {
 		return roundtypes.ResponseAccept
 	case strings.Contains(l, "tentative"):
 		return roundtypes.ResponseTentative
+	case strings.Contains(l, "participants"):
+		return roundtypes.ResponseAccept
 	default:
 		return ""
 	}
@@ -195,15 +199,20 @@ func (m *startRoundManager) TransformRoundToScorecard(
 			return string(a.UserID) < string(b.UserID)
 		})
 
-		var accepted, tentative []string
+		// PRESERVED: old accepted/tentative split — may be reused in PWA
+		// var accepted, tentative []string
+		// for _, p := range list {
+		// 	line := formatParticipantLine(p)
+		// 	switch p.Response {
+		// 	case roundtypes.ResponseAccept:
+		// 		accepted = append(accepted, line)
+		// 	case roundtypes.ResponseTentative:
+		// 		tentative = append(tentative, line)
+		// 	}
+		// }
+		var participantLines []string
 		for _, p := range list {
-			line := formatParticipantLine(p)
-			switch p.Response {
-			case roundtypes.ResponseAccept:
-				accepted = append(accepted, line)
-			case roundtypes.ResponseTentative:
-				tentative = append(tentative, line)
-			}
+			participantLines = append(participantLines, formatParticipantLine(p))
 		}
 
 		location := placeholderUnknownLocation
@@ -214,15 +223,11 @@ func (m *startRoundManager) TransformRoundToScorecard(
 		fields := []*discordgo.MessageEmbedField{
 			{Name: fieldNameStarted, Value: fmt.Sprintf("<t:%d:f>", startUnix)},
 			{Name: fieldNameLocation, Value: location},
-			{Name: fieldNameAccepted, Value: placeholderNoParticipants},
-			{Name: fieldNameTentative, Value: placeholderNoParticipants},
+			{Name: fieldNameParticipants, Value: placeholderNoParticipants},
 		}
 
-		if len(accepted) > 0 {
-			fields[2].Value = strings.Join(accepted, "\n")
-		}
-		if len(tentative) > 0 {
-			fields[3].Value = strings.Join(tentative, "\n")
+		if len(participantLines) > 0 {
+			fields[2].Value = strings.Join(participantLines, "\n")
 		}
 
 		embed := &discordgo.MessageEmbed{

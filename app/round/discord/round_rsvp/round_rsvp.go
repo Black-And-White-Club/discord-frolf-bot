@@ -25,7 +25,7 @@ import (
 // RoundRsvpManager defines the interface for round RSVP operations.
 type RoundRsvpManager interface {
 	HandleRoundResponse(ctx context.Context, i *discordgo.InteractionCreate) (RoundRsvpOperationResult, error)
-	UpdateRoundEventEmbed(ctx context.Context, channelID string, messageID string, acceptedParticipants, declinedParticipants, tentativeParticipants []roundtypes.Participant) (RoundRsvpOperationResult, error)
+	UpdateRoundEventEmbed(ctx context.Context, channelID string, messageID string, participants []roundtypes.Participant) (RoundRsvpOperationResult, error)
 	InteractionJoinRoundLate(ctx context.Context, i *discordgo.InteractionCreate) (RoundRsvpOperationResult, error)
 }
 

@@ -56,7 +56,11 @@ func ReconcileNativeEventMap(
 				continue
 			}
 
-			nativeEventMap.Store(event.ID, roundID, sharedtypes.GuildID(g.ID))
+			// ReconcileNativeEventMap cannot extract the original creator ID from the
+			// event description, so we store an empty ID. This means bot-created
+			// events reconciled after a restart will still face deletion auth issues,
+			// but RSVP tracking will work.
+			nativeEventMap.Store(event.ID, roundID, sharedtypes.GuildID(g.ID), sharedtypes.DiscordID(""))
 			reconciled++
 
 			logger.Debug("Reconciled native event mapping",

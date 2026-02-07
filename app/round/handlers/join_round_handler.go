@@ -76,8 +76,12 @@ func (h *RoundHandlers) HandleRoundParticipantJoined(ctx context.Context, payloa
 
 	// Get message ID from context (set by wrapper from message metadata)
 	messageID, ok := ctx.Value("discord_message_id").(string)
-	if !ok {
-		messageID = ""
+	if !ok || messageID == "" {
+		if id, found := h.service.GetMessageMap().Load(payload.RoundID); found {
+			messageID = id
+		} else {
+			messageID = ""
+		}
 	}
 
 	// Determine if this was a late join
@@ -100,13 +104,13 @@ func (h *RoundHandlers) HandleRoundParticipantJoined(ctx context.Context, payloa
 		)
 	} else {
 		// Use RSVP embed update for rounds that haven't started
+		// Merge all participant lists into one for the single Participants field
+		allParticipants := append(append(payload.AcceptedParticipants, payload.DeclinedParticipants...), payload.TentativeParticipants...)
 		_, err = h.service.GetRoundRsvpManager().UpdateRoundEventEmbed(
 			ctx,
 			channelID,
 			messageID,
-			payload.AcceptedParticipants,
-			payload.DeclinedParticipants,
-			payload.TentativeParticipants,
+			allParticipants,
 		)
 	}
 
@@ -130,8 +134,12 @@ func (h *RoundHandlers) HandleRoundParticipantRemoved(ctx context.Context, paylo
 
 	// Get message ID from context (set by wrapper from message metadata)
 	messageID, ok := ctx.Value("discord_message_id").(string)
-	if !ok {
-		messageID = ""
+	if !ok || messageID == "" {
+		if id, found := h.service.GetMessageMap().Load(payload.RoundID); found {
+			messageID = id
+		} else {
+			messageID = ""
+		}
 	}
 
 	// Check if this is a scorecard embed (started round) by checking if any participant has a score
@@ -149,13 +157,13 @@ func (h *RoundHandlers) HandleRoundParticipantRemoved(ctx context.Context, paylo
 	}
 
 	// Only update RSVP embeds (before round starts)
+	// Merge all participant lists into one for the single Participants field
+	allParticipants := append(append(payload.AcceptedParticipants, payload.DeclinedParticipants...), payload.TentativeParticipants...)
 	_, err := h.service.GetRoundRsvpManager().UpdateRoundEventEmbed(
 		ctx,
 		channelID,
 		messageID,
-		payload.AcceptedParticipants,
-		payload.DeclinedParticipants,
-		payload.TentativeParticipants,
+		allParticipants,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update round event embed after removal: %w", err)

@@ -61,20 +61,14 @@ func (crm *createRoundManager) SendRoundEventEmbed(guildID string, channelID str
 					Name:  "📍 Location",
 					Value: string(location),
 				},
+				// PRESERVED: old 3-field RSVP status grouping — may be reused in PWA
+				// {Name: "✅ Accepted", Value: "-", Inline: true},
+				// {Name: "❌ Declined", Value: "-", Inline: true},
+				// {Name: "🤔 Tentative", Value: "-", Inline: true},
 				{
-					Name:   "✅ Accepted",
+					Name:   "👥 Participants",
 					Value:  "-",
-					Inline: true,
-				},
-				{
-					Name:   "❌ Declined",
-					Value:  "-",
-					Inline: true,
-				},
-				{
-					Name:   "🤔 Tentative",
-					Value:  "-",
-					Inline: true,
+					Inline: false,
 				},
 			},
 			Footer: &discordgo.MessageEmbedFooter{
@@ -86,21 +80,6 @@ func (crm *createRoundManager) SendRoundEventEmbed(guildID string, channelID str
 		components := []discordgo.MessageComponent{
 			discordgo.ActionsRow{
 				Components: []discordgo.MessageComponent{
-					discordgo.Button{
-						Label:    "Accept ✅",
-						Style:    discordgo.SecondaryButton,
-						CustomID: fmt.Sprintf("round_accept|%s", roundID),
-					},
-					discordgo.Button{
-						Label:    "Decline ❌",
-						Style:    discordgo.SecondaryButton,
-						CustomID: fmt.Sprintf("round_decline|%s", roundID),
-					},
-					discordgo.Button{
-						Label:    "Tentative 🤔",
-						Style:    discordgo.SecondaryButton,
-						CustomID: fmt.Sprintf("round_tentative|%s", roundID),
-					},
 					discordgo.Button{
 						Label:    "Edit",
 						Style:    discordgo.PrimaryButton,

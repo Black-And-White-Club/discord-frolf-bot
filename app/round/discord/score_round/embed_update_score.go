@@ -112,44 +112,50 @@ func (srm *scoreRoundManager) UpdateScoreEmbedBulk(ctx context.Context, channelI
 		}
 		embed := message.Embeds[0]
 
-		scoreByUser := make(map[sharedtypes.DiscordID]*sharedtypes.Score)
-		tagByUser := make(map[sharedtypes.DiscordID]*sharedtypes.TagNumber)
-		for _, p := range participants {
-			scoreByUser[p.UserID] = p.Score
-			tagByUser[p.UserID] = p.TagNumber
+		// Filter out all existing participant fields to "clean" the embed and avoid duplicates
+		var newFields []*discordgo.MessageEmbedField
+		participantFieldIndex := -1
+
+		for _, f := range embed.Fields {
+			if isParticipantField(f.Name, f.Value) {
+				// Stick to the first location we find for participants
+				if participantFieldIndex == -1 {
+					participantFieldIndex = len(newFields)
+					// Append a placeholder that we will overwrite shortly
+					newFields = append(newFields, f)
+				}
+				// Skip subsequent participant fields (consolidating them)
+			} else {
+				newFields = append(newFields, f)
+			}
+		}
+		embed.Fields = newFields
+
+		// Sort participants for consistent display (Tag > Name)
+		// We can't easily sort roundtypes.Participant here unless we implement Sort interface or use a helper
+		// but standard practice is to trust the order or just append.
+		// For now, we'll just format them directly.
+
+		// Generate new field value
+		lines := participantsToEmbedLines(participants)
+		newValue := strings.Join(lines, "\n")
+		if len(lines) == 0 {
+			newValue = placeholderNoParticipants
 		}
 
-		updated := false
-		for i := range embed.Fields {
-			field := embed.Fields[i]
-			if !isParticipantField(field.Name, field.Value) || strings.TrimSpace(field.Value) == "" || field.Value == placeholderNoParticipants {
-				continue
-			}
+		// Standardize field name
+		fieldName := "👥 Participants"
 
-			lines := strings.Split(field.Value, "\n")
-			for j, line := range lines {
-				uid, oldScore, oldTag, ok := parseParticipantLine(line)
-				if !ok {
-					continue
-				}
-				newScore, scoreOK := scoreByUser[uid]
-				newTag, tagOK := tagByUser[uid]
-				if scoreOK || tagOK {
-					if !scoreOK {
-						newScore = oldScore
-					}
-					if !tagOK {
-						newTag = oldTag
-					}
-					lines[j] = formatParticipantLine(uid, newScore, newTag)
-					updated = true
-				}
-			}
-			embed.Fields[i].Value = strings.Join(lines, "\n")
-		}
-
-		if !updated {
-			return ScoreRoundOperationResult{Success: "no changes"}, nil
+		if participantFieldIndex != -1 {
+			// Update existing field location
+			embed.Fields[participantFieldIndex].Name = fieldName
+			embed.Fields[participantFieldIndex].Value = newValue
+		} else {
+			// Append new field if none existed
+			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+				Name:  fieldName,
+				Value: newValue,
+			})
 		}
 
 		edit := &discordgo.MessageEdit{
@@ -190,7 +196,7 @@ func (srm *scoreRoundManager) AddLateParticipantToScorecard(ctx context.Context,
 			}
 			if !added {
 				embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-					Name:  "✅ Accepted",
+					Name:  "👥 Participants",
 					Value: strings.Join(participantsToEmbedLines([]roundtypes.Participant{p}), "\n"),
 				})
 			}

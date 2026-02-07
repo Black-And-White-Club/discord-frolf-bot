@@ -71,8 +71,7 @@ func Test_startRoundManager_TransformRoundToScorecard(t *testing.T) {
 				Fields: []*discordgo.MessageEmbedField{
 					{Name: "📅 Started", Value: fmt.Sprintf("<t:%d:f>", fixedTime.Unix())},
 					{Name: "📍 Location", Value: "Test Course"},
-					{Name: "✅ Accepted", Value: "*No participants*"},
-					{Name: "🤔 Tentative", Value: "*No participants*"},
+					{Name: "👥 Participants", Value: "*No participants*"},
 				},
 				Footer: &discordgo.MessageEmbedFooter{
 					Text: "Round in progress. Use the buttons below to join or record your score.",
@@ -101,8 +100,7 @@ func Test_startRoundManager_TransformRoundToScorecard(t *testing.T) {
 				Fields: []*discordgo.MessageEmbedField{
 					{Name: "📅 Started", Value: fmt.Sprintf("<t:%d:f>", fixedTime.Unix())},
 					{Name: "📍 Location", Value: "Test Course"},
-					{Name: "✅ Accepted", Value: "<@user-1> — Score: --\n<@user-3> — Score: --"},
-					{Name: "🤔 Tentative", Value: "<@user-2> — Score: --"},
+					{Name: "👥 Participants", Value: "<@user-1> — Score: --\n<@user-2> — Score: --\n<@user-3> — Score: --"},
 				},
 				Footer: &discordgo.MessageEmbedFooter{
 					Text: "Round in progress. Use the buttons below to join or record your score.",
@@ -130,8 +128,7 @@ func Test_startRoundManager_TransformRoundToScorecard(t *testing.T) {
 				Fields: []*discordgo.MessageEmbedField{
 					{Name: "📅 Started", Value: fmt.Sprintf("<t:%d:f>", fixedTime.Unix())},
 					{Name: "📍 Location", Value: "Test Course"},
-					{Name: "✅ Accepted", Value: "<@user-1> Tag: 1 — Score: --\n<@user-2> Tag: 2 — Score: --"},
-					{Name: "🤔 Tentative", Value: "*No participants*"},
+					{Name: "👥 Participants", Value: "<@user-1> Tag: 1 — Score: --\n<@user-2> Tag: 2 — Score: --"},
 				},
 				Footer: &discordgo.MessageEmbedFooter{
 					Text: "Round in progress. Use the buttons below to join or record your score.",

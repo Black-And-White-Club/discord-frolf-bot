@@ -83,6 +83,10 @@ func InitializeRoundModule(
 	// Register Native Event RSVP gateway listeners (GuildScheduledEventUserAdd/Remove)
 	rsvpListener := gateway.NewScheduledEventRSVPListener(
 		roundDiscord.GetNativeEventMap(),
+		roundDiscord.GetMessageMap(),
+		roundDiscord.GetPendingNativeEventMap(),
+		session,
+		cfg,
 		eventBus,
 		helper,
 		logger.With("component", "scheduled-event-rsvp"),
@@ -98,12 +102,25 @@ func InitializeRoundModule(
 		guildConfig,
 	)
 
+	// Create a separate subscriber for native-event fan-out handlers.
+	// This gives native-event handlers their own NATS consumer group
+	// ("discord-native-...") so they receive messages independently of the
+	// embed handlers that share the primary "discord-..." consumer group.
+	nativeConsumerMgr := eventbus.NewConsumerManager(eventBus.GetJetStream(), logger, nil)
+	nativeSubscriber := eventbus.NewJetStreamSubscriberAdapter(
+		eventBus.GetJetStream(),
+		nativeConsumerMgr,
+		"discord-native",
+		logger,
+	)
+
 	// Setup Watermill router
 	rr := roundrouter.NewRoundRouter(
 		logger,
 		router,
 		eventBus,
 		eventBus,
+		nativeSubscriber,
 		cfg,
 		helper,
 		tracer,
