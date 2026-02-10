@@ -58,4 +58,7 @@ type Handlers interface {
 
 	// Reminders
 	HandleRoundReminder(ctx context.Context, payload *roundevents.DiscordReminderPayloadV1) ([]handlerwrapper.Result, error)
+
+	// Points
+	HandlePointsAwarded(ctx context.Context, payload *sharedevents.PointsAwardedPayloadV1) ([]handlerwrapper.Result, error)
 }

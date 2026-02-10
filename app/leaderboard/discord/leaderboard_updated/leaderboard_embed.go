@@ -10,8 +10,10 @@ import (
 )
 
 type LeaderboardEntry struct {
-	Rank   sharedtypes.TagNumber `json:"rank"`
-	UserID sharedtypes.DiscordID `json:"user_id"`
+	Rank         sharedtypes.TagNumber `json:"rank"`
+	UserID       sharedtypes.DiscordID `json:"user_id"`
+	TotalPoints  int                   `json:"total_points"`
+	RoundsPlayed int                   `json:"rounds_played"`
 }
 
 func (lum *leaderboardUpdateManager) SendLeaderboardEmbed(ctx context.Context, channelID string, leaderboard []LeaderboardEntry, page int32) (LeaderboardUpdateOperationResult, error) {
@@ -63,7 +65,11 @@ func (lum *leaderboardUpdateManager) SendLeaderboardEmbed(ctx context.Context, c
 				}
 
 				// Format each row with proper spacing
-				leaderboardText += fmt.Sprintf("%s **Tag #%-3d** <@%s>\n", emoji, entry.Rank, entry.UserID)
+				if entry.TotalPoints > 0 {
+					leaderboardText += fmt.Sprintf("%s **Tag #%-3d** <@%s> • %d pts (%d rds)\n", emoji, entry.Rank, entry.UserID, entry.TotalPoints, entry.RoundsPlayed)
+				} else {
+					leaderboardText += fmt.Sprintf("%s **Tag #%-3d** <@%s>\n", emoji, entry.Rank, entry.UserID)
+				}
 			}
 
 			// Create a single field with the formatted table

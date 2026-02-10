@@ -66,8 +66,10 @@ func (h *LeaderboardHandlers) HandleLeaderboardResponse(ctx context.Context,
 	leaderboardData := make([]leaderboardtypes.LeaderboardEntry, len(payloadData.Leaderboard))
 	for i, entry := range payloadData.Leaderboard {
 		leaderboardData[i] = leaderboardtypes.LeaderboardEntry{
-			TagNumber: entry.TagNumber,
-			UserID:    entry.UserID,
+			TagNumber:    entry.TagNumber,
+			UserID:       entry.UserID,
+			TotalPoints:  entry.TotalPoints,
+			RoundsPlayed: entry.RoundsPlayed,
 		}
 	}
 

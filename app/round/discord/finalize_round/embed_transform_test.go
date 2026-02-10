@@ -106,6 +106,27 @@ func TestTransformRoundToFinalizedScorecard(t *testing.T) {
 			wantFields: nil,
 			wantButton: true,
 		},
+		{
+			name: "participant with points",
+			payload: roundevents.RoundFinalizedEmbedUpdatePayloadV1{
+				RoundID:   roundID,
+				Location:  "Test Course",
+				StartTime: start,
+				Participants: []roundtypes.Participant{
+					{UserID: "u1", Score: score(0), Points: intPtr(10)},
+					{UserID: "u2", Score: score(-2), Points: intPtr(20)},
+				},
+			},
+			mockUsers: map[string]string{
+				"u1": "Alice",
+				"u2": "Bob",
+			},
+			wantFields: []string{
+				"🥇 Bob | Score: -2 • 20 pts (<@u2>)",
+				"🗑️ Alice | Score: Even • 10 pts (<@u1>)",
+			},
+			wantButton: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -173,4 +194,8 @@ func findField(embed *discordgo.MessageEmbed, name string) *discordgo.MessageEmb
 		}
 	}
 	return nil
+}
+
+func intPtr(v int) *int {
+	return &v
 }

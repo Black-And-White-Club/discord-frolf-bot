@@ -25,7 +25,7 @@ func NewRoundHandlers(
 	helpers utils.Helpers,
 	roundDiscord rounddiscord.RoundDiscordInterface,
 	guildConfigResolver guildconfig.GuildConfigResolver,
-) Handlers {
+) *RoundHandlers {
 	return &RoundHandlers{
 		service:             roundDiscord,
 		helpers:             helpers,

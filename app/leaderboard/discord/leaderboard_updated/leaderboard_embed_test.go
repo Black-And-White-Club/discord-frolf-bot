@@ -302,6 +302,34 @@ func Test_leaderboardUpdateManager_SendLeaderboardEmbed(t *testing.T) {
 			expectErr:     false,
 		},
 		{
+			name: "Leaderboard with points display",
+			setupFake: func(t *testing.T, fakeSession *discord.FakeSession) {
+				fakeSession.ChannelMessageSendComplexFunc = func(chID string, send *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					embed := send.Embeds[0]
+					if len(embed.Fields) != 1 {
+						t.Errorf("Expected 1 field, got %d", len(embed.Fields))
+					}
+
+					// Entries with points should show "• N pts"
+					expectedValue := "🥇 **Tag #1  ** <@user1> • 30 pts (1 rds)\n🥈 **Tag #2  ** <@user2> • 20 pts (2 rds)\n🥉 **Tag #3  ** <@user3> • 10 pts (3 rds)\n"
+					if embed.Fields[0].Value != expectedValue {
+						t.Errorf("Unexpected field value:\ngot:  %q\nwant: %q", embed.Fields[0].Value, expectedValue)
+					}
+
+					return &discordgo.Message{
+						ID:      "test-message-id",
+						Embeds:  send.Embeds,
+						Content: "Test Message",
+					}, nil
+				}
+			},
+			leaderboard:   createTestLeaderboardWithPoints(3),
+			page:          1,
+			expectedPage:  1,
+			expectButtons: false,
+			expectErr:     false,
+		},
+		{
 			name: "Discord API error",
 			setupFake: func(t *testing.T, fakeSession *discord.FakeSession) {
 				fakeSession.ChannelMessageSendComplexFunc = func(chID string, send *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error) {
@@ -369,6 +397,20 @@ func createTestLeaderboard(count int) []LeaderboardEntry {
 		entries[i] = LeaderboardEntry{
 			Rank:   sharedtypes.TagNumber(i + 1),
 			UserID: sharedtypes.DiscordID(fmt.Sprintf("user%d", i+1)),
+		}
+	}
+	return entries
+}
+
+// Helper function to create test leaderboard entries with points
+func createTestLeaderboardWithPoints(count int) []LeaderboardEntry {
+	entries := make([]LeaderboardEntry, count)
+	for i := 0; i < count; i++ {
+		entries[i] = LeaderboardEntry{
+			Rank:         sharedtypes.TagNumber(i + 1),
+			UserID:       sharedtypes.DiscordID(fmt.Sprintf("user%d", i+1)),
+			TotalPoints:  (count - i) * 10,
+			RoundsPlayed: i + 1,
 		}
 	}
 	return entries
