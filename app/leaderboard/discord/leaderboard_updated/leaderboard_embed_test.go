@@ -311,7 +311,7 @@ func Test_leaderboardUpdateManager_SendLeaderboardEmbed(t *testing.T) {
 					}
 
 					// Entries with points should show "• N pts"
-					expectedValue := "🥇 **Tag #1  ** <@user1> • 30 pts (0 rds)\n🥈 **Tag #2  ** <@user2> • 20 pts (0 rds)\n🥉 **Tag #3  ** <@user3> • 10 pts (0 rds)\n"
+					expectedValue := "🥇 **Tag #1  ** <@user1> • 30 pts (1 rds)\n🥈 **Tag #2  ** <@user2> • 20 pts (2 rds)\n🥉 **Tag #3  ** <@user3> • 10 pts (3 rds)\n"
 					if embed.Fields[0].Value != expectedValue {
 						t.Errorf("Unexpected field value:\ngot:  %q\nwant: %q", embed.Fields[0].Value, expectedValue)
 					}
@@ -407,9 +407,10 @@ func createTestLeaderboardWithPoints(count int) []LeaderboardEntry {
 	entries := make([]LeaderboardEntry, count)
 	for i := 0; i < count; i++ {
 		entries[i] = LeaderboardEntry{
-			Rank:        sharedtypes.TagNumber(i + 1),
-			UserID:      sharedtypes.DiscordID(fmt.Sprintf("user%d", i+1)),
-			TotalPoints: (count - i) * 10,
+			Rank:         sharedtypes.TagNumber(i + 1),
+			UserID:       sharedtypes.DiscordID(fmt.Sprintf("user%d", i+1)),
+			TotalPoints:  (count - i) * 10,
+			RoundsPlayed: i + 1,
 		}
 	}
 	return entries

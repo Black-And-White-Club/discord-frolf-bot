@@ -11,7 +11,7 @@ import (
 )
 
 // HandlePointsAwarded handles the PointsAwardedV1 event.
-// It retrieves the cached round payload, updates participant points, and refreshes the embed.
+// It updates participant points on the scorecard embed.
 func (h *RoundHandlers) HandlePointsAwarded(ctx context.Context, payload *sharedevents.PointsAwardedPayloadV1) ([]handlerwrapper.Result, error) {
 	h.logger.InfoContext(ctx, "Handling points awarded event",
 		attr.String("guild_id", string(payload.GuildID)),
@@ -30,6 +30,12 @@ func (h *RoundHandlers) HandlePointsAwarded(ctx context.Context, payload *shared
 			h.logger.WarnContext(ctx, "skipping points display update: missing event_message_id in payload", "round_id", payload.RoundID)
 			return []handlerwrapper.Result{}, nil
 		}
+	}
+
+	// Early return if no points to apply — avoids an unnecessary Discord API call
+	if len(payload.Points) == 0 {
+		h.logger.InfoContext(ctx, "no points in payload, skipping embed update", "round_id", payload.RoundID)
+		return []handlerwrapper.Result{}, nil
 	}
 
 	// Construct the embed update payload directly from the enriched event

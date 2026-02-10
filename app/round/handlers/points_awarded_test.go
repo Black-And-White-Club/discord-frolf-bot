@@ -61,17 +61,21 @@ func TestRoundHandlers_HandlePointsAwarded(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "round_payload_not_in_cache",
+			name: "empty_points_map_skips_update",
 			payload: &sharedevents.PointsAwardedPayloadV1{
-				GuildID: testGuildID,
-				RoundID: testRoundID,
-				Points:  map[sharedtypes.DiscordID]int{user1: 10},
+				GuildID:        testGuildID,
+				RoundID:        testRoundID,
+				EventMessageID: testMessageID,
+				Points:         map[sharedtypes.DiscordID]int{},
 			},
-			ctx: context.Background(),
+			ctx: context.WithValue(context.Background(), "discord_message_id", testMessageID),
 			setup: func(f *FakeRoundDiscord) {
-
+				f.FinalizeRoundManager.FinalizeScorecardEmbedFunc = func(ctx context.Context, msgID, chID string, payload roundevents.RoundFinalizedEmbedUpdatePayloadV1) (finalizeround.FinalizeRoundOperationResult, error) {
+					t.Error("FinalizeScorecardEmbed should not be called with empty points")
+					return finalizeround.FinalizeRoundOperationResult{}, nil
+				}
 			},
-			wantErr: false, // Should return nil error to avoid retries
+			wantErr: false,
 		},
 		{
 			name: "missing_discord_message_id",
