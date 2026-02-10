@@ -13,7 +13,7 @@ func TestNewRoundHandlers(t *testing.T) {
 		cfg := &config.Config{}
 		fakeRoundDiscord := &FakeRoundDiscord{}
 
-		handlers := NewRoundHandlers(logger, cfg, nil, fakeRoundDiscord, nil, &FakeInteractionStore{})
+		handlers := NewRoundHandlers(logger, cfg, nil, fakeRoundDiscord, nil)
 
 		if handlers == nil {
 			t.Fatalf("Expected non-nil RoundHandlers")

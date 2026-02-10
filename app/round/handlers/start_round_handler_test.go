@@ -98,7 +98,6 @@ func TestRoundHandlers_HandleRoundStarted(t *testing.T) {
 				nil,
 				fakeRoundDiscord,
 				nil,
-				&FakeInteractionStore{},
 			)
 
 			got, err := h.HandleRoundStarted(tt.ctx, tt.payload)

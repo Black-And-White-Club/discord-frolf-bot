@@ -97,7 +97,6 @@ func TestRoundHandlers_HandleRoundFinalized(t *testing.T) {
 				nil,
 				fakeRoundDiscord,
 				nil,
-				&FakeInteractionStore{},
 			)
 
 			got, err := h.HandleRoundFinalized(tt.ctx, tt.payload)

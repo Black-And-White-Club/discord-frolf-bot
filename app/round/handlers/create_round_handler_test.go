@@ -59,7 +59,6 @@ func TestRoundHandlers_HandleRoundCreateRequested(t *testing.T) {
 				nil,
 				fakeRoundDiscord,
 				nil,
-				&FakeInteractionStore{},
 			)
 
 			got, err := h.HandleRoundCreateRequested(tt.ctx, tt.payload)
@@ -196,7 +195,6 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 				nil,
 				fakeRoundDiscord,
 				nil,
-				&FakeInteractionStore{},
 			)
 
 			got, err := h.HandleRoundCreated(tt.ctx, tt.payload)
@@ -287,7 +285,6 @@ func TestRoundHandlers_HandleRoundCreationFailed(t *testing.T) {
 				nil,
 				fakeRoundDiscord,
 				nil,
-				&FakeInteractionStore{},
 			)
 
 			got, err := h.HandleRoundCreationFailed(tt.ctx, tt.payload)
@@ -365,7 +362,6 @@ func TestRoundHandlers_HandleRoundValidationFailed(t *testing.T) {
 				nil,
 				fakeRoundDiscord,
 				nil,
-				&FakeInteractionStore{},
 			)
 
 			got, err := h.HandleRoundValidationFailed(tt.ctx, tt.payload)

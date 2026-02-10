@@ -77,7 +77,6 @@ func TestRoundHandlers_HandleRoundParticipantJoinRequest(t *testing.T) {
 				nil,
 				fakeRoundDiscord,
 				nil,
-				&FakeInteractionStore{},
 			)
 
 			got, err := h.HandleRoundParticipantJoinRequest(tt.ctx, tt.payload)
@@ -148,7 +147,6 @@ func TestRoundHandlers_HandleRoundParticipantRemoved(t *testing.T) {
 				nil,
 				fakeRoundDiscord,
 				nil,
-				&FakeInteractionStore{},
 			)
 
 			got, err := h.HandleRoundParticipantRemoved(tt.ctx, tt.payload)

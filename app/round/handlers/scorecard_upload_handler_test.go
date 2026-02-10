@@ -40,7 +40,6 @@ func TestRoundHandlers_HandleScorecardUploaded(t *testing.T) {
 		nil,
 		&FakeRoundDiscord{},
 		nil,
-		&FakeInteractionStore{},
 	)
 
 	tests := []struct {
@@ -147,7 +146,6 @@ func TestRoundHandlers_HandleScorecardURLRequested(t *testing.T) {
 				nil,
 				fakeRoundDiscord,
 				nil,
-				&FakeInteractionStore{},
 			)
 
 			got, err := h.HandleScorecardURLRequested(tt.ctx, tt.payload)
@@ -222,7 +220,6 @@ func TestRoundHandlers_HandleImportFailed(t *testing.T) {
 				nil,
 				fakeRoundDiscord,
 				nil,
-				&FakeInteractionStore{},
 			)
 
 			got, err := h.HandleImportFailed(tt.ctx, tt.payload)
@@ -297,7 +294,6 @@ func TestRoundHandlers_HandleScorecardParseFailed(t *testing.T) {
 				nil,
 				fakeRoundDiscord,
 				nil,
-				&FakeInteractionStore{},
 			)
 
 			got, err := h.HandleScorecardParseFailed(tt.ctx, tt.payload)

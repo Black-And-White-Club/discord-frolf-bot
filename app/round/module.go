@@ -100,7 +100,6 @@ func InitializeRoundModule(
 		helper,
 		roundDiscord,
 		guildConfig,
-		interactionStore,
 	)
 
 	// Create a separate subscriber for native-event fan-out handlers.

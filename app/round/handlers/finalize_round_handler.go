@@ -33,13 +33,6 @@ func (h *RoundHandlers) HandleRoundFinalized(ctx context.Context, payload *round
 		DiscordChannelID: payload.DiscordChannelID,
 	}
 
-	// Cache the payload for potential points updates
-	cacheKey := fmt.Sprintf("round_payload:%s", payload.RoundID)
-	err := h.interactionStore.Set(ctx, cacheKey, embedPayload)
-	if err != nil {
-		h.logger.WarnContext(ctx, "failed to cache round payload", "round_id", payload.RoundID, "error", err)
-	}
-
 	// Get the FinalizeRoundManager and finalize the round embed
 	finalizeRoundManager := h.service.GetFinalizeRoundManager()
 	finalizeResult, err := finalizeRoundManager.FinalizeScorecardEmbed(

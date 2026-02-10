@@ -21,33 +21,6 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-// FakeInteractionStore is a mock implementation of storage.ISInterface[any]
-type FakeInteractionStore struct {
-	GetFunc    func(ctx context.Context, key string) (any, error)
-	SetFunc    func(ctx context.Context, key string, value any) error
-	DeleteFunc func(ctx context.Context, key string)
-}
-
-func (f *FakeInteractionStore) Get(ctx context.Context, key string) (any, error) {
-	if f.GetFunc != nil {
-		return f.GetFunc(ctx, key)
-	}
-	return nil, nil
-}
-
-func (f *FakeInteractionStore) Set(ctx context.Context, key string, value any) error {
-	if f.SetFunc != nil {
-		return f.SetFunc(ctx, key, value)
-	}
-	return nil
-}
-
-func (f *FakeInteractionStore) Delete(ctx context.Context, key string) {
-	if f.DeleteFunc != nil {
-		f.DeleteFunc(ctx, key)
-	}
-}
-
 // FakeRoundDiscord is a programmable fake for RoundDiscordInterface
 type FakeRoundDiscord struct {
 	GetCreateRoundManagerFunc     func() createround.CreateRoundManager

@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"testing"
@@ -12,7 +11,6 @@ import (
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	sharedevents "github.com/Black-And-White-Club/frolf-bot-shared/events/shared"
-	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/google/uuid"
 )
@@ -30,7 +28,7 @@ func TestRoundHandlers_HandlePointsAwarded(t *testing.T) {
 		payload *sharedevents.PointsAwardedPayloadV1
 		ctx     context.Context
 		wantErr bool
-		setup   func(*FakeRoundDiscord, *FakeInteractionStore)
+		setup   func(*FakeRoundDiscord)
 	}{
 		{
 			name: "successful_points_awarded",
@@ -43,19 +41,7 @@ func TestRoundHandlers_HandlePointsAwarded(t *testing.T) {
 				},
 			},
 			ctx: context.WithValue(context.Background(), "discord_message_id", testMessageID),
-			setup: func(f *FakeRoundDiscord, store *FakeInteractionStore) {
-				store.GetFunc = func(ctx context.Context, key string) (any, error) {
-					if key != fmt.Sprintf("round_payload:%s", testRoundID) {
-						return nil, errors.New("not found")
-					}
-					return roundevents.RoundFinalizedEmbedUpdatePayloadV1{
-						EventMessageID: testMessageID,
-						Participants: []roundtypes.Participant{
-							{UserID: user1},
-							{UserID: user2},
-						},
-					}, nil
-				}
+			setup: func(f *FakeRoundDiscord) {
 				f.FinalizeRoundManager.FinalizeScorecardEmbedFunc = func(ctx context.Context, msgID, chID string, payload roundevents.RoundFinalizedEmbedUpdatePayloadV1) (finalizeround.FinalizeRoundOperationResult, error) {
 					if msgID != testMessageID {
 						return finalizeround.FinalizeRoundOperationResult{}, errors.New("wrong msg id")
@@ -82,10 +68,8 @@ func TestRoundHandlers_HandlePointsAwarded(t *testing.T) {
 				Points:  map[sharedtypes.DiscordID]int{user1: 10},
 			},
 			ctx: context.Background(),
-			setup: func(f *FakeRoundDiscord, store *FakeInteractionStore) {
-				store.GetFunc = func(ctx context.Context, key string) (any, error) {
-					return nil, errors.New("not found")
-				}
+			setup: func(f *FakeRoundDiscord) {
+
 			},
 			wantErr: false, // Should return nil error to avoid retries
 		},
@@ -97,15 +81,10 @@ func TestRoundHandlers_HandlePointsAwarded(t *testing.T) {
 				Points:  map[sharedtypes.DiscordID]int{user1: 10},
 			},
 			ctx: context.Background(),
-			setup: func(f *FakeRoundDiscord, store *FakeInteractionStore) {
-				store.GetFunc = func(ctx context.Context, key string) (any, error) {
-					return roundevents.RoundFinalizedEmbedUpdatePayloadV1{
-						EventMessageID: "", // Also empty here
-						Participants:   []roundtypes.Participant{{UserID: user1}},
-					}, nil
-				}
+			setup: func(f *FakeRoundDiscord) {
+
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "finalize_embed_fails",
@@ -115,13 +94,7 @@ func TestRoundHandlers_HandlePointsAwarded(t *testing.T) {
 				Points:  map[sharedtypes.DiscordID]int{user1: 10},
 			},
 			ctx: context.WithValue(context.Background(), "discord_message_id", testMessageID),
-			setup: func(f *FakeRoundDiscord, store *FakeInteractionStore) {
-				store.GetFunc = func(ctx context.Context, key string) (any, error) {
-					return roundevents.RoundFinalizedEmbedUpdatePayloadV1{
-						EventMessageID: testMessageID,
-						Participants:   []roundtypes.Participant{{UserID: user1}},
-					}, nil
-				}
+			setup: func(f *FakeRoundDiscord) {
 				f.FinalizeRoundManager.FinalizeScorecardEmbedFunc = func(ctx context.Context, msgID, chID string, payload roundevents.RoundFinalizedEmbedUpdatePayloadV1) (finalizeround.FinalizeRoundOperationResult, error) {
 					return finalizeround.FinalizeRoundOperationResult{}, errors.New("api error")
 				}
@@ -136,13 +109,7 @@ func TestRoundHandlers_HandlePointsAwarded(t *testing.T) {
 				Points:  map[sharedtypes.DiscordID]int{sharedtypes.DiscordID("unknown"): 10},
 			},
 			ctx: context.WithValue(context.Background(), "discord_message_id", testMessageID),
-			setup: func(f *FakeRoundDiscord, store *FakeInteractionStore) {
-				store.GetFunc = func(ctx context.Context, key string) (any, error) {
-					return roundevents.RoundFinalizedEmbedUpdatePayloadV1{
-						EventMessageID: testMessageID,
-						Participants:   []roundtypes.Participant{{UserID: user1}},
-					}, nil
-				}
+			setup: func(f *FakeRoundDiscord) {
 			},
 			wantErr: false, // Handled as warning, returns nil results
 		},
@@ -151,9 +118,9 @@ func TestRoundHandlers_HandlePointsAwarded(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			fakeRoundDiscord := &FakeRoundDiscord{}
-			fakeStore := &FakeInteractionStore{}
+
 			if tt.setup != nil {
-				tt.setup(fakeRoundDiscord, fakeStore)
+				tt.setup(fakeRoundDiscord)
 			}
 			mockLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
@@ -167,7 +134,6 @@ func TestRoundHandlers_HandlePointsAwarded(t *testing.T) {
 				nil,
 				fakeRoundDiscord,
 				nil,
-				fakeStore,
 			)
 
 			_, err := h.HandlePointsAwarded(tt.ctx, tt.payload)

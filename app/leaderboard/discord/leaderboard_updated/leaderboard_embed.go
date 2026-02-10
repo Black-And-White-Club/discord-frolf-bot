@@ -66,7 +66,7 @@ func (lum *leaderboardUpdateManager) SendLeaderboardEmbed(ctx context.Context, c
 
 				// Format each row with proper spacing
 				if entry.TotalPoints > 0 {
-					leaderboardText += fmt.Sprintf("%s **Tag #%-3d** <@%s> • %d pts\n", emoji, entry.Rank, entry.UserID, entry.TotalPoints)
+					leaderboardText += fmt.Sprintf("%s **Tag #%-3d** <@%s> • %d pts (%d rds)\n", emoji, entry.Rank, entry.UserID, entry.TotalPoints, entry.RoundsPlayed)
 				} else {
 					leaderboardText += fmt.Sprintf("%s **Tag #%-3d** <@%s>\n", emoji, entry.Rank, entry.UserID)
 				}

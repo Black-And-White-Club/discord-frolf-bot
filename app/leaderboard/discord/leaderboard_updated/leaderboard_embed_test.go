@@ -311,7 +311,7 @@ func Test_leaderboardUpdateManager_SendLeaderboardEmbed(t *testing.T) {
 					}
 
 					// Entries with points should show "• N pts"
-					expectedValue := "🥇 **Tag #1  ** <@user1> • 30 pts\n🥈 **Tag #2  ** <@user2> • 20 pts\n🥉 **Tag #3  ** <@user3> • 10 pts\n"
+					expectedValue := "🥇 **Tag #1  ** <@user1> • 30 pts (0 rds)\n🥈 **Tag #2  ** <@user2> • 20 pts (0 rds)\n🥉 **Tag #3  ** <@user3> • 10 pts (0 rds)\n"
 					if embed.Fields[0].Value != expectedValue {
 						t.Errorf("Unexpected field value:\ngot:  %q\nwant: %q", embed.Fields[0].Value, expectedValue)
 					}

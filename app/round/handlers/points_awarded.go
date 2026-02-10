@@ -19,57 +19,54 @@ func (h *RoundHandlers) HandlePointsAwarded(ctx context.Context, payload *shared
 		attr.Int("player_count", len(payload.Points)),
 	)
 
-	// Retrieve cached payload
-	cacheKey := fmt.Sprintf("round_payload:%s", payload.RoundID)
-	cached, err := h.interactionStore.Get(ctx, cacheKey)
-	if err != nil {
-		h.logger.WarnContext(ctx, "round payload not found in cache or expired", "round_id", payload.RoundID, "error", err)
-		return []handlerwrapper.Result{}, nil // Return nil error to avoid retries for expired cache
+	// Validate essential enriched data
+	if payload.EventMessageID == "" {
+		// If enrichment failed or event is from legacy backend, we can't update the embed without the ID.
+		// However, we can try to fall back if the context has it, but enrichment is the primary path now.
+		// Use context ID as fallback if available
+		if msgID, ok := ctx.Value("discord_message_id").(string); ok && msgID != "" {
+			payload.EventMessageID = msgID
+		} else {
+			h.logger.WarnContext(ctx, "skipping points display update: missing event_message_id in payload", "round_id", payload.RoundID)
+			return []handlerwrapper.Result{}, nil
+		}
 	}
 
-	embedPayload, ok := cached.(roundevents.RoundFinalizedEmbedUpdatePayloadV1)
-	if !ok {
-		return nil, fmt.Errorf("unexpected type in cache for round_payload:%s", payload.RoundID)
+	// Construct the embed update payload directly from the enriched event
+	embedPayload := roundevents.RoundFinalizedEmbedUpdatePayloadV1{
+		GuildID:          payload.GuildID,
+		RoundID:          payload.RoundID,
+		Title:            payload.Title,
+		StartTime:        payload.StartTime,
+		Location:         payload.Location,
+		Participants:     payload.Participants,
+		Teams:            payload.Teams,
+		EventMessageID:   payload.EventMessageID,
+		DiscordChannelID: payload.DiscordChannelID,
 	}
 
-	// Update participants with points
-	updatedCount := 0
+	// Ensure participants have the correct points from the payload map
+	// The backend enrichment might have already set them, but we enforce consistency with the map
 	for userID, points := range payload.Points {
 		for i := range embedPayload.Participants {
 			if embedPayload.Participants[i].UserID == userID {
-				p := points // copy
+				p := points
 				embedPayload.Participants[i].Points = &p
-				updatedCount++
 				break
 			}
 		}
 	}
 
-	if updatedCount == 0 {
-		h.logger.WarnContext(ctx, "no participants updated with points", "round_id", payload.RoundID)
-		return []handlerwrapper.Result{}, nil
+	discordChannelID := payload.DiscordChannelID
+	if discordChannelID == "" {
+		discordChannelID = h.config.GetEventChannelID()
 	}
-
-	// Get message ID from context (set by wrapper from message metadata)
-	discordMessageID, ok := ctx.Value("discord_message_id").(string)
-	if !ok || discordMessageID == "" {
-		// If points are awarded via a background process, we might lack the message ID in context.
-		// However, RoundFinalized should have just finished and points are usually awarded immediately after.
-		// If it's missing, we use the EventMessageID from the payload if available.
-		discordMessageID = string(embedPayload.EventMessageID)
-	}
-
-	if discordMessageID == "" {
-		return nil, fmt.Errorf("missing discord_message_id for points awarding update")
-	}
-
-	discordChannelID := h.config.GetEventChannelID()
 
 	// Update the embed
 	finalizeRoundManager := h.service.GetFinalizeRoundManager()
 	finalizeResult, err := finalizeRoundManager.FinalizeScorecardEmbed(
 		ctx,
-		discordMessageID,
+		embedPayload.EventMessageID,
 		discordChannelID,
 		embedPayload,
 	)
@@ -80,9 +77,6 @@ func (h *RoundHandlers) HandlePointsAwarded(ctx context.Context, payload *shared
 	if finalizeResult.Error != nil {
 		return nil, fmt.Errorf("finalize scorecard embed update failed: %w", finalizeResult.Error)
 	}
-
-	// Clean up cache (optional, but good practice)
-	h.interactionStore.Delete(ctx, cacheKey)
 
 	return []handlerwrapper.Result{}, nil
 }
