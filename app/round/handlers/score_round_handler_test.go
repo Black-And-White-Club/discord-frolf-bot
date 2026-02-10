@@ -56,6 +56,7 @@ func TestRoundHandlers_HandleDiscordRoundScoreUpdate(t *testing.T) {
 				nil,
 				fakeRoundDiscord,
 				nil,
+				&FakeInteractionStore{},
 			)
 
 			got, err := h.HandleDiscordRoundScoreUpdate(tt.ctx, tt.payload)
@@ -166,6 +167,7 @@ func TestRoundHandlers_HandleParticipantScoreUpdated(t *testing.T) {
 				nil,
 				fakeRoundDiscord,
 				nil,
+				&FakeInteractionStore{},
 			)
 
 			got, err := h.HandleParticipantScoreUpdated(tt.ctx, tt.payload)
@@ -256,6 +258,7 @@ func TestRoundHandlers_HandleScoreUpdateError(t *testing.T) {
 				nil,
 				fakeRoundDiscord,
 				nil,
+				&FakeInteractionStore{},
 			)
 
 			got, err := h.HandleScoreUpdateError(tt.ctx, tt.payload)

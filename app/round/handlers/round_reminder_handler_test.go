@@ -76,6 +76,7 @@ func TestRoundHandlers_HandleRoundReminder(t *testing.T) {
 				nil,
 				fakeRoundDiscord,
 				nil,
+				&FakeInteractionStore{},
 			)
 
 			got, err := h.HandleRoundReminder(tt.ctx, tt.payload)

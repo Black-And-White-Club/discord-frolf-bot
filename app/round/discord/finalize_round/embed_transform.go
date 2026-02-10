@@ -27,6 +27,7 @@ type participantWithUser struct {
 	Username  string
 	Score     *sharedtypes.Score
 	TagNumber *sharedtypes.TagNumber
+	Points    *int
 }
 
 func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roundevents.RoundFinalizedEmbedUpdatePayloadV1) (*discordgo.MessageEmbed, []discordgo.MessageComponent, error) {
@@ -80,6 +81,7 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 				Username:  username,
 				Score:     p.Score,
 				TagNumber: p.TagNumber,
+				Points:    p.Points,
 			}
 		}
 
@@ -217,12 +219,16 @@ func buildParticipantFields(participants []*participantWithUser) []*discordgo.Me
 			}
 		}
 
+		if p.Points != nil {
+			score = fmt.Sprintf("%s • %d pts", score, *p.Points)
+		}
+
 		emoji := rankEmoji(i, total)
 
 		fields = append(fields, &discordgo.MessageEmbedField{
 			Name:   fmt.Sprintf("%s %s", emoji, p.Username),
 			Value:  fmt.Sprintf("%s (<@%s>)", score, p.UserID),
-			Inline: true,
+			Inline: false,
 		})
 	}
 

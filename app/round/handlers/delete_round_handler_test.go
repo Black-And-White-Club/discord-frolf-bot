@@ -54,6 +54,7 @@ func TestRoundHandlers_HandleRoundDeleteRequested(t *testing.T) {
 				nil,
 				fakeRoundDiscord,
 				nil,
+				&FakeInteractionStore{},
 			)
 
 			got, err := h.HandleRoundDeleteRequested(tt.ctx, tt.payload)
@@ -164,6 +165,7 @@ func TestRoundHandlers_HandleRoundDeleted(t *testing.T) {
 				nil,
 				fakeRoundDiscord,
 				nil,
+				&FakeInteractionStore{},
 			)
 
 			got, err := h.HandleRoundDeleted(tt.ctx, tt.payload)
