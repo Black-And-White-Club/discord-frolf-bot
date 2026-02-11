@@ -5,13 +5,29 @@ import (
 	"fmt"
 
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
+	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 	"github.com/bwmarrin/discordgo"
 )
 
 // HandleRoundFinalized handles the DiscordRoundFinalized event and updates the Discord embed
 func (h *RoundHandlers) HandleRoundFinalized(ctx context.Context, payload *roundevents.RoundFinalizedDiscordPayloadV1) ([]handlerwrapper.Result, error) {
-	discordChannelID := h.config.GetEventChannelID()
+	discordChannelID := payload.DiscordChannelID
+	if discordChannelID == "" {
+		if h.guildConfigResolver != nil {
+			guildCfg, err := h.guildConfigResolver.GetGuildConfigWithContext(ctx, string(payload.GuildID))
+			if err != nil || guildCfg == nil {
+				h.logger.WarnContext(ctx, "failed to resolve guild config for round finalized, falling back to global config",
+					attr.String("guild_id", string(payload.GuildID)),
+					attr.Error(err))
+				discordChannelID = h.config.GetEventChannelID()
+			} else {
+				discordChannelID = guildCfg.EventChannelID
+			}
+		} else {
+			discordChannelID = h.config.GetEventChannelID()
+		}
+	}
 
 	// Get message ID from context (set by wrapper from message metadata)
 	discordMessageID, ok := ctx.Value("discord_message_id").(string)

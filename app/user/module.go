@@ -62,6 +62,7 @@ func InitializeUserModule(
 		cfg,
 		helper,
 		userDiscord,
+		guildConfigResolver,
 	)
 
 	// Setup Watermill router

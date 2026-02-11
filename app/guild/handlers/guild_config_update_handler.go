@@ -34,18 +34,7 @@ func (h *GuildHandlers) HandleGuildConfigUpdated(ctx context.Context, payload *g
 		h.guildConfigResolver.HandleGuildConfigReceived(ctx, guildID, convertedConfig)
 	}
 
-	if h.config != nil && convertedConfig != nil {
-		h.config.UpdateGuildConfig(
-			convertedConfig.GuildID,
-			convertedConfig.SignupChannelID,
-			convertedConfig.EventChannelID,
-			convertedConfig.LeaderboardChannelID,
-			convertedConfig.SignupMessageID,
-			convertedConfig.RegisteredRoleID,
-			convertedConfig.AdminRoleID,
-			convertedConfig.RoleMappings,
-		)
-	}
+
 
 	if h.signupManager != nil && convertedConfig != nil && convertedConfig.SignupChannelID != "" {
 		h.signupManager.TrackChannelForReactions(convertedConfig.SignupChannelID)
@@ -146,19 +135,7 @@ func (h *GuildHandlers) HandleGuildConfigRetrieved(ctx context.Context, payload 
 		h.guildConfigResolver.HandleGuildConfigReceived(ctx, guildID, convertedConfig)
 	}
 
-	// (Legacy support remains below)
-	if h.config != nil && convertedConfig != nil {
-		h.config.UpdateGuildConfig(
-			convertedConfig.GuildID,
-			convertedConfig.SignupChannelID,
-			convertedConfig.EventChannelID,
-			convertedConfig.LeaderboardChannelID,
-			convertedConfig.SignupMessageID,
-			convertedConfig.RegisteredRoleID,
-			convertedConfig.AdminRoleID,
-			convertedConfig.RoleMappings,
-		)
-	}
+
 
 	if h.signupManager != nil && convertedConfig != nil && convertedConfig.SignupChannelID != "" {
 		h.signupManager.TrackChannelForReactions(convertedConfig.SignupChannelID)

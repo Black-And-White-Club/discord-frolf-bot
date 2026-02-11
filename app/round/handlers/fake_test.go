@@ -4,6 +4,7 @@ import (
 	"context"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	rounddiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord"
 	createround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/create_round"
 	deleteround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/delete_round"
@@ -15,6 +16,7 @@ import (
 	startround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/start_round"
 	tagupdates "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/tag_updates"
 	updateround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/update_round"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
@@ -507,8 +509,33 @@ func (f *FakeScorecardUploadManager) SendUploadError(ctx context.Context, channe
 	return nil
 }
 
+// FakeGuildConfigResolver is a programmable fake for guildconfig.GuildConfigResolver
+type FakeGuildConfigResolver struct {
+	GetGuildConfigWithContextFunc func(ctx context.Context, guildID string) (*storage.GuildConfig, error)
+}
+
+func (f *FakeGuildConfigResolver) GetGuildConfigWithContext(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
+	if f.GetGuildConfigWithContextFunc != nil {
+		return f.GetGuildConfigWithContextFunc(ctx, guildID)
+	}
+	return nil, nil
+}
+
+func (f *FakeGuildConfigResolver) RequestGuildConfigAsync(ctx context.Context, guildID string) {}
+
+func (f *FakeGuildConfigResolver) IsGuildSetupComplete(guildID string) bool { return true }
+
+func (f *FakeGuildConfigResolver) HandleGuildConfigReceived(ctx context.Context, guildID string, config *storage.GuildConfig) {
+}
+
+func (f *FakeGuildConfigResolver) HandleBackendError(ctx context.Context, guildID string, err error) {
+}
+
+func (f *FakeGuildConfigResolver) ClearInflightRequest(ctx context.Context, guildID string) {}
+
 // Ensure interface compliance
 var _ rounddiscord.RoundDiscordInterface = (*FakeRoundDiscord)(nil)
+var _ guildconfig.GuildConfigResolver = (*FakeGuildConfigResolver)(nil)
 var _ createround.CreateRoundManager = (*FakeCreateRoundManager)(nil)
 var _ roundrsvp.RoundRsvpManager = (*FakeRoundRsvpManager)(nil)
 var _ roundreminder.RoundReminderManager = (*FakeRoundReminderManager)(nil)

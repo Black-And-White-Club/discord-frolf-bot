@@ -53,7 +53,7 @@ func TestRoundHandlers_HandleRoundDeleteRequested(t *testing.T) {
 				&config.Config{},
 				nil,
 				fakeRoundDiscord,
-				nil,
+				&FakeGuildConfigResolver{},
 			)
 
 			got, err := h.HandleRoundDeleteRequested(tt.ctx, tt.payload)
@@ -163,7 +163,7 @@ func TestRoundHandlers_HandleRoundDeleted(t *testing.T) {
 				},
 				nil,
 				fakeRoundDiscord,
-				nil,
+				&FakeGuildConfigResolver{},
 			)
 
 			got, err := h.HandleRoundDeleted(tt.ctx, tt.payload)

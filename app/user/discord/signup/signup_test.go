@@ -295,8 +295,9 @@ func Test_signupManager_createEvent(t *testing.T) {
 	// Create a mock interaction
 	mockInteraction := &discordgo.InteractionCreate{
 		Interaction: &discordgo.Interaction{
-			ID:    "test-interaction-id",
-			Token: "test-interaction-token",
+			ID:      "test-interaction-id",
+			Token:   "test-interaction-token",
+			GuildID: "test-guild-id",
 		},
 	}
 
@@ -357,8 +358,8 @@ func Test_signupManager_createEvent(t *testing.T) {
 					t.Errorf("Expected interaction_token = %q, got %q", mockInteraction.Interaction.Token, msg.Metadata.Get("interaction_token"))
 				}
 
-				if msg.Metadata.Get("guild_id") != mockConfig.GetGuildID() {
-					t.Errorf("Expected guild_id = %q, got %q", mockConfig.GetGuildID(), msg.Metadata.Get("guild_id"))
+				if msg.Metadata.Get("guild_id") != mockInteraction.Interaction.GuildID {
+					t.Errorf("Expected guild_id = %q, got %q", mockInteraction.Interaction.GuildID, msg.Metadata.Get("guild_id"))
 				}
 			}
 		})

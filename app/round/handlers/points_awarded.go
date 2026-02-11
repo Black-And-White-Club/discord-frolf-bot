@@ -65,7 +65,19 @@ func (h *RoundHandlers) HandlePointsAwarded(ctx context.Context, payload *shared
 
 	discordChannelID := payload.DiscordChannelID
 	if discordChannelID == "" {
-		discordChannelID = h.config.GetEventChannelID()
+		if h.guildConfigResolver != nil {
+			guildCfg, err := h.guildConfigResolver.GetGuildConfigWithContext(ctx, string(payload.GuildID))
+			if err != nil || guildCfg == nil {
+				h.logger.WarnContext(ctx, "failed to resolve guild config for points update, falling back to global config",
+					attr.String("guild_id", string(payload.GuildID)),
+					attr.Error(err))
+				discordChannelID = h.config.GetEventChannelID()
+			} else {
+				discordChannelID = guildCfg.EventChannelID
+			}
+		} else {
+			discordChannelID = h.config.GetEventChannelID()
+		}
 	}
 
 	// Update the embed

@@ -4,6 +4,8 @@ import (
 	"context"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	userdiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord/role"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/user/discord/signup"
@@ -11,6 +13,28 @@ import (
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
 )
+
+// FakeGuildConfigResolver implements guildconfig.GuildConfigResolver
+type FakeGuildConfigResolver struct {
+	GetGuildConfigWithContextFunc func(ctx context.Context, guildID string) (*storage.GuildConfig, error)
+}
+
+func (f *FakeGuildConfigResolver) GetGuildConfigWithContext(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
+	if f.GetGuildConfigWithContextFunc != nil {
+		return f.GetGuildConfigWithContextFunc(ctx, guildID)
+	}
+	return &storage.GuildConfig{}, nil
+}
+
+func (f *FakeGuildConfigResolver) RequestGuildConfigAsync(ctx context.Context, guildID string) {}
+func (f *FakeGuildConfigResolver) IsGuildSetupComplete(guildID string) bool                    { return true }
+func (f *FakeGuildConfigResolver) HandleGuildConfigReceived(ctx context.Context, guildID string, config *storage.GuildConfig) {
+}
+func (f *FakeGuildConfigResolver) HandleBackendError(ctx context.Context, guildID string, err error) {
+}
+func (f *FakeGuildConfigResolver) ClearInflightRequest(ctx context.Context, guildID string) {}
+
+var _ guildconfig.GuildConfigResolver = (*FakeGuildConfigResolver)(nil)
 
 // FakeUserDiscord is a programmable fake for UserDiscordInterface
 type FakeUserDiscord struct {

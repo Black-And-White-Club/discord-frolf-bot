@@ -180,8 +180,7 @@ func (crm *updateRoundManager) createEvent(ctx context.Context, topic string, pa
 	if i.Interaction.GuildID != "" {
 		newEvent.Metadata.Set("guild_id", i.Interaction.GuildID)
 	} else {
-		// Fallback to config only if interaction doesn't have GuildID
-		newEvent.Metadata.Set("guild_id", crm.config.GetGuildID())
+		crm.logger.WarnContext(ctx, "Interaction missing GuildID in updateRoundManager.createEvent, but no longer falling back to global config")
 	}
 
 	return newEvent, nil

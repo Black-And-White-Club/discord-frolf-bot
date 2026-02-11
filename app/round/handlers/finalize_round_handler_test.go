@@ -96,7 +96,7 @@ func TestRoundHandlers_HandleRoundFinalized(t *testing.T) {
 				},
 				nil,
 				fakeRoundDiscord,
-				nil,
+				&FakeGuildConfigResolver{},
 			)
 
 			got, err := h.HandleRoundFinalized(tt.ctx, tt.payload)

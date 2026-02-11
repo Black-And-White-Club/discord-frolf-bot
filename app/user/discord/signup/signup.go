@@ -111,12 +111,11 @@ func (sm *signupManager) createEvent(ctx context.Context, topic string, payload 
 	newEvent.Metadata.Set("interaction_id", i.Interaction.ID)
 	newEvent.Metadata.Set("interaction_token", i.Interaction.Token)
 
-	// Use GuildID from the actual interaction instead of config
+	// Use GuildID from the actual interaction
 	if i.Interaction.GuildID != "" {
 		newEvent.Metadata.Set("guild_id", i.Interaction.GuildID)
 	} else {
-		// Fallback to config only if interaction doesn't have GuildID
-		newEvent.Metadata.Set("guild_id", sm.config.GetGuildID())
+		sm.logger.WarnContext(ctx, "Interaction missing GuildID in createEvent")
 	}
 
 	return newEvent, nil

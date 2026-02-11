@@ -6,6 +6,7 @@ import (
 
 	discorduserevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/user"
 	userevents "github.com/Black-And-White-Club/frolf-bot-shared/events/user"
+	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 )
 
@@ -14,9 +15,21 @@ func (h *UserHandlers) HandleUserCreated(
 	ctx context.Context,
 	payload *userevents.UserCreatedPayloadV1,
 ) ([]handlerwrapper.Result, error) {
+	// Resolve guild-specific registered role ID
+	roleID := h.config.GetRegisteredRoleID()
+	if h.guildConfigResolver != nil {
+		if cfg, err := h.guildConfigResolver.GetGuildConfigWithContext(ctx, string(payload.GuildID)); err == nil && cfg != nil && cfg.RegisteredRoleID != "" {
+			roleID = cfg.RegisteredRoleID
+		} else {
+			h.logger.WarnContext(ctx, "Failed to resolve guild-specific registered role ID, falling back to global config",
+				attr.String("guild_id", string(payload.GuildID)),
+				attr.Error(err))
+		}
+	}
+
 	rolePayload := discorduserevents.AddRolePayloadV1{
 		UserID:  payload.UserID,
-		RoleID:  h.config.GetRegisteredRoleID(),
+		RoleID:  roleID,
 		GuildID: string(payload.GuildID),
 	}
 

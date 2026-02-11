@@ -87,6 +87,7 @@ func InitializeRoundModule(
 		roundDiscord.GetPendingNativeEventMap(),
 		session,
 		cfg,
+		guildConfig,
 		eventBus,
 		helper,
 		logger.With("component", "scheduled-event-rsvp"),

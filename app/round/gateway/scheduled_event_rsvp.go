@@ -9,6 +9,7 @@ import (
 	"time"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	rounddiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
@@ -29,6 +30,7 @@ type ScheduledEventRSVPListener struct {
 	pendingNativeEventMap rounddiscord.PendingNativeEventMap
 	session               discord.Session
 	config                *config.Config
+	guildConfig           guildconfig.GuildConfigResolver
 	eventBus              eventbus.EventBus
 	helper                utils.Helpers
 	logger                *slog.Logger
@@ -42,6 +44,7 @@ func NewScheduledEventRSVPListener(
 	pendingNativeEventMap rounddiscord.PendingNativeEventMap,
 	session discord.Session,
 	cfg *config.Config,
+	guildConfig guildconfig.GuildConfigResolver,
 	eventBus eventbus.EventBus,
 	helper utils.Helpers,
 	logger *slog.Logger,
@@ -52,10 +55,25 @@ func NewScheduledEventRSVPListener(
 		pendingNativeEventMap: pendingNativeEventMap,
 		session:               session,
 		config:                cfg,
+		guildConfig:           guildConfig,
 		eventBus:              eventBus,
 		helper:                helper,
 		logger:                logger,
 	}
+}
+
+// resolveEventChannel resolves the event channel ID for a guild, with a logged fallback to global config.
+func (l *ScheduledEventRSVPListener) resolveEventChannel(ctx context.Context, guildID string) string {
+	if l.guildConfig != nil {
+		gc, err := l.guildConfig.GetGuildConfigWithContext(ctx, guildID)
+		if err == nil && gc != nil && gc.EventChannelID != "" {
+			return gc.EventChannelID
+		}
+		l.logger.WarnContext(ctx, "Failed to resolve guild-specific event channel, falling back to global config",
+			attr.String("guild_id", guildID),
+			attr.Error(err))
+	}
+	return l.config.GetEventChannelID()
 }
 
 // RegisterGatewayHandlers registers Discord gateway handlers for
@@ -119,7 +137,8 @@ func (l *ScheduledEventRSVPListener) handleEventCreate(event *discordgo.GuildSch
 		creatorID = event.Creator.ID
 	}
 
-	channelID := l.config.GetEventChannelID()
+	// Resolve guild-specific event channel
+	channelID := l.resolveEventChannel(context.Background(), event.GuildID)
 
 	desc := roundtypes.Description(event.Description)
 	payload := roundevents.CreateRoundRequestedPayloadV1{
@@ -191,6 +210,17 @@ func (l *ScheduledEventRSVPListener) handleUserAdd(event *discordgo.GuildSchedul
 		return
 	}
 
+	// Set metadata needed by HandleRoundParticipantJoined
+	if messageID, found := l.messageMap.Load(roundID); found {
+		msg.Metadata.Set("discord_message_id", messageID)
+	}
+
+	// Resolve guild-specific channel ID
+	resolvedChannelID := l.resolveEventChannel(context.Background(), string(guildID))
+	if resolvedChannelID != "" {
+		msg.Metadata.Set("channel_id", resolvedChannelID)
+	}
+
 	if err := l.eventBus.Publish(roundevents.RoundParticipantJoinRequestedV1, msg); err != nil {
 		l.logger.Error("Failed to publish join request from native event RSVP",
 			attr.String("guild_id", string(guildID)),
@@ -233,6 +263,17 @@ func (l *ScheduledEventRSVPListener) handleUserRemove(event *discordgo.GuildSche
 			attr.String("discord_event_id", discordEventID),
 			attr.Error(err))
 		return
+	}
+
+	// Set metadata needed by HandleRoundParticipantRemoved
+	if messageID, found := l.messageMap.Load(roundID); found {
+		msg.Metadata.Set("discord_message_id", messageID)
+	}
+
+	// Resolve guild-specific channel ID
+	resolvedChannelID := l.resolveEventChannel(context.Background(), string(guildID))
+	if resolvedChannelID != "" {
+		msg.Metadata.Set("channel_id", resolvedChannelID)
 	}
 
 	if err := l.eventBus.Publish(roundevents.RoundParticipantRemovalRequestedV1, msg); err != nil {
@@ -314,6 +355,12 @@ func (l *ScheduledEventRSVPListener) handleEventCanceled(event *discordgo.GuildS
 		msg.Metadata.Set("discord_message_id", messageID)
 	}
 
+	// Resolve guild-specific channel ID
+	resolvedChannelID := l.resolveEventChannel(context.Background(), string(guildID))
+	if resolvedChannelID != "" {
+		msg.Metadata.Set("channel_id", resolvedChannelID)
+	}
+
 	if err := l.eventBus.Publish(roundevents.RoundDeleteRequestedV1, msg); err != nil {
 		l.logger.Error("Failed to publish delete request from canceled Discord event",
 			attr.String("guild_id", string(guildID)),
@@ -347,13 +394,15 @@ func (l *ScheduledEventRSVPListener) handleEventCompleted(event *discordgo.Guild
 		return
 	}
 
-	channelID := l.config.GetEventChannelID()
-	if channelID == "" {
+	// Resolve guild-specific channel ID
+	resolvedChannelID := l.resolveEventChannel(context.Background(), string(guildID))
+
+	if resolvedChannelID == "" {
 		return
 	}
 
 	// Fetch the current embed from Discord
-	msg, err := l.session.ChannelMessage(channelID, messageID)
+	msg, err := l.session.ChannelMessage(resolvedChannelID, messageID)
 	if err != nil || len(msg.Embeds) == 0 {
 		return
 	}
@@ -364,7 +413,7 @@ func (l *ScheduledEventRSVPListener) handleEventCompleted(event *discordgo.Guild
 
 	// Edit message: update embed, remove action buttons
 	_, err = l.session.ChannelMessageEditComplex(&discordgo.MessageEdit{
-		Channel:    channelID,
+		Channel:    resolvedChannelID,
 		ID:         messageID,
 		Embeds:     &[]*discordgo.MessageEmbed{embed},
 		Components: &[]discordgo.MessageComponent{},
@@ -447,8 +496,10 @@ func (l *ScheduledEventRSVPListener) handleEventFieldUpdate(event *discordgo.Gui
 		return
 	}
 
-	channelID := l.config.GetEventChannelID()
-	if channelID == "" {
+	// Resolve guild-specific channel ID
+	resolvedChannelID := l.resolveEventChannel(context.Background(), string(guildID))
+
+	if resolvedChannelID == "" {
 		return
 	}
 
@@ -474,7 +525,7 @@ func (l *ScheduledEventRSVPListener) handleEventFieldUpdate(event *discordgo.Gui
 		GuildID:     guildID,
 		RoundID:     roundID,
 		UserID:      sharedtypes.DiscordID(event.CreatorID),
-		ChannelID:   channelID,
+		ChannelID:   resolvedChannelID,
 		MessageID:   messageID,
 		Title:       &title,
 		Description: &description,
@@ -494,7 +545,7 @@ func (l *ScheduledEventRSVPListener) handleEventFieldUpdate(event *discordgo.Gui
 	}
 
 	// Set metadata so downstream handlers can update the embed
-	msg.Metadata.Set("channel_id", channelID)
+	msg.Metadata.Set("channel_id", resolvedChannelID)
 	msg.Metadata.Set("message_id", messageID)
 	msg.Metadata.Set("discord_message_id", messageID)
 

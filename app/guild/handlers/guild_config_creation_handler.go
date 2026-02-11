@@ -52,18 +52,6 @@ func (h *GuildHandlers) HandleGuildConfigCreated(ctx context.Context, payload *g
 	// 3. Make guild config available to runtime immediately
 	convertedConfig := convertGuildConfigFromShared(&payload.Config)
 	if convertedConfig != nil {
-		if h.config != nil {
-			h.config.UpdateGuildConfig(
-				convertedConfig.GuildID,
-				convertedConfig.SignupChannelID,
-				convertedConfig.EventChannelID,
-				convertedConfig.LeaderboardChannelID,
-				convertedConfig.SignupMessageID,
-				convertedConfig.RegisteredRoleID,
-				convertedConfig.AdminRoleID,
-				convertedConfig.RoleMappings,
-			)
-		}
 
 		// Notify resolver to unblock any pending config lookups
 		if h.guildConfigResolver != nil {

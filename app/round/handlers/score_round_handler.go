@@ -5,15 +5,28 @@ import (
 	"fmt"
 
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
+	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 )
 
 // HandleParticipantScoreUpdated handles a successful participant score update event from the backend.
 // It calls the scoreround.UpdateScoreEmbed function to update the scorecard.
 func (h *RoundHandlers) HandleParticipantScoreUpdated(ctx context.Context, payload *roundevents.ParticipantScoreUpdatedPayloadV1) ([]handlerwrapper.Result, error) {
-	// Use ChannelID from config if payload ChannelID is empty (as a fallback)
-	channelID := payload.ChannelID
-	if channelID == "" && h.config != nil && h.config.GetEventChannelID() != "" {
+	// Resolve channel ID from guild config
+	var channelID string
+	if h.guildConfigResolver != nil {
+		guildCfg, err := h.guildConfigResolver.GetGuildConfigWithContext(ctx, string(payload.GuildID))
+		if err != nil || guildCfg == nil {
+			h.logger.WarnContext(ctx, "failed to resolve guild config for score update, falling back to global config",
+				attr.String("guild_id", string(payload.GuildID)),
+				attr.Error(err))
+			if h.config != nil {
+				channelID = h.config.GetEventChannelID()
+			}
+		} else {
+			channelID = guildCfg.EventChannelID
+		}
+	} else if h.config != nil {
 		channelID = h.config.GetEventChannelID()
 	}
 
@@ -49,9 +62,21 @@ func (h *RoundHandlers) HandleParticipantScoreUpdated(ctx context.Context, paylo
 
 // HandleScoresBulkUpdated updates the scorecard for bulk score overrides.
 func (h *RoundHandlers) HandleScoresBulkUpdated(ctx context.Context, payload *roundevents.RoundScoresBulkUpdatedPayloadV1) ([]handlerwrapper.Result, error) {
-	// Use ChannelID from config if payload ChannelID is empty (as a fallback)
-	channelID := payload.ChannelID
-	if channelID == "" && h.config != nil && h.config.GetEventChannelID() != "" {
+	// Resolve channel ID from guild config
+	var channelID string
+	if h.guildConfigResolver != nil {
+		guildCfg, err := h.guildConfigResolver.GetGuildConfigWithContext(ctx, string(payload.GuildID))
+		if err != nil || guildCfg == nil {
+			h.logger.WarnContext(ctx, "failed to resolve guild config for bulk score update, falling back to global config",
+				attr.String("guild_id", string(payload.GuildID)),
+				attr.Error(err))
+			if h.config != nil {
+				channelID = h.config.GetEventChannelID()
+			}
+		} else {
+			channelID = guildCfg.EventChannelID
+		}
+	} else if h.config != nil {
 		channelID = h.config.GetEventChannelID()
 	}
 

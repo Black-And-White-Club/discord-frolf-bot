@@ -7,6 +7,7 @@ import (
 
 	discordroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
+	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 )
@@ -31,25 +32,60 @@ func (h *RoundHandlers) HandleRoundDeleteRequested(ctx context.Context, payload 
 
 // HandleRoundDeleted handles the RoundDeleted event using the standardized wrapper
 func (h *RoundHandlers) HandleRoundDeleted(ctx context.Context, payload *roundevents.RoundDeletedPayloadV1) ([]handlerwrapper.Result, error) {
-	// Get message ID from context (set by wrapper from message metadata)
-	discordMessageID, ok := ctx.Value("discord_message_id").(string)
-	if !ok || discordMessageID == "" {
-		// Fallback: try to look up message ID from the map if metadata is missing
+	// 1. Get IDs from context (set by wrapper from message metadata)
+	discordMessageID, _ := ctx.Value("discord_message_id").(string)
+	channelID, _ := ctx.Value("channel_id").(string)
+
+	// 2. Fallback to payload data if metadata is missing (ensure protocol consistency)
+	if discordMessageID == "" {
+		discordMessageID = payload.EventMessageID
+	}
+	if channelID == "" {
+		channelID = payload.ChannelID
+	}
+
+	// 3. Last-resort fallback to message map lookup for discordMessageID
+	if discordMessageID == "" {
 		if msgID, found := h.service.GetMessageMap().Load(payload.RoundID); found {
 			discordMessageID = msgID
-		} else {
-			return nil, fmt.Errorf("discord_message_id not found or is empty in message metadata for round %s", payload.RoundID.String())
 		}
 	}
 
-	result, err := h.service.GetDeleteRoundManager().DeleteRoundEventEmbed(ctx, discordMessageID, h.config.GetEventChannelID())
+	// 4. Last-resort fallback to config for channelID
+	if channelID == "" {
+		if h.guildConfigResolver != nil {
+			guildCfg, err := h.guildConfigResolver.GetGuildConfigWithContext(ctx, string(payload.GuildID))
+			if err != nil || guildCfg == nil {
+				h.logger.WarnContext(ctx, "failed to resolve guild config for round deletion, falling back to global config",
+					attr.String("guild_id", string(payload.GuildID)),
+					attr.Error(err))
+				channelID = h.config.GetEventChannelID()
+			} else {
+				channelID = guildCfg.EventChannelID
+			}
+		} else {
+			channelID = h.config.GetEventChannelID()
+		}
+	}
+
+	// 5. Final validation before call
+	if discordMessageID == "" {
+		return nil, fmt.Errorf("discord_message_id not found or is empty in message metadata or payload for round %s", payload.RoundID.String())
+	}
+
+	result, err := h.service.GetDeleteRoundManager().DeleteRoundEventEmbed(ctx, discordMessageID, channelID)
 	if err != nil {
 		return nil, fmt.Errorf("error calling delete round embed service: %w", err)
 	}
 
-	_, ok = result.Success.(bool)
-	if !ok {
-		return nil, fmt.Errorf("unexpected type for result.Success in DeleteRoundEventEmbed result for round %s", payload.RoundID.String())
+	// The deleteround service returns Success as a bool interface{}
+	success, ok := result.Success.(bool)
+	if !ok || !success {
+		// If Success is not true, check if there's an error in the result
+		if result.Error != nil {
+			return nil, fmt.Errorf("deleteround service returned error for round %s: %w", payload.RoundID.String(), result.Error)
+		}
+		return nil, fmt.Errorf("deleteround service reported failure for round %s (success=false)", payload.RoundID.String())
 	}
 
 	// Delete the native Discord Scheduled Event (best-effort).

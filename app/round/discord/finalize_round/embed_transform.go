@@ -51,7 +51,12 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 
 		guildID := string(payload.GuildID)
 		if guildID == "" {
-			guildID = frm.config.GetGuildID()
+			// Try to get from context if missing from payload
+			if ctxGuildID, ok := ctx.Value("guild_id").(string); ok && ctxGuildID != "" {
+				guildID = ctxGuildID
+			} else {
+				frm.logger.WarnContext(ctx, "GuildID missing in TransformRoundToFinalizedScorecard, but no longer falling back to global config")
+			}
 		}
 
 		participants := make(map[sharedtypes.DiscordID]*participantWithUser)

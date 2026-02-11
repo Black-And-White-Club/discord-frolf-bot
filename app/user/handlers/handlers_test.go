@@ -14,9 +14,10 @@ func TestNewUserHandlers(t *testing.T) {
 	logger := loggerfrolfbot.NoOpLogger
 	helpers := &testutils.FakeHelpers{}
 	cfg := &config.Config{}
+	fakeGuildConfig := &FakeGuildConfigResolver{}
 
 	// Call the function being tested
-	handlers := NewUserHandlers(logger, cfg, helpers, fakeUserDiscord)
+	handlers := NewUserHandlers(logger, cfg, helpers, fakeUserDiscord, fakeGuildConfig)
 
 	// Verify returns non-nil handlers
 	if handlers == nil {
@@ -26,7 +27,7 @@ func TestNewUserHandlers(t *testing.T) {
 
 func TestNewUserHandlersWithNilDependencies(t *testing.T) {
 	// Call with nil dependencies
-	handlers := NewUserHandlers(nil, nil, nil, nil)
+	handlers := NewUserHandlers(nil, nil, nil, nil, nil)
 
 	// Verify returns non-nil handlers
 	if handlers == nil {

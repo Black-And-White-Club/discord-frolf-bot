@@ -137,7 +137,7 @@ func TestRoundHandlers_HandlePointsAwarded(t *testing.T) {
 				},
 				nil,
 				fakeRoundDiscord,
-				nil,
+				&FakeGuildConfigResolver{},
 			)
 
 			_, err := h.HandlePointsAwarded(tt.ctx, tt.payload)

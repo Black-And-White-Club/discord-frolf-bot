@@ -7,6 +7,7 @@ import (
 
 	discordroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
+	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
@@ -64,9 +65,21 @@ func (h *RoundHandlers) HandleRoundParticipantJoinRequest(ctx context.Context, p
 
 // HandleRoundParticipantJoined handles the event when a participant has joined a round.
 func (h *RoundHandlers) HandleRoundParticipantJoined(ctx context.Context, payload *roundevents.ParticipantJoinedPayloadV1) ([]handlerwrapper.Result, error) {
-	// Resolve channel ID (currently from in-memory config). If empty, embed update can't proceed.
-	channelID := ""
-	if h.config != nil && h.config.GetEventChannelID() != "" {
+	// Resolve channel ID from guild config
+	var channelID string
+	if h.guildConfigResolver != nil {
+		guildCfg, err := h.guildConfigResolver.GetGuildConfigWithContext(ctx, string(payload.GuildID))
+		if err != nil || guildCfg == nil {
+			h.logger.WarnContext(ctx, "failed to resolve guild config for participant join, falling back to global config",
+				attr.String("guild_id", string(payload.GuildID)),
+				attr.Error(err))
+			if h.config != nil {
+				channelID = h.config.GetEventChannelID()
+			}
+		} else {
+			channelID = guildCfg.EventChannelID
+		}
+	} else if h.config != nil {
 		channelID = h.config.GetEventChannelID()
 	}
 
@@ -90,13 +103,13 @@ func (h *RoundHandlers) HandleRoundParticipantJoined(ctx context.Context, payloa
 		joinedLate = *payload.JoinedLate
 	}
 
-	var err error
+	var updateErr error
 
 	// If this is a late join, the round has started and we need to update a scorecard embed
 	// If not a late join, it's still an RSVP embed
 	if joinedLate {
 		// Use scorecard embed update for started rounds - add late participant to scorecard
-		_, err = h.service.GetScoreRoundManager().AddLateParticipantToScorecard(
+		_, updateErr = h.service.GetScoreRoundManager().AddLateParticipantToScorecard(
 			ctx,
 			channelID,
 			messageID,
@@ -106,7 +119,7 @@ func (h *RoundHandlers) HandleRoundParticipantJoined(ctx context.Context, payloa
 		// Use RSVP embed update for rounds that haven't started
 		// Merge all participant lists into one for the single Participants field
 		allParticipants := append(append(payload.AcceptedParticipants, payload.DeclinedParticipants...), payload.TentativeParticipants...)
-		_, err = h.service.GetRoundRsvpManager().UpdateRoundEventEmbed(
+		_, updateErr = h.service.GetRoundRsvpManager().UpdateRoundEventEmbed(
 			ctx,
 			channelID,
 			messageID,
@@ -114,8 +127,8 @@ func (h *RoundHandlers) HandleRoundParticipantJoined(ctx context.Context, payloa
 		)
 	}
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to update round event embed: %w", err)
+	if updateErr != nil {
+		return nil, fmt.Errorf("failed to update round event embed: %w", updateErr)
 	}
 
 	return nil, nil
@@ -123,12 +136,24 @@ func (h *RoundHandlers) HandleRoundParticipantJoined(ctx context.Context, payloa
 
 func (h *RoundHandlers) HandleRoundParticipantRemoved(ctx context.Context, payload *roundevents.ParticipantRemovedPayloadV1) ([]handlerwrapper.Result, error) {
 	// Resolve channel ID similarly for removal events
-	channelID := ""
-	if h.config != nil && h.config.GetEventChannelID() != "" {
-		channelID = h.config.GetEventChannelID()
+	var removeChannelID string
+	if h.guildConfigResolver != nil {
+		removeGuildCfg, removeErr := h.guildConfigResolver.GetGuildConfigWithContext(ctx, string(payload.GuildID))
+		if removeErr != nil || removeGuildCfg == nil {
+			h.logger.WarnContext(ctx, "failed to resolve guild config for participant removal, falling back to global config",
+				attr.String("guild_id", string(payload.GuildID)),
+				attr.Error(removeErr))
+			if h.config != nil {
+				removeChannelID = h.config.GetEventChannelID()
+			}
+		} else {
+			removeChannelID = removeGuildCfg.EventChannelID
+		}
+	} else if h.config != nil {
+		removeChannelID = h.config.GetEventChannelID()
 	}
 
-	if channelID == "" {
+	if removeChannelID == "" {
 		return nil, nil
 	}
 
@@ -159,14 +184,14 @@ func (h *RoundHandlers) HandleRoundParticipantRemoved(ctx context.Context, paylo
 	// Only update RSVP embeds (before round starts)
 	// Merge all participant lists into one for the single Participants field
 	allParticipants := append(append(payload.AcceptedParticipants, payload.DeclinedParticipants...), payload.TentativeParticipants...)
-	_, err := h.service.GetRoundRsvpManager().UpdateRoundEventEmbed(
+	_, embedErr := h.service.GetRoundRsvpManager().UpdateRoundEventEmbed(
 		ctx,
-		channelID,
+		removeChannelID,
 		messageID,
 		allParticipants,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update round event embed after removal: %w", err)
+	if embedErr != nil {
+		return nil, fmt.Errorf("failed to update round event embed after removal: %w", embedErr)
 	}
 
 	return nil, nil

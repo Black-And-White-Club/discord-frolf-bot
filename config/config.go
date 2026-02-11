@@ -28,20 +28,22 @@ type NATSConfig struct {
 	URL string `yaml:"url"`
 }
 
-// DiscordConfig holds Discord bot configuration
+// DiscordConfig holds Discord bot configuration.
+// Fields other than Token and AppID are treated as global defaults
+// and should be resolved per-guild via GuildConfigResolver whenever possible.
 type DiscordConfig struct {
 	Token                string            `yaml:"token"`
-	SignupChannelID      string            `yaml:"signup_channel_id"`
-	SignupMessageID      string            `yaml:"signup_message_id"`
-	SignupEmoji          string            `yaml:"signup_emoji"`
-	RegisteredRoleID     string            `yaml:"registered_role_id"`
-	EventChannelID       string            `yaml:"event_channel_id"`
-	LeaderboardChannelID string            `yaml:"leaderboard_channel_id"`
-	GuildID              string            `yaml:"guild_id"`
+	SignupChannelID      string            `yaml:"signup_channel_id"`      // Default only
+	SignupMessageID      string            `yaml:"signup_message_id"`      // Default only
+	SignupEmoji          string            `yaml:"signup_emoji"`           // Default only
+	RegisteredRoleID     string            `yaml:"registered_role_id"`     // Default only
+	EventChannelID       string            `yaml:"event_channel_id"`       // Default only
+	LeaderboardChannelID string            `yaml:"leaderboard_channel_id"` // Default only
+	GuildID              string            `yaml:"guild_id"`              // Default/Main guild only; deprecated for multi-tenant scoping
 	AppID                string            `yaml:"app_id"`
 	URL                  string            `yaml:"url"`
 	RoleMappings         map[string]string `yaml:"role_mappings"`
-	AdminRoleID          string            `yaml:"admin_role_id"`
+	AdminRoleID          string            `yaml:"admin_role_id"` // Default only
 }
 
 // ServiceConfig holds service metadata
@@ -335,35 +337,46 @@ func applyEnvironmentOverrides(cfg *Config) {
 	}
 }
 
-// Getter methods for backward compatibility
+// Getter methods for backward compatibility or global defaults.
+// Use GuildConfigResolver for guild-specific settings.
+
+// GetGuildID returns the default guild ID.
+// Deprecated: Use interaction GuildID or context-based scoping.
 func (c *Config) GetGuildID() string {
 	return c.Discord.GuildID
 }
 
+// GetSignupChannelID returns the default signup channel ID.
 func (c *Config) GetSignupChannelID() string {
 	return c.Discord.SignupChannelID
 }
 
+// GetSignupMessageID returns the default signup message ID.
 func (c *Config) GetSignupMessageID() string {
 	return c.Discord.SignupMessageID
 }
 
+// GetSignupEmoji returns the default signup emoji.
 func (c *Config) GetSignupEmoji() string {
 	return c.Discord.SignupEmoji
 }
 
+// GetEventChannelID returns the default event channel ID.
 func (c *Config) GetEventChannelID() string {
 	return c.Discord.EventChannelID
 }
 
+// GetLeaderboardChannelID returns the default leaderboard channel ID.
 func (c *Config) GetLeaderboardChannelID() string {
 	return c.Discord.LeaderboardChannelID
 }
 
+// GetRegisteredRoleID returns the default registered role ID.
 func (c *Config) GetRegisteredRoleID() string {
 	return c.Discord.RegisteredRoleID
 }
 
+// GetAdminRoleID returns the default admin role ID.
 func (c *Config) GetAdminRoleID() string {
 	return c.Discord.AdminRoleID
 }
@@ -372,28 +385,8 @@ func (c *Config) GetRoleMappings() map[string]string {
 	return c.Discord.RoleMappings
 }
 
-// UpdateGuildConfig updates the guild-specific configuration for multi-tenant deployment
-func (c *Config) UpdateGuildConfig(guildID, signupChannelID, eventChannelID, leaderboardChannelID, signupMessageID, registeredRoleID, adminRoleID string, roleMappings map[string]string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.Discord.GuildID = guildID
-	c.Discord.SignupChannelID = signupChannelID
-	c.Discord.EventChannelID = eventChannelID
-	c.Discord.LeaderboardChannelID = leaderboardChannelID
-	c.Discord.SignupMessageID = signupMessageID
-	c.Discord.RegisteredRoleID = registeredRoleID
-	c.Discord.AdminRoleID = adminRoleID
-	c.Discord.RoleMappings = roleMappings
-}
-
-// IsGuildConfigured returns true if the guild has been configured
+// IsGuildConfigured is deprecated and should not be used as it relies on global state mutation.
+// Use GuildConfigResolver instead.
 func (c *Config) IsGuildConfigured(guildID string) bool {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	// Check if this guild has essential configuration
-	return c.Discord.GuildID == guildID &&
-		c.Discord.SignupChannelID != "" &&
-		c.Discord.EventChannelID != ""
+	return false
 }

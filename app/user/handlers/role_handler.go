@@ -82,7 +82,7 @@ func (h *UserHandlers) HandleAddRole(
 	payload *discorduserevents.AddRolePayloadV1,
 ) ([]handlerwrapper.Result, error) {
 	// Attempt to add the role
-	_, err := h.service.GetRoleManager().AddRoleToUser(ctx, h.config.GetGuildID(), payload.UserID, payload.RoleID)
+	_, err := h.service.GetRoleManager().AddRoleToUser(ctx, payload.GuildID, payload.UserID, payload.RoleID)
 	if err != nil {
 		// Create a failure result
 		failurePayload := discorduserevents.RoleAdditionFailedPayloadV1{

@@ -2,9 +2,11 @@ package deleteround
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
+	"github.com/bwmarrin/discordgo"
 )
 
 // DeleteRoundEventEmbed removes the message with the given messageID from the specified channel.
@@ -39,6 +41,15 @@ func (drm *deleteRoundManager) DeleteRoundEventEmbed(ctx context.Context, discor
 
 		err := drm.session.ChannelMessageDelete(resolvedChannelID, discordMessageID)
 		if err != nil {
+			// Check if message was deleted (404 Unknown Message) - treat as success
+			var restErr *discordgo.RESTError
+			if errors.As(err, &restErr) && restErr.Message.Code == discordgo.ErrCodeUnknownMessage {
+				drm.logger.DebugContext(ctx, "Discord message already deleted, ignoring 404",
+					attr.String("channel_id", resolvedChannelID),
+					attr.String("discord_message_id", discordMessageID))
+				return DeleteRoundOperationResult{Success: true}, nil
+			}
+
 			// Provide more context in the wrapped error
 			wrappedErr := fmt.Errorf("failed to delete message: %w", err)
 			drm.logger.ErrorContext(ctx, "Discord API call failed to delete message",

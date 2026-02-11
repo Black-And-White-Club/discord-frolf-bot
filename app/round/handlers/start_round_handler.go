@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
+	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 	"github.com/bwmarrin/discordgo"
 )
@@ -21,8 +22,19 @@ func (h *RoundHandlers) HandleRoundStarted(ctx context.Context, payload *roundev
 		channelID = payload.Config.EventChannelID
 	}
 	if channelID == "" {
-		// Fallback to config if payload channel ID is empty
-		channelID = h.config.GetEventChannelID()
+		if h.guildConfigResolver != nil {
+			guildCfg, err := h.guildConfigResolver.GetGuildConfigWithContext(ctx, string(payload.GuildID))
+			if err != nil || guildCfg == nil {
+				h.logger.WarnContext(ctx, "failed to resolve guild config for round start, falling back to global config",
+					attr.String("guild_id", string(payload.GuildID)),
+					attr.Error(err))
+				channelID = h.config.GetEventChannelID()
+			} else {
+				channelID = guildCfg.EventChannelID
+			}
+		} else {
+			channelID = h.config.GetEventChannelID()
+		}
 	}
 
 	eventMessageID := payload.EventMessageID

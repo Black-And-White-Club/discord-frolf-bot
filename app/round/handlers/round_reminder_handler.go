@@ -6,6 +6,7 @@ import (
 	"time"
 
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
+	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 	"github.com/google/uuid"
@@ -20,7 +21,21 @@ func (h *RoundHandlers) HandleRoundReminder(ctx context.Context, payload *rounde
 
 	// Use default channel from config if payload doesn't have one
 	if payload.DiscordChannelID == "" {
-		defaultChannelID := h.config.GetEventChannelID()
+		var defaultChannelID string
+		if h.guildConfigResolver != nil {
+			guildConfig, err := h.guildConfigResolver.GetGuildConfigWithContext(ctx, payload.DiscordGuildID)
+			if err != nil || guildConfig == nil {
+				h.logger.WarnContext(ctx, "failed to resolve guild config for round reminder, falling back to global config",
+					attr.String("guild_id", payload.DiscordGuildID),
+					attr.Error(err))
+				defaultChannelID = h.config.GetEventChannelID()
+			} else {
+				defaultChannelID = guildConfig.EventChannelID
+			}
+		} else {
+			defaultChannelID = h.config.GetEventChannelID()
+		}
+
 		if defaultChannelID == "" {
 			return nil, nil // Don't return error - configuration issue, no point retrying
 		}
