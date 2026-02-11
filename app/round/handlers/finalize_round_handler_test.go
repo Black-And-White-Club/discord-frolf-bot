@@ -42,7 +42,7 @@ func TestRoundHandlers_HandleRoundFinalized(t *testing.T) {
 			wantLen: 0,
 			setup: func(f *FakeRoundDiscord) {
 				f.FinalizeRoundManager.FinalizeScorecardEmbedFunc = func(ctx context.Context, eventMessageID string, channelID string, embedPayload roundevents.RoundFinalizedEmbedUpdatePayloadV1) (finalizeround.FinalizeRoundOperationResult, error) {
-					if channelID != configChannelID {
+					if channelID != "payload-channel-123" {
 						return finalizeround.FinalizeRoundOperationResult{}, errors.New("wrong channel ID")
 					}
 					return finalizeround.FinalizeRoundOperationResult{}, nil
