@@ -11,6 +11,7 @@ import (
 	leaderboarddiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord"
 	claimtag "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/claim_tag" // Add this import
 	leaderboardupdated "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/leaderboard_updated"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/season"
 	leaderboardhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/handlers"
 	leaderboardrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/router"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
@@ -60,6 +61,7 @@ func InitializeLeaderboardModule(
 	// Register Discord interactions
 	leaderboardupdated.RegisterHandlers(interactionRegistry, leaderboardDiscord.GetLeaderboardUpdateManager())
 	claimtag.RegisterHandlers(interactionRegistry, leaderboardDiscord.GetClaimTagManager()) // Add this line
+	season.RegisterHandlers(interactionRegistry, leaderboardDiscord.GetSeasonManager())
 
 	// Initialize Watermill handlers
 	leaderboardHandlers := leaderboardhandlers.NewLeaderboardHandlers(

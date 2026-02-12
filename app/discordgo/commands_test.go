@@ -43,10 +43,10 @@ func TestRegisterCommands_Idempotent_SkipsExistingGuildCommands(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Verify the expected commands were created (claimtag, set-udisc-name, dashboard)
-	want := map[string]bool{"claimtag": true, "set-udisc-name": true, "dashboard": true}
-	if len(created) != 3 {
-		t.Fatalf("expected 3 created commands, got %d: %v", len(created), created)
+	// Verify the expected commands were created (claimtag, set-udisc-name, dashboard, season)
+	want := map[string]bool{"claimtag": true, "set-udisc-name": true, "dashboard": true, "season": true}
+	if len(created) != 4 {
+		t.Fatalf("expected 4 created commands, got %d: %v", len(created), created)
 	}
 	for _, name := range created {
 		if !want[name] {
@@ -75,7 +75,7 @@ func TestRegisterCommands_Idempotent_AllCommandsPresent_NoCreates(t *testing.T) 
 		return &discordgo.User{ID: "bot"}, nil
 	}
 
-	// All 5 commands already exist
+	// All 6 commands already exist
 	fs.ApplicationCommandsFunc = func(appID, guildID string, options ...discordgo.RequestOption) ([]*discordgo.ApplicationCommand, error) {
 		return []*discordgo.ApplicationCommand{
 			{Name: "updaterole"},
@@ -83,6 +83,7 @@ func TestRegisterCommands_Idempotent_AllCommandsPresent_NoCreates(t *testing.T) 
 			{Name: "claimtag"},
 			{Name: "set-udisc-name"},
 			{Name: "dashboard"},
+			{Name: "season"},
 		}, nil
 	}
 
@@ -124,8 +125,8 @@ func TestRegisterCommands_ListError_FallsBackToCreate(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Should have created all 5 commands since list failed
-	if createCount != 5 {
-		t.Fatalf("expected 5 commands to be created (fallback behavior), got %d", createCount)
+	// Should have created all 6 commands since list failed
+	if createCount != 6 {
+		t.Fatalf("expected 6 commands to be created (fallback behavior), got %d", createCount)
 	}
 }

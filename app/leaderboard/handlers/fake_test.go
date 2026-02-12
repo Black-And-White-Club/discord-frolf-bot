@@ -6,7 +6,9 @@ import (
 	leaderboarddiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord"
 	claimtag "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/claim_tag"
 	leaderboardupdated "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/leaderboard_updated"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/season"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
+	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/bwmarrin/discordgo"
 )
@@ -15,10 +17,12 @@ import (
 type FakeLeaderboardDiscord struct {
 	GetLeaderboardUpdateManagerFunc func() leaderboardupdated.LeaderboardUpdateManager
 	GetClaimTagManagerFunc          func() claimtag.ClaimTagManager
+	GetSeasonManagerFunc            func() season.SeasonManager
 
 	// Holds the sub-fakes
 	LeaderboardUpdateManager FakeLeaderboardUpdateManager
 	ClaimTagManager          FakeClaimTagManager
+	SeasonMgr                FakeSeasonManager
 }
 
 func (f *FakeLeaderboardDiscord) GetLeaderboardUpdateManager() leaderboardupdated.LeaderboardUpdateManager {
@@ -33,6 +37,13 @@ func (f *FakeLeaderboardDiscord) GetClaimTagManager() claimtag.ClaimTagManager {
 		return f.GetClaimTagManagerFunc()
 	}
 	return &f.ClaimTagManager
+}
+
+func (f *FakeLeaderboardDiscord) GetSeasonManager() season.SeasonManager {
+	if f.GetSeasonManagerFunc != nil {
+		return f.GetSeasonManagerFunc()
+	}
+	return &f.SeasonMgr
 }
 
 // FakeLeaderboardUpdateManager implements leaderboardupdated.LeaderboardUpdateManager
@@ -75,10 +86,50 @@ func (f *FakeClaimTagManager) UpdateInteractionResponse(ctx context.Context, cor
 	return claimtag.ClaimTagOperationResult{}, nil
 }
 
+// FakeSeasonManager implements season.SeasonManager
+type FakeSeasonManager struct {
+	HandleSeasonCommandFunc        func(ctx context.Context, i *discordgo.InteractionCreate)
+	HandleSeasonStartedFunc        func(ctx context.Context, payload *leaderboardevents.StartNewSeasonSuccessPayloadV1)
+	HandleSeasonStartFailedFunc    func(ctx context.Context, payload *leaderboardevents.AdminFailedPayloadV1)
+	HandleSeasonStandingsFunc      func(ctx context.Context, payload *leaderboardevents.GetSeasonStandingsResponsePayloadV1)
+	HandleSeasonStandingsFailedFunc func(ctx context.Context, payload *leaderboardevents.AdminFailedPayloadV1)
+}
+
+func (f *FakeSeasonManager) HandleSeasonCommand(ctx context.Context, i *discordgo.InteractionCreate) {
+	if f.HandleSeasonCommandFunc != nil {
+		f.HandleSeasonCommandFunc(ctx, i)
+	}
+}
+
+func (f *FakeSeasonManager) HandleSeasonStarted(ctx context.Context, payload *leaderboardevents.StartNewSeasonSuccessPayloadV1) {
+	if f.HandleSeasonStartedFunc != nil {
+		f.HandleSeasonStartedFunc(ctx, payload)
+	}
+}
+
+func (f *FakeSeasonManager) HandleSeasonStartFailed(ctx context.Context, payload *leaderboardevents.AdminFailedPayloadV1) {
+	if f.HandleSeasonStartFailedFunc != nil {
+		f.HandleSeasonStartFailedFunc(ctx, payload)
+	}
+}
+
+func (f *FakeSeasonManager) HandleSeasonStandings(ctx context.Context, payload *leaderboardevents.GetSeasonStandingsResponsePayloadV1) {
+	if f.HandleSeasonStandingsFunc != nil {
+		f.HandleSeasonStandingsFunc(ctx, payload)
+	}
+}
+
+func (f *FakeSeasonManager) HandleSeasonStandingsFailed(ctx context.Context, payload *leaderboardevents.AdminFailedPayloadV1) {
+	if f.HandleSeasonStandingsFailedFunc != nil {
+		f.HandleSeasonStandingsFailedFunc(ctx, payload)
+	}
+}
+
 // Ensure interface compliance
 var _ leaderboarddiscord.LeaderboardDiscordInterface = (*FakeLeaderboardDiscord)(nil)
 var _ leaderboardupdated.LeaderboardUpdateManager = (*FakeLeaderboardUpdateManager)(nil)
 var _ claimtag.ClaimTagManager = (*FakeClaimTagManager)(nil)
+var _ season.SeasonManager = (*FakeSeasonManager)(nil)
 
 // FakeHelpers provides a programmable stub for utils.Helpers
 type FakeHelpers struct {

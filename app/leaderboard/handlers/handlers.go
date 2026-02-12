@@ -43,6 +43,12 @@ type Handlers interface {
 
 	// Leaderboard Updates
 	HandleBatchTagAssigned(ctx context.Context, payload *leaderboardevents.LeaderboardBatchTagAssignedPayloadV1) ([]handlerwrapper.Result, error)
+
+	// Season Management
+	HandleSeasonStartedResponse(ctx context.Context, payload *leaderboardevents.StartNewSeasonSuccessPayloadV1) ([]handlerwrapper.Result, error)
+	HandleSeasonStartFailedResponse(ctx context.Context, payload *leaderboardevents.AdminFailedPayloadV1) ([]handlerwrapper.Result, error)
+	HandleGetSeasonStandingsResponse(ctx context.Context, payload *leaderboardevents.GetSeasonStandingsResponsePayloadV1) ([]handlerwrapper.Result, error)
+	HandleGetSeasonStandingsFailedResponse(ctx context.Context, payload *leaderboardevents.AdminFailedPayloadV1) ([]handlerwrapper.Result, error)
 }
 
 // LeaderboardHandlers handles leaderboard-related events.
