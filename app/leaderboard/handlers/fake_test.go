@@ -5,6 +5,7 @@ import (
 
 	leaderboarddiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord"
 	claimtag "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/claim_tag"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/history"
 	leaderboardupdated "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/leaderboard_updated"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/season"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
@@ -18,11 +19,13 @@ type FakeLeaderboardDiscord struct {
 	GetLeaderboardUpdateManagerFunc func() leaderboardupdated.LeaderboardUpdateManager
 	GetClaimTagManagerFunc          func() claimtag.ClaimTagManager
 	GetSeasonManagerFunc            func() season.SeasonManager
+	GetHistoryManagerFunc           func() history.HistoryManager
 
 	// Holds the sub-fakes
 	LeaderboardUpdateManager FakeLeaderboardUpdateManager
 	ClaimTagManager          FakeClaimTagManager
 	SeasonMgr                FakeSeasonManager
+	HistoryManager           FakeHistoryManager
 }
 
 func (f *FakeLeaderboardDiscord) GetLeaderboardUpdateManager() leaderboardupdated.LeaderboardUpdateManager {
@@ -45,6 +48,69 @@ func (f *FakeLeaderboardDiscord) GetSeasonManager() season.SeasonManager {
 	}
 	return &f.SeasonMgr
 }
+
+func (f *FakeLeaderboardDiscord) GetHistoryManager() history.HistoryManager {
+	if f.GetHistoryManagerFunc != nil {
+		return f.GetHistoryManagerFunc()
+	}
+	return &f.HistoryManager
+}
+
+// FakeHistoryManager implements history.HistoryManager
+type FakeHistoryManager struct {
+	HandleHistoryCommandFunc     func(ctx context.Context, i *discordgo.InteractionCreate)
+	HandleTagHistoryResponseFunc func(ctx context.Context, payload *leaderboardevents.TagHistoryResponsePayloadV1)
+	HandleTagHistoryFailedFunc   func(ctx context.Context, payload *leaderboardevents.TagHistoryFailedPayloadV1)
+	HandleTagGraphResponseFunc   func(ctx context.Context, payload *leaderboardevents.TagGraphResponsePayloadV1)
+	HandleTagGraphFailedFunc     func(ctx context.Context, payload *leaderboardevents.TagGraphFailedPayloadV1)
+	HandleTagListResponseFunc    func(ctx context.Context, payload *leaderboardevents.TagListResponsePayloadV1)
+	HandleTagListFailedFunc      func(ctx context.Context, payload *leaderboardevents.TagListFailedPayloadV1)
+}
+
+func (f *FakeHistoryManager) HandleHistoryCommand(ctx context.Context, i *discordgo.InteractionCreate) {
+	if f.HandleHistoryCommandFunc != nil {
+		f.HandleHistoryCommandFunc(ctx, i)
+	}
+}
+
+func (f *FakeHistoryManager) HandleTagHistoryResponse(ctx context.Context, payload *leaderboardevents.TagHistoryResponsePayloadV1) {
+	if f.HandleTagHistoryResponseFunc != nil {
+		f.HandleTagHistoryResponseFunc(ctx, payload)
+	}
+}
+
+func (f *FakeHistoryManager) HandleTagHistoryFailed(ctx context.Context, payload *leaderboardevents.TagHistoryFailedPayloadV1) {
+	if f.HandleTagHistoryFailedFunc != nil {
+		f.HandleTagHistoryFailedFunc(ctx, payload)
+	}
+}
+
+func (f *FakeHistoryManager) HandleTagGraphResponse(ctx context.Context, payload *leaderboardevents.TagGraphResponsePayloadV1) {
+	if f.HandleTagGraphResponseFunc != nil {
+		f.HandleTagGraphResponseFunc(ctx, payload)
+	}
+}
+
+func (f *FakeHistoryManager) HandleTagGraphFailed(ctx context.Context, payload *leaderboardevents.TagGraphFailedPayloadV1) {
+	if f.HandleTagGraphFailedFunc != nil {
+		f.HandleTagGraphFailedFunc(ctx, payload)
+	}
+}
+
+func (f *FakeHistoryManager) HandleTagListResponse(ctx context.Context, payload *leaderboardevents.TagListResponsePayloadV1) {
+	if f.HandleTagListResponseFunc != nil {
+		f.HandleTagListResponseFunc(ctx, payload)
+	}
+}
+
+func (f *FakeHistoryManager) HandleTagListFailed(ctx context.Context, payload *leaderboardevents.TagListFailedPayloadV1) {
+	if f.HandleTagListFailedFunc != nil {
+		f.HandleTagListFailedFunc(ctx, payload)
+	}
+}
+
+// Ensure interface compliance
+var _ history.HistoryManager = (*FakeHistoryManager)(nil)
 
 // FakeLeaderboardUpdateManager implements leaderboardupdated.LeaderboardUpdateManager
 type FakeLeaderboardUpdateManager struct {
@@ -88,10 +154,10 @@ func (f *FakeClaimTagManager) UpdateInteractionResponse(ctx context.Context, cor
 
 // FakeSeasonManager implements season.SeasonManager
 type FakeSeasonManager struct {
-	HandleSeasonCommandFunc        func(ctx context.Context, i *discordgo.InteractionCreate)
-	HandleSeasonStartedFunc        func(ctx context.Context, payload *leaderboardevents.StartNewSeasonSuccessPayloadV1)
-	HandleSeasonStartFailedFunc    func(ctx context.Context, payload *leaderboardevents.AdminFailedPayloadV1)
-	HandleSeasonStandingsFunc      func(ctx context.Context, payload *leaderboardevents.GetSeasonStandingsResponsePayloadV1)
+	HandleSeasonCommandFunc         func(ctx context.Context, i *discordgo.InteractionCreate)
+	HandleSeasonStartedFunc         func(ctx context.Context, payload *leaderboardevents.StartNewSeasonSuccessPayloadV1)
+	HandleSeasonStartFailedFunc     func(ctx context.Context, payload *leaderboardevents.AdminFailedPayloadV1)
+	HandleSeasonStandingsFunc       func(ctx context.Context, payload *leaderboardevents.GetSeasonStandingsResponsePayloadV1)
 	HandleSeasonStandingsFailedFunc func(ctx context.Context, payload *leaderboardevents.AdminFailedPayloadV1)
 }
 
