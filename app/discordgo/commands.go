@@ -173,5 +173,43 @@ func RegisterCommands(s Session, logger *slog.Logger, guildID string) error {
 		return fmt.Errorf("failed to create '/dashboard' command: %w", err)
 	}
 
-	return nil
-}
+	err = createIfMissing(&discordgo.ApplicationCommand{
+		Name:        "season",
+		Description: "Manage and view seasons (Admin only)",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Type:        discordgo.ApplicationCommandOptionSubCommand,
+				Name:        "start",
+				Description: "Start a new season",
+				Options: []*discordgo.ApplicationCommandOption{
+					{
+						Type:        discordgo.ApplicationCommandOptionString,
+						Name:        "name",
+						Description: "Name of the new season",
+						Required:    true,
+					},
+				},
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionSubCommand,
+				Name:        "standings",
+				Description: "View season standings",
+				Options: []*discordgo.ApplicationCommandOption{
+					{
+						Type:        discordgo.ApplicationCommandOptionString,
+						Name:        "season_id",
+						Description: "ID of the season (optional, defaults to current)",
+						Required:    false,
+					},
+				},
+			},
+		},
+					DefaultMemberPermissions: func() *int64 { v := int64(discordgo.PermissionAdministrator); return &v }(),
+			})
+			if err != nil {
+				logger.Error("Failed to create '/season' command", attr.Error(err))
+				return fmt.Errorf("failed to create '/season' command: %w", err)
+			}
+		
+			return nil
+		}

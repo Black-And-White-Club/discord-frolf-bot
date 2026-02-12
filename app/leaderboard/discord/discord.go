@@ -8,6 +8,7 @@ import (
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	claimtag "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/claim_tag"
 	leaderboardupdated "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/leaderboard_updated"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/season"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
@@ -20,12 +21,14 @@ import (
 type LeaderboardDiscordInterface interface {
 	GetLeaderboardUpdateManager() leaderboardupdated.LeaderboardUpdateManager
 	GetClaimTagManager() claimtag.ClaimTagManager
+	GetSeasonManager() season.SeasonManager
 }
 
 // LeaderboardDiscord encapsulates all leaderboard-related Discord services.
 type LeaderboardDiscord struct {
 	LeaderboardUpdateManager leaderboardupdated.LeaderboardUpdateManager
 	ClaimTagManager          claimtag.ClaimTagManager
+	SeasonManager            season.SeasonManager
 }
 
 // NewLeaderboardDiscord creates a new LeaderboardDiscord instance.
@@ -47,9 +50,12 @@ func NewLeaderboardDiscord(
 
 	claimTagManager := claimtag.NewClaimTagManager(session, publisher, logger, helper, config, guildConfigResolver, interactionStore, guildConfigCache, tracer, metrics)
 
+	seasonManager := season.NewSeasonManager(session, publisher, logger, helper, config, guildConfigResolver, interactionStore, guildConfigCache, tracer, metrics)
+
 	return &LeaderboardDiscord{
 		LeaderboardUpdateManager: leaderboardUpdateManager,
 		ClaimTagManager:          claimTagManager,
+		SeasonManager:            seasonManager,
 	}, nil
 }
 
@@ -61,4 +67,9 @@ func (ld *LeaderboardDiscord) GetLeaderboardUpdateManager() leaderboardupdated.L
 // GetClaimTagManager returns the ClaimTagManager.
 func (ld *LeaderboardDiscord) GetClaimTagManager() claimtag.ClaimTagManager {
 	return ld.ClaimTagManager
+}
+
+// GetSeasonManager returns the SeasonManager.
+func (ld *LeaderboardDiscord) GetSeasonManager() season.SeasonManager {
+	return ld.SeasonManager
 }

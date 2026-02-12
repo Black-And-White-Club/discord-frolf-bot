@@ -151,6 +151,12 @@ func (r *LeaderboardRouter) RegisterHandlers(ctx context.Context, handlers leade
 	registerHandler(deps, leaderboardevents.LeaderboardUpdateFailedV1, handlers.HandleLeaderboardUpdateFailed)
 	registerHandler(deps, leaderboardevents.GetLeaderboardFailedV1, handlers.HandleLeaderboardRetrievalFailed)
 
+	// Season Management
+	registerHandler(deps, leaderboardevents.LeaderboardStartNewSeasonSuccessV1, handlers.HandleSeasonStartedResponse)
+	registerHandler(deps, leaderboardevents.LeaderboardStartNewSeasonFailedV1, handlers.HandleSeasonStartFailedResponse)
+	registerHandler(deps, leaderboardevents.LeaderboardGetSeasonStandingsResponseV1, handlers.HandleGetSeasonStandingsResponse)
+	registerHandler(deps, leaderboardevents.LeaderboardGetSeasonStandingsFailedV1, handlers.HandleGetSeasonStandingsFailedResponse)
+
 	r.logger.InfoContext(ctx, "LeaderboardRouter.RegisterHandlers completed successfully")
 	return nil
 }
