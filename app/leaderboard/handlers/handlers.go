@@ -49,6 +49,8 @@ type Handlers interface {
 	HandleSeasonStartFailedResponse(ctx context.Context, payload *leaderboardevents.AdminFailedPayloadV1) ([]handlerwrapper.Result, error)
 	HandleGetSeasonStandingsResponse(ctx context.Context, payload *leaderboardevents.GetSeasonStandingsResponsePayloadV1) ([]handlerwrapper.Result, error)
 	HandleGetSeasonStandingsFailedResponse(ctx context.Context, payload *leaderboardevents.AdminFailedPayloadV1) ([]handlerwrapper.Result, error)
+	HandleSeasonEndedResponse(ctx context.Context, payload *leaderboardevents.EndSeasonSuccessPayloadV1) ([]handlerwrapper.Result, error)
+	HandleSeasonEndFailedResponse(ctx context.Context, payload *leaderboardevents.AdminFailedPayloadV1) ([]handlerwrapper.Result, error)
 
 	// History
 	HandleTagHistoryResponse(ctx context.Context, payload *leaderboardevents.TagHistoryResponsePayloadV1) ([]handlerwrapper.Result, error)

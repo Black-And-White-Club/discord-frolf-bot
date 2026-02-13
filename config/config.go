@@ -39,7 +39,7 @@ type DiscordConfig struct {
 	RegisteredRoleID     string            `yaml:"registered_role_id"`     // Default only
 	EventChannelID       string            `yaml:"event_channel_id"`       // Default only
 	LeaderboardChannelID string            `yaml:"leaderboard_channel_id"` // Default only
-	GuildID              string            `yaml:"guild_id"`              // Default/Main guild only; deprecated for multi-tenant scoping
+	GuildID              string            `yaml:"guild_id"`               // Default/Main guild only; deprecated for multi-tenant scoping
 	AppID                string            `yaml:"app_id"`
 	URL                  string            `yaml:"url"`
 	RoleMappings         map[string]string `yaml:"role_mappings"`

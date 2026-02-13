@@ -34,8 +34,6 @@ func (h *GuildHandlers) HandleGuildConfigUpdated(ctx context.Context, payload *g
 		h.guildConfigResolver.HandleGuildConfigReceived(ctx, guildID, convertedConfig)
 	}
 
-
-
 	if h.signupManager != nil && convertedConfig != nil && convertedConfig.SignupChannelID != "" {
 		h.signupManager.TrackChannelForReactions(convertedConfig.SignupChannelID)
 	}
@@ -134,8 +132,6 @@ func (h *GuildHandlers) HandleGuildConfigRetrieved(ctx context.Context, payload 
 	if h.guildConfigResolver != nil && convertedConfig != nil {
 		h.guildConfigResolver.HandleGuildConfigReceived(ctx, guildID, convertedConfig)
 	}
-
-
 
 	if h.signupManager != nil && convertedConfig != nil && convertedConfig.SignupChannelID != "" {
 		h.signupManager.TrackChannelForReactions(convertedConfig.SignupChannelID)
