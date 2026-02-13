@@ -112,6 +112,61 @@ func (sm *seasonManager) HandleSeasonStandingsFailed(ctx context.Context, payloa
 	}
 }
 
+// HandleSeasonEnded handles a successful season end response.
+func (sm *seasonManager) HandleSeasonEnded(ctx context.Context, payload *leaderboardevents.EndSeasonSuccessPayloadV1) {
+	sm.logger.InfoContext(ctx, "Season ended successfully",
+		attr.String("guild_id", string(payload.GuildID)))
+
+	// Prefer the configured leaderboard channel for public announcements
+	var channelID string
+
+	// 1. Try Cache
+	if cfg, err := sm.guildConfigCache.Get(ctx, string(payload.GuildID)); err == nil && cfg.LeaderboardChannelID != "" {
+		channelID = cfg.LeaderboardChannelID
+	}
+
+	// 2. Try Resolver
+	if channelID == "" {
+		if cfg, err := sm.guildConfigResolver.GetGuildConfigWithContext(ctx, string(payload.GuildID)); err == nil && cfg.LeaderboardChannelID != "" {
+			channelID = cfg.LeaderboardChannelID
+		}
+	}
+
+	// 3. Fallback to standard resolution (Context -> Cache -> Resolver)
+	if channelID == "" {
+		channelID = sm.getChannelID(ctx, string(payload.GuildID))
+	}
+
+	if channelID == "" {
+		sm.logger.WarnContext(ctx, "No channel ID found to send season end message")
+		return
+	}
+
+	msg := "🏁 **Season Ended!**\nThe current season has been deactivated. Use `/season start` to begin a new one."
+	_, err := sm.session.ChannelMessageSend(channelID, msg)
+	if err != nil {
+		sm.logger.ErrorContext(ctx, "Failed to send season end message", attr.Error(err))
+	}
+}
+
+// HandleSeasonEndFailed handles a failed season end response.
+func (sm *seasonManager) HandleSeasonEndFailed(ctx context.Context, payload *leaderboardevents.AdminFailedPayloadV1) {
+	sm.logger.WarnContext(ctx, "Season end failed",
+		attr.String("guild_id", string(payload.GuildID)),
+		attr.String("reason", payload.Reason))
+
+	channelID := sm.getChannelID(ctx, string(payload.GuildID))
+	if channelID == "" {
+		return
+	}
+
+	msg := fmt.Sprintf("❌ **Failed to end season**\nReason: %s", payload.Reason)
+	_, err := sm.session.ChannelMessageSend(channelID, msg)
+	if err != nil {
+		sm.logger.ErrorContext(ctx, "Failed to send season end failure message", attr.Error(err))
+	}
+}
+
 // getChannelID attempts to retrieve the channel ID from context or falls back to guild config.
 func (sm *seasonManager) getChannelID(ctx context.Context, guildID string) string {
 	// 1. Try to get from context (if middleware propagated it)

@@ -89,7 +89,7 @@ func TestSeasonManager_HandleSeasonStarted_NoChannel(t *testing.T) {
 	fakeGuildConfigCache.GetFunc = func(ctx context.Context, key string) (storage.GuildConfig, error) {
 		return storage.GuildConfig{}, errors.New("not found")
 	}
-	
+
 	// Mock Resolver Miss (returns empty config or error)
 	fakeResolver.GetGuildConfigFunc = func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
 		return &storage.GuildConfig{}, nil
@@ -198,6 +198,107 @@ func TestSeasonManager_HandleSeasonStartFailed(t *testing.T) {
 	}
 
 	manager.HandleSeasonStartFailed(context.Background(), payload)
+
+	if !messageSent {
+		t.Error("expected ChannelMessageSend to be called")
+	}
+}
+
+func TestSeasonManager_HandleSeasonEnded_PrioritizesConfigChannel(t *testing.T) {
+	fakeSession := discord.NewFakeSession()
+	fakeGuildConfigCache := &testutils.FakeStorage[storage.GuildConfig]{}
+	logger := testutils.NoOpLogger()
+	fakeMetrics := &testutils.FakeDiscordMetrics{}
+
+	manager := NewSeasonManager(
+		fakeSession,
+		nil,
+		logger,
+		nil,
+		nil,
+		nil,
+		nil,
+		fakeGuildConfigCache,
+		otel.Tracer("test"),
+		fakeMetrics,
+	)
+
+	// Mock GuildConfigCache to return a valid channel ID
+	fakeGuildConfigCache.GetFunc = func(ctx context.Context, key string) (storage.GuildConfig, error) {
+		return storage.GuildConfig{LeaderboardChannelID: "config-channel"}, nil
+	}
+
+	// Mock ChannelMessageSend
+	messageSent := false
+	fakeSession.ChannelMessageSendFunc = func(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+		messageSent = true
+		if channelID != "config-channel" {
+			t.Errorf("expected channel ID config-channel, got %s", channelID)
+		}
+		if !strings.Contains(content, "Season Ended") {
+			t.Errorf("expected message to contain 'Season Ended', got %s", content)
+		}
+		return &discordgo.Message{}, nil
+	}
+
+	payload := &leaderboardevents.EndSeasonSuccessPayloadV1{
+		GuildID: sharedtypes.GuildID("guild-1"),
+	}
+
+	// Put a different channel ID in context to verify priority
+	ctx := context.WithValue(context.Background(), channelIDKey, "context-channel")
+	manager.HandleSeasonEnded(ctx, payload)
+
+	if !messageSent {
+		t.Error("expected ChannelMessageSend to be called")
+	}
+}
+
+func TestSeasonManager_HandleSeasonEnded_FallbackToContext(t *testing.T) {
+	fakeSession := discord.NewFakeSession()
+	fakeGuildConfigCache := &testutils.FakeStorage[storage.GuildConfig]{}
+	logger := testutils.NoOpLogger()
+	fakeMetrics := &testutils.FakeDiscordMetrics{}
+	fakeResolver := &testutils.FakeGuildConfigResolver{}
+
+	manager := NewSeasonManager(
+		fakeSession,
+		nil,
+		logger,
+		nil,
+		nil,
+		fakeResolver,
+		nil,
+		fakeGuildConfigCache,
+		otel.Tracer("test"),
+		fakeMetrics,
+	)
+
+	// Mock Cache Miss
+	fakeGuildConfigCache.GetFunc = func(ctx context.Context, key string) (storage.GuildConfig, error) {
+		return storage.GuildConfig{}, errors.New("not found")
+	}
+	// Mock Resolver Miss
+	fakeResolver.GetGuildConfigFunc = func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
+		return &storage.GuildConfig{}, nil
+	}
+
+	// Mock ChannelMessageSend
+	messageSent := false
+	fakeSession.ChannelMessageSendFunc = func(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+		messageSent = true
+		if channelID != "context-channel" {
+			t.Errorf("expected channel ID context-channel, got %s", channelID)
+		}
+		return &discordgo.Message{}, nil
+	}
+
+	payload := &leaderboardevents.EndSeasonSuccessPayloadV1{
+		GuildID: sharedtypes.GuildID("guild-1"),
+	}
+
+	ctx := context.WithValue(context.Background(), channelIDKey, "context-channel")
+	manager.HandleSeasonEnded(ctx, payload)
 
 	if !messageSent {
 		t.Error("expected ChannelMessageSend to be called")

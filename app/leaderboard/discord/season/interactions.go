@@ -29,6 +29,8 @@ func (sm *seasonManager) HandleSeasonCommand(ctx context.Context, i *discordgo.I
 		sm.handleStartSeason(ctx, i, options[0].Options)
 	case "standings":
 		sm.handleGetStandings(ctx, i, options[0].Options)
+	case "end":
+		sm.handleEndSeason(ctx, i)
 	default:
 		sm.logger.WarnContext(ctx, "Unknown subcommand", attr.String("subcommand", subCommand))
 		sm.respondWithError(ctx, i, "Unknown subcommand")
@@ -185,5 +187,51 @@ func (sm *seasonManager) followupWithError(ctx context.Context, i *discordgo.Int
 	})
 	if err != nil {
 		sm.logger.ErrorContext(ctx, "Failed to followup with error", attr.Error(err))
+	}
+}
+
+func (sm *seasonManager) handleEndSeason(ctx context.Context, i *discordgo.InteractionCreate) {
+	guildID := i.GuildID
+
+	sm.logger.InfoContext(ctx, "Handling end season request",
+		attr.String("guild_id", guildID))
+
+	// Defer the response
+	err := sm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Flags: discordgo.MessageFlagsEphemeral,
+		},
+	})
+	if err != nil {
+		sm.logger.ErrorContext(ctx, "Failed to defer interaction", attr.Error(err))
+		return
+	}
+
+	payload := &leaderboardevents.EndSeasonPayloadV1{
+		GuildID: sharedtypes.GuildID(guildID),
+	}
+
+	msg, err := sm.helper.CreateNewMessage(payload, leaderboardevents.LeaderboardEndSeasonV1)
+	if err != nil {
+		sm.logger.ErrorContext(ctx, "Failed to create message", attr.Error(err))
+		sm.followupWithError(ctx, i, "Failed to process request")
+		return
+	}
+	msg.Metadata.Set("guild_id", guildID)
+	msg.Metadata.Set("channel_id", i.ChannelID)
+
+	if err := sm.publisher.Publish(leaderboardevents.LeaderboardEndSeasonV1, msg); err != nil {
+		sm.logger.ErrorContext(ctx, "Failed to publish event", attr.Error(err))
+		sm.followupWithError(ctx, i, "Failed to end season")
+		return
+	}
+
+	respContent := "Ending current season..."
+	_, err = sm.session.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+		Content: &respContent,
+	})
+	if err != nil {
+		sm.logger.ErrorContext(ctx, "Failed to edit interaction response", attr.Error(err))
 	}
 }

@@ -75,3 +75,36 @@ func (h *LeaderboardHandlers) HandleGetSeasonStandingsFailedResponse(ctx context
 
 	return []handlerwrapper.Result{}, nil
 }
+
+// HandleSeasonEndedResponse handles a successful season end event from the backend.
+func (h *LeaderboardHandlers) HandleSeasonEndedResponse(ctx context.Context,
+	payload *leaderboardevents.EndSeasonSuccessPayloadV1) ([]handlerwrapper.Result, error) {
+	h.logger.InfoContext(ctx, "Handling season ended response",
+		attr.String("guild_id", string(payload.GuildID)))
+
+	if h.service != nil {
+		seasonManager := h.service.GetSeasonManager()
+		if seasonManager != nil {
+			seasonManager.HandleSeasonEnded(ctx, payload)
+		}
+	}
+
+	return []handlerwrapper.Result{}, nil
+}
+
+// HandleSeasonEndFailedResponse handles a failed season end event from the backend.
+func (h *LeaderboardHandlers) HandleSeasonEndFailedResponse(ctx context.Context,
+	payload *leaderboardevents.AdminFailedPayloadV1) ([]handlerwrapper.Result, error) {
+	h.logger.WarnContext(ctx, "Handling season end failed response",
+		attr.String("guild_id", string(payload.GuildID)),
+		attr.String("reason", payload.Reason))
+
+	if h.service != nil {
+		seasonManager := h.service.GetSeasonManager()
+		if seasonManager != nil {
+			seasonManager.HandleSeasonEndFailed(ctx, payload)
+		}
+	}
+
+	return []handlerwrapper.Result{}, nil
+}

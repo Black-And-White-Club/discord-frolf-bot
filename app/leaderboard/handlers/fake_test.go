@@ -159,6 +159,8 @@ type FakeSeasonManager struct {
 	HandleSeasonStartFailedFunc     func(ctx context.Context, payload *leaderboardevents.AdminFailedPayloadV1)
 	HandleSeasonStandingsFunc       func(ctx context.Context, payload *leaderboardevents.GetSeasonStandingsResponsePayloadV1)
 	HandleSeasonStandingsFailedFunc func(ctx context.Context, payload *leaderboardevents.AdminFailedPayloadV1)
+	HandleSeasonEndedFunc           func(ctx context.Context, payload *leaderboardevents.EndSeasonSuccessPayloadV1)
+	HandleSeasonEndFailedFunc       func(ctx context.Context, payload *leaderboardevents.AdminFailedPayloadV1)
 }
 
 func (f *FakeSeasonManager) HandleSeasonCommand(ctx context.Context, i *discordgo.InteractionCreate) {
@@ -188,6 +190,18 @@ func (f *FakeSeasonManager) HandleSeasonStandings(ctx context.Context, payload *
 func (f *FakeSeasonManager) HandleSeasonStandingsFailed(ctx context.Context, payload *leaderboardevents.AdminFailedPayloadV1) {
 	if f.HandleSeasonStandingsFailedFunc != nil {
 		f.HandleSeasonStandingsFailedFunc(ctx, payload)
+	}
+}
+
+func (f *FakeSeasonManager) HandleSeasonEnded(ctx context.Context, payload *leaderboardevents.EndSeasonSuccessPayloadV1) {
+	if f.HandleSeasonEndedFunc != nil {
+		f.HandleSeasonEndedFunc(ctx, payload)
+	}
+}
+
+func (f *FakeSeasonManager) HandleSeasonEndFailed(ctx context.Context, payload *leaderboardevents.AdminFailedPayloadV1) {
+	if f.HandleSeasonEndFailedFunc != nil {
+		f.HandleSeasonEndFailedFunc(ctx, payload)
 	}
 }
 

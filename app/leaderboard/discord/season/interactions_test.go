@@ -20,7 +20,7 @@ func TestSeasonManager_HandleSeasonCommand_Start(t *testing.T) {
 	fakeMetrics := &testutils.FakeDiscordMetrics{}
 	logger := testutils.NoOpLogger()
 	cfg := &config.Config{}
-	
+
 	// Create manager
 	manager := NewSeasonManager(
 		fakeSession,
@@ -188,7 +188,7 @@ func TestSeasonManager_HandleSeasonCommand_Standings_InvalidUUID(t *testing.T) {
 	fakeSession := discord.NewFakeSession()
 	logger := testutils.NoOpLogger()
 	fakeMetrics := &testutils.FakeDiscordMetrics{}
-	
+
 	manager := NewSeasonManager(
 		fakeSession,
 		nil,

@@ -203,13 +203,18 @@ func RegisterCommands(s Session, logger *slog.Logger, guildID string) error {
 					},
 				},
 			},
+			{
+				Type:        discordgo.ApplicationCommandOptionSubCommand,
+				Name:        "end",
+				Description: "End the current season",
+			},
 		},
-					DefaultMemberPermissions: func() *int64 { v := int64(discordgo.PermissionAdministrator); return &v }(),
-			})
-			if err != nil {
-				logger.Error("Failed to create '/season' command", attr.Error(err))
-				return fmt.Errorf("failed to create '/season' command: %w", err)
-			}
-		
-			return nil
-		}
+		DefaultMemberPermissions: func() *int64 { v := int64(discordgo.PermissionAdministrator); return &v }(),
+	})
+	if err != nil {
+		logger.Error("Failed to create '/season' command", attr.Error(err))
+		return fmt.Errorf("failed to create '/season' command: %w", err)
+	}
+
+	return nil
+}

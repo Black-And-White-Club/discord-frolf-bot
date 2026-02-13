@@ -23,6 +23,8 @@ type SeasonManager interface {
 	HandleSeasonStartFailed(ctx context.Context, payload *leaderboardevents.AdminFailedPayloadV1)
 	HandleSeasonStandings(ctx context.Context, payload *leaderboardevents.GetSeasonStandingsResponsePayloadV1)
 	HandleSeasonStandingsFailed(ctx context.Context, payload *leaderboardevents.AdminFailedPayloadV1)
+	HandleSeasonEnded(ctx context.Context, payload *leaderboardevents.EndSeasonSuccessPayloadV1)
+	HandleSeasonEndFailed(ctx context.Context, payload *leaderboardevents.AdminFailedPayloadV1)
 }
 
 // seasonManager implements SeasonManager.
