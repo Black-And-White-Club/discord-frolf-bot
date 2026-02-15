@@ -151,7 +151,8 @@ func Test_wrapScoreRoundOperation(t *testing.T) {
 			fn: func(ctx context.Context) (ScoreRoundOperationResult, error) {
 				panic("unexpected panic")
 			},
-			expectRes: ScoreRoundOperationResult{Error: nil},
+			expectErr: "panic in handle_panic",
+			expectRes: ScoreRoundOperationResult{Error: errors.New("panic in handle_panic")},
 			setup: func() {
 				fakeMetrics.RecordAPIRequestDurationFunc = func(ctx context.Context, operation string, duration time.Duration) {
 					if operation != "handle_panic" {

@@ -177,7 +177,7 @@ func TestPublishSetupEvent_Success(t *testing.T) {
 	}
 	i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{GuildID: "g1", Member: &discordgo.Member{User: &discordgo.User{ID: "u1"}}}}
 
-	if err := m.publishSetupEvent(i, res); err != nil {
+	if err := m.publishSetupEvent(i, res, "corr-1"); err != nil {
 		t.Fatalf("publishSetupEvent error: %v", err)
 	}
 }
@@ -201,7 +201,7 @@ func TestPublishSetupEvent_Errors(t *testing.T) {
 	// Case 1: missing user role id -> immediate error
 	m1 := &setupManager{}
 	i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{GuildID: "g1", Member: &discordgo.Member{User: &discordgo.User{ID: "u1"}}}}
-	if err := m1.publishSetupEvent(i, &SetupResult{UserRoleID: "", EditorRoleID: "e", AdminRoleID: "a"}); err == nil {
+	if err := m1.publishSetupEvent(i, &SetupResult{UserRoleID: "", EditorRoleID: "e", AdminRoleID: "a"}, "corr-1"); err == nil {
 		t.Fatalf("expected error for missing user role id")
 	}
 
@@ -210,7 +210,7 @@ func TestPublishSetupEvent_Errors(t *testing.T) {
 		return &discordgo.Guild{ID: "g1", Name: "Guild"}, nil
 	}
 	m2 := &setupManager{session: fakeSession, publisher: eb, logger: discardLogger(), helper: fakeHelpers{}}
-	if err := m2.publishSetupEvent(i, &SetupResult{UserRoleID: "u", EditorRoleID: "e", AdminRoleID: "a"}); err == nil {
+	if err := m2.publishSetupEvent(i, &SetupResult{UserRoleID: "u", EditorRoleID: "e", AdminRoleID: "a"}, "corr-1"); err == nil {
 		t.Fatalf("expected error when helper fails")
 	}
 
@@ -222,7 +222,7 @@ func TestPublishSetupEvent_Errors(t *testing.T) {
 		return fmt.Errorf("pub fail")
 	}
 	m3 := &setupManager{session: fakeSession, publisher: eb, logger: discardLogger(), helper: utils.NewHelper(discardLogger())}
-	if err := m3.publishSetupEvent(i, &SetupResult{UserRoleID: "u", EditorRoleID: "e", AdminRoleID: "a"}); err == nil {
+	if err := m3.publishSetupEvent(i, &SetupResult{UserRoleID: "u", EditorRoleID: "e", AdminRoleID: "a"}, "corr-1"); err == nil {
 		t.Fatalf("expected error when publish fails")
 	}
 }

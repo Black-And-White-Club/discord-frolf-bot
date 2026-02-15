@@ -18,10 +18,7 @@ import (
 
 func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
 	testRoundID := sharedtypes.RoundID(uuid.New())
-	fakeSession := discord.NewFakeSession()
-	fakePublisher := &testutils.FakeEventBus{}
 	mockLogger := loggerfrolfbot.NoOpLogger
-	fakeHelper := &testutils.FakeHelpers{}
 	mockConfig := &config.Config{}
 
 	createInteraction := func(customID string) *discordgo.InteractionCreate {
@@ -48,7 +45,7 @@ func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
 
 	tests := []struct {
 		name  string
-		setup func()
+		setup func(fakeSession *discord.FakeSession, fakePublisher *testutils.FakeEventBus, fakeHelper *testutils.FakeHelpers)
 		args  struct {
 			ctx context.Context
 			i   *discordgo.InteractionCreate
@@ -57,7 +54,7 @@ func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
 	}{
 		{
 			name: "interaction respond error",
-			setup: func() {
+			setup: func(fakeSession *discord.FakeSession, fakePublisher *testutils.FakeEventBus, fakeHelper *testutils.FakeHelpers) {
 				fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
 					return errors.New("failed to respond to interaction")
 				}
@@ -73,7 +70,7 @@ func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
 		},
 		{
 			name: "unknown response type",
-			setup: func() {
+			setup: func(fakeSession *discord.FakeSession, fakePublisher *testutils.FakeEventBus, fakeHelper *testutils.FakeHelpers) {
 				// No mocks needed - function should return early
 			},
 			args: struct {
@@ -87,7 +84,7 @@ func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
 		},
 		{
 			name: "invalid event ID",
-			setup: func() {
+			setup: func(fakeSession *discord.FakeSession, fakePublisher *testutils.FakeEventBus, fakeHelper *testutils.FakeHelpers) {
 				fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
 					return nil
 				}
@@ -103,7 +100,7 @@ func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
 		},
 		{
 			name: "create result message error",
-			setup: func() {
+			setup: func(fakeSession *discord.FakeSession, fakePublisher *testutils.FakeEventBus, fakeHelper *testutils.FakeHelpers) {
 				fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
 					return nil
 				}
@@ -123,7 +120,7 @@ func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
 		},
 		{
 			name: "publish error",
-			setup: func() {
+			setup: func(fakeSession *discord.FakeSession, fakePublisher *testutils.FakeEventBus, fakeHelper *testutils.FakeHelpers) {
 				fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
 					return nil
 				}
@@ -149,8 +146,12 @@ func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			fakeSession := discord.NewFakeSession()
+			fakePublisher := &testutils.FakeEventBus{}
+			fakeHelper := &testutils.FakeHelpers{}
+
 			if tt.setup != nil {
-				tt.setup()
+				tt.setup(fakeSession, fakePublisher, fakeHelper)
 			}
 
 			rrm := &roundRsvpManager{
@@ -182,10 +183,7 @@ func Test_roundRsvpManager_HandleRoundResponse(t *testing.T) {
 
 func Test_roundRsvpManager_InteractionJoinRoundLate(t *testing.T) {
 	testRoundID := sharedtypes.RoundID(uuid.New())
-	fakeSession := discord.NewFakeSession()
-	fakePublisher := &testutils.FakeEventBus{}
 	mockLogger := loggerfrolfbot.NoOpLogger
-	fakeHelper := &testutils.FakeHelpers{}
 	mockConfig := &config.Config{}
 
 	createInteraction := func(customID string) *discordgo.InteractionCreate {
@@ -212,7 +210,7 @@ func Test_roundRsvpManager_InteractionJoinRoundLate(t *testing.T) {
 
 	tests := []struct {
 		name  string
-		setup func()
+		setup func(fakeSession *discord.FakeSession, fakePublisher *testutils.FakeEventBus, fakeHelper *testutils.FakeHelpers)
 		args  struct {
 			ctx context.Context
 			i   *discordgo.InteractionCreate
@@ -221,7 +219,7 @@ func Test_roundRsvpManager_InteractionJoinRoundLate(t *testing.T) {
 	}{
 		{
 			name: "invalid custom ID format",
-			setup: func() {
+			setup: func(fakeSession *discord.FakeSession, fakePublisher *testutils.FakeEventBus, fakeHelper *testutils.FakeHelpers) {
 				// No mocks needed - function should exit early
 			},
 			args: struct {
@@ -235,7 +233,7 @@ func Test_roundRsvpManager_InteractionJoinRoundLate(t *testing.T) {
 		},
 		{
 			name: "interaction respond error",
-			setup: func() {
+			setup: func(fakeSession *discord.FakeSession, fakePublisher *testutils.FakeEventBus, fakeHelper *testutils.FakeHelpers) {
 				fakeSession.ChannelMessageFunc = func(channelID, messageID string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
 					return &discordgo.Message{
 						ID: "message-123",
@@ -260,7 +258,7 @@ func Test_roundRsvpManager_InteractionJoinRoundLate(t *testing.T) {
 		},
 		{
 			name: "publish error",
-			setup: func() {
+			setup: func(fakeSession *discord.FakeSession, fakePublisher *testutils.FakeEventBus, fakeHelper *testutils.FakeHelpers) {
 				fakeSession.ChannelMessageFunc = func(channelID, messageID string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
 					return &discordgo.Message{
 						ID: "message-123",
@@ -293,7 +291,7 @@ func Test_roundRsvpManager_InteractionJoinRoundLate(t *testing.T) {
 		},
 		{
 			name: "invalid event ID",
-			setup: func() {
+			setup: func(fakeSession *discord.FakeSession, fakePublisher *testutils.FakeEventBus, fakeHelper *testutils.FakeHelpers) {
 			},
 			args: struct {
 				ctx context.Context
@@ -308,8 +306,12 @@ func Test_roundRsvpManager_InteractionJoinRoundLate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			fakeSession := discord.NewFakeSession()
+			fakePublisher := &testutils.FakeEventBus{}
+			fakeHelper := &testutils.FakeHelpers{}
+
 			if tt.setup != nil {
-				tt.setup()
+				tt.setup(fakeSession, fakePublisher, fakeHelper)
 			}
 
 			rrm := &roundRsvpManager{

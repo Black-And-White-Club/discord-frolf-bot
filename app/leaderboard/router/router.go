@@ -159,12 +159,6 @@ func (r *LeaderboardRouter) RegisterHandlers(ctx context.Context, handlers leade
 	registerHandler(deps, leaderboardevents.LeaderboardEndSeasonSuccessV1, handlers.HandleSeasonEndedResponse)
 	registerHandler(deps, leaderboardevents.LeaderboardEndSeasonFailedV1, handlers.HandleSeasonEndFailedResponse)
 
-	// History
-	registerHandler(deps, leaderboardevents.LeaderboardTagHistoryResponseV1, handlers.HandleTagHistoryResponse)
-	registerHandler(deps, leaderboardevents.LeaderboardTagHistoryFailedV1, handlers.HandleTagHistoryFailed)
-	registerHandler(deps, leaderboardevents.LeaderboardTagGraphResponseV1, handlers.HandleTagGraphResponse)
-	registerHandler(deps, leaderboardevents.LeaderboardTagGraphFailedV1, handlers.HandleTagGraphFailed)
-
 	r.logger.InfoContext(ctx, "LeaderboardRouter.RegisterHandlers completed successfully")
 	return nil
 }

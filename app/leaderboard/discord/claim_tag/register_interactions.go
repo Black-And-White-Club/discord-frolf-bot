@@ -11,7 +11,7 @@ import (
 
 func RegisterHandlers(registry *interactions.Registry, manager ClaimTagManager) {
 	// claimtag command available to all players
-	registry.RegisterHandlerWithPermissions("claimtag", func(ctx context.Context, i *discordgo.InteractionCreate) {
+	registry.RegisterMutatingHandler("claimtag", func(ctx context.Context, i *discordgo.InteractionCreate) {
 		slog.Info("Handling /claimtag command",
 			attr.String("command_name", i.ApplicationCommandData().Name),
 			attr.String("user", i.Member.User.Username))
@@ -32,5 +32,5 @@ func RegisterHandlers(registry *interactions.Registry, manager ClaimTagManager) 
 			slog.InfoContext(ctx, "Claim tag command completed successfully",
 				attr.String("user", i.Member.User.Username))
 		}
-	}, interactions.PlayerRequired, true)
+	}, interactions.MutatingHandlerPolicy{RequiredPermission: interactions.PlayerRequired, RequiresSetup: true})
 }

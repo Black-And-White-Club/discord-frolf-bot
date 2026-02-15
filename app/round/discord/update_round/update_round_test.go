@@ -119,8 +119,8 @@ func Test_wrapUpdateRoundOperation(t *testing.T) {
 			fn: func(ctx context.Context) (UpdateRoundOperationResult, error) {
 				panic("oh no")
 			},
-			expectErr: "",
-			expectRes: UpdateRoundOperationResult{Error: nil},
+			expectErr: "panic in update_panic",
+			expectRes: UpdateRoundOperationResult{Error: errors.New("panic in update_panic")},
 			setupFake: func(fm *testutils.FakeDiscordMetrics) {
 				fm.RecordAPIRequestDurationFunc = func(ctx context.Context, operation string, duration time.Duration) {}
 				fm.RecordAPIErrorFunc = func(ctx context.Context, operation, errorType string) {}

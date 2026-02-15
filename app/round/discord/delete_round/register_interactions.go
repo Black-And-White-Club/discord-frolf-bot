@@ -20,7 +20,7 @@ func RegisterHandlers(registry *interactions.Registry, manager DeleteRoundManage
 
 	slog.Info("RegisterHandlers is registering handlers for DeleteRoundManager")
 
-	registry.RegisterHandler("round_delete", func(ctx context.Context, i *discordgo.InteractionCreate) {
+	registry.RegisterMutatingHandler("round_delete", func(ctx context.Context, i *discordgo.InteractionCreate) {
 		customID := i.MessageComponentData().CustomID
 		slog.Info("Checking delete button interaction", attr.String("custom_id", customID))
 
@@ -45,5 +45,5 @@ func RegisterHandlers(registry *interactions.Registry, manager DeleteRoundManage
 
 		slog.Info("✅ Button matched! Processing delete request.", attr.String("round_id", roundUUID.String()))
 		manager.HandleDeleteRoundButton(ctx, i)
-	})
+	}, interactions.MutatingHandlerPolicy{RequiredPermission: interactions.EditorRequired, RequiresSetup: true})
 }

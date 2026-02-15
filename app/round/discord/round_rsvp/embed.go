@@ -102,8 +102,7 @@ func (rrm *roundRsvpManager) UpdateRoundEventEmbed(ctx context.Context, channelI
 
 // formatParticipants formats the participant list for the embed field value in the RSVP embed.
 // It formats as "<@USER_ID> Tag: N" or just "<@USER_ID>" if no tag number.
-// Includes logging for failed user info fetches.
-func (rrm *roundRsvpManager) formatParticipants(ctx context.Context, participants []roundtypes.Participant) string {
+func (rrm *roundRsvpManager) formatParticipants(_ context.Context, participants []roundtypes.Participant) string {
 	if len(participants) == 0 {
 		return placeholderNoParticipants // Use consistent placeholder
 	}
@@ -130,37 +129,6 @@ func (rrm *roundRsvpManager) formatParticipants(ctx context.Context, participant
 
 	var lines []string
 	for _, participant := range sortedParticipants {
-		// Attempt to fetch user/member info primarily for logging purposes if it fails.
-		// The fetched display name is NOT used in the final output line format.
-		_, err := rrm.session.User(string(participant.UserID))
-		if err != nil {
-			// Log the error using the context. Format the potential display name attempt directly in the log attribute.
-			rrm.logger.ErrorContext(ctx, "Failed to get user info for participant in formatParticipants",
-				attr.Error(err),
-				attr.String("user_id", string(participant.UserID)),
-				// Format display name attempt for logging context if fetch fails
-				attr.String("display_name_attempted", fmt.Sprintf("User ID: %s (Fetch Failed)", participant.UserID)),
-				attr.String("status", string(participant.Response)),
-				attr.Any("tag_number", participant.TagNumber), // Use attr.Any for pointers that might be nil
-			)
-			// Continue without fetching member if user fetch failed
-		} else {
-			// Fetch guild ID from context for member lookup
-			guildID, _ := ctx.Value("guild_id").(string)
-			if guildID != "" {
-				_, memberErr := rrm.session.GuildMember(guildID, string(participant.UserID))
-				if memberErr != nil {
-					rrm.logger.WarnContext(ctx, "Failed to get guild member info for participant in formatParticipants",
-						attr.Error(memberErr),
-						attr.String("user_id", string(participant.UserID)),
-						attr.String("guild_id", guildID),
-						attr.String("status", string(participant.Response)),
-						attr.Any("tag_number", participant.TagNumber),
-					)
-				}
-			}
-		}
-
 		line := ""
 		if participant.TagNumber != nil && *participant.TagNumber > 0 {
 			// RSVP Format: <@USER_ID> Tag: N

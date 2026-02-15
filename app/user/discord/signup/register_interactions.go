@@ -12,7 +12,7 @@ import (
 )
 
 func RegisterHandlers(registry *interactions.Registry, manager SignupManager) {
-	registry.RegisterHandler("signup_button|", func(ctx context.Context, i *discordgo.InteractionCreate) {
+	registry.RegisterMutatingHandler("signup_button|", func(ctx context.Context, i *discordgo.InteractionCreate) {
 		customID := i.MessageComponentData().CustomID
 		slog.Info("Checking button interaction", attr.String("custom_id", customID))
 
@@ -24,10 +24,10 @@ func RegisterHandlers(registry *interactions.Registry, manager SignupManager) {
 
 		slog.Info("✅ Button matched! Processing...")
 		manager.HandleSignupButtonPress(ctx, i)
-	})
+	}, interactions.MutatingHandlerPolicy{RequiredPermission: interactions.NoPermissionRequired, RequiresSetup: false})
 
-	registry.RegisterHandler("signup_modal", func(ctx context.Context, i *discordgo.InteractionCreate) {
+	registry.RegisterMutatingHandler("signup_modal", func(ctx context.Context, i *discordgo.InteractionCreate) {
 		slog.Info("Handling signup modal submission", attr.String("custom_id", i.ModalSubmitData().CustomID))
 		manager.HandleSignupModalSubmit(ctx, i)
-	})
+	}, interactions.MutatingHandlerPolicy{RequiredPermission: interactions.NoPermissionRequired, RequiresSetup: false})
 }

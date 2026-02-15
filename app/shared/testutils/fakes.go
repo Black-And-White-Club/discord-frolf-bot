@@ -123,9 +123,12 @@ func (f *FakeGuildConfigResolver) ClearInflightRequest(ctx context.Context, guil
 
 // FakeDiscordMetrics is a programmable fake for DiscordMetrics
 type FakeDiscordMetrics struct {
-	RecordAPIRequestFunc         func(ctx context.Context, operation string)
-	RecordAPIErrorFunc           func(ctx context.Context, operation, errorType string)
-	RecordAPIRequestDurationFunc func(ctx context.Context, operation string, duration time.Duration)
+	RecordAPIRequestFunc          func(ctx context.Context, operation string)
+	RecordAPIErrorFunc            func(ctx context.Context, operation, errorType string)
+	RecordAPIRequestDurationFunc  func(ctx context.Context, operation string, duration time.Duration)
+	RecordWebsocketEventFunc      func(ctx context.Context, eventType string)
+	RecordWebsocketReconnectFunc  func(ctx context.Context)
+	RecordWebsocketDisconnectFunc func(ctx context.Context, reason string)
 }
 
 func (f *FakeDiscordMetrics) RecordAPIRequest(ctx context.Context, endpoint string) {
@@ -150,12 +153,21 @@ func (f *FakeDiscordMetrics) RecordRateLimit(ctx context.Context, endpoint strin
 }
 
 func (f *FakeDiscordMetrics) RecordWebsocketEvent(ctx context.Context, eventType string) {
+	if f.RecordWebsocketEventFunc != nil {
+		f.RecordWebsocketEventFunc(ctx, eventType)
+	}
 }
 
 func (f *FakeDiscordMetrics) RecordWebsocketReconnect(ctx context.Context) {
+	if f.RecordWebsocketReconnectFunc != nil {
+		f.RecordWebsocketReconnectFunc(ctx)
+	}
 }
 
 func (f *FakeDiscordMetrics) RecordWebsocketDisconnect(ctx context.Context, reason string) {
+	if f.RecordWebsocketDisconnectFunc != nil {
+		f.RecordWebsocketDisconnectFunc(ctx, reason)
+	}
 }
 
 func (f *FakeDiscordMetrics) RecordHandlerAttempt(ctx context.Context, handlerName string) {

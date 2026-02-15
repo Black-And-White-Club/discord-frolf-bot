@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"sync"
 	"testing"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
@@ -49,13 +50,25 @@ func (s *memStore) Get(_ context.Context, id string) (interface{}, error) {
 
 // fake eventbus capturing publish
 type fakeEventBus struct {
+	mu     sync.Mutex
 	topics []string
 	err    error
 }
 
 func (f *fakeEventBus) Publish(topic string, _ ...*message.Message) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.topics = append(f.topics, topic)
 	return f.err
+}
+
+func (f *fakeEventBus) Topics() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	out := make([]string, len(f.topics))
+	copy(out, f.topics)
+	return out
 }
 
 func (f *fakeEventBus) Subscribe(context.Context, string) (<-chan *message.Message, error) {
@@ -197,7 +210,7 @@ func TestHandleClaimTagCommand_Variants(t *testing.T) {
 		if err != nil || res.Error != nil {
 			t.Fatalf("expected success, got res=%v err=%v", res, err)
 		}
-		if len(eb.topics) == 0 {
+		if len(eb.Topics()) == 0 {
 			t.Fatalf("expected publish to be called")
 		}
 	})

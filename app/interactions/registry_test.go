@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"testing"
+	"time"
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/bwmarrin/discordgo"
@@ -17,8 +18,9 @@ func TestPrefixMatching_HandlerInvoked(t *testing.T) {
 
 	// Modal submit with customID that has a prefix match
 	i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
-		Type: discordgo.InteractionModalSubmit,
-		Data: discordgo.ModalSubmitInteractionData{CustomID: "my-action:123"},
+		Type:    discordgo.InteractionModalSubmit,
+		GuildID: "g1",
+		Data:    discordgo.ModalSubmitInteractionData{CustomID: "my-action:123"},
 	}}
 
 	// nil session is fine as long as permissions pass and no error response is sent
@@ -29,10 +31,28 @@ func TestPrefixMatching_HandlerInvoked(t *testing.T) {
 	}
 }
 
-func TestDMBypass_AllowsRegardlessOfPermissions(t *testing.T) {
+func TestPrefixMatching_LongestPrefixWins(t *testing.T) {
+	r := NewRegistry()
+	called := ""
+	r.RegisterHandler("action|", func(ctx context.Context, i *discordgo.InteractionCreate) { called = "short" })
+	r.RegisterHandler("action|special|", func(ctx context.Context, i *discordgo.InteractionCreate) { called = "long" })
+
+	i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
+		Type:    discordgo.InteractionModalSubmit,
+		GuildID: "g1",
+		Data:    discordgo.ModalSubmitInteractionData{CustomID: "action|special|123"},
+	}}
+
+	r.HandleInteraction(nil, i)
+	if called != "long" {
+		t.Fatalf("expected longest prefix handler, got %q", called)
+	}
+}
+
+func TestDMInteraction_NotAllowlisted_Blocked(t *testing.T) {
 	r := NewRegistry()
 	called := false
-	// Require admin, but DM should bypass
+	// Requires setup+admin and should not run in a non-allowlisted DM interaction.
 	r.RegisterHandlerWithPermissions("cmd", func(ctx context.Context, i *discordgo.InteractionCreate) { called = true }, AdminRequired, true)
 
 	i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
@@ -42,8 +62,25 @@ func TestDMBypass_AllowsRegardlessOfPermissions(t *testing.T) {
 	}}
 
 	r.HandleInteraction(nil, i)
+	if called {
+		t.Fatalf("expected handler to be blocked for non-allowlisted DM interaction")
+	}
+}
+
+func TestDMInteraction_Allowlisted_BypassesGuildChecks(t *testing.T) {
+	r := NewRegistry()
+	called := false
+	r.RegisterHandlerWithPermissions("signup_modal", func(ctx context.Context, i *discordgo.InteractionCreate) { called = true }, AdminRequired, true)
+
+	i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
+		Type:    discordgo.InteractionModalSubmit,
+		GuildID: "",
+		Data:    discordgo.ModalSubmitInteractionData{CustomID: "signup_modal|guild_id=g1"},
+	}}
+
+	r.HandleInteraction(nil, i)
 	if !called {
-		t.Fatalf("expected handler to be called for DM interaction")
+		t.Fatalf("expected allowlisted DM interaction to execute")
 	}
 }
 
@@ -86,9 +123,19 @@ type stubResolver struct {
 	setupComplete bool
 	cfg           *storage.GuildConfig
 	err           error
+	delay         time.Duration
+	getCalls      int
 }
 
-func (s *stubResolver) GetGuildConfigWithContext(_ context.Context, _ string) (*storage.GuildConfig, error) {
+func (s *stubResolver) GetGuildConfigWithContext(ctx context.Context, _ string) (*storage.GuildConfig, error) {
+	s.getCalls++
+	if s.delay > 0 {
+		select {
+		case <-time.After(s.delay):
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
 	if s.err != nil {
 		return nil, s.err
 	}
@@ -145,8 +192,9 @@ func TestMessageComponent_PrefixMatching(t *testing.T) {
 	r.RegisterHandler("comp-", func(ctx context.Context, i *discordgo.InteractionCreate) { called = true })
 
 	r.HandleInteraction(nil, &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
-		Type: discordgo.InteractionMessageComponent,
-		Data: discordgo.MessageComponentInteractionData{CustomID: "comp-42"},
+		Type:    discordgo.InteractionMessageComponent,
+		GuildID: "g1",
+		Data:    discordgo.MessageComponentInteractionData{CustomID: "comp-42"},
 	}})
 
 	if !called {
@@ -188,6 +236,131 @@ func TestPermissionDenied_EditorRequired_PlayerOnly_NoPanic(t *testing.T) {
 	}
 }
 
+func TestRequiresSetupAndPermission_UsesSingleGuildConfigFetch(t *testing.T) {
+	r := NewRegistry()
+	executed := false
+	r.RegisterHandlerWithPermissions("needs-setup-and-player", func(ctx context.Context, i *discordgo.InteractionCreate) {
+		executed = true
+	}, PlayerRequired, true)
+
+	resolver := &stubResolver{
+		cfg: &storage.GuildConfig{
+			GuildID:              "g1",
+			SignupChannelID:      "signup",
+			EventChannelID:       "event",
+			LeaderboardChannelID: "leaderboard",
+			RegisteredRoleID:     "player",
+		},
+	}
+	r.SetGuildConfigResolver(resolver)
+
+	i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
+		Type:    discordgo.InteractionApplicationCommand,
+		GuildID: "g1",
+		Member:  &discordgo.Member{Roles: []string{"player"}},
+		Data:    discordgo.ApplicationCommandInteractionData{Name: "needs-setup-and-player"},
+	}}
+
+	r.HandleInteraction(nil, i)
+
+	if !executed {
+		t.Fatalf("expected handler to execute")
+	}
+	if resolver.getCalls != 1 {
+		t.Fatalf("expected exactly one guild config fetch, got %d", resolver.getCalls)
+	}
+}
+
+func TestPermissionLookupTimeout_BlocksHandler(t *testing.T) {
+	r := NewRegistry()
+	executed := false
+	r.RegisterHandlerWithPermissions("slow-config", func(ctx context.Context, i *discordgo.InteractionCreate) {
+		executed = true
+	}, PlayerRequired, false)
+
+	resolver := &stubResolver{
+		delay: 2 * time.Second,
+		cfg: &storage.GuildConfig{
+			GuildID:          "g1",
+			RegisteredRoleID: "player",
+		},
+	}
+	r.SetGuildConfigResolver(resolver)
+
+	i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
+		Type:    discordgo.InteractionApplicationCommand,
+		GuildID: "g1",
+		Member:  &discordgo.Member{Roles: []string{"player"}},
+		Data:    discordgo.ApplicationCommandInteractionData{Name: "slow-config"},
+	}}
+
+	r.HandleInteraction(nil, i)
+
+	if executed {
+		t.Fatalf("handler should not execute when guild config lookup times out")
+	}
+	if resolver.getCalls != 1 {
+		t.Fatalf("expected one lookup attempt, got %d", resolver.getCalls)
+	}
+}
+
+func TestRegisterMutatingHandler_BlockingPolicies(t *testing.T) {
+	tests := []struct {
+		name     string
+		resolver *stubResolver
+		member   *discordgo.Member
+		wantRun  bool
+	}{
+		{
+			name: "setup incomplete is blocked",
+			resolver: &stubResolver{
+				cfg: &storage.GuildConfig{GuildID: "g1"},
+			},
+			member:  &discordgo.Member{Roles: []string{"player"}},
+			wantRun: false,
+		},
+		{
+			name: "missing required role is blocked",
+			resolver: &stubResolver{
+				cfg: &storage.GuildConfig{
+					GuildID:              "g1",
+					SignupChannelID:      "signup",
+					EventChannelID:       "event",
+					LeaderboardChannelID: "leaderboard",
+					RegisteredRoleID:     "player",
+				},
+			},
+			member:  &discordgo.Member{Roles: []string{"viewer"}},
+			wantRun: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := NewRegistry()
+			r.SetGuildConfigResolver(tt.resolver)
+
+			executed := false
+			r.RegisterMutatingHandler("mutate", func(ctx context.Context, i *discordgo.InteractionCreate) {
+				executed = true
+			}, MutatingHandlerPolicy{RequiredPermission: PlayerRequired, RequiresSetup: true})
+
+			i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
+				Type:    discordgo.InteractionApplicationCommand,
+				GuildID: "g1",
+				Member:  tt.member,
+				Data:    discordgo.ApplicationCommandInteractionData{Name: "mutate"},
+			}}
+
+			r.HandleInteraction(nil, i)
+
+			if executed != tt.wantRun {
+				t.Fatalf("executed=%v want=%v", executed, tt.wantRun)
+			}
+		})
+	}
+}
+
 func TestMessageComponent_NoHandlerFound_NoPanic(t *testing.T) {
 	r := NewRegistry()
 	r.SetLogger(slog.Default())
@@ -196,6 +369,34 @@ func TestMessageComponent_NoHandlerFound_NoPanic(t *testing.T) {
 		Type: discordgo.InteractionMessageComponent,
 		Data: discordgo.MessageComponentInteractionData{CustomID: "unknown-component"},
 	}})
+}
+
+func TestHandleInteraction_NilPayload_NoPanic(t *testing.T) {
+	r := NewRegistry()
+	r.SetLogger(slog.Default())
+
+	r.HandleInteraction(nil, nil)
+	r.HandleInteraction(nil, &discordgo.InteractionCreate{})
+}
+
+func TestHandleInteraction_HandlerPanic_Recovered(t *testing.T) {
+	r := NewRegistry()
+	r.SetLogger(slog.Default())
+	called := false
+	r.RegisterHandler("panic-cmd", func(ctx context.Context, i *discordgo.InteractionCreate) {
+		called = true
+		panic("boom")
+	})
+
+	r.HandleInteraction(nil, &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
+		Type:    discordgo.InteractionApplicationCommand,
+		GuildID: "g1",
+		Data:    discordgo.ApplicationCommandInteractionData{Name: "panic-cmd"},
+	}})
+
+	if !called {
+		t.Fatalf("expected handler to run before panic")
+	}
 }
 
 func TestCheckGuildPermission_Variants(t *testing.T) {
@@ -210,9 +411,9 @@ func TestCheckGuildPermission_Variants(t *testing.T) {
 
 	member := func(roles ...string) *discordgo.Member { return &discordgo.Member{Roles: roles} }
 
-	// Discord admin bit passes immediately
-	if !r.checkGuildPermission(&discordgo.Member{Permissions: discordgo.PermissionAdministrator}, cfg, AdminRequired) {
-		t.Fatalf("admin bit should pass")
+	// Payload admin bit alone should not bypass role checks.
+	if r.checkGuildPermission(&discordgo.Member{Permissions: discordgo.PermissionAdministrator}, cfg, AdminRequired) {
+		t.Fatalf("admin permission bit alone should not satisfy admin required")
 	}
 
 	// AdminRequired: must have admin role

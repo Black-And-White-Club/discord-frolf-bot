@@ -36,11 +36,49 @@ type Stores struct {
 	GuildConfigCache ISInterface[GuildConfig]
 }
 
+const (
+	defaultInteractionStoreTTL   = 1 * time.Hour
+	defaultGuildConfigCacheSize  = 10000
+	defaultGuildConfigCacheTTL   = 24 * time.Hour
+	defaultGuildConfigRefreshTTL = 2 * time.Hour
+)
+
 func NewStores(ctx context.Context) *Stores {
+	guildConfigCache := NewGuildConfigCache(
+		ctx,
+		defaultGuildConfigCacheSize,
+		defaultGuildConfigCacheTTL,
+		defaultGuildConfigRefreshTTL,
+	)
+
 	return &Stores{
-		InteractionStore: NewInteractionStore[any](ctx, 1*time.Hour),
-		GuildConfigCache: NewInteractionStore[GuildConfig](ctx, 24*time.Hour),
+		InteractionStore: NewInteractionStore[any](ctx, defaultInteractionStoreTTL),
+		GuildConfigCache: newGuildConfigStoreAdapter(guildConfigCache),
 	}
+}
+
+type guildConfigStoreAdapter struct {
+	cache GuildConfigCacheInterface
+}
+
+func newGuildConfigStoreAdapter(cache GuildConfigCacheInterface) ISInterface[GuildConfig] {
+	return &guildConfigStoreAdapter{cache: cache}
+}
+
+func (a *guildConfigStoreAdapter) Set(_ context.Context, correlationID string, interaction GuildConfig) error {
+	return a.cache.Set(correlationID, &interaction)
+}
+
+func (a *guildConfigStoreAdapter) Delete(_ context.Context, correlationID string) {
+	a.cache.Delete(correlationID)
+}
+
+func (a *guildConfigStoreAdapter) Get(_ context.Context, correlationID string) (GuildConfig, error) {
+	config, ok := a.cache.Get(correlationID)
+	if !ok || config == nil {
+		return GuildConfig{}, errors.New("item not found or expired")
+	}
+	return *config, nil
 }
 
 func NewInteractionStore[T any](ctx context.Context, ttl time.Duration) ISInterface[T] {

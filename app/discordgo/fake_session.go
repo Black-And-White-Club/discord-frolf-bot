@@ -66,6 +66,7 @@ type FakeSession struct {
 
 	// --- Application Command Methods ---
 	ApplicationCommandCreateFunc          func(appID, guildID string, cmd *discordgo.ApplicationCommand, options ...discordgo.RequestOption) (*discordgo.ApplicationCommand, error)
+	ApplicationCommandEditFunc            func(appID, guildID, cmdID string, cmd *discordgo.ApplicationCommand, options ...discordgo.RequestOption) (*discordgo.ApplicationCommand, error)
 	ApplicationCommandsFunc               func(appID, guildID string, options ...discordgo.RequestOption) ([]*discordgo.ApplicationCommand, error)
 	ApplicationCommandDeleteFunc          func(appID, guildID, cmdID string, options ...discordgo.RequestOption) error
 	ApplicationCommandPermissionsEditFunc func(appID, guildID, cmdID string, permissions *discordgo.ApplicationCommandPermissionsList, options ...discordgo.RequestOption) error
@@ -411,6 +412,14 @@ func (f *FakeSession) ApplicationCommandCreate(appID, guildID string, cmd *disco
 		return f.ApplicationCommandCreateFunc(appID, guildID, cmd, options...)
 	}
 	return &discordgo.ApplicationCommand{ID: "fake-cmd-123", Name: cmd.Name}, nil
+}
+
+func (f *FakeSession) ApplicationCommandEdit(appID, guildID, cmdID string, cmd *discordgo.ApplicationCommand, options ...discordgo.RequestOption) (*discordgo.ApplicationCommand, error) {
+	f.record("ApplicationCommandEdit")
+	if f.ApplicationCommandEditFunc != nil {
+		return f.ApplicationCommandEditFunc(appID, guildID, cmdID, cmd, options...)
+	}
+	return &discordgo.ApplicationCommand{ID: cmdID, Name: cmd.Name}, nil
 }
 
 func (f *FakeSession) ApplicationCommands(appID, guildID string, options ...discordgo.RequestOption) ([]*discordgo.ApplicationCommand, error) {

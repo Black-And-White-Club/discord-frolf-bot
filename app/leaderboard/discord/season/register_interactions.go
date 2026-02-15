@@ -11,10 +11,10 @@ import (
 
 // RegisterHandlers registers the season command handlers.
 func RegisterHandlers(registry *interactions.Registry, manager SeasonManager) {
-	registry.RegisterHandler("season", func(ctx context.Context, i *discordgo.InteractionCreate) {
+	registry.RegisterMutatingHandler("season", func(ctx context.Context, i *discordgo.InteractionCreate) {
 		slog.Info("Handling season command",
 			attr.String("interaction_id", i.ID),
 			attr.String("user", i.Member.User.Username))
 		manager.HandleSeasonCommand(ctx, i)
-	})
+	}, interactions.MutatingHandlerPolicy{RequiredPermission: interactions.AdminRequired, RequiresSetup: true})
 }

@@ -2,6 +2,7 @@ package bot
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -76,13 +77,32 @@ type DiscordBot struct {
 	shutdownOnce sync.Once
 
 	// Command reconciliation (startup)
-	commandRegistrar func(discord.Session, *slog.Logger, string) error
-	commandSyncDelay time.Duration
+	commandRegistrar       func(discord.Session, *slog.Logger, string) error
+	commandSyncDelay       time.Duration
+	commandSyncWorkers     int
+	commandSyncRetryDelay  time.Duration
+	commandManifestVersion string
+	commandSyncState       sync.Map // guildID -> manifest version
+	commandSyncRetries     sync.Map // guildID -> struct{}
+
+	gatewayStateMu       sync.RWMutex
+	gatewaySessionID     string
+	gatewayGuildCount    int
+	gatewayEverConnected bool
 }
 
 const (
 	defaultCommandSyncDelay   = 250 * time.Millisecond
+	defaultCommandSyncWorkers = 4
+	defaultCommandSyncRetry   = 5 * time.Second
 	commandSyncDelayEnvVarKey = "DISCORD_COMMAND_SYNC_DELAY_MS"
+	commandSyncWorkersEnvVar  = "DISCORD_COMMAND_SYNC_WORKERS"
+	commandSyncRetryEnvVar    = "DISCORD_COMMAND_SYNC_RETRY_MS"
+)
+
+var (
+	newEventBusFactory            = eventbus.NewEventBus
+	newGuildConfigResolverFactory = guildconfig.NewResolver
 )
 
 func commandSyncDelayFromEnv(logger *slog.Logger) time.Duration {
@@ -105,6 +125,48 @@ func commandSyncDelayFromEnv(logger *slog.Logger) time.Duration {
 	return time.Duration(ms) * time.Millisecond
 }
 
+func commandSyncWorkersFromEnv(logger *slog.Logger) int {
+	val := os.Getenv(commandSyncWorkersEnvVar)
+	if val == "" {
+		return defaultCommandSyncWorkers
+	}
+	workers, err := strconv.Atoi(val)
+	if err != nil || workers <= 0 {
+		if logger != nil {
+			logger.Warn("Invalid command sync workers; using default",
+				attr.String("env", commandSyncWorkersEnvVar),
+				attr.String("value", val),
+				attr.Int("default", defaultCommandSyncWorkers),
+				attr.Error(err),
+			)
+		}
+		return defaultCommandSyncWorkers
+	}
+	return workers
+}
+
+func commandSyncRetryDelayFromEnv(logger *slog.Logger) time.Duration {
+	val := os.Getenv(commandSyncRetryEnvVar)
+	if val == "" {
+		return defaultCommandSyncRetry
+	}
+
+	ms, err := strconv.Atoi(val)
+	if err != nil || ms <= 0 {
+		if logger != nil {
+			logger.Warn("Invalid command sync retry delay; using default",
+				attr.String("env", commandSyncRetryEnvVar),
+				attr.String("value", val),
+				attr.Duration("default", defaultCommandSyncRetry),
+				attr.Error(err),
+			)
+		}
+		return defaultCommandSyncRetry
+	}
+
+	return time.Duration(ms) * time.Millisecond
+}
+
 func NewDiscordBot(
 	session discord.Session,
 	cfg *config.Config,
@@ -115,11 +177,30 @@ func NewDiscordBot(
 	tracer trace.Tracer,
 	helper utils.Helpers,
 ) (*DiscordBot, error) {
+	if session == nil {
+		return nil, fmt.Errorf("discord session is required")
+	}
+	if cfg == nil {
+		return nil, fmt.Errorf("config is required")
+	}
+	if logger == nil {
+		return nil, fmt.Errorf("logger is required")
+	}
+	if appStores == nil {
+		return nil, fmt.Errorf("stores are required")
+	}
+	if appStores.GuildConfigCache == nil {
+		return nil, fmt.Errorf("guild config cache store is required")
+	}
+	if appStores.InteractionStore == nil {
+		return nil, fmt.Errorf("interaction store is required")
+	}
+
 	logger.Info("Creating DiscordBot instance")
 
 	ctx := context.Background()
 
-	eventBus, err := eventbus.NewEventBus(
+	eventBus, err := newEventBusFactory(
 		ctx,
 		cfg.NATS.URL,
 		logger,
@@ -133,12 +214,15 @@ func NewDiscordBot(
 
 	// UPDATED: Pass the specific GuildConfigCache into the resolver.
 	// This enables the "Short-Circuit" logic we just wrote in the resolver.
-	guildConfigResolver := guildconfig.NewResolver(
+	guildConfigResolver, err := newGuildConfigResolverFactory(
 		ctx,
 		eventBus,
 		appStores.GuildConfigCache,
 		guildconfig.DefaultResolverConfig(),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize guild config resolver: %w", err)
+	}
 
 	// Create separate router instances for each domain
 	userRouter, err := message.NewRouter(message.RouterConfig{}, watermill.NopLogger{})
@@ -189,14 +273,106 @@ func NewDiscordBot(
 		AuthWatermillRouter:        authRouter,
 		commandRegistrar:           discord.RegisterCommands,
 		commandSyncDelay:           commandSyncDelayFromEnv(logger),
+		commandSyncWorkers:         commandSyncWorkersFromEnv(logger),
+		commandSyncRetryDelay:      commandSyncRetryDelayFromEnv(logger),
+		commandManifestVersion:     discord.GuildCommandManifestVersion(),
 	}, nil
+}
+
+func (bot *DiscordBot) setGatewayContext(sessionID string, guildCount int) {
+	bot.gatewayStateMu.Lock()
+	bot.gatewaySessionID = sessionID
+	bot.gatewayGuildCount = guildCount
+	bot.gatewayStateMu.Unlock()
+}
+
+func (bot *DiscordBot) gatewayContext() (string, int) {
+	bot.gatewayStateMu.RLock()
+	defer bot.gatewayStateMu.RUnlock()
+	return bot.gatewaySessionID, bot.gatewayGuildCount
+}
+
+func (bot *DiscordBot) markGatewayConnected() bool {
+	bot.gatewayStateMu.Lock()
+	defer bot.gatewayStateMu.Unlock()
+	reconnect := bot.gatewayEverConnected
+	bot.gatewayEverConnected = true
+	return reconnect
+}
+
+func (bot *DiscordBot) registerGatewayLifecycleHandlers() {
+	bot.Session.AddHandler(func(s *discordgo.Session, event *discordgo.Connect) {
+		ctx := context.Background()
+		reconnect := bot.markGatewayConnected()
+		sessionID, guildCount := bot.gatewayContext()
+
+		if bot.Metrics != nil {
+			bot.Metrics.RecordWebsocketEvent(ctx, "connect")
+			if reconnect {
+				bot.Metrics.RecordWebsocketReconnect(ctx)
+			}
+		}
+
+		bot.Logger.InfoContext(ctx, "Discord gateway connected",
+			attr.Bool("reconnect", reconnect),
+			attr.String("session_id", sessionID),
+			attr.Int("guild_count", guildCount))
+	})
+
+	bot.Session.AddHandler(func(s *discordgo.Session, event *discordgo.Disconnect) {
+		ctx := context.Background()
+		sessionID, guildCount := bot.gatewayContext()
+
+		if bot.Metrics != nil {
+			bot.Metrics.RecordWebsocketDisconnect(ctx, "gateway_disconnect")
+		}
+
+		bot.Logger.WarnContext(ctx, "Discord gateway disconnected",
+			attr.String("reason", "gateway_disconnect"),
+			attr.String("session_id", sessionID),
+			attr.Int("guild_count", guildCount))
+	})
+
+	bot.Session.AddHandler(func(s *discordgo.Session, event *discordgo.Resumed) {
+		ctx := context.Background()
+		sessionID, guildCount := bot.gatewayContext()
+
+		if bot.Metrics != nil {
+			bot.Metrics.RecordWebsocketEvent(ctx, "resumed")
+			bot.Metrics.RecordWebsocketReconnect(ctx)
+		}
+
+		bot.Logger.InfoContext(ctx, "Discord gateway resumed session",
+			attr.String("session_id", sessionID),
+			attr.Int("guild_count", guildCount))
+	})
 }
 
 func (bot *DiscordBot) Run(ctx context.Context) error {
 	bot.Logger.Info("Starting Discord bot initialization")
-	discordgoSession := bot.Session.(*discord.DiscordSession).GetUnderlyingSession()
 
 	var commandSyncOnce sync.Once
+	routerErrCh := make(chan error, 6)
+	reportFatalRouterError := func(name string, err error) {
+		if err == nil || errors.Is(err, context.Canceled) {
+			return
+		}
+		wrapped := fmt.Errorf("%s Watermill router failed: %w", name, err)
+		bot.Logger.Error(wrapped.Error(), attr.Error(err))
+		select {
+		case routerErrCh <- wrapped:
+		default:
+		}
+	}
+
+	startRouter := func(name string, router *message.Router) {
+		go func() {
+			bot.Logger.Info(fmt.Sprintf("Starting %s Watermill router", name))
+			if err := router.Run(ctx); err != nil {
+				reportFatalRouterError(name, err)
+			}
+		}()
+	}
 
 	// Setup interaction registries
 	registry := interactions.NewRegistry()
@@ -205,11 +381,11 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 
 	// Initialize Reaction Registry with the bot's logger
 	reactionRegistry := interactions.NewReactionRegistry(bot.Logger)
-	reactionRegistry.RegisterWithSession(discordgoSession, bot.Session)
+	reactionRegistry.RegisterWithSession(bot.Session, bot.Session)
 
 	// Initialize Message Registry with the bot's logger
 	messageRegistry := interactions.NewMessageRegistry(bot.Logger)
-	messageRegistry.RegisterWithSession(discordgoSession, bot.Session)
+	messageRegistry.RegisterWithSession(bot.Session, bot.Session)
 
 	// Initialize modules
 	var err error
@@ -325,18 +501,19 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 
 	// Start guild router - MUST be running before Discord session opens
 	// to ensure we can receive guild config retrieval responses
-	go func() {
-		bot.Logger.Info("Starting Guild Watermill router")
-		if err := bot.GuildWatermillRouter.Run(ctx); err != nil && err != context.Canceled {
-			bot.Logger.Error("Guild Watermill router failed", attr.Error(err))
-		}
-	}()
+	startRouter("Guild", bot.GuildWatermillRouter)
 
 	// Wait for guild router to be fully running before proceeding
 	// This ensures the subscription for guild.config.retrieved.v1 is established
 	// before we open Discord session and trigger config retrieval requests
 	bot.Logger.Info("Waiting for Guild Watermill router to be running...")
-	<-bot.GuildWatermillRouter.Running()
+	select {
+	case <-ctx.Done():
+		return nil
+	case err := <-routerErrCh:
+		return err
+	case <-bot.GuildWatermillRouter.Running():
+	}
 	bot.Logger.Info("Guild Watermill router is now running")
 
 	// Multi-tenant deployment: register all commands globally with proper gating
@@ -347,12 +524,17 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 	}
 
 	// Register Discord handlers
-	discordgoSession.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	bot.Session.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		bot.Logger.Info("Handling interaction", attr.String("type", i.Type.String()))
 		registry.HandleInteraction(s, i)
 	})
 
-	discordgoSession.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
+	bot.Session.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
+		bot.setGatewayContext(r.SessionID, len(r.Guilds))
+		if bot.Metrics != nil {
+			bot.Metrics.RecordWebsocketEvent(ctx, "ready")
+		}
+
 		bot.Logger.Info("Bot is ready", attr.Int("guilds", len(r.Guilds)))
 		for _, g := range r.Guilds {
 			if g == nil || g.ID == "" {
@@ -378,8 +560,10 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 		})
 	})
 
+	bot.registerGatewayLifecycleHandlers()
+
 	// Handle guild lifecycle events for multi-tenant support
-	discordgoSession.AddHandler(func(s *discordgo.Session, event *discordgo.GuildCreate) {
+	bot.Session.AddHandler(func(s *discordgo.Session, event *discordgo.GuildCreate) {
 		ctx := context.Background()
 
 		bot.Logger.InfoContext(ctx, "Bot connected to guild",
@@ -396,7 +580,7 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 		}
 	})
 
-	discordgoSession.AddHandler(func(s *discordgo.Session, event *discordgo.GuildDelete) {
+	bot.Session.AddHandler(func(s *discordgo.Session, event *discordgo.GuildDelete) {
 		ctx := context.Background()
 
 		bot.Logger.InfoContext(ctx, "Bot removed from guild",
@@ -419,40 +603,11 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 	})
 
 	// Start the Watermill routers
-	go func() {
-		bot.Logger.Info("Starting User Watermill router")
-		if err := bot.UserWatermillRouter.Run(ctx); err != nil {
-			bot.Logger.Error("User Watermill router failed", attr.Error(err))
-		}
-	}()
-
-	go func() {
-		bot.Logger.Info("Starting Round Watermill router")
-		if err := bot.RoundWatermillRouter.Run(ctx); err != nil {
-			bot.Logger.Error("Round Watermill router failed", attr.Error(err))
-		}
-	}()
-
-	go func() {
-		bot.Logger.Info("Starting Score Watermill router")
-		if err := bot.ScoreWatermillRouter.Run(ctx); err != nil {
-			bot.Logger.Error("Score Watermill router failed", attr.Error(err))
-		}
-	}()
-
-	go func() {
-		bot.Logger.Info("Starting Leaderboard Watermill router")
-		if err := bot.LeaderboardWatermillRouter.Run(ctx); err != nil {
-			bot.Logger.Error("Leaderboard Watermill router failed", attr.Error(err))
-		}
-	}()
-
-	go func() {
-		bot.Logger.Info("Starting Auth Watermill router")
-		if err := bot.AuthWatermillRouter.Run(ctx); err != nil && err != context.Canceled {
-			bot.Logger.Error("Auth Watermill router failed", attr.Error(err))
-		}
-	}()
+	startRouter("User", bot.UserWatermillRouter)
+	startRouter("Round", bot.RoundWatermillRouter)
+	startRouter("Score", bot.ScoreWatermillRouter)
+	startRouter("Leaderboard", bot.LeaderboardWatermillRouter)
+	startRouter("Auth", bot.AuthWatermillRouter)
 
 	// Open Discord connection
 	if err := bot.Session.Open(); err != nil {
@@ -460,8 +615,12 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 	}
 
 	bot.Logger.Info("Discord bot is now running")
-	<-ctx.Done()
-	return nil
+	select {
+	case <-ctx.Done():
+		return nil
+	case err := <-routerErrCh:
+		return err
+	}
 }
 
 func (bot *DiscordBot) syncGuildCommands(ctx context.Context, guilds []*discordgo.Guild) {
@@ -477,54 +636,181 @@ func (bot *DiscordBot) syncGuildCommands(ctx context.Context, guilds []*discordg
 	bot.Logger.InfoContext(ctx, "Syncing guild commands for existing guilds",
 		attr.Int("guilds", len(guilds)))
 
+	registrar := bot.commandRegistrar
+	if registrar == nil {
+		registrar = discord.RegisterCommands
+	}
+
+	workers := bot.commandSyncWorkers
+	if workers <= 0 {
+		workers = 1
+	}
+	if workers > len(guilds) {
+		workers = len(guilds)
+	}
+	if workers == 0 {
+		return
+	}
+
+	var limiter <-chan time.Time
+	var ticker *time.Ticker
+	if bot.commandSyncDelay > 0 {
+		ticker = time.NewTicker(bot.commandSyncDelay)
+		limiter = ticker.C
+		defer ticker.Stop()
+	}
+
+	waitForRateLimit := func(ctx context.Context) bool {
+		if limiter == nil {
+			return true
+		}
+		select {
+		case <-ctx.Done():
+			return false
+		case <-limiter:
+			return true
+		}
+	}
+
+	guildJobs := make(chan *discordgo.Guild, len(guilds))
+	var wg sync.WaitGroup
+
+	for range workers {
+		wg.Go(func() {
+			for g := range guildJobs {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+
+				if g == nil || g.ID == "" {
+					continue
+				}
+
+				// Preserve the intended UX: only register guild commands after setup is complete.
+				// This also avoids spamming unconfigured guilds with commands that will just be blocked.
+				if bot.GuildConfigResolver != nil {
+					if !bot.GuildConfigResolver.IsGuildSetupComplete(g.ID) {
+						bot.Logger.InfoContext(ctx, "Skipping command sync: guild setup incomplete",
+							attr.String("guild_id", g.ID))
+						bot.scheduleGuildCommandRetry(ctx, g.ID)
+						continue
+					}
+				}
+
+				if bot.isGuildCommandManifestCurrent(g.ID) {
+					bot.Logger.DebugContext(ctx, "Skipping command sync: manifest already current",
+						attr.String("guild_id", g.ID),
+						attr.String("manifest_version", bot.commandManifestVersion))
+					continue
+				}
+
+				if !waitForRateLimit(ctx) {
+					return
+				}
+
+				if err := registrar(bot.Session, bot.Logger, g.ID); err != nil {
+					bot.Logger.ErrorContext(ctx, "Failed to sync guild commands",
+						attr.String("guild_id", g.ID),
+						attr.Error(err))
+					continue
+				}
+
+				bot.markGuildCommandManifestSynced(g.ID)
+			}
+		})
+	}
+
 	for _, g := range guilds {
 		select {
 		case <-ctx.Done():
+			close(guildJobs)
+			wg.Wait()
 			bot.Logger.InfoContext(ctx, "Command sync canceled", attr.Error(ctx.Err()))
 			return
-		default:
+		case guildJobs <- g:
 		}
+	}
+	close(guildJobs)
+	wg.Wait()
+}
 
-		if g == nil || g.ID == "" {
-			continue
-		}
+func (bot *DiscordBot) scheduleGuildCommandRetry(ctx context.Context, guildID string) {
+	if guildID == "" {
+		return
+	}
+	if _, loaded := bot.commandSyncRetries.LoadOrStore(guildID, struct{}{}); loaded {
+		return
+	}
 
-		// Preserve the intended UX: only register guild commands after setup is complete.
-		// This also avoids spamming unconfigured guilds with commands that will just be blocked.
-		if bot.GuildConfigResolver != nil {
-			if !bot.GuildConfigResolver.IsGuildSetupComplete(g.ID) {
-				bot.Logger.InfoContext(ctx, "Skipping command sync: guild setup incomplete",
-					attr.String("guild_id", g.ID))
-				continue
-			}
-		}
+	retryDelay := bot.commandSyncRetryDelay
+	if retryDelay <= 0 {
+		retryDelay = defaultCommandSyncRetry
+	}
+
+	go func() {
+		defer bot.commandSyncRetries.Delete(guildID)
+
+		timer := time.NewTimer(retryDelay)
+		defer timer.Stop()
 
 		registrar := bot.commandRegistrar
 		if registrar == nil {
 			registrar = discord.RegisterCommands
 		}
-		if err := registrar(bot.Session, bot.Logger, g.ID); err != nil {
-			bot.Logger.ErrorContext(ctx, "Failed to sync guild commands",
-				attr.String("guild_id", g.ID),
-				attr.Error(err))
-			continue
-		}
 
-		// Avoid hitting Discord rate limits when syncing across many guilds.
-		if bot.commandSyncDelay <= 0 {
-			continue
-		}
-		t := time.NewTimer(bot.commandSyncDelay)
-		select {
-		case <-ctx.Done():
-			if !t.Stop() {
-				<-t.C
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-timer.C:
 			}
-			bot.Logger.InfoContext(ctx, "Command sync canceled", attr.Error(ctx.Err()))
+
+			if bot.isGuildCommandManifestCurrent(guildID) {
+				return
+			}
+
+			if bot.GuildConfigResolver != nil && !bot.GuildConfigResolver.IsGuildSetupComplete(guildID) {
+				timer.Reset(retryDelay)
+				continue
+			}
+
+			if err := registrar(bot.Session, bot.Logger, guildID); err != nil {
+				bot.Logger.ErrorContext(ctx, "Failed to sync guild commands on retry",
+					attr.String("guild_id", guildID),
+					attr.Error(err))
+				timer.Reset(retryDelay)
+				continue
+			}
+
+			bot.markGuildCommandManifestSynced(guildID)
+			bot.Logger.InfoContext(ctx, "Synced guild commands after setup completion",
+				attr.String("guild_id", guildID),
+				attr.String("manifest_version", bot.commandManifestVersion))
 			return
-		case <-t.C:
 		}
+	}()
+}
+
+func (bot *DiscordBot) isGuildCommandManifestCurrent(guildID string) bool {
+	current, ok := bot.commandSyncState.Load(guildID)
+	if !ok {
+		return false
 	}
+
+	currentVersion, ok := current.(string)
+	if !ok {
+		return false
+	}
+	return currentVersion == bot.commandManifestVersion
+}
+
+func (bot *DiscordBot) markGuildCommandManifestSynced(guildID string) {
+	if guildID == "" {
+		return
+	}
+	bot.commandSyncState.Store(guildID, bot.commandManifestVersion)
 }
 
 func (bot *DiscordBot) Close() {

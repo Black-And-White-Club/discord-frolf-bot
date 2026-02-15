@@ -64,9 +64,9 @@ func NewScoreRoundManager(
 ) ScoreRoundManager {
 	if logger != nil {
 		logger.InfoContext(context.Background(), "Creating ScoreRoundManager",
-			attr.Any("session", session),
-			attr.Any("publisher", publisher),
-			attr.Any("config", config),
+			attr.Bool("has_session", session != nil),
+			attr.Bool("has_publisher", publisher != nil),
+			attr.Bool("has_config", config != nil),
 		)
 	}
 	return &scoreRoundManager{
@@ -94,9 +94,10 @@ func wrapScoreRoundOperation(
 	logger *slog.Logger,
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
-) (ScoreRoundOperationResult, error) {
+) (result ScoreRoundOperationResult, err error) {
 	if fn == nil {
-		return ScoreRoundOperationResult{Error: errors.New("operation function is nil")}, nil
+		result = ScoreRoundOperationResult{Error: errors.New("operation function is nil")}
+		return result, nil
 	}
 
 	if tracer == nil {
@@ -124,19 +125,21 @@ func wrapScoreRoundOperation(
 	// Second defer: handle panics
 	defer func() {
 		if r := recover(); r != nil {
-			err := fmt.Errorf("panic in %s: %v", operationName, r)
-			span.RecordError(err)
+			panicErr := fmt.Errorf("panic in %s: %v", operationName, r)
+			span.RecordError(panicErr)
 			if logger != nil {
-				logger.ErrorContext(ctx, "Recovered from panic", attr.Error(err))
+				logger.ErrorContext(ctx, "Recovered from panic", attr.Error(panicErr))
 			}
 			if localMetrics != nil {
 				localMetrics.RecordAPIError(ctx, operationName, "panic")
 			}
+			result = ScoreRoundOperationResult{Error: panicErr}
+			err = panicErr
 		}
 	}()
 
 	// Execute the operation function
-	result, err := fn(ctx)
+	result, err = fn(ctx)
 	if err != nil {
 		wrapped := fmt.Errorf("%s operation error: %w", operationName, err)
 		span.RecordError(wrapped)

@@ -26,24 +26,24 @@ func (rm *resetManager) HandleResetCommand(ctx context.Context, i *discordgo.Int
 		}
 
 		// Respond with confirmation dialog
-		return rm.showConfirmationDialog(ctx, i)
+		return rm.showConfirmationDialog(ctx, i, newResetCorrelationID())
 	})
 }
 
 // showConfirmationDialog presents a confirmation dialog with buttons.
-func (rm *resetManager) showConfirmationDialog(ctx context.Context, i *discordgo.InteractionCreate) error {
+func (rm *resetManager) showConfirmationDialog(ctx context.Context, i *discordgo.InteractionCreate, correlationID string) error {
 	components := []discordgo.MessageComponent{
 		discordgo.ActionsRow{
 			Components: []discordgo.MessageComponent{
 				discordgo.Button{
 					Label:    "⚠️ Yes, Reset Server Data",
 					Style:    discordgo.DangerButton,
-					CustomID: "frolf_reset_confirm",
+					CustomID: resetConfirmCustomID(correlationID),
 				},
 				discordgo.Button{
 					Label:    "Cancel",
 					Style:    discordgo.SecondaryButton,
-					CustomID: "frolf_reset_cancel",
+					CustomID: resetCancelCustomID(correlationID),
 				},
 			},
 		},

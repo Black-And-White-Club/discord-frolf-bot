@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"maps"
 
-	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/discordutils"
 	guildevents "github.com/Black-And-White-Club/frolf-bot-shared/events/guild"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	guildtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/guild"
@@ -105,10 +104,9 @@ func (h *GuildHandlers) HandleGuildConfigDeletionFailed(ctx context.Context, pay
 		return []handlerwrapper.Result{}, nil
 	}
 
-	// UPDATED: Use the bridge utility with context
-	if interaction, err := discordutils.GetInteraction(ctx, h.interactionStore, guildID); err == nil {
+	if interaction, interactionKey, err := h.getInteractionForGuildResponse(ctx, guildID); err == nil {
 		// Clean up immediately
-		h.interactionStore.Delete(ctx, guildID)
+		h.interactionStore.Delete(ctx, interactionKey)
 
 		content := fmt.Sprintf(
 			"❌ Failed to reset server configuration.\n\n**Reason:** %s\n\nPlease try again.",
@@ -142,15 +140,14 @@ func (h *GuildHandlers) sendDeletionSummary(
 		return
 	}
 
-	// UPDATED: Use the bridge utility to replace manual Get + Assertion
-	interaction, err := discordutils.GetInteraction(ctx, h.interactionStore, guildID)
+	interaction, interactionKey, err := h.getInteractionForGuildResponse(ctx, guildID)
 	if err != nil {
 		// If it's not in the store, we can't send a summary, just exit
 		return
 	}
 
 	// Clean up the cache now that we've retrieved it
-	h.interactionStore.Delete(ctx, guildID)
+	h.interactionStore.Delete(ctx, interactionKey)
 
 	summary := "✅ Server configuration reset completed.\n\n"
 	summary += "Bot commands have been unregistered. Run `/frolf-setup` when you're ready.\n\n"

@@ -49,9 +49,10 @@ func TestRegisterHandlers_WiresManager(t *testing.T) {
 
 	// 2) Modal submit: guild_setup_modal
 	modal := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
-		ID:   uuid.New().String(),
-		Type: discordgo.InteractionModalSubmit,
-		Data: discordgo.ModalSubmitInteractionData{CustomID: "guild_setup_modal"},
+		ID:      uuid.New().String(),
+		Type:    discordgo.InteractionModalSubmit,
+		GuildID: "g1",
+		Data:    discordgo.ModalSubmitInteractionData{CustomID: "guild_setup_modal"},
 	}}
 	reg.HandleInteraction(&discordgo.Session{}, modal)
 

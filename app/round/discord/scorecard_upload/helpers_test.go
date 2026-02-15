@@ -62,6 +62,20 @@ func Test_scorecardUploadManager_downloadAttachment_BadURL(t *testing.T) {
 	}
 }
 
+func Test_scorecardUploadManager_downloadAttachment_TooLarge(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(make([]byte, maxAttachmentBytes+1))
+	}))
+	t.Cleanup(server.Close)
+
+	m := &scorecardUploadManager{logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	_, err := m.downloadAttachment(context.Background(), server.URL)
+	if !errors.Is(err, errAttachmentTooLarge) {
+		t.Fatalf("expected errAttachmentTooLarge, got %v", err)
+	}
+}
+
 func Test_scorecardUploadManager_sendFileUploadPrompt_StoresPendingAndResponds(t *testing.T) {
 	// This overlaps with existing coverage, but hits the prompt + pending-store path directly.
 	fakeSession := discord.NewFakeSession()

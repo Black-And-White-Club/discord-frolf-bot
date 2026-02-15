@@ -41,6 +41,12 @@ type SetupConfig struct {
 
 // SendSetupModal sends the guild setup modal to the user
 func (s *setupManager) SendSetupModal(ctx context.Context, i *discordgo.InteractionCreate) error {
+	return s.sendSetupModalWithCorrelation(ctx, i, newSetupCorrelationID())
+}
+
+func (s *setupManager) sendSetupModalWithCorrelation(ctx context.Context, i *discordgo.InteractionCreate, correlationID string) error {
+	customID := setupModalCustomID(correlationID)
+
 	return s.operationWrapper(ctx, "send_setup_modal", func(ctx context.Context) error {
 		s.logger.InfoContext(ctx, "Sending guild setup modal", "guild_id", i.GuildID)
 
@@ -49,7 +55,7 @@ func (s *setupManager) SendSetupModal(ctx context.Context, i *discordgo.Interact
 			Type: discordgo.InteractionResponseModal,
 			Data: &discordgo.InteractionResponseData{
 				Title:    "🥏 Frolf Bot Setup",
-				CustomID: "guild_setup_modal",
+				CustomID: customID,
 				Components: []discordgo.MessageComponent{
 					discordgo.ActionsRow{
 						Components: []discordgo.MessageComponent{
@@ -122,15 +128,22 @@ func (s *setupManager) HandleSetupModalSubmit(ctx context.Context, i *discordgo.
 		s.logger.InfoContext(ctx, "Handling guild setup modal submission", "guild_id", i.GuildID)
 
 		// Store the interaction so asynchronous backend processing can update the original UI
+		correlationID := setupCorrelationIDFromCustomID(i.ModalSubmitData().CustomID)
+		if correlationID == "" {
+			correlationID = newSetupCorrelationID()
+		}
+
 		if s.interactionStore != nil {
-			if err := s.interactionStore.Set(ctx, i.GuildID, i.Interaction); err != nil {
+			if err := s.interactionStore.Set(ctx, correlationID, i.Interaction); err != nil {
 				s.logger.ErrorContext(ctx, "Failed to store interaction for setup modal submission",
 					"guild_id", i.GuildID,
+					"correlation_id", correlationID,
 					"error", err)
 				// Non-fatal: continue processing so user still receives acknowledgement
 			} else {
 				s.logger.DebugContext(ctx, "Stored interaction for setup modal submission",
-					"guild_id", i.GuildID)
+					"guild_id", i.GuildID,
+					"correlation_id", correlationID)
 			}
 		}
 
@@ -305,7 +318,7 @@ func (s *setupManager) HandleSetupModalSubmit(ctx context.Context, i *discordgo.
 			"signup_emoji", result.SignupEmoji)
 
 		// Publish setup event to backend
-		if err := s.publishSetupEvent(i, result); err != nil {
+		if err := s.publishSetupEvent(i, result, correlationID); err != nil {
 			s.logger.ErrorContext(ctx, "Failed to publish setup event", "guild_id", i.GuildID, "error", err)
 			return s.sendFollowupError(i, "Setup completed but failed to save configuration")
 		}
