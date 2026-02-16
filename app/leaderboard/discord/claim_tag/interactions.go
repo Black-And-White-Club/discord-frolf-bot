@@ -7,6 +7,7 @@ import (
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/discordutils"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/utils"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
+	sharedevents "github.com/Black-And-White-Club/frolf-bot-shared/events/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
@@ -72,12 +73,13 @@ func (ctm *claimTagManager) HandleClaimTagCommand(ctx context.Context, i *discor
 
 		// Create the batch payload (single-assignment batch) so backend receives the expected schema
 		batchPayload := leaderboardevents.LeaderboardBatchTagAssignmentRequestedPayloadV1{
-			GuildID:          sharedtypes.GuildID(i.GuildID),
+			ScopedGuildID: sharedevents.ScopedGuildID{
+				GuildID: sharedtypes.GuildID(i.GuildID),
+			},
 			RequestingUserID: sharedtypes.DiscordID(i.Member.User.ID),
 			BatchID:          requestID,
-			Assignments: []leaderboardevents.TagAssignmentInfoV1{
+			Assignments: []sharedevents.TagAssignmentInfoV1{
 				{
-					GuildID:   sharedtypes.GuildID(i.GuildID),
 					UserID:    sharedtypes.DiscordID(i.Member.User.ID),
 					TagNumber: sharedtypes.TagNumber(tagValue),
 				},
