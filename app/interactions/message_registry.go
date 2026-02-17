@@ -75,7 +75,7 @@ func (r *MessageRegistry) RegisterWithSession(session discordgoAdder, wrapperSes
 		ctx := context.Background()
 
 		if r.logger != nil {
-			r.logger.Info("Processing MessageCreate handlers",
+			r.logger.Debug("Processing MessageCreate handlers",
 				slog.String("author_id", authorID),
 				slog.String("channel_id", e.ChannelID),
 				slog.String("message_id", e.ID))

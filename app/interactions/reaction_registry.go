@@ -62,7 +62,7 @@ func (r *ReactionRegistry) RegisterWithSession(session discordgoAdder, wrapperSe
 		ctx := context.Background() // Base context for the reaction event chain
 
 		if r.logger != nil {
-			r.logger.Info("Processing ReactionAdd handlers",
+			r.logger.Debug("Processing ReactionAdd handlers",
 				slog.String("emoji", e.Emoji.Name),
 				slog.String("message_id", e.MessageID))
 		}
@@ -90,7 +90,7 @@ func (r *ReactionRegistry) RegisterWithSession(session discordgoAdder, wrapperSe
 		ctx := context.Background()
 
 		if r.logger != nil {
-			r.logger.Info("Processing ReactionRemove handlers",
+			r.logger.Debug("Processing ReactionRemove handlers",
 				slog.String("emoji", e.Emoji.Name),
 				slog.String("message_id", e.MessageID))
 		}
