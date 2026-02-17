@@ -84,9 +84,10 @@ func wrapRoundRsvpOperation(
 	logger *slog.Logger,
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
-) (RoundRsvpOperationResult, error) {
+) (result RoundRsvpOperationResult, err error) {
 	if fn == nil {
-		return RoundRsvpOperationResult{Error: errors.New("operation function is nil")}, nil
+		result = RoundRsvpOperationResult{Error: errors.New("operation function is nil")}
+		return result, nil
 	}
 
 	if tracer == nil {
@@ -114,19 +115,21 @@ func wrapRoundRsvpOperation(
 	// Second defer: handle panics
 	defer func() {
 		if r := recover(); r != nil {
-			err := fmt.Errorf("panic in %s: %v", operationName, r)
-			span.RecordError(err)
+			panicErr := fmt.Errorf("panic in %s: %v", operationName, r)
+			span.RecordError(panicErr)
 			if logger != nil {
-				logger.ErrorContext(ctx, "Recovered from panic", attr.Error(err))
+				logger.ErrorContext(ctx, "Recovered from panic", attr.Error(panicErr))
 			}
 			if localMetrics != nil {
 				localMetrics.RecordAPIError(ctx, operationName, "panic")
 			}
+			result = RoundRsvpOperationResult{Error: panicErr}
+			err = panicErr
 		}
 	}()
 
 	// Execute the operation function
-	result, err := fn(ctx)
+	result, err = fn(ctx)
 	if err != nil {
 		wrapped := fmt.Errorf("%s operation error: %w", operationName, err)
 		span.RecordError(wrapped)

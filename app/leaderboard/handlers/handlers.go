@@ -51,12 +51,6 @@ type Handlers interface {
 	HandleGetSeasonStandingsFailedResponse(ctx context.Context, payload *leaderboardevents.AdminFailedPayloadV1) ([]handlerwrapper.Result, error)
 	HandleSeasonEndedResponse(ctx context.Context, payload *leaderboardevents.EndSeasonSuccessPayloadV1) ([]handlerwrapper.Result, error)
 	HandleSeasonEndFailedResponse(ctx context.Context, payload *leaderboardevents.AdminFailedPayloadV1) ([]handlerwrapper.Result, error)
-
-	// History
-	HandleTagHistoryResponse(ctx context.Context, payload *leaderboardevents.TagHistoryResponsePayloadV1) ([]handlerwrapper.Result, error)
-	HandleTagHistoryFailed(ctx context.Context, payload *leaderboardevents.TagHistoryFailedPayloadV1) ([]handlerwrapper.Result, error)
-	HandleTagGraphResponse(ctx context.Context, payload *leaderboardevents.TagGraphResponsePayloadV1) ([]handlerwrapper.Result, error)
-	HandleTagGraphFailed(ctx context.Context, payload *leaderboardevents.TagGraphFailedPayloadV1) ([]handlerwrapper.Result, error)
 }
 
 // LeaderboardHandlers handles leaderboard-related events.

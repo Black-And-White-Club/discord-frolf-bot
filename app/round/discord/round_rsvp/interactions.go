@@ -190,8 +190,21 @@ func (rrm *roundRsvpManager) InteractionJoinRoundLate(ctx context.Context, i *di
 			return RoundRsvpOperationResult{Error: fmt.Errorf("failed to parse round UUID: %w", err)}, nil
 		}
 
-		// Check if user is already participating by fetching the current embed
-		// Multi-tenant: resolve channel ID from guild config if possible
+		if rrm.session == nil {
+			return RoundRsvpOperationResult{Error: fmt.Errorf("session is nil")}, nil
+		}
+		if i.Message == nil {
+			return RoundRsvpOperationResult{Error: fmt.Errorf("interaction message is nil")}, nil
+		}
+
+		// Defer immediately to stay within Discord interaction timing windows.
+		if err := rrm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseDeferredMessageUpdate,
+		}); err != nil {
+			return RoundRsvpOperationResult{Error: err}, nil
+		}
+
+		// Multi-tenant: resolve channel ID from guild config if possible.
 		resolvedChannelID := i.ChannelID
 		if rrm.guildConfigResolver != nil && i.GuildID != "" {
 			cfg, err := rrm.guildConfigResolver.GetGuildConfigWithContext(ctx, i.GuildID)
@@ -200,21 +213,23 @@ func (rrm *roundRsvpManager) InteractionJoinRoundLate(ctx context.Context, i *di
 			}
 		}
 
-		if rrm.session == nil {
-			return RoundRsvpOperationResult{Error: fmt.Errorf("session is nil")}, nil
-		}
-		if i.Message == nil {
-			return RoundRsvpOperationResult{Error: fmt.Errorf("interaction message is nil")}, nil
-		}
-		message, err := rrm.session.ChannelMessage(resolvedChannelID, i.Message.ID)
-		if err != nil {
-			return RoundRsvpOperationResult{Error: fmt.Errorf("failed to fetch current message: %w", err)}, nil
+		message := i.Message
+		if len(message.Embeds) == 0 {
+			latestMessage, err := rrm.session.ChannelMessage(resolvedChannelID, i.Message.ID)
+			if err != nil {
+				rrm.logger.WarnContext(ctx, "Failed to fetch latest message for late-join precheck; continuing optimistically",
+					attr.Error(err),
+					attr.String("guild_id", i.GuildID),
+					attr.String("message_id", i.Message.ID))
+			} else {
+				message = latestMessage
+			}
 		}
 
+		// Check if user is already in any embed field.
 		if len(message.Embeds) > 0 {
 			embed := message.Embeds[0]
 
-			// Check if user is already in any of the embed fields
 			userAlreadyJoined := false
 			for _, field := range embed.Fields {
 				if strings.Contains(field.Value, fmt.Sprintf("<@%s>", user.ID)) {
@@ -224,13 +239,10 @@ func (rrm *roundRsvpManager) InteractionJoinRoundLate(ctx context.Context, i *di
 			}
 
 			if userAlreadyJoined {
-				// User is already in the round, send ephemeral message
-				err := rrm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-					Type: discordgo.InteractionResponseChannelMessageWithSource,
-					Data: &discordgo.InteractionResponseData{
-						Content: "You have already joined this round!",
-						Flags:   discordgo.MessageFlagsEphemeral,
-					},
+				// A deferred interaction cannot receive a new initial response.
+				_, err := rrm.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+					Content: "You have already joined this round!",
+					Flags:   discordgo.MessageFlagsEphemeral,
 				})
 				if err != nil {
 					return RoundRsvpOperationResult{Error: err}, nil
@@ -242,13 +254,6 @@ func (rrm *roundRsvpManager) InteractionJoinRoundLate(ctx context.Context, i *di
 
 				return RoundRsvpOperationResult{Success: "User already joined"}, nil
 			}
-		}
-
-		// User is not already in the round, proceed with join logic
-		if err := rrm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseDeferredMessageUpdate,
-		}); err != nil {
-			return RoundRsvpOperationResult{Error: err}, nil
 		}
 
 		joinedLate := true

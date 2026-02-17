@@ -2,6 +2,7 @@ package scorecardupload
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,6 +13,8 @@ import (
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
 )
+
+var errAttachmentTooLarge = errors.New("attachment exceeds maximum size")
 
 // sendUploadConfirmation sends an ephemeral response confirming the upload started.
 func (m *scorecardUploadManager) sendUploadConfirmation(ctx context.Context, s discord.Session, i *discordgo.Interaction, importID string) error {
@@ -121,8 +124,11 @@ func (m *scorecardUploadManager) downloadAttachment(ctx context.Context, url str
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	client := &http.Client{
-		Timeout: 30 * time.Second,
+	client := m.httpClient
+	if client == nil {
+		client = &http.Client{
+			Timeout: 30 * time.Second,
+		}
 	}
 
 	resp, err := client.Do(req)
@@ -135,9 +141,16 @@ func (m *scorecardUploadManager) downloadAttachment(ctx context.Context, url str
 		return nil, fmt.Errorf("failed to download attachment: status %d", resp.StatusCode)
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	if resp.ContentLength > maxAttachmentBytes {
+		return nil, errAttachmentTooLarge
+	}
+
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxAttachmentBytes+1))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read attachment data: %w", err)
+	}
+	if len(data) > maxAttachmentBytes {
+		return nil, errAttachmentTooLarge
 	}
 
 	return data, nil

@@ -88,8 +88,8 @@ func (s *setupManager) performCustomSetup(ctx context.Context, guildID string, c
 	return result, nil
 }
 
-// publishSetupEvent publishes the guild setup event to the backend
-func (s *setupManager) publishSetupEvent(i *discordgo.InteractionCreate, result *SetupResult) error {
+// publishSetupEvent publishes the guild setup event to the backend.
+func (s *setupManager) publishSetupEvent(i *discordgo.InteractionCreate, result *SetupResult, correlationID string) error {
 	// Validate that required role IDs are not empty
 	if result.UserRoleID == "" {
 		return fmt.Errorf("user role ID is required but empty")
@@ -139,6 +139,9 @@ func (s *setupManager) publishSetupEvent(i *discordgo.InteractionCreate, result 
 	}
 
 	msg.Metadata.Set("guild_id", i.GuildID)
+	if correlationID != "" {
+		msg.Metadata.Set("correlation_id", correlationID)
+	}
 
 	return s.publisher.Publish(guildevents.GuildSetupRequestedV1, msg)
 }

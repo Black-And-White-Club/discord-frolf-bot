@@ -11,7 +11,7 @@ import (
 
 func RegisterHandlers(registry *interactions.Registry, manager ScoreRoundManager) {
 	// Standard score entry button
-	registry.RegisterHandler("round_enter_score|", func(ctx context.Context, i *discordgo.InteractionCreate) {
+	registry.RegisterMutatingHandler("round_enter_score|", func(ctx context.Context, i *discordgo.InteractionCreate) {
 		slog.InfoContext(ctx, "Handling round_enter_score button press",
 			attr.String("custom_id", i.MessageComponentData().CustomID),
 			attr.String("interaction_id", i.ID),
@@ -19,10 +19,10 @@ func RegisterHandlers(registry *interactions.Registry, manager ScoreRoundManager
 			attr.String("user_username", i.Member.User.Username),
 		)
 		manager.HandleScoreButton(ctx, i)
-	})
+	}, interactions.MutatingHandlerPolicy{RequiredPermission: interactions.PlayerRequired, RequiresSetup: true})
 
 	// Bulk override button
-	registry.RegisterHandler("round_bulk_score_override|", func(ctx context.Context, i *discordgo.InteractionCreate) {
+	registry.RegisterMutatingHandler("round_bulk_score_override|", func(ctx context.Context, i *discordgo.InteractionCreate) {
 		slog.InfoContext(ctx, "Handling round_bulk_score_override button press",
 			attr.String("custom_id", i.MessageComponentData().CustomID),
 			attr.String("interaction_id", i.ID),
@@ -30,10 +30,10 @@ func RegisterHandlers(registry *interactions.Registry, manager ScoreRoundManager
 			attr.String("user_username", i.Member.User.Username),
 		)
 		manager.HandleScoreButton(ctx, i)
-	})
+	}, interactions.MutatingHandlerPolicy{RequiredPermission: interactions.PlayerRequired, RequiresSetup: true})
 
 	// Standard modal submission
-	registry.RegisterHandler("submit_score_modal|", func(ctx context.Context, i *discordgo.InteractionCreate) {
+	registry.RegisterMutatingHandler("submit_score_modal|", func(ctx context.Context, i *discordgo.InteractionCreate) {
 		slog.InfoContext(ctx, "Handling score modal submission",
 			attr.String("custom_id", i.ModalSubmitData().CustomID),
 			attr.String("interaction_id", i.ID),
@@ -41,10 +41,10 @@ func RegisterHandlers(registry *interactions.Registry, manager ScoreRoundManager
 			attr.String("user_username", i.Member.User.Username),
 		)
 		manager.HandleScoreSubmission(ctx, i)
-	})
+	}, interactions.MutatingHandlerPolicy{RequiredPermission: interactions.PlayerRequired, RequiresSetup: true})
 
 	// Bulk override modal submission
-	registry.RegisterHandler("submit_score_bulk_override|", func(ctx context.Context, i *discordgo.InteractionCreate) {
+	registry.RegisterMutatingHandler("submit_score_bulk_override|", func(ctx context.Context, i *discordgo.InteractionCreate) {
 		slog.InfoContext(ctx, "Handling bulk score override submission",
 			attr.String("custom_id", i.ModalSubmitData().CustomID),
 			attr.String("interaction_id", i.ID),
@@ -52,5 +52,5 @@ func RegisterHandlers(registry *interactions.Registry, manager ScoreRoundManager
 			attr.String("user_username", i.Member.User.Username),
 		)
 		manager.HandleScoreSubmission(ctx, i)
-	})
+	}, interactions.MutatingHandlerPolicy{RequiredPermission: interactions.PlayerRequired, RequiresSetup: true})
 }

@@ -21,6 +21,11 @@ func (rm *resetManager) HandleResetConfirmButton(ctx context.Context, i *discord
 			attr.String("guild_id", i.GuildID),
 			attr.String("user_id", getUserID(i)))
 
+		correlationID := resetCorrelationIDFromCustomID(i.MessageComponentData().CustomID)
+		if correlationID == "" {
+			correlationID = newResetCorrelationID()
+		}
+
 		// Acknowledge the interaction with a deferred response
 		err := rm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseDeferredMessageUpdate,
@@ -47,17 +52,18 @@ func (rm *resetManager) HandleResetConfirmButton(ctx context.Context, i *discord
 
 		// Store the interaction so watermill handlers can send the final response
 		if rm.interactionStore != nil {
-			err := rm.interactionStore.Set(ctx, i.GuildID, i.Interaction)
+			err := rm.interactionStore.Set(ctx, correlationID, i.Interaction)
 			if err != nil {
 				rm.logger.ErrorContext(ctx, "Failed to store interaction",
 					attr.String("guild_id", i.GuildID),
+					attr.String("correlation_id", correlationID),
 					attr.Error(err))
 			}
 		}
 
 		// Publish the deletion request event
 		// The watermill handlers will send the actual success/failure response
-		err = rm.publishDeletionRequest(ctx, i.GuildID)
+		err = rm.publishDeletionRequest(ctx, i.GuildID, correlationID)
 		if err != nil {
 			// Only handle publish errors here, not backend processing errors
 			content := "❌ Failed to send reset request. Please try again or contact support."
@@ -110,7 +116,7 @@ func (rm *resetManager) HandleResetCancelButton(ctx context.Context, i *discordg
 }
 
 // publishDeletionRequest publishes the guild config deletion request event.
-func (rm *resetManager) publishDeletionRequest(ctx context.Context, guildID string) error {
+func (rm *resetManager) publishDeletionRequest(ctx context.Context, guildID, correlationID string) error {
 	payload := guildevents.GuildConfigDeletionRequestedPayloadV1{
 		GuildID: sharedtypes.GuildID(guildID),
 	}
@@ -125,6 +131,9 @@ func (rm *resetManager) publishDeletionRequest(ctx context.Context, guildID stri
 	}
 
 	msg.Metadata.Set("guild_id", guildID)
+	if correlationID != "" {
+		msg.Metadata.Set("correlation_id", correlationID)
+	}
 
 	err = rm.publisher.Publish(guildevents.GuildConfigDeletionRequestedV1, msg)
 	if err != nil {

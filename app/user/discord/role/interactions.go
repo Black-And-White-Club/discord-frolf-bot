@@ -305,7 +305,13 @@ func (rm *roleManager) HandleRoleButtonPress(ctx context.Context, i *discordgo.I
 			GuildID:             i.GuildID,
 		}
 
-		rm.logger.DebugContext(ctx, "Constructed event payload", attr.Any("payload", payload))
+		rm.logger.DebugContext(ctx, "Constructed role update payload",
+			attr.String("requester_id", string(payload.RequesterID)),
+			attr.String("target_user_id", string(payload.TargetUserID)),
+			attr.String("selected_role", string(payload.SelectedRole)),
+			attr.String("interaction_custom_id", payload.InteractionCustomID),
+			attr.String("guild_id", payload.GuildID),
+		)
 
 		// Generate and store correlation ID for tracking
 		correlationID := uuid.New().String()

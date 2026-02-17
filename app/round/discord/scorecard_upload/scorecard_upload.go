@@ -3,6 +3,7 @@ package scorecardupload
 import (
 	"context"
 	"log/slog"
+	"net/http"
 	"sync"
 	"time"
 
@@ -27,6 +28,11 @@ type pendingUpload struct {
 	CreatedAt      time.Time
 }
 
+const (
+	maxAttachmentBytes           = 10 * 1024 * 1024 // 10 MB
+	maxUploadsPerMinutePerUserID = 10
+)
+
 // ScorecardUploadManager defines the interface for scorecard upload operations.
 type ScorecardUploadManager interface {
 	HandleScorecardUploadButton(ctx context.Context, i *discordgo.InteractionCreate) (ScorecardUploadOperationResult, error)
@@ -48,6 +54,9 @@ type scorecardUploadManager struct {
 	operationWrapper func(ctx context.Context, opName string, fn func(ctx context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error)
 	pendingUploads   map[string]*pendingUpload // key: "userID:channelID"
 	pendingMutex     sync.RWMutex
+	ingressWindows   map[string][]time.Time // key: "guildID:userID" (guildID can be empty for DM)
+	ingressMutex     sync.Mutex
+	httpClient       *http.Client
 }
 
 // NewScorecardUploadManager creates a new ScorecardUploadManager instance.
@@ -76,6 +85,10 @@ func NewScorecardUploadManager(
 		tracer:           tracer,
 		metrics:          metrics,
 		pendingUploads:   make(map[string]*pendingUpload),
+		ingressWindows:   make(map[string][]time.Time),
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
 		operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error) {
 			return operationWrapper(ctx, opName, fn, logger, tracer)
 		},
@@ -152,4 +165,34 @@ func (m *scorecardUploadManager) cleanupPendingUploads(ctx context.Context) {
 			m.pendingMutex.Unlock()
 		}
 	}
+}
+
+func (m *scorecardUploadManager) allowUploadIngress(guildID, userID string) bool {
+	m.ingressMutex.Lock()
+	defer m.ingressMutex.Unlock()
+
+	if m.ingressWindows == nil {
+		m.ingressWindows = make(map[string][]time.Time)
+	}
+
+	key := guildID + ":" + userID
+	now := time.Now()
+	cutoff := now.Add(-1 * time.Minute)
+
+	events := m.ingressWindows[key]
+	kept := events[:0]
+	for _, ts := range events {
+		if ts.After(cutoff) {
+			kept = append(kept, ts)
+		}
+	}
+
+	if len(kept) >= maxUploadsPerMinutePerUserID {
+		m.ingressWindows[key] = kept
+		return false
+	}
+
+	kept = append(kept, now)
+	m.ingressWindows[key] = kept
+	return true
 }

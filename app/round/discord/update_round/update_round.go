@@ -89,9 +89,10 @@ func wrapUpdateRoundOperation(
 	logger *slog.Logger,
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
-) (UpdateRoundOperationResult, error) {
+) (result UpdateRoundOperationResult, err error) {
 	if fn == nil {
-		return UpdateRoundOperationResult{Error: errors.New("operation function is nil")}, nil
+		result = UpdateRoundOperationResult{Error: errors.New("operation function is nil")}
+		return result, nil
 	}
 
 	if tracer == nil {
@@ -113,18 +114,20 @@ func wrapUpdateRoundOperation(
 
 	defer func() {
 		if r := recover(); r != nil {
-			err := fmt.Errorf("panic in %s: %v", operationName, r)
-			span.RecordError(err)
+			panicErr := fmt.Errorf("panic in %s: %v", operationName, r)
+			span.RecordError(panicErr)
 			if logger != nil {
-				logger.ErrorContext(ctx, "Recovered from panic", attr.Error(err))
+				logger.ErrorContext(ctx, "Recovered from panic", attr.Error(panicErr))
 			}
 			if metrics != nil {
 				metrics.RecordAPIError(ctx, operationName, "panic")
 			}
+			result = UpdateRoundOperationResult{Error: panicErr}
+			err = panicErr
 		}
 	}()
 
-	result, err := fn(ctx)
+	result, err = fn(ctx)
 	if err != nil {
 		wrapped := fmt.Errorf("%s operation error: %w", operationName, err)
 		span.RecordError(wrapped)

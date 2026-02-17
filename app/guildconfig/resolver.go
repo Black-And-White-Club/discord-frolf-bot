@@ -45,14 +45,14 @@ type Resolver struct {
 }
 
 // NewResolver creates a resolver and validates its configuration.
-func NewResolver(ctx context.Context, eventBus eventbus.EventBus, cache storage.ISInterface[storage.GuildConfig], config *ResolverConfig) *Resolver {
+func NewResolver(ctx context.Context, eventBus eventbus.EventBus, cache storage.ISInterface[storage.GuildConfig], config *ResolverConfig) (*Resolver, error) {
 	if config == nil {
 		config = DefaultResolverConfig()
 	}
 
 	if err := config.Validate(); err != nil {
 		slog.ErrorContext(ctx, "Invalid guild config resolver configuration", attr.Error(err))
-		panic(fmt.Errorf("guild config resolver configuration validation failed: %w", err))
+		return nil, fmt.Errorf("guild config resolver configuration validation failed: %w", err)
 	}
 
 	return &Resolver{
@@ -61,7 +61,7 @@ func NewResolver(ctx context.Context, eventBus eventbus.EventBus, cache storage.
 		config:       config,
 		errorMetrics: &ConfigErrorMetrics{ErrorsByType: make(map[string]int64), ErrorsByGuild: make(map[string]int64)},
 		lastRetry:    make(map[string]time.Time),
-	}
+	}, nil
 }
 
 // GetGuildConfig retrieves guild config using a background context.

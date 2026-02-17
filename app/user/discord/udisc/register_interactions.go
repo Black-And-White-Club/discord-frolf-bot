@@ -13,7 +13,7 @@ func RegisterUDiscInteractions(
 	manager UDiscManager,
 ) {
 	// Register slash command handler
-	registry.RegisterHandler("set-udisc-name", func(ctx context.Context, i *discordgo.InteractionCreate) {
+	registry.RegisterMutatingHandler("set-udisc-name", func(ctx context.Context, i *discordgo.InteractionCreate) {
 		_, _ = manager.HandleSetUDiscNameCommand(ctx, i)
-	})
+	}, interactions.MutatingHandlerPolicy{RequiredPermission: interactions.PlayerRequired, RequiresSetup: true})
 }

@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/testutils"
@@ -46,7 +47,13 @@ func Test_scorecardUploadManager_HandleScorecardUploadModalSubmit_MissingRoundID
 		operationWrapper: func(ctx context.Context, _ string, fn func(context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error) {
 			return fn(ctx)
 		},
-		pendingUploads: make(map[string]*pendingUpload),
+		pendingUploads: map[string]*pendingUpload{
+			"user-id:channel-id": {
+				RoundID:   sharedtypes.RoundID(uuid.New()),
+				GuildID:   sharedtypes.GuildID("guild-id"),
+				CreatedAt: time.Now(),
+			},
+		},
 	}
 
 	res, err := m.HandleScorecardUploadModalSubmit(context.Background(), i)
@@ -84,7 +91,13 @@ func Test_scorecardUploadManager_HandleScorecardUploadModalSubmit_InvalidRoundID
 		operationWrapper: func(ctx context.Context, _ string, fn func(context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error) {
 			return fn(ctx)
 		},
-		pendingUploads: make(map[string]*pendingUpload),
+		pendingUploads: map[string]*pendingUpload{
+			"user-id:channel-id": {
+				RoundID:   sharedtypes.RoundID(uuid.New()),
+				GuildID:   sharedtypes.GuildID("guild-id"),
+				CreatedAt: time.Now(),
+			},
+		},
 	}
 
 	res, err := m.HandleScorecardUploadModalSubmit(context.Background(), i)
@@ -93,6 +106,72 @@ func Test_scorecardUploadManager_HandleScorecardUploadModalSubmit_InvalidRoundID
 	}
 	if res.Error == nil {
 		t.Fatalf("expected result error")
+	}
+}
+
+func Test_scorecardUploadManager_HandleScorecardUploadModalSubmit_InvalidUDiscURL_ReturnsValidationError(t *testing.T) {
+	fakeSession := discord.NewFakeSession()
+	fakePublisher := &testutils.FakeEventBus{}
+
+	roundID := uuid.New()
+	i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
+		ID:        "interaction-id",
+		Type:      discordgo.InteractionModalSubmit,
+		GuildID:   "guild-id",
+		ChannelID: "channel-id",
+		Member:    &discordgo.Member{User: &discordgo.User{ID: "user-id"}},
+		Message:   &discordgo.Message{ID: "message-id"},
+		Data: discordgo.ModalSubmitInteractionData{
+			CustomID: fmt.Sprintf("scorecard_upload_modal|%s", roundID.String()),
+			Components: []discordgo.MessageComponent{
+				&discordgo.ActionsRow{Components: []discordgo.MessageComponent{
+					&discordgo.TextInput{CustomID: "udisc_url_input", Value: "https://example.com/scorecard.csv"},
+				}},
+				&discordgo.ActionsRow{Components: []discordgo.MessageComponent{
+					&discordgo.TextInput{CustomID: "notes_input", Value: ""},
+				}},
+			},
+		},
+	}}
+
+	published := false
+	fakePublisher.PublishFunc = func(topic string, messages ...*message.Message) error {
+		published = true
+		return nil
+	}
+
+	fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, resp *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+		if resp == nil || resp.Data == nil {
+			t.Fatalf("expected non-nil response data")
+		}
+		if resp.Data.Flags&discordgo.MessageFlagsEphemeral == 0 {
+			t.Fatalf("expected ephemeral response")
+		}
+		if !strings.Contains(resp.Data.Content, "valid HTTPS URL on udisc.com") {
+			t.Fatalf("unexpected validation content: %q", resp.Data.Content)
+		}
+		return nil
+	}
+
+	m := &scorecardUploadManager{
+		session:   fakeSession,
+		publisher: fakePublisher,
+		logger:    discardLogger(),
+		operationWrapper: func(ctx context.Context, _ string, fn func(context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error) {
+			return fn(ctx)
+		},
+		pendingUploads: make(map[string]*pendingUpload),
+	}
+
+	res, err := m.HandleScorecardUploadModalSubmit(context.Background(), i)
+	if err != nil {
+		t.Fatalf("expected nil error return, got %v", err)
+	}
+	if res.Error == nil {
+		t.Fatalf("expected validation error in result")
+	}
+	if published {
+		t.Fatalf("expected no publish call for invalid URL")
 	}
 }
 
@@ -180,7 +259,13 @@ func Test_scorecardUploadManager_HandleScorecardUploadButton_RespondError_Propag
 		operationWrapper: func(ctx context.Context, _ string, fn func(context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error) {
 			return fn(ctx)
 		},
-		pendingUploads: make(map[string]*pendingUpload),
+		pendingUploads: map[string]*pendingUpload{
+			"user-id:channel-id": {
+				RoundID:   sharedtypes.RoundID(uuid.New()),
+				GuildID:   sharedtypes.GuildID("guild-id"),
+				CreatedAt: time.Now(),
+			},
+		},
 	}
 
 	res, err := m.HandleScorecardUploadButton(context.Background(), i)
@@ -304,6 +389,87 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_PendingExists_Publishes
 	}
 }
 
+func Test_scorecardUploadManager_HandleFileUploadMessage_LargeAttachment_PublishesURLReferenceWithoutDownload(t *testing.T) {
+	fakeSession := discord.NewFakeSession()
+	fakePublisher := &testutils.FakeEventBus{}
+
+	downloadRequests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		downloadRequests++
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("should-not-download"))
+	}))
+	defer server.Close()
+
+	userID := "user-id"
+	guildID := "guild-id"
+	channelID := "channel-id"
+	messageID := "message-id"
+	roundUUID := uuid.New()
+	fileName := "scorecard.csv"
+
+	msg := &discordgo.MessageCreate{Message: &discordgo.Message{
+		ID:        messageID,
+		GuildID:   guildID,
+		ChannelID: channelID,
+		Author:    &discordgo.User{ID: userID, Bot: false},
+		Attachments: []*discordgo.MessageAttachment{
+			{
+				Filename: fileName,
+				URL:      server.URL,
+				Size:     maxInlineFileDataBytes + 1,
+			},
+		},
+	}}
+
+	m := &scorecardUploadManager{
+		session:   fakeSession,
+		publisher: fakePublisher,
+		logger:    discardLogger(),
+		operationWrapper: func(ctx context.Context, _ string, fn func(context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error) {
+			return fn(ctx)
+		},
+		pendingUploads: map[string]*pendingUpload{
+			fmt.Sprintf("%s:%s", userID, channelID): {
+				RoundID:        sharedtypes.RoundID(roundUUID),
+				GuildID:        sharedtypes.GuildID(guildID),
+				EventMessageID: messageID,
+			},
+		},
+	}
+
+	fakePublisher.PublishFunc = func(topic string, messages ...*message.Message) error {
+		if topic != roundevents.ScorecardUploadedV1 {
+			t.Fatalf("unexpected topic: %q", topic)
+		}
+		if len(messages) != 1 {
+			t.Fatalf("expected 1 message")
+		}
+
+		var payload roundevents.ScorecardUploadedPayloadV1
+		if err := json.Unmarshal(messages[0].Payload, &payload); err != nil {
+			t.Fatalf("failed to unmarshal payload: %v", err)
+		}
+		if len(payload.FileData) != 0 {
+			t.Fatalf("expected no inline file data for large attachment, got %d bytes", len(payload.FileData))
+		}
+		if payload.FileURL != server.URL {
+			t.Fatalf("file URL mismatch: got %q want %q", payload.FileURL, server.URL)
+		}
+		return nil
+	}
+
+	fakeSession.ChannelMessageSendFunc = func(cID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+		return &discordgo.Message{ID: "confirmation"}, nil
+	}
+
+	m.HandleFileUploadMessage(fakeSession, msg)
+
+	if downloadRequests != 0 {
+		t.Fatalf("expected attachment download to be skipped, got %d request(s)", downloadRequests)
+	}
+}
+
 func Test_scorecardUploadManager_HandleFileUploadMessage_DownloadFailure_SendsError(t *testing.T) {
 	fakeSession := discord.NewFakeSession()
 
@@ -336,7 +502,13 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_DownloadFailure_SendsEr
 		operationWrapper: func(ctx context.Context, _ string, fn func(context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error) {
 			return fn(ctx)
 		},
-		pendingUploads: make(map[string]*pendingUpload),
+		pendingUploads: map[string]*pendingUpload{
+			"user-id:channel-id": {
+				RoundID:   sharedtypes.RoundID(uuid.New()),
+				GuildID:   sharedtypes.GuildID("guild-id"),
+				CreatedAt: time.Now(),
+			},
+		},
 	}
 
 	m.HandleFileUploadMessage(fakeSession, msg)
@@ -345,8 +517,7 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_DownloadFailure_SendsEr
 func Test_scorecardUploadManager_HandleFileUploadMessage_FileTooLarge_SendsError(t *testing.T) {
 	fakeSession := discord.NewFakeSession()
 
-	const maxFileSize = 10 * 1024 * 1024
-	big := make([]byte, maxFileSize+1)
+	big := make([]byte, maxAttachmentBytes+1)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(big)
@@ -376,7 +547,13 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_FileTooLarge_SendsError
 		operationWrapper: func(ctx context.Context, _ string, fn func(context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error) {
 			return fn(ctx)
 		},
-		pendingUploads: make(map[string]*pendingUpload),
+		pendingUploads: map[string]*pendingUpload{
+			"user-id:channel-id": {
+				RoundID:   sharedtypes.RoundID(uuid.New()),
+				GuildID:   sharedtypes.GuildID("guild-id"),
+				CreatedAt: time.Now(),
+			},
+		},
 	}
 
 	m.HandleFileUploadMessage(fakeSession, msg)
@@ -474,10 +651,41 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_BotOrNoAttachments_Igno
 	m.HandleFileUploadMessage(fakeSession, noAttachMsg)
 }
 
+func Test_scorecardUploadManager_HandleFileUploadMessage_InvalidPayloadsIgnored(t *testing.T) {
+	fakeSession := discord.NewFakeSession()
+	fakeSession.ChannelMessageSendFunc = func(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+		t.Fatalf("unexpected ChannelMessageSend call for invalid payload path")
+		return nil, nil
+	}
+
+	m := &scorecardUploadManager{
+		session: fakeSession,
+		logger:  discardLogger(),
+		operationWrapper: func(ctx context.Context, _ string, fn func(context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error) {
+			return fn(ctx)
+		},
+		pendingUploads: make(map[string]*pendingUpload),
+	}
+
+	m.HandleFileUploadMessage(fakeSession, nil)
+	m.HandleFileUploadMessage(fakeSession, &discordgo.MessageCreate{})
+	m.HandleFileUploadMessage(fakeSession, &discordgo.MessageCreate{Message: &discordgo.Message{
+		ID:        "msg-no-author",
+		ChannelID: "channel-id",
+	}})
+	m.HandleFileUploadMessage(nil, &discordgo.MessageCreate{Message: &discordgo.Message{
+		ID:        "msg-no-session",
+		ChannelID: "channel-id",
+		Author:    &discordgo.User{ID: "user-id", Bot: false},
+	}})
+}
+
 func Test_scorecardUploadManager_HandleFileUploadMessage_NoPending_SendsError(t *testing.T) {
 	fakeSession := discord.NewFakeSession()
 
+	downloadRequests := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		downloadRequests++
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("file"))
 	}))
@@ -510,6 +718,10 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_NoPending_SendsError(t 
 	}
 
 	m.HandleFileUploadMessage(fakeSession, msg)
+
+	if downloadRequests != 0 {
+		t.Fatalf("expected no attachment download when no pending upload exists, got %d request(s)", downloadRequests)
+	}
 }
 
 func Test_scorecardUploadManager_HandleFileUploadMessage_NonScorecardAttachment_Ignored(t *testing.T) {
@@ -536,6 +748,20 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_NonScorecardAttachment_
 
 	// No expectations: should return early without sending anything.
 	m.HandleFileUploadMessage(fakeSession, msg)
+}
+
+func Test_scorecardUploadManager_allowUploadIngress_EnforcesPerUserLimit(t *testing.T) {
+	m := &scorecardUploadManager{}
+
+	for i := 0; i < maxUploadsPerMinutePerUserID; i++ {
+		if !m.allowUploadIngress("guild-id", "user-id") {
+			t.Fatalf("unexpected rate-limit rejection at iteration %d", i)
+		}
+	}
+
+	if m.allowUploadIngress("guild-id", "user-id") {
+		t.Fatalf("expected final request to be rate limited")
+	}
 }
 
 func discardLogger() *slog.Logger {

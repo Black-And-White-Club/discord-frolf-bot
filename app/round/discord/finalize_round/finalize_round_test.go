@@ -150,8 +150,8 @@ func Test_wrapFinalizeRoundOperation(t *testing.T) {
 			fn: func(ctx context.Context) (FinalizeRoundOperationResult, error) {
 				panic("oh no")
 			},
-			expectErr: "",                                       // The outer function returns nil error on panic recovery
-			expectRes: FinalizeRoundOperationResult{Error: nil}, // The struct's Error field is nil on panic recovery before assignment
+			expectErr: "panic in finalize_panic: oh no",
+			expectRes: FinalizeRoundOperationResult{Error: errors.New("panic in finalize_panic")},
 			setup: func() {
 				fakeMetrics.RecordAPIRequestDurationFunc = func(ctx context.Context, operation string, duration time.Duration) {
 					if operation != "finalize_panic" {

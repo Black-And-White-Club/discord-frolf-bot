@@ -122,10 +122,24 @@ func (m *scorecardUploadManager) HandleScorecardUploadModalSubmit(ctx context.Co
 		guildID := sharedtypes.GuildID(i.GuildID)
 		userID := sharedtypes.DiscordID(i.Member.User.ID)
 		channelID := i.ChannelID
-		messageID := i.Message.ID
+		messageID := ""
+		if i.Message != nil {
+			messageID = i.Message.ID
+		}
 
 		// Route based on whether URL was provided
-		if strings.TrimSpace(uDiscURL) != "" {
+		uDiscURL = strings.TrimSpace(uDiscURL)
+		if uDiscURL != "" {
+			if err := validateUDiscURL(uDiscURL); err != nil {
+				m.logger.WarnContext(ctx, "Rejected invalid UDisc URL",
+					attr.String("guild_id", i.GuildID),
+					attr.String("user_id", i.Member.User.ID),
+					attr.Error(err),
+				)
+				_ = m.sendUploadError(ctx, m.session, i.Interaction, "Please provide a valid HTTPS URL on udisc.com.")
+				return ScorecardUploadOperationResult{Error: err}, nil
+			}
+
 			// URL-based import
 			importID, err := m.publishScorecardURLEvent(ctx, guildID, sharedtypes.RoundID(parsedRoundID), userID, channelID, messageID, uDiscURL, notes)
 			if err != nil {

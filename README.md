@@ -4,7 +4,7 @@ A production-ready Discord bot for managing frolf (frisbee golf) events, scoring
 
 ## Features
 
-- **Automated Guild Setup**: Command-line setup that auto-configures your Discord server
+- **Guided Guild Setup**: `/frolf-setup` command configures your Discord server
 - **Event Management**: Create and manage frolf events with RSVP functionality
 - **Score Tracking**: Track scores and maintain leaderboards
 - **Role Management**: Automatic role assignment based on performance
@@ -30,17 +30,14 @@ A production-ready Discord bot for managing frolf (frisbee golf) events, scoring
    # Edit config.yaml with your Discord bot token
    ```
 
-3. **Guild Setup** (Auto-configures your Discord server):
+3. **Run Locally**:
 
-   ```bash
-   go run main.go setup YOUR_GUILD_ID
-   # This will automatically update your config.yaml
-   ```
-
-4. **Run Locally**:
    ```bash
    go run main.go
    ```
+
+4. **Guild Setup**:
+   Run `/frolf-setup` inside your Discord server after the bot is online.
 
 ### Container Deployment
 
@@ -58,22 +55,7 @@ A production-ready Discord bot for managing frolf (frisbee golf) events, scoring
               discord-frolf-bot:latest
    ```
 
-3. **Multi-Pod Production Deployment**:
-
-   ```bash
-   # Gateway pod (exactly 1 replica)
-   docker run -e DISCORD_TOKEN=your_token \
-              -e BOT_MODE=gateway \
-              -e NATS_URL=nats://nats:4222 \
-              -p 8080:8080 \
-              discord-frolf-bot:latest
-
-   # Worker pods (scale as needed)
-   docker run -e BOT_MODE=worker \
-              -e NATS_URL=nats://nats:4222 \
-              -p 8081:8080 \
-              discord-frolf-bot:latest
-   ```
+3. `BOT_MODE=gateway` and `BOT_MODE=worker` are currently unsupported and fail fast at startup.
 
 ## Configuration
 
@@ -84,7 +66,7 @@ The following environment variables override config file values:
 - `DISCORD_TOKEN` - Discord bot token (required)
 - `DISCORD_GUILD_ID` - Primary Discord guild/server ID (optional, for single-guild mode)
 - `NATS_URL` - NATS server URL (default: nats://localhost:4222)
-- `BOT_MODE` - Deployment mode: `standalone`, `gateway`, or `worker` (default: `standalone`)
+- `BOT_MODE` - Deployment mode: `standalone` (default). `gateway` and `worker` are currently unsupported.
 - `METRICS_ADDRESS` - Metrics server address (default: :8080)
 - `LOKI_URL` - Loki logging endpoint (optional)
 - `ENVIRONMENT` - Environment name for queue group isolation (default: development)
@@ -147,11 +129,12 @@ Details: see `docs/COMMAND_REGISTRATION.md`.
 ### Option 2: Setup Trigger Tool
 
 ```bash
-# Start the setup tool
+# Deprecated (no-op)
 go run cmd/setup-trigger/main.go -guild YOUR_GUILD_ID
-
-# Then run /frolf-setup in Discord
 ```
+
+`cmd/setup-trigger` is deprecated and no longer starts setup automation.
+Use `/frolf-setup` directly in Discord.
 
 ### Option 3: Manual Setup via Events
 
@@ -170,33 +153,16 @@ For programmatic setup, publish a `GuildSetupEvent` to the event bus.
 
 ## Production Deployment
 
-### Multi-Pod Architecture
+### Runtime Mode
 
-The bot supports three deployment modes via the `BOT_MODE` environment variable:
+Only `standalone` mode is currently implemented.
 
-1. **Standalone Mode** (Default):
+```bash
+# Standalone mode (default)
+docker run -e DISCORD_TOKEN=your_token discord-frolf-bot:latest
+```
 
-   ```bash
-   # Single pod handling both Discord interactions and backend processing
-   docker run -e DISCORD_TOKEN=your_token discord-frolf-bot:latest
-   ```
-
-2. **Gateway Mode** (Production):
-
-   ```bash
-   # Single pod handling Discord interactions only
-   docker run -e DISCORD_TOKEN=your_token \
-              -e BOT_MODE=gateway \
-              discord-frolf-bot:latest
-   ```
-
-3. **Worker Mode** (Production):
-   ```bash
-   # Multiple pods handling backend event processing
-   docker run -e DISCORD_TOKEN=your_token \
-              -e BOT_MODE=worker \
-              discord-frolf-bot:latest
-   ```
+Setting `BOT_MODE=gateway` or `BOT_MODE=worker` exits immediately with a clear startup error.
 
 ### Health Checks
 
@@ -207,45 +173,27 @@ The bot includes health check endpoints (port 8080) for container orchestration:
 
 ### Kubernetes Deployment
 
-For production deployments, use the gateway/worker pattern:
+Use standalone mode until gateway/worker runtimes are implemented:
 
 ```yaml
-# Gateway deployment (exactly 1 replica)
+# Standalone deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: discord-frolf-bot-gateway
+  name: discord-frolf-bot
 spec:
-  replicas: 1 # MUST be 1 - Discord allows only one connection per bot
+  replicas: 1
   template:
     spec:
       containers:
-        - name: gateway
+        - name: discord-frolf-bot
           image: discord-frolf-bot:latest
           env:
-            - name: BOT_MODE
-              value: "gateway"
             - name: DISCORD_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: discord-secrets
                   key: token
----
-# Worker deployment (scale as needed)
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: discord-frolf-bot-worker
-spec:
-  replicas: 3 # Scale based on load
-  template:
-    spec:
-      containers:
-        - name: worker
-          image: discord-frolf-bot:latest
-          env:
-            - name: BOT_MODE
-              value: "worker"
 ```
 
 ### CI/CD
@@ -261,9 +209,9 @@ GitHub Actions workflow automatically:
 
 The Discord Frolf Bot is built using a modern, multi-tenant event-driven architecture (EDA) designed for production scale and reliability.
 
-### Multi-Pod Deployment Modes
+### Runtime Mode
 
-The bot supports three deployment modes optimized for different scenarios:
+The bot currently supports one runtime mode:
 
 **Standalone Mode** (Development/Small deployments):
 
@@ -271,19 +219,7 @@ The bot supports three deployment modes optimized for different scenarios:
 - Simplest deployment, good for development and testing
 - Set `BOT_MODE=standalone` or leave unset (default)
 
-**Gateway Mode** (Production - Discord Interface):
-
-- Dedicated pod handling only Discord interactions and event publishing
-- **MUST run exactly 1 replica** (Discord allows only one bot connection)
-- Handles slash commands, user interactions, and Discord events
-- Set `BOT_MODE=gateway`
-
-**Worker Mode** (Production - Backend Processing):
-
-- Dedicated pods handling event processing and business logic
-- **Can scale horizontally** (multiple replicas supported)
-- Processes guild setup, scoring, leaderboards, and database operations
-- Set `BOT_MODE=worker`
+`BOT_MODE=gateway` and `BOT_MODE=worker` are documented as roadmap items and are not implemented.
 
 ### Multi-Tenant Support
 
@@ -321,25 +257,25 @@ Each module follows the same EDA patterns with:
 
 ### Setup Commands
 
-- `go run main.go setup <guild_id>` - Automated server setup and configuration
-- `make setup GUILD_ID=<guild_id>` - Setup using Makefile
+- `/frolf-setup` (Discord) - Automated server setup and configuration
+- `/frolf-reset` (Discord) - Reset guild bot configuration
+- `go run cmd/setup-trigger/main.go -guild <guild_id>` - Deprecated helper that now exits with guidance
 
 ### Bot Commands (Discord)
 
-- `/frolf-setup` - Initial guild setup (auto-registered for new guilds)
-- `/create-round` - Create new frolf event
-- `/score-round` - Submit scores for completed round
-- `/leaderboard` - View current standings
-- `/claim-tag` - Claim leaderboard position tags
-- And many more... (commands auto-register after guild setup)
+- `/updaterole` - Request role updates (Editor/Admin policy)
+- `/createround` - Create a new round
+- `/claimtag` - Claim a tag number
+- `/set-udisc-name` - Set UDisc username/display name
+- `/dashboard` - Request dashboard access link
+- `/season` - Season admin operations
 
 ### Development Commands
 
-- `make test-all` - Run all tests with summary
-- `make build` - Build the application
+- `make test-all` - Run all tests
 - `make run` - Run in development mode
-- `BOT_MODE=gateway make run` - Run in gateway mode
-- `BOT_MODE=worker make run` - Run in worker mode
+- `make build-version` - Build binary with version ldflags
+- `make check-help-targets` - Verify `make help` target list matches real targets
 
 ## Development
 

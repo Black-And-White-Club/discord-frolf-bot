@@ -1,6 +1,6 @@
 .PHONY: test-all test-verbose test-with-summary test-quick test-silent test-json test-module
 .PHONY: test-count coverage-all coverage-html clean-coverage
-.PHONY: build-coverage build-version run setup clean-all help
+.PHONY: build-coverage build-version run setup clean-all help check-help-targets
 
 
 # --- Discord Bot Specific Targets ---
@@ -189,62 +189,28 @@ build-version:
 # --- Help Target ---
 help:
 	@echo "Available targets:"
-	@echo ""
-	@echo "Discord Bot:"
 	@echo "  run                   - Run the Discord bot"
-	@echo "  setup GUILD_ID=<id>   - Setup Discord server with specified guild ID"
-	@echo ""
-	@echo "Testing:"
+	@echo "  setup                 - Setup Discord server (requires GUILD_ID=<id>)"
 	@echo "  test-all              - Run all tests"
-	@echo "  test-verbose          - Run tests with verbose output"
-	@echo "  test-with-summary     - Run tests with failure summary"
-	@echo "  test-quick            - Quick tests (fast feedback)"
-	@echo "  test-silent           - Run tests silently (results only)"
+	@echo "  test-verbose          - Run all tests with verbose output"
+	@echo "  test-with-summary     - Run tests with pass/fail summary"
+	@echo "  test-quick            - Run fast feedback test command"
+	@echo "  test-silent           - Run tests with minimal output"
 	@echo "  test-json             - Run tests with JSON output"
-	@echo "  test-module MODULE=x  - Test specific module (user|round|score|leaderboard|guild)"
-	@echo "  test-count            - Show test count"
-	@echo ""
-	@echo "Coverage:"
-	@echo "  coverage-all          - Run tests with coverage"
-	@echo "  coverage-html         - Generate HTML coverage report"
-	@echo ""
+	@echo "  test-module           - Run one module's tests (MODULE=<name>)"
+	@echo "  test-count            - Count tests under ./app/..."
+	@echo "  coverage-all          - Run coverage across app packages"
+	@echo "  coverage-html         - Build HTML coverage report"
+	@echo "  clean-coverage        - Remove coverage artifacts"
+	@echo "  clean-all             - Remove generated artifacts"
+	@echo "  build-version         - Build binary with version ldflags"
+	@echo "  check-help-targets    - Verify help-listed targets exist in Makefile"
 
-	@echo "Development:"
-	@echo "  build-version         - Build with version info"
-	@echo "  clean-all             - Clean all generated files"
-	@echo "  clean-coverage        - Clean coverage reports only"
-	@echo ""
-	@echo "Docker/Container:"
-	@echo "  docker-build           - Build Docker image"
-	@echo "  docker-run             - Run locally in Docker"
-	@echo "  docker-push            - Push Docker image to registry"
-	@echo ""
-	@echo "Kubernetes:"
-	@echo "  k8s-deploy             - Deploy to Kubernetes"
-	@echo "  k8s-delete             - Delete from Kubernetes"
-	@echo "  k8s-logs               - Follow logs from K8s deployment"
-	@echo "  k8s-status             - Show K8s resources status"
-	@echo "  k8s-health             - Check health endpoint"
-	@echo ""
-	@echo "Examples:"
-	@echo "  make setup GUILD_ID=123456789012345678"
-	@echo "  make test-module MODULE=round"
-	@echo "  make coverage-html && open reports/coverage.html"
-	@echo "  make docker-build"
-	@echo "  make k8s-deploy"
-	@echo "  make guild-setup GUILD_ID=123456789012345678 GUILD_NAME='My Guild' ADMIN_USER_ID=987654321098765432"
-	@echo ""
-	@echo "Development Helpers:"
-	@echo "  dev-setup              - Set up development environment"
-	@echo "  test-all               - Run all tests with coverage"
-	@echo "  lint                   - Run linters"
-	@echo "  security-scan          - Run security scans"
-	@echo ""
-	@echo "Database Operations:"
-	@echo "  db-migrate             - Run database migrations"
-	@echo ""
-	@echo "Observability:"
-	@echo "  port-forward-metrics    - Port forward metrics service"
-	@echo ""
-	@echo "Cleanup:"
-	@echo "  clean                  - Clean up Docker and Go cache"
+check-help-targets:
+	@set -eu; \
+	HELP_TARGETS_FROM_OUTPUT="$$(MAKEFLAGS= make -s help | awk '/^  [a-zA-Z0-9_.-]+/{print $$1}')"; \
+	DECLARED_TARGETS="$$(awk -F: '/^[a-zA-Z0-9_.-]+:/{print $$1}' Makefile | sort -u)"; \
+	for target in $$HELP_TARGETS_FROM_OUTPUT; do \
+		echo "$$DECLARED_TARGETS" | grep -qx "$$target" || { echo "missing target in Makefile: $$target"; exit 1; }; \
+	done; \
+	echo "help target verification passed"

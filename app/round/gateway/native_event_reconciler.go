@@ -4,6 +4,9 @@ import (
 	"log/slog"
 	"regexp"
 	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	rounddiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord"
@@ -16,6 +19,11 @@ import (
 // roundIDPattern matches the RoundID footer embedded in native event descriptions.
 // Format: \n---\nRoundID: <uuid>
 var roundIDPattern = regexp.MustCompile(`(?m)^RoundID:\s*([0-9a-fA-F-]{36})$`)
+
+const (
+	reconcileWorkerCount   = 4
+	reconcileAPIRateWindow = 200 * time.Millisecond
+)
 
 // ReconcileNativeEventMap populates the NativeEventMap from active Guild Scheduled Events.
 // This should be called on bot startup (after the Discord session is ready) to ensure
@@ -31,47 +39,74 @@ func ReconcileNativeEventMap(
 		return
 	}
 
-	reconciled := 0
-	for _, g := range guilds {
-		if g == nil || g.ID == "" {
-			continue
-		}
-
-		events, err := session.GuildScheduledEvents(g.ID, false)
-		if err != nil {
-			logger.Warn("Failed to fetch scheduled events for guild during reconciliation",
-				attr.String("guild_id", g.ID),
-				attr.Error(err))
-			continue
-		}
-
-		for _, event := range events {
-			if event.Status == discordgo.GuildScheduledEventStatusCompleted ||
-				event.Status == discordgo.GuildScheduledEventStatusCanceled {
-				continue
-			}
-
-			roundID, ok := parseRoundIDFromDescription(event.Description)
-			if !ok {
-				continue
-			}
-
-			// ReconcileNativeEventMap cannot extract the original creator ID from the
-			// event description, so we store an empty ID. This means bot-created
-			// events reconciled after a restart will still face deletion auth issues,
-			// but RSVP tracking will work.
-			nativeEventMap.Store(event.ID, roundID, sharedtypes.GuildID(g.ID), sharedtypes.DiscordID(""))
-			reconciled++
-
-			logger.Debug("Reconciled native event mapping",
-				attr.String("guild_id", g.ID),
-				attr.String("discord_event_id", event.ID),
-				attr.String("round_id", roundID.String()))
-		}
+	var reconciled int64
+	workers := reconcileWorkerCount
+	if workers > len(guilds) {
+		workers = len(guilds)
+	}
+	if workers <= 0 {
+		logger.Info("Native event map reconciliation complete",
+			attr.Int("reconciled_count", 0),
+			attr.Int("guild_count", len(guilds)))
+		return
 	}
 
+	guildJobs := make(chan *discordgo.Guild, len(guilds))
+	ticker := time.NewTicker(reconcileAPIRateWindow)
+	defer ticker.Stop()
+
+	var wg sync.WaitGroup
+	for range workers {
+		wg.Go(func() {
+			for g := range guildJobs {
+				if g == nil || g.ID == "" {
+					continue
+				}
+
+				<-ticker.C
+				events, err := session.GuildScheduledEvents(g.ID, false)
+				if err != nil {
+					logger.Warn("Failed to fetch scheduled events for guild during reconciliation",
+						attr.String("guild_id", g.ID),
+						attr.Error(err))
+					continue
+				}
+
+				for _, event := range events {
+					if event.Status == discordgo.GuildScheduledEventStatusCompleted ||
+						event.Status == discordgo.GuildScheduledEventStatusCanceled {
+						continue
+					}
+
+					roundID, ok := parseRoundIDFromDescription(event.Description)
+					if !ok {
+						continue
+					}
+
+					// ReconcileNativeEventMap cannot extract the original creator ID from the
+					// event description, so we store an empty ID. This means bot-created
+					// events reconciled after a restart will still face deletion auth issues,
+					// but RSVP tracking will work.
+					nativeEventMap.Store(event.ID, roundID, sharedtypes.GuildID(g.ID), sharedtypes.DiscordID(""))
+					atomic.AddInt64(&reconciled, 1)
+
+					logger.Debug("Reconciled native event mapping",
+						attr.String("guild_id", g.ID),
+						attr.String("discord_event_id", event.ID),
+						attr.String("round_id", roundID.String()))
+				}
+			}
+		})
+	}
+
+	for _, g := range guilds {
+		guildJobs <- g
+	}
+	close(guildJobs)
+	wg.Wait()
+
 	logger.Info("Native event map reconciliation complete",
-		attr.Int("reconciled_count", reconciled),
+		attr.Int("reconciled_count", int(atomic.LoadInt64(&reconciled))),
 		attr.Int("guild_count", len(guilds)))
 }
 

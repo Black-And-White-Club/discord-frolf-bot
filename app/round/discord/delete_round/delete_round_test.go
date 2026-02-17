@@ -147,8 +147,8 @@ func Test_wrapDeleteRoundOperation(t *testing.T) {
 			fn: func(ctx context.Context) (DeleteRoundOperationResult, error) {
 				panic("oh no")
 			},
-			expectErr: "",
-			expectRes: DeleteRoundOperationResult{Error: nil},
+			expectErr: "panic in delete_panic",
+			expectRes: DeleteRoundOperationResult{Error: errors.New("panic in delete_panic")},
 			setup: func() {
 				fakeMetrics.RecordAPIRequestDurationFunc = func(ctx context.Context, operation string, duration time.Duration) {
 					if operation != "delete_panic" {

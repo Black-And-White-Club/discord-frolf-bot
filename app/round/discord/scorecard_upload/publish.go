@@ -14,6 +14,8 @@ import (
 	"github.com/google/uuid"
 )
 
+const maxInlineFileDataBytes = 256 * 1024
+
 // publishScorecardURLEvent publishes a scorecard URL requested event to the message bus.
 func (m *scorecardUploadManager) publishScorecardURLEvent(ctx context.Context, guildID sharedtypes.GuildID, roundID sharedtypes.RoundID, userID sharedtypes.DiscordID, channelID, messageID, uDiscURL, notes string) (string, error) {
 	importID := uuid.New().String()
@@ -62,6 +64,15 @@ func (m *scorecardUploadManager) publishScorecardURLEvent(ctx context.Context, g
 func (m *scorecardUploadManager) publishScorecardUploadEvent(ctx context.Context, guildID sharedtypes.GuildID, roundID sharedtypes.RoundID, userID sharedtypes.DiscordID, channelID, messageID string, fileData []byte, fileURL, fileName, notes string) (string, error) {
 	importID := uuid.New().String()
 
+	inlineData := fileData
+	if len(fileData) > maxInlineFileDataBytes && fileURL != "" {
+		inlineData = nil
+		m.logger.InfoContext(ctx, "Publishing scorecard upload by URL reference",
+			attr.String("import_id", importID),
+			attr.Int("inline_file_bytes", len(fileData)),
+			attr.String("file_url", fileURL))
+	}
+
 	payload := roundevents.ScorecardUploadedPayloadV1{
 		ImportID:  importID,
 		GuildID:   guildID,
@@ -69,7 +80,7 @@ func (m *scorecardUploadManager) publishScorecardUploadEvent(ctx context.Context
 		UserID:    userID,
 		ChannelID: channelID,
 		MessageID: messageID,
-		FileData:  fileData,
+		FileData:  inlineData,
 		FileURL:   fileURL,
 		FileName:  fileName,
 		Notes:     notes,

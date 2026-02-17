@@ -75,6 +75,7 @@ type Session interface {
 
 	// --- Application Command Methods ---
 	ApplicationCommandCreate(appID, guildID string, cmd *discordgo.ApplicationCommand, options ...discordgo.RequestOption) (*discordgo.ApplicationCommand, error)
+	ApplicationCommandEdit(appID, guildID, cmdID string, cmd *discordgo.ApplicationCommand, options ...discordgo.RequestOption) (*discordgo.ApplicationCommand, error)
 	ApplicationCommands(appID, guildID string, options ...discordgo.RequestOption) ([]*discordgo.ApplicationCommand, error)
 	ApplicationCommandDelete(appID, guildID, cmdID string, options ...discordgo.RequestOption) error
 	ApplicationCommandPermissionsEdit(appID, guildID, cmdID string, permissions *discordgo.ApplicationCommandPermissionsList, options ...discordgo.RequestOption) error
@@ -118,7 +119,7 @@ func (d *DiscordSession) FollowupMessageCreate(interaction *discordgo.Interactio
 }
 
 func (d *DiscordSession) WebhookExecute(webhookID string, token string, wait bool, data *discordgo.WebhookParams, options ...discordgo.RequestOption) (st *discordgo.Message, err error) {
-	return d.session.WebhookExecute("", token, wait, data, options...)
+	return d.session.WebhookExecute(webhookID, token, wait, data, options...)
 }
 
 // NewDiscordSession creates a new DiscordSession.
@@ -274,6 +275,10 @@ func (d *DiscordSession) InteractionResponseEdit(interaction *discordgo.Interact
 // Add the new methods to the Discord Session
 func (d *DiscordSession) ApplicationCommandCreate(appID, guildID string, cmd *discordgo.ApplicationCommand, options ...discordgo.RequestOption) (*discordgo.ApplicationCommand, error) {
 	return d.session.ApplicationCommandCreate(appID, guildID, cmd, options...)
+}
+
+func (d *DiscordSession) ApplicationCommandEdit(appID, guildID, cmdID string, cmd *discordgo.ApplicationCommand, options ...discordgo.RequestOption) (*discordgo.ApplicationCommand, error) {
+	return d.session.ApplicationCommandEdit(appID, guildID, cmdID, cmd, options...)
 }
 
 func (d *DiscordSession) ApplicationCommands(appID, guildID string, options ...discordgo.RequestOption) ([]*discordgo.ApplicationCommand, error) {

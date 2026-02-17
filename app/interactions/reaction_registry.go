@@ -42,11 +42,20 @@ func (r *ReactionRegistry) RegisterMessageReactionRemoveHandler(handler Reaction
 }
 
 // RegisterWithSession registers all handlers with the Discord session
-func (r *ReactionRegistry) RegisterWithSession(session *discordgo.Session, wrapperSession discord.Session) {
+func (r *ReactionRegistry) RegisterWithSession(session discordgoAdder, wrapperSession discord.Session) {
 	// Register MessageReactionAdd handler
 	session.AddHandler(func(s *discordgo.Session, e *discordgo.MessageReactionAdd) {
+		if e == nil {
+			return
+		}
+
+		var sessionUserID string
+		if s != nil && s.State != nil && s.State.User != nil {
+			sessionUserID = s.State.User.ID
+		}
+
 		// Ignore bot reactions to avoid loops
-		if e.UserID == s.State.User.ID {
+		if e.UserID != "" && sessionUserID != "" && e.UserID == sessionUserID {
 			return
 		}
 
@@ -65,7 +74,16 @@ func (r *ReactionRegistry) RegisterWithSession(session *discordgo.Session, wrapp
 
 	// Register MessageReactionRemove handler
 	session.AddHandler(func(s *discordgo.Session, e *discordgo.MessageReactionRemove) {
-		if e.UserID == s.State.User.ID {
+		if e == nil {
+			return
+		}
+
+		var sessionUserID string
+		if s != nil && s.State != nil && s.State.User != nil {
+			sessionUserID = s.State.User.ID
+		}
+
+		if e.UserID != "" && sessionUserID != "" && e.UserID == sessionUserID {
 			return
 		}
 

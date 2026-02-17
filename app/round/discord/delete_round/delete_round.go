@@ -81,9 +81,10 @@ func wrapDeleteRoundOperation(
 	logger *slog.Logger,
 	tracer trace.Tracer,
 	metrics discordmetrics.DiscordMetrics,
-) (DeleteRoundOperationResult, error) {
+) (result DeleteRoundOperationResult, err error) {
 	if fn == nil {
-		return DeleteRoundOperationResult{Error: errors.New("operation function is nil")}, nil
+		result = DeleteRoundOperationResult{Error: errors.New("operation function is nil")}
+		return result, nil
 	}
 
 	if tracer == nil {
@@ -105,18 +106,20 @@ func wrapDeleteRoundOperation(
 
 	defer func() {
 		if r := recover(); r != nil {
-			err := fmt.Errorf("panic in %s: %v", operationName, r)
-			span.RecordError(err)
+			panicErr := fmt.Errorf("panic in %s: %v", operationName, r)
+			span.RecordError(panicErr)
 			if logger != nil {
-				logger.ErrorContext(ctx, "Recovered from panic", attr.Error(err))
+				logger.ErrorContext(ctx, "Recovered from panic", attr.Error(panicErr))
 			}
 			if metrics != nil {
 				metrics.RecordAPIError(ctx, operationName, "panic")
 			}
+			result = DeleteRoundOperationResult{Error: panicErr}
+			err = panicErr
 		}
 	}()
 
-	result, err := fn(ctx)
+	result, err = fn(ctx)
 	if err != nil {
 		wrapped := fmt.Errorf("%s operation error: %w", operationName, err)
 		span.RecordError(wrapped)

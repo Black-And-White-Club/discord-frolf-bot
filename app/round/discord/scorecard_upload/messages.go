@@ -2,6 +2,7 @@ package scorecardupload
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -14,6 +15,28 @@ import (
 // HandleFileUploadMessage handles file uploads from Discord messages.
 func (m *scorecardUploadManager) HandleFileUploadMessage(s discord.Session, msg *discordgo.MessageCreate) {
 	ctx := context.Background()
+
+	if msg == nil || msg.Message == nil {
+		m.logger.WarnContext(ctx, "Ignoring scorecard upload message with nil payload")
+		return
+	}
+
+	if msg.Author == nil {
+		m.logger.WarnContext(ctx, "Ignoring scorecard upload message with nil author",
+			attr.String("channel_id", msg.ChannelID),
+			attr.String("guild_id", msg.GuildID),
+		)
+		return
+	}
+
+	if s == nil {
+		m.logger.WarnContext(ctx, "Ignoring scorecard upload message with nil discord session",
+			attr.String("channel_id", msg.ChannelID),
+			attr.String("guild_id", msg.GuildID),
+			attr.String("user_id", msg.Author.ID),
+		)
+		return
+	}
 
 	// Ignore bot messages
 	if msg.Author.Bot {
@@ -28,6 +51,16 @@ func (m *scorecardUploadManager) HandleFileUploadMessage(s discord.Session, msg 
 
 	// Check if message has attachments
 	if len(msg.Attachments) == 0 {
+		return
+	}
+
+	if !m.allowUploadIngress(msg.GuildID, msg.Author.ID) {
+		m.logger.WarnContext(ctx, "Rate limited scorecard upload ingress",
+			attr.String("user_id", msg.Author.ID),
+			attr.String("guild_id", msg.GuildID),
+			attr.String("channel_id", msg.ChannelID),
+		)
+		m.sendFileUploadErrorMessage(ctx, s, msg.ChannelID, "Too many upload attempts. Please wait a minute and try again.")
 		return
 	}
 
@@ -52,32 +85,11 @@ func (m *scorecardUploadManager) HandleFileUploadMessage(s discord.Session, msg 
 		attr.String("guild_id", msg.GuildID),
 	)
 
-	// Download the file
-	fileData, err := m.downloadAttachment(ctx, scorecardFile.URL)
-	if err != nil {
-		m.logger.ErrorContext(ctx, "Failed to download attachment",
-			attr.Error(err),
-			attr.String("url", scorecardFile.URL),
-		)
-		m.sendFileUploadErrorMessage(ctx, s, msg.ChannelID, "Failed to download file. Please try again.")
-		return
-	}
-
-	// Validate file size (10MB limit)
-	const maxFileSize = 10 * 1024 * 1024
-	if len(fileData) > maxFileSize {
-		m.sendFileUploadErrorMessage(ctx, s, msg.ChannelID, "File too large. Maximum size is 10MB.")
-		return
-	}
-
 	// Look up pending upload for this user/channel
 	key := fmt.Sprintf("%s:%s", msg.Author.ID, msg.ChannelID)
-	m.pendingMutex.Lock()
-	pending, exists := m.pendingUploads[key]
-	if exists {
-		delete(m.pendingUploads, key) // Consume the pending upload
-	}
-	m.pendingMutex.Unlock()
+	m.pendingMutex.RLock()
+	_, exists := m.pendingUploads[key]
+	m.pendingMutex.RUnlock()
 
 	if !exists {
 		m.logger.WarnContext(ctx, "File upload received but no pending upload found",
@@ -90,9 +102,62 @@ func (m *scorecardUploadManager) HandleFileUploadMessage(s discord.Session, msg 
 		return
 	}
 
+	// Download the file after confirming there's a pending upload context.
+	if scorecardFile.Size > maxAttachmentBytes {
+		m.sendFileUploadErrorMessage(ctx, s, msg.ChannelID, "File too large. Maximum size is 10MB.")
+		return
+	}
+
+	shouldInlineFileData := scorecardFile.URL == "" || scorecardFile.Size <= 0 || scorecardFile.Size <= maxInlineFileDataBytes
+
+	var (
+		fileData []byte
+		err      error
+	)
+	if shouldInlineFileData {
+		fileData, err = m.downloadAttachment(ctx, scorecardFile.URL)
+		if err != nil {
+			if errors.Is(err, errAttachmentTooLarge) {
+				m.sendFileUploadErrorMessage(ctx, s, msg.ChannelID, "File too large. Maximum size is 10MB.")
+				return
+			}
+
+			m.logger.ErrorContext(ctx, "Failed to download attachment",
+				attr.Error(err),
+				attr.String("url", scorecardFile.URL),
+			)
+			m.sendFileUploadErrorMessage(ctx, s, msg.ChannelID, "Failed to download file. Please try again.")
+			return
+		}
+	} else {
+		m.logger.InfoContext(ctx, "Skipping attachment download for large scorecard; publishing URL reference",
+			attr.String("filename", scorecardFile.Filename),
+			attr.Int("attachment_size", scorecardFile.Size),
+			attr.String("url", scorecardFile.URL),
+		)
+	}
+
+	m.pendingMutex.Lock()
+	pending, exists := m.pendingUploads[key]
+	if exists {
+		delete(m.pendingUploads, key) // Consume the pending upload
+	}
+	m.pendingMutex.Unlock()
+
+	if !exists {
+		m.logger.WarnContext(ctx, "Pending upload no longer exists after attachment download",
+			attr.String("user_id", msg.Author.ID),
+			attr.String("channel_id", msg.ChannelID),
+		)
+		m.sendFileUploadErrorMessage(ctx, s, msg.ChannelID,
+			"No pending scorecard upload found. Please click the 'Upload Scorecard' button first.")
+		return
+	}
+
 	m.logger.InfoContext(ctx, "Processing file upload with pending context",
 		attr.String("filename", scorecardFile.Filename),
-		attr.Int("file_size", len(fileData)),
+		attr.Int("file_size", scorecardFile.Size),
+		attr.Bool("file_data_inline", len(fileData) > 0),
 		attr.String("round_id", pending.RoundID.String()),
 		attr.String("user_id", msg.Author.ID),
 	)

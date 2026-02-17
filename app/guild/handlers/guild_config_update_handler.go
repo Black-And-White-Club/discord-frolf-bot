@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/discordutils"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	guildevents "github.com/Black-And-White-Club/frolf-bot-shared/events/guild"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
@@ -40,8 +39,8 @@ func (h *GuildHandlers) HandleGuildConfigUpdated(ctx context.Context, payload *g
 
 	// 1. UI FEEDBACK: Notify the admin that the update was successful
 	if h.interactionStore != nil && h.session != nil {
-		if interaction, err := discordutils.GetInteraction(ctx, h.interactionStore, guildID); err == nil {
-			h.interactionStore.Delete(ctx, guildID)
+		if interaction, interactionKey, err := h.getInteractionForGuildResponse(ctx, guildID); err == nil {
+			h.interactionStore.Delete(ctx, interactionKey)
 
 			successContent := "✅ **Configuration Updated Successfully!**"
 			_, err = h.session.InteractionResponseEdit(interaction, &discordgo.WebhookEdit{
@@ -88,8 +87,8 @@ func (h *GuildHandlers) HandleGuildConfigUpdateFailed(ctx context.Context, paylo
 
 	// 2. UI FEEDBACK: Notify the admin of the failure
 	if h.interactionStore != nil && h.session != nil {
-		if interaction, err := discordutils.GetInteraction(ctx, h.interactionStore, guildID); err == nil {
-			h.interactionStore.Delete(ctx, guildID)
+		if interaction, interactionKey, err := h.getInteractionForGuildResponse(ctx, guildID); err == nil {
+			h.interactionStore.Delete(ctx, interactionKey)
 
 			failContent := fmt.Sprintf("❌ **Update Failed**\n\n**Reason:** %s", payload.Reason)
 			_, err = h.session.InteractionResponseEdit(interaction, &discordgo.WebhookEdit{

@@ -144,8 +144,8 @@ func Test_wrapRoundRsvpOperation(t *testing.T) {
 			fn: func(ctx context.Context) (RoundRsvpOperationResult, error) {
 				panic("unexpected panic")
 			},
-			expectErr: "",
-			expectRes: RoundRsvpOperationResult{Error: nil},
+			expectErr: "panic in handle_panic",
+			expectRes: RoundRsvpOperationResult{Error: errors.New("panic in handle_panic")},
 			setup: func() {
 				fakeMetrics.RecordAPIRequestDurationFunc = func(ctx context.Context, operation string, duration time.Duration) {
 					if operation != "handle_panic" {

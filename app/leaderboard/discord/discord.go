@@ -54,7 +54,6 @@ func NewLeaderboardDiscord(
 	claimTagManager := claimtag.NewClaimTagManager(session, publisher, logger, helper, config, guildConfigResolver, interactionStore, guildConfigCache, tracer, metrics)
 
 	seasonManager := season.NewSeasonManager(session, publisher, logger, helper, config, guildConfigResolver, interactionStore, guildConfigCache, tracer, metrics)
-
 	historyManager := history.NewHistoryManager(session, publisher, logger, helper, interactionStore, metrics)
 
 	return &LeaderboardDiscord{

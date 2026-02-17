@@ -15,6 +15,7 @@ import (
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
+	"github.com/bwmarrin/discordgo"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -101,7 +102,12 @@ func (gd *GuildDiscord) UnregisterAllCommands(guildID string) error {
 	}
 
 	// Get all existing commands for this guild
-	commands, err := gd.session.ApplicationCommands(appID.ID, guildID)
+	var commands []*discordgo.ApplicationCommand
+	err = discordgocommands.RetryDiscordAPI(gd.logger, "list guild commands for unregister", func() error {
+		var listErr error
+		commands, listErr = gd.session.ApplicationCommands(appID.ID, guildID)
+		return listErr
+	})
 	if err != nil {
 		return fmt.Errorf("failed to get guild commands: %w", err)
 	}
@@ -109,7 +115,9 @@ func (gd *GuildDiscord) UnregisterAllCommands(guildID string) error {
 	// Delete all guild-specific commands (except frolf-setup which is global)
 	for _, cmd := range commands {
 		if cmd.Name != "frolf-setup" {
-			err = gd.session.ApplicationCommandDelete(appID.ID, guildID, cmd.ID)
+			err = discordgocommands.RetryDiscordAPI(gd.logger, "delete guild command "+cmd.Name, func() error {
+				return gd.session.ApplicationCommandDelete(appID.ID, guildID, cmd.ID)
+			})
 			if err != nil {
 				gd.logger.Error("Failed to delete guild command",
 					attr.String("guild_id", guildID),

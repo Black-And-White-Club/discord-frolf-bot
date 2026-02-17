@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This guide covers deploying the Discord Frolf Bot using modern container practices with multi-pod, event-driven architecture.
+This guide covers deploying the Discord Frolf Bot with the currently supported runtime topology.
 
 ## Prerequisites
 
@@ -13,11 +13,9 @@ This guide covers deploying the Discord Frolf Bot using modern container practic
 
 ## Architecture Overview
 
-The bot supports three deployment modes:
+The bot currently supports one deployment mode:
 
 1. **Standalone Mode**: Single pod handling both Discord and backend processing
-2. **Gateway Mode**: Dedicated pod for Discord interactions (exactly 1 replica)
-3. **Worker Mode**: Scalable pods for backend event processing (N replicas)
 
 ## Configuration Options
 
@@ -31,7 +29,7 @@ The bot dynamically loads guild configurations at runtime - no config file resta
 - `NATS_URL`: NATS server URL (default: nats://localhost:4222)
 
 **Optional:**
-- `BOT_MODE`: `standalone`, `gateway`, or `worker` (default: standalone)
+- `BOT_MODE`: `standalone` (default). `gateway` and `worker` are not implemented and fail fast at startup.
 - `DISCORD_GUILD_ID`: Single guild ID (for development/testing)
 - `DATABASE_URL`: PostgreSQL connection string
 - `ENVIRONMENT`: Environment name for queue isolation (default: development)
@@ -58,17 +56,7 @@ The bot dynamically loads guild configurations at runtime - no config file resta
               discord-frolf-bot:latest
    ```
 
-3. For testing multi-pod architecture locally:
-   ```bash
-   # Terminal 1: Gateway mode
-   export BOT_MODE=gateway
-   export DISCORD_TOKEN=your_token
-   go run main.go
-
-   # Terminal 2: Worker mode
-   export BOT_MODE=worker
-   go run main.go
-   ```
+3. `BOT_MODE=gateway` and `BOT_MODE=worker` are intentionally unsupported right now.
 
 ## Production Deployment
 
@@ -94,10 +82,10 @@ services:
     volumes:
       - nats_data:/data
 
-  gateway:
+  bot:
     image: your-registry/discord-frolf-bot:latest
     environment:
-      BOT_MODE: gateway
+      BOT_MODE: standalone
       DISCORD_TOKEN: ${DISCORD_TOKEN}
       NATS_URL: nats://nats:4222
       DATABASE_URL: postgres://frolf_user:secure_password@postgres:5432/discord_frolf_bot?sslmode=disable
@@ -106,20 +94,7 @@ services:
       - postgres
       - nats
     deploy:
-      replicas: 1  # MUST be 1 - Discord allows only one connection
-
-  worker:
-    image: your-registry/discord-frolf-bot:latest
-    environment:
-      BOT_MODE: worker
-      NATS_URL: nats://nats:4222
-      DATABASE_URL: postgres://frolf_user:secure_password@postgres:5432/discord_frolf_bot?sslmode=disable
-      ENVIRONMENT: production
-    depends_on:
-      - postgres
-      - nats
-    deploy:
-      replicas: 3  # Scale based on load
+      replicas: 1
 
 volumes:
   postgres_data:
@@ -142,32 +117,32 @@ docker-compose -f docker-compose.prod.yml up -d
 2. **Create Kubernetes manifests**:
 
 ```yaml
-# gateway-deployment.yaml
+# standalone-deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: discord-frolf-bot-gateway
+  name: discord-frolf-bot
   labels:
     app: discord-frolf-bot
-    mode: gateway
+    mode: standalone
 spec:
-  replicas: 1  # CRITICAL: Must be exactly 1
+  replicas: 1
   selector:
     matchLabels:
       app: discord-frolf-bot
-      mode: gateway
+      mode: standalone
   template:
     metadata:
       labels:
         app: discord-frolf-bot
-        mode: gateway
+        mode: standalone
     spec:
       containers:
-      - name: gateway
+      - name: discord-frolf-bot
         image: your-registry/discord-frolf-bot:latest
         env:
         - name: BOT_MODE
-          value: "gateway"
+          value: "standalone"
         - name: DISCORD_TOKEN
           valueFrom:
             secretKeyRef:
@@ -194,60 +169,11 @@ spec:
             path: /ready
             port: 8080
           initialDelaySeconds: 5
----
-# worker-deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: discord-frolf-bot-worker
-  labels:
-    app: discord-frolf-bot
-    mode: worker
-spec:
-  replicas: 3  # Scale based on load
-  selector:
-    matchLabels:
-      app: discord-frolf-bot
-      mode: worker
-  template:
-    metadata:
-      labels:
-        app: discord-frolf-bot
-        mode: worker
-    spec:
-      containers:
-      - name: worker
-        image: your-registry/discord-frolf-bot:latest
-        env:
-        - name: BOT_MODE
-          value: "worker"
-        - name: NATS_URL
-          value: "nats://nats:4222"
-        - name: DATABASE_URL
-          valueFrom:
-            secretKeyRef:
-              name: database-secrets
-              key: url
-        - name: ENVIRONMENT
-          value: "production"
-        ports:
-        - containerPort: 8080
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8080
-          initialDelaySeconds: 30
-        readinessProbe:
-          httpGet:
-            path: /ready
-            port: 8080
-          initialDelaySeconds: 5
 ```
 
 3. **Deploy**:
    ```bash
-   kubectl apply -f gateway-deployment.yaml
-   kubectl apply -f worker-deployment.yaml
+   kubectl apply -f standalone-deployment.yaml
    ```
 
 ## Environment Variables
@@ -257,7 +183,7 @@ spec:
 - `NATS_URL`: NATS server URL (default: nats://localhost:4222)
 
 ### Optional
-- `BOT_MODE`: Deployment mode (`standalone`, `gateway`, `worker`)
+- `BOT_MODE`: Deployment mode (`standalone` only)
 - `DISCORD_GUILD_ID`: Single guild ID (development/testing only)
 - `DATABASE_URL`: PostgreSQL connection string
 - `ENVIRONMENT`: Environment name for queue isolation (default: development)
@@ -271,34 +197,14 @@ spec:
 Initialize bot configuration for a new guild:
 
 ```bash
-# Using Go directly
-go run main.go setup YOUR_GUILD_ID
-
-# Using Docker (standalone mode)
-docker run --rm \
-  -e DISCORD_TOKEN=your_token \
-  -e NATS_URL=nats://host.docker.internal:4222 \
-  your-registry/discord-frolf-bot:latest \
-  setup YOUR_GUILD_ID
-
-# Using Kubernetes job
-kubectl run setup-guild --rm -it --restart=Never \
-  --image=your-registry/discord-frolf-bot:latest \
-  --env="DISCORD_TOKEN=your_token" \
-  --env="NATS_URL=nats://nats:4222" \
-  -- setup YOUR_GUILD_ID
+# Setup is done from Discord with `/frolf-setup`.
+# The legacy CLI setup command is intentionally disabled.
 ```
 
 ### Runtime Configuration
 - Guild configurations are loaded dynamically from the database
 - No restarts required for new guild configurations
-- Backend workers automatically pick up new guild events
-kubectl run discord-setup --rm -it --restart=Never \
-  --image=your-registry/discord-frolf-bot:latest \
-  --env="DATABASE_URL=$DATABASE_URL" \
-  --env="DISCORD_GUILD_ID=$GUILD_ID" \
-  -- setup $GUILD_ID
-```
+- Setup/config updates are handled by the running standalone bot process
 
 ### Configuration Updates
 - **File-based**: Update `config.yaml` and restart container
@@ -344,6 +250,8 @@ Configure your monitoring stack to collect from these endpoints.
    - Use signed images when possible
 
 ## Troubleshooting
+
+> Note: Any gateway/worker references below are legacy troubleshooting notes for the planned multi-pod runtime and are not applicable to the current standalone-only runtime.
 
 ### Common Issues
 

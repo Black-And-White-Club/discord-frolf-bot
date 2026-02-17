@@ -1,13 +1,31 @@
 #!/bin/bash
 # Script to create per-guild infrastructure
 
-GUILD_ID=$1
-GUILD_NAME=$2
+set -euo pipefail
+
+GUILD_ID=${1:-}
+GUILD_NAME=${2:-}
+DB_PASSWORD=${DB_PASSWORD:-}
+BOT_IMAGE_REF=${BOT_IMAGE_REF:-frolf-bot:latest}
+BACKEND_IMAGE_REF=${BACKEND_IMAGE_REF:-frolf-backend:latest}
+MIGRATIONS_IMAGE_REF=${MIGRATIONS_IMAGE_REF:-frolf-migrations:latest}
 
 if [ -z "$GUILD_ID" ]; then
     echo "Usage: $0 <guild_id> <guild_name>"
     exit 1
 fi
+
+if [ -z "$DB_PASSWORD" ]; then
+    echo "Error: DB_PASSWORD environment variable is required"
+    exit 1
+fi
+
+for image_ref in "$BOT_IMAGE_REF" "$BACKEND_IMAGE_REF" "$MIGRATIONS_IMAGE_REF"; do
+    if [[ "$image_ref" == *":latest" ]]; then
+        echo "Error: image ref '$image_ref' uses mutable ':latest'. Use a pinned tag or digest."
+        exit 1
+    fi
+done
 
 # Create namespace for this guild
 kubectl create namespace "frolf-guild-${GUILD_ID}"
@@ -97,14 +115,14 @@ spec:
     spec:
       containers:
       - name: discord-bot
-        image: frolf-bot:latest
+        image: ${BOT_IMAGE_REF}
         env:
         - name: INFRASTRUCTURE_MODE
           value: "single-server"
         - name: GUILD_ID
           value: "${GUILD_ID}"
         - name: DATABASE_URL
-          value: "postgresql://frolf_user_${GUILD_ID}:password@postgres:5432/frolf_${GUILD_ID}"
+          value: "postgresql://frolf_user_${GUILD_ID}:${DB_PASSWORD}@postgres:5432/frolf_${GUILD_ID}"
         - name: NATS_URL
           value: "nats://nats:4222"
         resources:
@@ -115,12 +133,12 @@ spec:
             memory: "128Mi"
             cpu: "100m"
       - name: backend-api
-        image: frolf-backend:latest
+        image: ${BACKEND_IMAGE_REF}
         env:
         - name: GUILD_ID
           value: "${GUILD_ID}"
         - name: DATABASE_URL
-          value: "postgresql://frolf_user_${GUILD_ID}:password@postgres:5432/frolf_${GUILD_ID}"
+          value: "postgresql://frolf_user_${GUILD_ID}:${DB_PASSWORD}@postgres:5432/frolf_${GUILD_ID}"
         - name: NATS_URL
           value: "nats://nats:4222"
         resources:
@@ -166,8 +184,8 @@ EOF
 # Run database migrations for this guild
 kubectl run migration-job-${GUILD_ID} \
   --namespace=frolf-guild-${GUILD_ID} \
-  --image=frolf-migrations:latest \
-  --env="DATABASE_URL=postgresql://frolf_user_${GUILD_ID}:password@postgres:5432/frolf_${GUILD_ID}" \
+  --image="${MIGRATIONS_IMAGE_REF}" \
+  --env="DATABASE_URL=postgresql://frolf_user_${GUILD_ID}:${DB_PASSWORD}@postgres:5432/frolf_${GUILD_ID}" \
   --restart=Never \
   --rm -i
 

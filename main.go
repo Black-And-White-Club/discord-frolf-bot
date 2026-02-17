@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	pprof "net/http/pprof"
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -19,6 +21,7 @@ import (
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
 	"github.com/bwmarrin/discordgo"
+	"golang.org/x/sync/errgroup"
 )
 
 func main() {
@@ -28,37 +31,46 @@ func main() {
 
 	// Check for setup command line argument
 	if len(os.Args) > 1 && os.Args[1] == "setup" {
-		if len(os.Args) < 3 {
-			fmt.Println("Usage: go run main.go setup <guild_id>")
+		guildID := ""
+		if len(os.Args) >= 3 {
+			guildID = os.Args[2]
+		}
+		if err := runSetup(ctx, guildID); err != nil {
+			fmt.Fprintf(os.Stderr, "setup mode failed: %v\n", err)
 			os.Exit(1)
 		}
-		guildID := os.Args[2]
-		runSetup(ctx, guildID)
 		return
 	}
 
 	// Check bot mode for multi-pod deployment
-	botMode := os.Getenv("BOT_MODE")
+	botMode := strings.TrimSpace(os.Getenv("BOT_MODE"))
+	var runErr error
 	switch botMode {
 	case "gateway":
-		runGatewayMode(ctx)
+		runErr = runGatewayMode(ctx)
 	case "worker":
-		runWorkerMode(ctx)
-	default:
+		runErr = runWorkerMode(ctx)
+	case "", "standalone":
 		// Default: standalone mode (current behavior)
-		runStandaloneMode(ctx)
+		runErr = runStandaloneMode(ctx)
+	default:
+		runErr = fmt.Errorf("unsupported BOT_MODE %q: supported values are standalone, gateway, worker", botMode)
+	}
+
+	if runErr != nil {
+		fmt.Fprintf(os.Stderr, "runtime failed: %v\n", runErr)
+		os.Exit(1)
 	}
 }
 
 // runStandaloneMode runs the bot in single-pod mode (current behavior)
-func runStandaloneMode(ctx context.Context) {
+func runStandaloneMode(ctx context.Context) error {
 	var cfg *config.Config
 	var err error
 
 	cfg, err = config.LoadBaseConfig()
 	if err != nil {
-		fmt.Printf("Failed to load base config: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to load base config: %w", err)
 	}
 
 	obsConfig := observability.Config{
@@ -77,8 +89,7 @@ func runStandaloneMode(ctx context.Context) {
 
 	obs, err := observability.Init(ctx, obsConfig)
 	if err != nil {
-		fmt.Printf("Failed to initialize observability: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to initialize observability: %w", err)
 	}
 
 	logger := obs.Provider.Logger
@@ -91,8 +102,7 @@ func runStandaloneMode(ctx context.Context) {
 	// Create Discord session
 	discordSession, err := discordgo.New("Bot " + cfg.Discord.Token)
 	if err != nil {
-		logger.Error("Failed to create Discord session", attr.Error(err))
-		os.Exit(1)
+		return fmt.Errorf("failed to create Discord session: %w", err)
 	}
 
 	discordSession.Identify.Intents = discordgo.IntentsGuilds |
@@ -117,19 +127,48 @@ func runStandaloneMode(ctx context.Context) {
 		utils.NewHelper(logger),
 	)
 	if err != nil {
-		logger.Error("Failed to create Discord bot", attr.Error(err))
-		os.Exit(1)
+		return fmt.Errorf("failed to create Discord bot: %w", err)
+	}
+
+	var runtimeErrMu sync.RWMutex
+	var runtimeErr error
+	setRuntimeErr := func(err error) {
+		if err == nil {
+			return
+		}
+		runtimeErrMu.Lock()
+		if runtimeErr == nil {
+			runtimeErr = err
+		}
+		runtimeErrMu.Unlock()
+	}
+	getRuntimeErr := func() error {
+		runtimeErrMu.RLock()
+		defer runtimeErrMu.RUnlock()
+		return runtimeErr
 	}
 
 	// --- Health Check Server ---
 	healthMux := http.NewServeMux()
 	healthMux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		if err := getRuntimeErr(); err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			fmt.Fprintf(w, `{"status":"unhealthy","reason":"runtime_failed","service":"discord-frolf-bot","version":"%s"}`, cfg.Service.Version)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, `{"status":"healthy","service":"discord-frolf-bot","version":"%s"}`, cfg.Service.Version)
 	})
 
 	healthMux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+		if err := getRuntimeErr(); err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			fmt.Fprintf(w, `{"status":"not_ready","reason":"runtime_failed"}`)
+			return
+		}
 		if discordSession == nil || discordSession.State == nil || discordSession.State.User == nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			fmt.Fprintf(w, `{"status":"not_ready","reason":"discord_session_not_ready"}`)
@@ -143,7 +182,9 @@ func runStandaloneMode(ctx context.Context) {
 	if os.Getenv("PPROF_ENABLED") == "true" {
 		addr := os.Getenv("PPROF_ADDR")
 		if addr == "" {
-			addr = ":6060"
+			addr = "127.0.0.1:6060"
+		} else if strings.HasPrefix(addr, ":") {
+			addr = "127.0.0.1" + addr
 		}
 		mux := http.NewServeMux()
 		mux.HandleFunc("/debug/pprof/", pprof.Index)
@@ -153,6 +194,9 @@ func runStandaloneMode(ctx context.Context) {
 		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 		go func() {
 			logger.Info("pprof enabled", attr.String("addr", addr))
+			if !strings.HasPrefix(addr, "127.0.0.1:") && !strings.HasPrefix(addr, "localhost:") {
+				logger.Warn("pprof is listening on a non-loopback address", attr.String("addr", addr))
+			}
 			if err := http.ListenAndServe(addr, mux); err != nil && err != http.ErrServerClosed {
 				logger.Error("pprof server failed", attr.Error(err))
 			}
@@ -172,24 +216,37 @@ func runStandaloneMode(ctx context.Context) {
 		Handler: healthMux,
 	}
 
-	go func() {
+	runtimeCtx, runtimeCancel := context.WithCancel(ctx)
+	defer runtimeCancel()
+	eg, egCtx := errgroup.WithContext(runtimeCtx)
+
+	eg.Go(func() error {
 		logger.Info("Starting health server", attr.String("addr", healthPort))
 		if err := healthServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Error("Health server failed", attr.Error(err))
+			wrapped := fmt.Errorf("health server failed: %w", err)
+			setRuntimeErr(wrapped)
+			return wrapped
 		}
-	}()
+		return nil
+	})
 
-	// --- Run Bot ---
-	go func() {
-		if err := discordBot.Run(ctx); err != nil && err != context.Canceled {
-			logger.Error("Bot run failed", attr.Error(err))
+	eg.Go(func() error {
+		if err := discordBot.Run(egCtx); err != nil && !errors.Is(err, context.Canceled) {
+			wrapped := fmt.Errorf("bot run failed: %w", err)
+			setRuntimeErr(wrapped)
+			return wrapped
 		}
-	}()
+		return nil
+	})
 
 	logger.Info("Discord bot is running. Press Ctrl+C to gracefully shut down.")
 
-	<-ctx.Done()
-	logger.Info("Received shutdown signal, initiating graceful shutdown...")
+	<-egCtx.Done()
+	if errors.Is(ctx.Err(), context.Canceled) {
+		logger.Info("Received shutdown signal, initiating graceful shutdown...")
+	} else {
+		logger.Error("Runtime failed, initiating shutdown", attr.Error(getRuntimeErr()))
+	}
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
@@ -206,74 +263,34 @@ func runStandaloneMode(ctx context.Context) {
 		logger.Error("Failed to shutdown health server", attr.Error(err))
 	}
 
+	groupErr := eg.Wait()
+	if groupErr != nil && !errors.Is(groupErr, context.Canceled) {
+		setRuntimeErr(groupErr)
+	}
+
+	if err := getRuntimeErr(); err != nil {
+		logger.Error("Shutdown completed after runtime failure", attr.Error(err))
+		return err
+	}
+
 	logger.Info("Shutdown complete")
+	return nil
 }
 
 // runSetup handles the automated Discord server setup
-func runSetup(ctx context.Context, guildID string) {
-	fmt.Printf("Running setup for guild: %s\n", guildID)
-
-	cfg, err := config.LoadBaseConfig()
-	if err != nil {
-		fmt.Printf("Failed to load base config: %v\n", err)
-		os.Exit(1)
+func runSetup(_ context.Context, guildID string) error {
+	if guildID == "" {
+		return fmt.Errorf("usage: go run main.go setup <guild_id>")
 	}
 
-	obsConfig := observability.Config{
-		ServiceName: "discord-frolf-bot-setup",
-		Environment: cfg.Observability.Environment,
-		Version:     cfg.Service.Version,
-		// ... other obs config remains the same
-	}
-
-	obs, err := observability.Init(ctx, obsConfig)
-	if err != nil {
-		fmt.Printf("Failed to initialize observability: %v\n", err)
-		os.Exit(1)
-	}
-	logger := obs.Provider.Logger
-
-	// Initialize Storage Hub for setup context
-	appStores := storage.NewStores(ctx)
-
-	discordSession, err := discordgo.New("Bot " + cfg.Discord.Token)
-	if err != nil {
-		logger.Error("Failed to create Discord session", attr.Error(err))
-		os.Exit(1)
-	}
-
-	discordSession.Identify.Intents = discordgo.IntentsGuilds |
-		discordgo.IntentsGuildMessages |
-		discordgo.IntentsGuildMessageReactions |
-		discordgo.IntentGuildScheduledEvents |
-		discordgo.IntentMessageContent |
-		discordgo.IntentGuildMembers
-
-	discordSessionWrapper := discord.NewDiscordSession(discordSession, logger)
-
-	setupBot, err := bot.NewDiscordBot(
-		discordSessionWrapper,
-		cfg,
-		logger,
-		appStores, // Shared storage hub
-		obs.Registry.DiscordMetrics,
-		obs.Registry.EventBusMetrics,
-		obs.Provider.TracerProvider.Tracer("setup"),
-		utils.NewHelper(logger),
-	)
-	if err != nil {
-		logger.Error("Failed to create setup bot", attr.Error(err))
-		os.Exit(1)
-	}
-
-	if err := setupBot.Run(ctx); err != nil {
-		logger.Error("Failed to start setup bot", attr.Error(err))
-		os.Exit(1)
-	}
-
-	fmt.Println("Setup system initialized successfully!")
+	return fmt.Errorf("setup CLI mode is not supported in this build; run '/frolf-setup' in guild %s instead", guildID)
 }
 
 // runGatewayMode and runWorkerMode would follow a similar pattern once implemented...
-func runGatewayMode(ctx context.Context) { /* ... */ }
-func runWorkerMode(ctx context.Context)  { /* ... */ }
+func runGatewayMode(_ context.Context) error {
+	return fmt.Errorf("BOT_MODE=gateway is not implemented; use standalone mode until gateway runtime is shipped")
+}
+
+func runWorkerMode(_ context.Context) error {
+	return fmt.Errorf("BOT_MODE=worker is not implemented; use standalone mode until worker runtime is shipped")
+}

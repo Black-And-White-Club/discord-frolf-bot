@@ -18,6 +18,7 @@ import (
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils"
+	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -35,6 +36,16 @@ type ScheduledEventRSVPListener struct {
 	helper                utils.Helpers
 	logger                *slog.Logger
 	startedEvents         sync.Map
+	lookupSubscriberMu    sync.Mutex
+	lookupSubscriberAlive bool
+	lookupSubscriberErr   error
+	lookupWaitersMu       sync.Mutex
+	lookupWaiters         map[string][]chan nativeEventLookupResult
+}
+
+type nativeEventLookupResult struct {
+	roundID sharedtypes.RoundID
+	found   bool
 }
 
 // NewScheduledEventRSVPListener creates a new RSVP gateway listener.
@@ -59,6 +70,7 @@ func NewScheduledEventRSVPListener(
 		eventBus:              eventBus,
 		helper:                helper,
 		logger:                logger,
+		lookupWaiters:         make(map[string][]chan nativeEventLookupResult),
 	}
 }
 
@@ -580,6 +592,156 @@ func (l *ScheduledEventRSVPListener) resolveRoundID(guildID sharedtypes.GuildID,
 		attr.String("guild_id", string(guildID)),
 		attr.String("discord_event_id", discordEventID))
 
+	if err := l.ensureLookupSubscriber(); err != nil {
+		l.logger.Warn("Failed to start native event lookup result subscriber",
+			attr.String("guild_id", string(guildID)),
+			attr.String("discord_event_id", discordEventID),
+			attr.Error(err))
+		return sharedtypes.RoundID{}, sharedtypes.DiscordID(""), false
+	}
+
+	lookupKey := discordEventID
+	waiter := make(chan nativeEventLookupResult, 1)
+	firstWaiter := l.addLookupWaiter(lookupKey, waiter)
+
+	if firstWaiter {
+		if err := l.publishNativeLookupRequest(guildID, discordEventID); err != nil {
+			l.removeLookupWaiter(lookupKey, waiter)
+			return sharedtypes.RoundID{}, sharedtypes.DiscordID(""), false
+		}
+	}
+
+	timeout := time.NewTimer(5 * time.Second)
+	defer timeout.Stop()
+
+	select {
+	case lookupResult, ok := <-waiter:
+		if !ok {
+			l.logger.Warn("Native event lookup waiter closed unexpectedly",
+				attr.String("guild_id", string(guildID)),
+				attr.String("discord_event_id", discordEventID))
+			return sharedtypes.RoundID{}, sharedtypes.DiscordID(""), false
+		}
+
+		if !lookupResult.found {
+			l.logger.Warn("Native event lookup returned not found",
+				attr.String("guild_id", string(guildID)),
+				attr.String("discord_event_id", discordEventID))
+			return sharedtypes.RoundID{}, sharedtypes.DiscordID(""), false
+		}
+
+		// Populate the NativeEventMap for future lookups.
+		// NOTE: Lookup results currently do not carry creator ID.
+		l.nativeEventMap.Store(discordEventID, lookupResult.roundID, guildID, sharedtypes.DiscordID(""))
+
+		l.logger.Info("Resolved native event via NATS lookup",
+			attr.String("guild_id", string(guildID)),
+			attr.String("discord_event_id", discordEventID),
+			attr.String("round_id", lookupResult.roundID.String()))
+
+		return lookupResult.roundID, sharedtypes.DiscordID(""), true
+	case <-timeout.C:
+		l.removeLookupWaiter(lookupKey, waiter)
+		l.logger.Warn("Timeout waiting for native event lookup result",
+			attr.String("guild_id", string(guildID)),
+			attr.String("discord_event_id", discordEventID))
+		return sharedtypes.RoundID{}, sharedtypes.DiscordID(""), false
+	}
+}
+
+func (l *ScheduledEventRSVPListener) ensureLookupSubscriber() error {
+	l.lookupSubscriberMu.Lock()
+	defer l.lookupSubscriberMu.Unlock()
+
+	if l.lookupSubscriberAlive {
+		return nil
+	}
+
+	resultCh, err := l.eventBus.Subscribe(context.Background(), roundevents.NativeEventLookupResultV1)
+	if err != nil {
+		l.lookupSubscriberErr = err
+		return l.lookupSubscriberErr
+	}
+
+	l.lookupSubscriberAlive = true
+	l.lookupSubscriberErr = nil
+	go l.consumeLookupResults(resultCh)
+	return nil
+}
+
+func (l *ScheduledEventRSVPListener) consumeLookupResults(resultCh <-chan *message.Message) {
+	for resultMsg := range resultCh {
+		var result roundevents.NativeEventLookupResultPayloadV1
+		if err := json.Unmarshal(resultMsg.Payload, &result); err != nil {
+			resultMsg.Ack()
+			l.logger.Warn("Failed to unmarshal native event lookup result",
+				attr.String("discord_event_id", result.DiscordEventID),
+				attr.Error(err))
+			continue
+		}
+
+		resultMsg.Ack()
+
+		lookupResult := nativeEventLookupResult{
+			roundID: result.RoundID,
+			found:   result.Found,
+		}
+
+		l.lookupWaitersMu.Lock()
+		waiters := l.lookupWaiters[result.DiscordEventID]
+		delete(l.lookupWaiters, result.DiscordEventID)
+		l.lookupWaitersMu.Unlock()
+
+		for _, waiter := range waiters {
+			select {
+			case waiter <- lookupResult:
+			default:
+			}
+			close(waiter)
+		}
+	}
+
+	l.lookupSubscriberMu.Lock()
+	l.lookupSubscriberAlive = false
+	l.lookupSubscriberMu.Unlock()
+
+	l.logger.Warn("Native event lookup result subscriber closed unexpectedly")
+}
+
+func (l *ScheduledEventRSVPListener) addLookupWaiter(lookupKey string, waiter chan nativeEventLookupResult) bool {
+	l.lookupWaitersMu.Lock()
+	defer l.lookupWaitersMu.Unlock()
+
+	waiters := l.lookupWaiters[lookupKey]
+	firstWaiter := len(waiters) == 0
+	l.lookupWaiters[lookupKey] = append(waiters, waiter)
+	return firstWaiter
+}
+
+func (l *ScheduledEventRSVPListener) removeLookupWaiter(lookupKey string, waiter chan nativeEventLookupResult) {
+	l.lookupWaitersMu.Lock()
+	defer l.lookupWaitersMu.Unlock()
+
+	waiters := l.lookupWaiters[lookupKey]
+	if len(waiters) == 0 {
+		return
+	}
+
+	filtered := make([]chan nativeEventLookupResult, 0, len(waiters))
+	for _, current := range waiters {
+		if current != waiter {
+			filtered = append(filtered, current)
+		}
+	}
+
+	if len(filtered) == 0 {
+		delete(l.lookupWaiters, lookupKey)
+		return
+	}
+	l.lookupWaiters[lookupKey] = filtered
+}
+
+func (l *ScheduledEventRSVPListener) publishNativeLookupRequest(guildID sharedtypes.GuildID, discordEventID string) error {
 	lookupPayload := roundevents.NativeEventLookupRequestPayloadV1{
 		GuildID:        guildID,
 		DiscordEventID: discordEventID,
@@ -591,7 +753,7 @@ func (l *ScheduledEventRSVPListener) resolveRoundID(guildID sharedtypes.GuildID,
 			attr.String("guild_id", string(guildID)),
 			attr.String("discord_event_id", discordEventID),
 			attr.Error(err))
-		return sharedtypes.RoundID{}, sharedtypes.DiscordID(""), false
+		return err
 	}
 
 	if err := l.eventBus.Publish(roundevents.NativeEventLookupRequestV1, msg); err != nil {
@@ -599,73 +761,8 @@ func (l *ScheduledEventRSVPListener) resolveRoundID(guildID sharedtypes.GuildID,
 			attr.String("guild_id", string(guildID)),
 			attr.String("discord_event_id", discordEventID),
 			attr.Error(err))
-		return sharedtypes.RoundID{}, sharedtypes.DiscordID(""), false
+		return err
 	}
 
-	// Subscribe to the result topic and wait with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	resultCh, err := l.eventBus.Subscribe(ctx, roundevents.NativeEventLookupResultV1)
-	if err != nil {
-		l.logger.Warn("Failed to subscribe to native event lookup result",
-			attr.String("guild_id", string(guildID)),
-			attr.String("discord_event_id", discordEventID),
-			attr.Error(err))
-		return sharedtypes.RoundID{}, sharedtypes.DiscordID(""), false
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			l.logger.Warn("Timeout waiting for native event lookup result",
-				attr.String("guild_id", string(guildID)),
-				attr.String("discord_event_id", discordEventID))
-			return sharedtypes.RoundID{}, sharedtypes.DiscordID(""), false
-		case resultMsg, ok := <-resultCh:
-			if !ok {
-				l.logger.Warn("Native event lookup result channel closed",
-					attr.String("guild_id", string(guildID)),
-					attr.String("discord_event_id", discordEventID))
-				return sharedtypes.RoundID{}, sharedtypes.DiscordID(""), false
-			}
-
-			var result roundevents.NativeEventLookupResultPayloadV1
-			if err := json.Unmarshal(resultMsg.Payload, &result); err != nil {
-				resultMsg.Ack()
-				l.logger.Warn("Failed to unmarshal native event lookup result",
-					attr.String("guild_id", string(guildID)),
-					attr.String("discord_event_id", discordEventID),
-					attr.Error(err))
-				continue
-			}
-
-			resultMsg.Ack()
-
-			// Check if this result is for our request
-			if result.DiscordEventID != discordEventID {
-				continue
-			}
-
-			if !result.Found {
-				l.logger.Warn("Native event lookup returned not found",
-					attr.String("guild_id", string(guildID)),
-					attr.String("discord_event_id", discordEventID))
-				return sharedtypes.RoundID{}, sharedtypes.DiscordID(""), false
-			}
-
-			// Populate the NativeEventMap for future lookups
-			// NOTE: We don't get CreatorID from the lookup result currently, so we pass empty.
-			// This means restart-persistence for bot-created event deletion will still fail,
-			// but active-session deletion will work.
-			l.nativeEventMap.Store(discordEventID, result.RoundID, guildID, sharedtypes.DiscordID(""))
-
-			l.logger.Info("Resolved native event via NATS lookup",
-				attr.String("guild_id", string(guildID)),
-				attr.String("discord_event_id", discordEventID),
-				attr.String("round_id", result.RoundID.String()))
-
-			return result.RoundID, sharedtypes.DiscordID(""), true
-		}
-	}
+	return nil
 }

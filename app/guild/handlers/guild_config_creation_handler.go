@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/discordutils"
 	guildevents "github.com/Black-And-White-Club/frolf-bot-shared/events/guild"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
@@ -24,9 +23,9 @@ func (h *GuildHandlers) HandleGuildConfigCreated(ctx context.Context, payload *g
 
 	// 1. UI FEEDBACK: Notify the admin that setup is complete
 	if h.interactionStore != nil && h.session != nil {
-		if interaction, err := discordutils.GetInteraction(ctx, h.interactionStore, guildID); err == nil {
-			// Clean up the store immediately
-			h.interactionStore.Delete(ctx, guildID)
+		if interaction, interactionKey, err := h.getInteractionForGuildResponse(ctx, guildID); err == nil {
+			// Clean up the store immediately.
+			h.interactionStore.Delete(ctx, interactionKey)
 
 			successContent := "✅ **Setup Complete!**\nAll server commands have been registered and are ready to use."
 			_, err = h.session.InteractionResponseEdit(interaction, &discordgo.WebhookEdit{
@@ -81,8 +80,8 @@ func (h *GuildHandlers) HandleGuildConfigCreationFailed(ctx context.Context, pay
 
 	// 1. UI FEEDBACK: Notify the admin of the failure
 	if h.interactionStore != nil && h.session != nil {
-		if interaction, err := discordutils.GetInteraction(ctx, h.interactionStore, guildID); err == nil {
-			h.interactionStore.Delete(ctx, guildID)
+		if interaction, interactionKey, err := h.getInteractionForGuildResponse(ctx, guildID); err == nil {
+			h.interactionStore.Delete(ctx, interactionKey)
 
 			failContent := fmt.Sprintf("❌ **Setup Failed**\n\n**Reason:** %s\n\nPlease try running `/frolf-setup` again.", payload.Reason)
 			_, err = h.session.InteractionResponseEdit(interaction, &discordgo.WebhookEdit{

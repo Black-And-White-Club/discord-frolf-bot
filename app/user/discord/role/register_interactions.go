@@ -12,16 +12,16 @@ import (
 
 func RegisterHandlers(registry *interactions.Registry, manager RoleManager) {
 	// updaterole command requires Editor role or higher and guild setup
-	registry.RegisterHandlerWithPermissions("updaterole", func(ctx context.Context, i *discordgo.InteractionCreate) {
+	registry.RegisterMutatingHandler("updaterole", func(ctx context.Context, i *discordgo.InteractionCreate) {
 		slog.Info("Handling /updaterole command", attr.String("command_name", i.ApplicationCommandData().Name))
 		manager.HandleRoleRequestCommand(ctx, i)
-	}, interactions.EditorRequired, true)
+	}, interactions.MutatingHandlerPolicy{RequiredPermission: interactions.EditorRequired, RequiresSetup: true})
 
 	// Role button interactions require Editor role or higher
-	registry.RegisterHandlerWithPermissions("role_button_", func(ctx context.Context, i *discordgo.InteractionCreate) {
+	registry.RegisterMutatingHandler("role_button_", func(ctx context.Context, i *discordgo.InteractionCreate) {
 		slog.Info("Handling role button press", attr.String("custom_id", i.MessageComponentData().CustomID))
 		manager.HandleRoleButtonPress(ctx, i)
-	}, interactions.EditorRequired, true)
+	}, interactions.MutatingHandlerPolicy{RequiredPermission: interactions.EditorRequired, RequiresSetup: true})
 
 	registry.RegisterHandlerWithPermissions("role_button_cancel", func(ctx context.Context, i *discordgo.InteractionCreate) {
 		slog.Info("Handling role cancel button", attr.String("custom_id", i.MessageComponentData().CustomID))

@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/url"
 	"path/filepath"
 	"strings"
@@ -69,6 +70,20 @@ func (rh *RoundHandlers) HandleScorecardUploaded(ctx context.Context, payload *r
 	if payload.UDiscURL != "" {
 		allowedExt := map[string]struct{}{".csv": {}, ".xlsx": {}}
 		if u, err := url.Parse(payload.UDiscURL); err == nil {
+			if u.Scheme != "https" {
+				return nil, fmt.Errorf("scorecard url must use https")
+			}
+			host := strings.ToLower(u.Hostname())
+			if host == "" {
+				return nil, fmt.Errorf("scorecard url host is required")
+			}
+			if ip := net.ParseIP(host); ip != nil {
+				return nil, fmt.Errorf("scorecard url ip hosts are not allowed")
+			}
+			if host != "udisc.com" && !strings.HasSuffix(host, ".udisc.com") {
+				return nil, fmt.Errorf("scorecard url host must be on udisc.com")
+			}
+
 			ext := strings.ToLower(filepath.Ext(u.Path))
 			if _, ok := allowedExt[ext]; ext != "" && !ok {
 				return nil, fmt.Errorf("unsupported scorecard extension: %s", ext)
