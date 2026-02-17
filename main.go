@@ -84,6 +84,7 @@ func runStandaloneMode(ctx context.Context) error {
 		TempoSampleRate: cfg.Observability.TempoSampleRate,
 		OTLPEndpoint:    cfg.Observability.OTLPEndpoint,
 		OTLPTransport:   cfg.Observability.OTLPTransport,
+		OTLPInsecure:    cfg.Observability.TempoInsecure,
 		LogsEnabled:     cfg.Observability.OTLPLogsEnabled,
 	}
 
