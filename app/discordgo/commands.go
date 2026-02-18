@@ -9,7 +9,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-const guildCommandManifestVersion = "2026-02-15.1"
+const guildCommandManifestVersion = "2026-02-18.1"
 
 // GuildCommandManifestVersion returns the current guild command manifest version.
 func GuildCommandManifestVersion() string {
@@ -188,6 +188,10 @@ func desiredCommands(targetGuildID string) []*discordgo.ApplicationCommand {
 		{
 			Name:        "dashboard",
 			Description: "Get a link to access the Frolf PWA dashboard",
+		},
+		{
+			Name:        "invite",
+			Description: "Get a link to manage club invites (Editor/Admin only)",
 		},
 		{
 			Name:        "season",

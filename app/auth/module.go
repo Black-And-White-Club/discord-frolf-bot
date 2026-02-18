@@ -7,6 +7,7 @@ import (
 
 	authdiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/auth/discord"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/auth/discord/dashboard"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/auth/discord/invite"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/auth/permission"
 	authwatermill "github.com/Black-And-White-Club/discord-frolf-bot/app/auth/watermill"
 	authhandlers "github.com/Black-And-White-Club/discord-frolf-bot/app/auth/watermill/handlers"
@@ -63,6 +64,7 @@ func InitializeAuthModule(
 
 	// Register slash command handlers
 	dashboard.RegisterHandlers(interactionRegistry, authDiscord.GetDashboardManager())
+	invite.RegisterHandlers(interactionRegistry, authDiscord.GetInviteManager())
 
 	// Build Watermill handlers
 	authHandlers := authhandlers.NewAuthHandlers(

@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/auth/discord/dashboard"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/auth/discord/invite"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/auth/permission"
 	discordpkg "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
@@ -19,6 +20,7 @@ import (
 // AuthDiscord aggregates auth-related Discord services.
 type AuthDiscord struct {
 	dashboardManager dashboard.DashboardManager
+	inviteManager    invite.InviteManager
 }
 
 // NewAuthDiscord creates a new AuthDiscord instance.
@@ -48,12 +50,20 @@ func NewAuthDiscord(
 		helper,
 	)
 
+	inviteMgr := invite.NewInviteManager(session, logger, cfg)
+
 	return &AuthDiscord{
 		dashboardManager: dashboardMgr,
+		inviteManager:    inviteMgr,
 	}, nil
 }
 
 // GetDashboardManager returns the dashboard manager.
 func (d *AuthDiscord) GetDashboardManager() dashboard.DashboardManager {
 	return d.dashboardManager
+}
+
+// GetInviteManager returns the invite manager.
+func (d *AuthDiscord) GetInviteManager() invite.InviteManager {
+	return d.inviteManager
 }
