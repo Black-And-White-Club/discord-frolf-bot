@@ -180,11 +180,17 @@ func TestRegisterCommands_RetriesTransientCreateFailure(t *testing.T) {
 				Options:     desired[3].Options,
 			},
 			{
+				ID:          "cmd-invite",
+				Name:        desired[5].Name,
+				Description: desired[5].Description,
+				Options:     desired[5].Options,
+			},
+			{
 				ID:                       "cmd-season",
-				Name:                     desired[5].Name,
-				Description:              desired[5].Description,
-				Options:                  desired[5].Options,
-				DefaultMemberPermissions: desired[5].DefaultMemberPermissions,
+				Name:                     desired[6].Name,
+				Description:              desired[6].Description,
+				Options:                  desired[6].Options,
+				DefaultMemberPermissions: desired[6].DefaultMemberPermissions,
 			},
 		}, nil
 	}
