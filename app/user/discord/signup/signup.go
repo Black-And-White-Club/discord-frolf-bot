@@ -233,6 +233,7 @@ func (sm *signupManager) SyncMember(ctx context.Context, guildID, userID string)
 	}
 
 	sm.publishUserProfile(ctx, member, guildID)
+	sm.publishRoleSync(ctx, guildID, member.User.ID, member.Roles)
 
 	sm.logger.InfoContext(ctx, "Profile sync completed",
 		attr.String("guild_id", guildID),
@@ -280,6 +281,80 @@ func (sm *signupManager) publishUserProfile(ctx context.Context, member *discord
 // guildNickname returns the member's server-specific nickname, or empty string if none is set.
 func guildNickname(member *discordgo.Member) string {
 	return member.Nick
+}
+
+// publishRoleSync derives a user's role from their Discord guild roles and publishes
+// a UserRoleUpdateRequestedV1 event so frolf-bot can update the DB. Best-effort.
+func (sm *signupManager) publishRoleSync(ctx context.Context, guildID, userID string, memberRoles []string) {
+	guildCfg, err := sm.guildConfigResolver.GetGuildConfigWithContext(ctx, guildID)
+	if err != nil || guildCfg == nil {
+		sm.logger.WarnContext(ctx, "Failed to get guild config for role sync",
+			attr.Error(err),
+			attr.String("guild_id", guildID),
+			attr.String("user_id", userID),
+		)
+		return
+	}
+
+	derived := deriveRole(memberRoles, guildCfg)
+	if derived == "" {
+		sm.logger.InfoContext(ctx, "No recognized role found for member, skipping role sync",
+			attr.String("guild_id", guildID),
+			attr.String("user_id", userID),
+		)
+		return
+	}
+
+	payload := &userevents.UserRoleUpdateRequestedPayloadV1{
+		GuildID: sharedtypes.GuildID(guildID),
+		UserID:  sharedtypes.DiscordID(userID),
+		Role:    derived,
+		// RequesterID intentionally empty for system-initiated syncs
+	}
+
+	msg, err := sm.helper.CreateNewMessage(payload, userevents.UserRoleUpdateRequestedV1)
+	if err != nil || msg == nil {
+		sm.logger.WarnContext(ctx, "Failed to create role sync message", attr.Error(err))
+		return
+	}
+
+	msg.Metadata.Set("user_id", userID)
+	msg.Metadata.Set("guild_id", guildID)
+
+	if err := sm.publisher.Publish(userevents.UserRoleUpdateRequestedV1, msg); err != nil {
+		sm.logger.WarnContext(ctx, "Failed to publish role sync event",
+			attr.Error(err),
+			attr.String("user_id", userID),
+			attr.String("guild_id", guildID),
+		)
+	} else {
+		sm.logger.InfoContext(ctx, "Published role sync event",
+			attr.String("user_id", userID),
+			attr.String("guild_id", guildID),
+			attr.String("role", string(derived)),
+		)
+	}
+}
+
+// deriveRole maps a member's Discord role IDs to a UserRoleEnum using guild config.
+// Priority: Admin > Editor > Registered. Returns "" if none match (skip update).
+func deriveRole(memberRoles []string, cfg *storage.GuildConfig) sharedtypes.UserRoleEnum {
+	for _, r := range memberRoles {
+		if cfg.AdminRoleID != "" && r == cfg.AdminRoleID {
+			return sharedtypes.UserRoleAdmin
+		}
+	}
+	for _, r := range memberRoles {
+		if cfg.EditorRoleID != "" && r == cfg.EditorRoleID {
+			return sharedtypes.UserRoleEditor
+		}
+	}
+	for _, r := range memberRoles {
+		if cfg.RegisteredRoleID != "" && r == cfg.RegisteredRoleID {
+			return sharedtypes.UserRoleUser
+		}
+	}
+	return ""
 }
 
 type SignupOperationResult struct {

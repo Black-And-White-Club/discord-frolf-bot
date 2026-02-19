@@ -10,8 +10,12 @@ import (
 	"testing"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/testutils"
+	userevents "github.com/Black-And-White-Club/frolf-bot-shared/events/user"
 	discordmetrics "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/metrics/discord"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/bwmarrin/discordgo"
@@ -158,13 +162,14 @@ func TestSignupManager_SyncMember(t *testing.T) {
 			}
 
 			sm := &signupManager{
-				session:          fakeSession,
-				publisher:        fakeEventBus,
-				logger:           slog.Default(),
-				helper:           newTestHelper(),
-				interactionStore: fakeInteractionStore,
-				tracer:           noop.NewTracerProvider().Tracer("test"),
-				metrics:          &discordmetrics.NoOpMetrics{},
+				session:             fakeSession,
+				publisher:           fakeEventBus,
+				logger:              slog.Default(),
+				helper:              newTestHelper(),
+				interactionStore:    fakeInteractionStore,
+				guildConfigResolver: &guildconfig.FakeGuildConfigResolver{},
+				tracer:              noop.NewTracerProvider().Tracer("test"),
+				metrics:             &discordmetrics.NoOpMetrics{},
 			}
 
 			err := sm.SyncMember(context.Background(), tt.guildID, tt.userID)
@@ -288,6 +293,256 @@ func TestPublishUserProfile(t *testing.T) {
 			}
 			if !tt.wantPublish && published {
 				t.Error("expected no event to be published but one was")
+			}
+		})
+	}
+}
+
+func TestPublishRoleSync(t *testing.T) {
+	const (
+		adminRoleID      = "role-admin-111"
+		editorRoleID     = "role-editor-222"
+		registeredRoleID = "role-registered-333"
+		guildID          = "guild-123"
+		userID           = "user-456"
+	)
+
+	baseGuildCfg := &storage.GuildConfig{
+		GuildID:          guildID,
+		AdminRoleID:      adminRoleID,
+		EditorRoleID:     editorRoleID,
+		RegisteredRoleID: registeredRoleID,
+	}
+
+	newSM := func(resolver guildconfig.GuildConfigResolver, bus *trackingEventBus) *signupManager {
+		return &signupManager{
+			session:             &discord.FakeSession{},
+			publisher:           bus,
+			logger:              slog.Default(),
+			helper:              newTestHelper(),
+			interactionStore:    testutils.NewFakeStorage[any](),
+			guildConfigResolver: resolver,
+			tracer:              noop.NewTracerProvider().Tracer("test"),
+			metrics:             &discordmetrics.NoOpMetrics{},
+		}
+	}
+
+	tests := []struct {
+		name        string
+		memberRoles []string
+		resolver    *guildconfig.FakeGuildConfigResolver
+		wantPublish bool
+		wantRole    sharedtypes.UserRoleEnum
+	}{
+		{
+			name:        "admin role publishes UserRoleAdmin",
+			memberRoles: []string{adminRoleID},
+			resolver: &guildconfig.FakeGuildConfigResolver{
+				GetGuildConfigWithContextFunc: func(_ context.Context, _ string) (*storage.GuildConfig, error) {
+					return baseGuildCfg, nil
+				},
+			},
+			wantPublish: true,
+			wantRole:    sharedtypes.UserRoleAdmin,
+		},
+		{
+			name:        "editor role publishes UserRoleEditor",
+			memberRoles: []string{editorRoleID},
+			resolver: &guildconfig.FakeGuildConfigResolver{
+				GetGuildConfigWithContextFunc: func(_ context.Context, _ string) (*storage.GuildConfig, error) {
+					return baseGuildCfg, nil
+				},
+			},
+			wantPublish: true,
+			wantRole:    sharedtypes.UserRoleEditor,
+		},
+		{
+			name:        "registered role publishes UserRoleUser",
+			memberRoles: []string{registeredRoleID},
+			resolver: &guildconfig.FakeGuildConfigResolver{
+				GetGuildConfigWithContextFunc: func(_ context.Context, _ string) (*storage.GuildConfig, error) {
+					return baseGuildCfg, nil
+				},
+			},
+			wantPublish: true,
+			wantRole:    sharedtypes.UserRoleUser,
+		},
+		{
+			name:        "admin wins over editor when both present",
+			memberRoles: []string{editorRoleID, adminRoleID},
+			resolver: &guildconfig.FakeGuildConfigResolver{
+				GetGuildConfigWithContextFunc: func(_ context.Context, _ string) (*storage.GuildConfig, error) {
+					return baseGuildCfg, nil
+				},
+			},
+			wantPublish: true,
+			wantRole:    sharedtypes.UserRoleAdmin,
+		},
+		{
+			name:        "no recognized roles skips publish",
+			memberRoles: []string{"role-unknown-999"},
+			resolver: &guildconfig.FakeGuildConfigResolver{
+				GetGuildConfigWithContextFunc: func(_ context.Context, _ string) (*storage.GuildConfig, error) {
+					return baseGuildCfg, nil
+				},
+			},
+			wantPublish: false,
+		},
+		{
+			name:        "empty member roles skips publish",
+			memberRoles: []string{},
+			resolver: &guildconfig.FakeGuildConfigResolver{
+				GetGuildConfigWithContextFunc: func(_ context.Context, _ string) (*storage.GuildConfig, error) {
+					return baseGuildCfg, nil
+				},
+			},
+			wantPublish: false,
+		},
+		{
+			name:        "guild config error skips publish without panic",
+			memberRoles: []string{adminRoleID},
+			resolver: &guildconfig.FakeGuildConfigResolver{
+				GetGuildConfigWithContextFunc: func(_ context.Context, _ string) (*storage.GuildConfig, error) {
+					return nil, errors.New("backend unavailable")
+				},
+			},
+			wantPublish: false,
+		},
+		{
+			name:        "nil guild config skips publish without panic",
+			memberRoles: []string{adminRoleID},
+			resolver: &guildconfig.FakeGuildConfigResolver{
+				GetGuildConfigWithContextFunc: func(_ context.Context, _ string) (*storage.GuildConfig, error) {
+					return nil, nil
+				},
+			},
+			wantPublish: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bus := newTrackingEventBus()
+			sm := newSM(tt.resolver, bus)
+
+			sm.publishRoleSync(context.Background(), guildID, userID, tt.memberRoles)
+
+			msgs := bus.PublishedMessages()
+			if tt.wantPublish {
+				if len(msgs) == 0 {
+					t.Fatal("expected role sync event to be published but none were")
+				}
+				// Verify topic
+				topic := msgs[0].Metadata.Get("topic")
+				if topic != userevents.UserRoleUpdateRequestedV1 {
+					t.Errorf("published topic = %q, want %q", topic, userevents.UserRoleUpdateRequestedV1)
+				}
+				// Verify payload role
+				var payload userevents.UserRoleUpdateRequestedPayloadV1
+				if err := json.Unmarshal(msgs[0].Payload, &payload); err != nil {
+					t.Fatalf("failed to unmarshal payload: %v", err)
+				}
+				if payload.Role != tt.wantRole {
+					t.Errorf("payload.Role = %q, want %q", payload.Role, tt.wantRole)
+				}
+				if payload.UserID != sharedtypes.DiscordID(userID) {
+					t.Errorf("payload.UserID = %q, want %q", payload.UserID, userID)
+				}
+				if payload.GuildID != sharedtypes.GuildID(guildID) {
+					t.Errorf("payload.GuildID = %q, want %q", payload.GuildID, guildID)
+				}
+				if payload.RequesterID != "" {
+					t.Errorf("payload.RequesterID = %q, want empty for system syncs", payload.RequesterID)
+				}
+			} else {
+				if len(msgs) != 0 {
+					t.Errorf("expected no role sync event but got %d", len(msgs))
+				}
+			}
+		})
+	}
+}
+
+func TestDeriveRole(t *testing.T) {
+	const (
+		adminRoleID      = "role-admin-111"
+		editorRoleID     = "role-editor-222"
+		registeredRoleID = "role-registered-333"
+	)
+
+	cfg := &storage.GuildConfig{
+		AdminRoleID:      adminRoleID,
+		EditorRoleID:     editorRoleID,
+		RegisteredRoleID: registeredRoleID,
+	}
+
+	tests := []struct {
+		name        string
+		memberRoles []string
+		cfg         *storage.GuildConfig
+		want        sharedtypes.UserRoleEnum
+	}{
+		{
+			name:        "admin role",
+			memberRoles: []string{adminRoleID},
+			cfg:         cfg,
+			want:        sharedtypes.UserRoleAdmin,
+		},
+		{
+			name:        "editor role",
+			memberRoles: []string{editorRoleID},
+			cfg:         cfg,
+			want:        sharedtypes.UserRoleEditor,
+		},
+		{
+			name:        "registered role",
+			memberRoles: []string{registeredRoleID},
+			cfg:         cfg,
+			want:        sharedtypes.UserRoleUser,
+		},
+		{
+			name:        "admin beats editor",
+			memberRoles: []string{editorRoleID, adminRoleID},
+			cfg:         cfg,
+			want:        sharedtypes.UserRoleAdmin,
+		},
+		{
+			name:        "admin beats registered",
+			memberRoles: []string{registeredRoleID, adminRoleID},
+			cfg:         cfg,
+			want:        sharedtypes.UserRoleAdmin,
+		},
+		{
+			name:        "editor beats registered",
+			memberRoles: []string{registeredRoleID, editorRoleID},
+			cfg:         cfg,
+			want:        sharedtypes.UserRoleEditor,
+		},
+		{
+			name:        "no matching role returns empty",
+			memberRoles: []string{"role-unknown-999"},
+			cfg:         cfg,
+			want:        "",
+		},
+		{
+			name:        "empty member roles returns empty",
+			memberRoles: []string{},
+			cfg:         cfg,
+			want:        "",
+		},
+		{
+			name:        "empty config role IDs never match",
+			memberRoles: []string{adminRoleID},
+			cfg:         &storage.GuildConfig{},
+			want:        "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := deriveRole(tt.memberRoles, tt.cfg)
+			if got != tt.want {
+				t.Errorf("deriveRole() = %q, want %q", got, tt.want)
 			}
 		})
 	}
