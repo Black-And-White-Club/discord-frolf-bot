@@ -252,11 +252,14 @@ func (rm *roleManager) HandleRoleButtonPress(ctx context.Context, i *discordgo.I
 			return RoleOperationResult{Error: ctx.Err()}, nil
 		}
 
-		// Type assertion for MessageComponentInteractionData
-		var data *discordgo.MessageComponentInteractionData
+		// Type assertion for MessageComponentInteractionData.
+		// discordgo may deserialize this as a value or pointer depending on version/context.
+		var data discordgo.MessageComponentInteractionData
 		switch d := i.Interaction.Data.(type) {
-		case *discordgo.MessageComponentInteractionData:
+		case discordgo.MessageComponentInteractionData:
 			data = d
+		case *discordgo.MessageComponentInteractionData:
+			data = *d
 		default:
 			err := fmt.Errorf("unexpected interaction data type: %T", i.Interaction.Data)
 			rm.logger.ErrorContext(ctx, err.Error())
