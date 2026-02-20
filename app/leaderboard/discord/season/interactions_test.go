@@ -56,7 +56,7 @@ func TestSeasonManager_HandleSeasonCommand_Start(t *testing.T) {
 	}
 
 	// Mock Helper CreateNewMessage
-	fakeHelpers.CreateNewMessageFunc = func(payload interface{}, topic string) (*message.Message, error) {
+	fakeHelpers.CreateNewMessageFunc = func(payload any, topic string) (*message.Message, error) {
 		return message.NewMessage("test-uuid", nil), nil
 	}
 
@@ -144,7 +144,7 @@ func TestSeasonManager_HandleSeasonCommand_Standings(t *testing.T) {
 		return nil
 	}
 
-	fakeHelpers.CreateNewMessageFunc = func(payload interface{}, topic string) (*message.Message, error) {
+	fakeHelpers.CreateNewMessageFunc = func(payload any, topic string) (*message.Message, error) {
 		return message.NewMessage("test-uuid", nil), nil
 	}
 

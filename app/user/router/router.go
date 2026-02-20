@@ -40,7 +40,7 @@ type UserRouter struct {
 	helper           utils.Helpers
 	tracer           trace.Tracer
 	middlewareHelper utils.MiddlewareHelpers
-	userDiscord      interface{} // Store userDiscord for access to signup manager
+	userDiscord      any // Store userDiscord for access to signup manager
 }
 
 // NewUserRouter creates a new UserRouter.

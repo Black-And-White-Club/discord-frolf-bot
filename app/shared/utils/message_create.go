@@ -9,7 +9,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-func BuildWatermillMessageFromInteraction(topic string, payload interface{}, interaction *discordgo.InteractionCreate, helper utils.Helpers, config *config.Config) (*message.Message, error) {
+func BuildWatermillMessageFromInteraction(topic string, payload any, interaction *discordgo.InteractionCreate, helper utils.Helpers, config *config.Config) (*message.Message, error) {
 	msg, err := helper.CreateNewMessage(payload, topic)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create message: %w", err)

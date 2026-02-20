@@ -160,7 +160,7 @@ func wrapRoleOperation(
 }
 
 type RoleOperationResult struct {
-	Success interface{}
-	Failure interface{}
+	Success any
+	Failure any
 	Error   error
 }

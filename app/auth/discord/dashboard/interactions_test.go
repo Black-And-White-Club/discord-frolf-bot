@@ -51,7 +51,7 @@ func TestDashboardManager_HandleDashboardCommand(t *testing.T) {
 				}
 			},
 			setupHelper: func(helper *testutils.FakeHelpers) {
-				helper.CreateNewMessageFunc = func(payload interface{}, topic string) (*message.Message, error) {
+				helper.CreateNewMessageFunc = func(payload any, topic string) (*message.Message, error) {
 					return message.NewMessage("test-msg-id", []byte("{}")), nil
 				}
 			},
@@ -84,7 +84,7 @@ func TestDashboardManager_HandleDashboardCommand(t *testing.T) {
 				}
 			},
 			setupHelper: func(helper *testutils.FakeHelpers) {
-				helper.CreateNewMessageFunc = func(payload interface{}, topic string) (*message.Message, error) {
+				helper.CreateNewMessageFunc = func(payload any, topic string) (*message.Message, error) {
 					return message.NewMessage("test-msg-id", []byte("{}")), nil
 				}
 			},
@@ -117,7 +117,7 @@ func TestDashboardManager_HandleDashboardCommand(t *testing.T) {
 				}
 			},
 			setupHelper: func(helper *testutils.FakeHelpers) {
-				helper.CreateNewMessageFunc = func(payload interface{}, topic string) (*message.Message, error) {
+				helper.CreateNewMessageFunc = func(payload any, topic string) (*message.Message, error) {
 					return message.NewMessage("test-msg-id", []byte("{}")), nil
 				}
 			},
@@ -141,7 +141,7 @@ func TestDashboardManager_HandleDashboardCommand(t *testing.T) {
 				}
 			},
 			setupHelper: func(helper *testutils.FakeHelpers) {
-				helper.CreateNewMessageFunc = func(payload interface{}, topic string) (*message.Message, error) {
+				helper.CreateNewMessageFunc = func(payload any, topic string) (*message.Message, error) {
 					return message.NewMessage("test-msg-id", []byte("{}")), nil
 				}
 			},
@@ -176,7 +176,7 @@ func TestDashboardManager_HandleDashboardCommand(t *testing.T) {
 				}
 			},
 			setupHelper: func(helper *testutils.FakeHelpers) {
-				helper.CreateNewMessageFunc = func(payload interface{}, topic string) (*message.Message, error) {
+				helper.CreateNewMessageFunc = func(payload any, topic string) (*message.Message, error) {
 					return message.NewMessage("test-msg-id", []byte("{}")), nil
 				}
 			},

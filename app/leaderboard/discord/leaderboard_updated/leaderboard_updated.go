@@ -146,7 +146,7 @@ func wrapLeaderboardUpdateOperation(
 
 // LeaderboardUpdateOperationResult defines a standard result wrapper for leaderboard operations.
 type LeaderboardUpdateOperationResult struct {
-	Success interface{}
-	Failure interface{}
+	Success any
+	Failure any
 	Error   error
 }

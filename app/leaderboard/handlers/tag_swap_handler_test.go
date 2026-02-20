@@ -16,7 +16,7 @@ func TestHandleTagSwapRequest(t *testing.T) {
 		name    string
 		payload *discordleaderboardevents.LeaderboardTagSwapRequestPayloadV1
 		wantErr bool
-		check   func(*testing.T, interface{}, error)
+		check   func(*testing.T, any, error)
 	}{
 		{
 			name: "successful_tag_swap_request",
@@ -29,7 +29,7 @@ func TestHandleTagSwapRequest(t *testing.T) {
 				MessageID:   "message",
 			},
 			wantErr: false,
-			check: func(t *testing.T, result interface{}, err error) {
+			check: func(t *testing.T, result any, err error) {
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
 				}

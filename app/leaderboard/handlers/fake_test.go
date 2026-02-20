@@ -197,26 +197,26 @@ func (f *FakeHistoryManager) HandleTagGraphFailed(ctx context.Context, payload *
 
 // FakeHelpers provides a programmable stub for utils.Helpers
 type FakeHelpers struct {
-	CreateNewMessageFunc    func(payload interface{}, topic string) (*message.Message, error)
-	CreateResultMessageFunc func(originalMsg *message.Message, payload interface{}, topic string) (*message.Message, error)
-	UnmarshalPayloadFunc    func(msg *message.Message, payload interface{}) error
+	CreateNewMessageFunc    func(payload any, topic string) (*message.Message, error)
+	CreateResultMessageFunc func(originalMsg *message.Message, payload any, topic string) (*message.Message, error)
+	UnmarshalPayloadFunc    func(msg *message.Message, payload any) error
 }
 
-func (f *FakeHelpers) CreateNewMessage(payload interface{}, topic string) (*message.Message, error) {
+func (f *FakeHelpers) CreateNewMessage(payload any, topic string) (*message.Message, error) {
 	if f.CreateNewMessageFunc != nil {
 		return f.CreateNewMessageFunc(payload, topic)
 	}
 	return &message.Message{}, nil
 }
 
-func (f *FakeHelpers) CreateResultMessage(originalMsg *message.Message, payload interface{}, topic string) (*message.Message, error) {
+func (f *FakeHelpers) CreateResultMessage(originalMsg *message.Message, payload any, topic string) (*message.Message, error) {
 	if f.CreateResultMessageFunc != nil {
 		return f.CreateResultMessageFunc(originalMsg, payload, topic)
 	}
 	return &message.Message{}, nil
 }
 
-func (f *FakeHelpers) UnmarshalPayload(msg *message.Message, payload interface{}) error {
+func (f *FakeHelpers) UnmarshalPayload(msg *message.Message, payload any) error {
 	if f.UnmarshalPayloadFunc != nil {
 		return f.UnmarshalPayloadFunc(msg, payload)
 	}

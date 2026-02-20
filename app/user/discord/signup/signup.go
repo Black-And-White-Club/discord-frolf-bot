@@ -91,7 +91,7 @@ func NewSignupManager(
 }
 
 // createEvent creates a Watermill message to send to the backend.
-func (sm *signupManager) createEvent(ctx context.Context, topic string, payload interface{}, i *discordgo.InteractionCreate) (*message.Message, error) {
+func (sm *signupManager) createEvent(ctx context.Context, topic string, payload any, i *discordgo.InteractionCreate) (*message.Message, error) {
 	newEvent := message.NewMessage(watermill.NewUUID(), nil)
 
 	if newEvent.Metadata == nil {
@@ -358,7 +358,7 @@ func deriveRole(memberRoles []string, cfg *storage.GuildConfig) sharedtypes.User
 }
 
 type SignupOperationResult struct {
-	Success interface{}
-	Failure interface{}
+	Success any
+	Failure any
 	Error   error
 }

@@ -163,7 +163,7 @@ func (gc *GuildConfigCache) Get(guildID string) (*GuildConfig, bool) {
 	// Check if soft refresh is needed
 	if time.Since(config.RefreshedAt) > gc.refreshTTL && !config.IsRequestPending {
 		// Use singleflight to ensure only one refresh runs for this guildID
-		go gc.sfGroup.Do(guildID, func() (interface{}, error) {
+		go gc.sfGroup.Do(guildID, func() (any, error) {
 			slog.Debug("Triggering deduplicated background refresh", attr.String("guild_id", guildID))
 			gc.triggerAsyncRefresh(guildID)
 			return nil, nil

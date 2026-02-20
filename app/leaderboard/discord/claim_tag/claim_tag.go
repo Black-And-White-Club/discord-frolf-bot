@@ -41,8 +41,8 @@ type claimTagManager struct {
 }
 
 type ClaimTagOperationResult struct {
-	Success interface{}
-	Failure interface{}
+	Success any
+	Failure any
 	Error   error
 }
 

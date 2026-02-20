@@ -65,8 +65,8 @@ func NewUDiscManager(
 
 // UDiscOperationResult represents the result of a UDisc operation.
 type UDiscOperationResult struct {
-	Success interface{}
-	Failure interface{}
+	Success any
+	Failure any
 	Error   error
 }
 

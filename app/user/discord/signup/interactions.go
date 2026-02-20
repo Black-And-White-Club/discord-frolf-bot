@@ -44,7 +44,7 @@ func (sm *signupManager) MessageReactionAdd(s discord.Session, r *discordgo.Mess
 	// we need to check config to populate the tracking.
 	_, tracked := sm.trackedChannels.Load(r.ChannelID)
 	hasTrackedChannels := false
-	sm.trackedChannels.Range(func(_, _ interface{}) bool {
+	sm.trackedChannels.Range(func(_, _ any) bool {
 		hasTrackedChannels = true
 		return false // stop after first item
 	})

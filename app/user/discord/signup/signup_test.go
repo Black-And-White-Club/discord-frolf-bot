@@ -304,7 +304,7 @@ func Test_signupManager_createEvent(t *testing.T) {
 	tests := []struct {
 		name    string
 		topic   string
-		payload interface{}
+		payload any
 		wantErr bool
 	}{
 		{

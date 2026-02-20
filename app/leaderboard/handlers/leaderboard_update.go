@@ -57,7 +57,7 @@ func (h *LeaderboardHandlers) HandleBatchTagAssigned(ctx context.Context,
 			attr.Int("assignment_count", batchPayload.AssignmentCount),
 		)
 
-		tracePayload := map[string]interface{}{
+		tracePayload := map[string]any{
 			"event_type":       "batch_assignment_completed",
 			"status":           "missing_channel_id",
 			"entry_count":      len(batchPayload.Assignments),

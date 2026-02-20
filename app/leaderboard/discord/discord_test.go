@@ -48,4 +48,4 @@ func TestNewLeaderboardDiscord_ConstructsAndExposesManagers(t *testing.T) {
 type testingLogger struct{}
 
 // nilTracer is a placeholder type alias; we pass nil so constructor doesn't use it.
-type nilTracer = interface{}
+type nilTracer = any

@@ -20,12 +20,12 @@ import (
 )
 
 // simple in-memory ISInterface stub
-type memStore struct{ m map[string]interface{} }
+type memStore struct{ m map[string]any }
 
 // Implement the new storage.ISInterface[T] signatures (context-aware, (T, error) returns)
-func (s *memStore) Set(_ context.Context, id string, v interface{}) error {
+func (s *memStore) Set(_ context.Context, id string, v any) error {
 	if s.m == nil {
-		s.m = map[string]interface{}{}
+		s.m = map[string]any{}
 	}
 	s.m[id] = v
 	return nil
@@ -37,7 +37,7 @@ func (s *memStore) Delete(_ context.Context, id string) {
 	}
 }
 
-func (s *memStore) Get(_ context.Context, id string) (interface{}, error) {
+func (s *memStore) Get(_ context.Context, id string) (any, error) {
 	if s.m == nil {
 		return nil, errors.New("not found")
 	}
@@ -90,26 +90,26 @@ func discard() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, ni
 
 // fakeHelpers provides a programmable stub for utils.Helpers
 type fakeHelpers struct {
-	CreateNewMessageFunc    func(payload interface{}, topic string) (*message.Message, error)
-	CreateResultMessageFunc func(originalMsg *message.Message, payload interface{}, topic string) (*message.Message, error)
-	UnmarshalPayloadFunc    func(msg *message.Message, payload interface{}) error
+	CreateNewMessageFunc    func(payload any, topic string) (*message.Message, error)
+	CreateResultMessageFunc func(originalMsg *message.Message, payload any, topic string) (*message.Message, error)
+	UnmarshalPayloadFunc    func(msg *message.Message, payload any) error
 }
 
-func (f *fakeHelpers) CreateNewMessage(payload interface{}, topic string) (*message.Message, error) {
+func (f *fakeHelpers) CreateNewMessage(payload any, topic string) (*message.Message, error) {
 	if f.CreateNewMessageFunc != nil {
 		return f.CreateNewMessageFunc(payload, topic)
 	}
 	return &message.Message{}, nil
 }
 
-func (f *fakeHelpers) CreateResultMessage(originalMsg *message.Message, payload interface{}, topic string) (*message.Message, error) {
+func (f *fakeHelpers) CreateResultMessage(originalMsg *message.Message, payload any, topic string) (*message.Message, error) {
 	if f.CreateResultMessageFunc != nil {
 		return f.CreateResultMessageFunc(originalMsg, payload, topic)
 	}
 	return &message.Message{}, nil
 }
 
-func (f *fakeHelpers) UnmarshalPayload(msg *message.Message, payload interface{}) error {
+func (f *fakeHelpers) UnmarshalPayload(msg *message.Message, payload any) error {
 	if f.UnmarshalPayloadFunc != nil {
 		return f.UnmarshalPayloadFunc(msg, payload)
 	}
@@ -189,7 +189,7 @@ func TestHandleClaimTagCommand_Variants(t *testing.T) {
 		}
 
 		helper := &fakeHelpers{
-			CreateNewMessageFunc: func(payload interface{}, topic string) (*message.Message, error) {
+			CreateNewMessageFunc: func(payload any, topic string) (*message.Message, error) {
 				return &message.Message{}, nil
 			},
 		}
@@ -307,7 +307,7 @@ func TestHandleClaimTagCommand_Variants(t *testing.T) {
 			return nil
 		}
 		helper := &fakeHelpers{
-			CreateNewMessageFunc: func(payload interface{}, topic string) (*message.Message, error) {
+			CreateNewMessageFunc: func(payload any, topic string) (*message.Message, error) {
 				return nil, errors.New("create err")
 			},
 		}
@@ -330,7 +330,7 @@ func TestHandleClaimTagCommand_Variants(t *testing.T) {
 			return nil
 		}
 		helper := &fakeHelpers{
-			CreateNewMessageFunc: func(payload interface{}, topic string) (*message.Message, error) {
+			CreateNewMessageFunc: func(payload any, topic string) (*message.Message, error) {
 				return &message.Message{}, nil
 			},
 		}
@@ -365,7 +365,7 @@ func TestUpdateInteractionResponse_Variants(t *testing.T) {
 	})
 
 	t.Run("bad stored type", func(t *testing.T) {
-		store := &memStore{m: map[string]interface{}{"cid": 42}}
+		store := &memStore{m: map[string]any{"cid": 42}}
 		mgr := NewClaimTagManager(nil, &fakeEventBus{}, logger, nil, cfg, nil, store, nil, tracer, metrics)
 		res, err := mgr.UpdateInteractionResponse(ctx, "cid", "msg")
 		if err != nil || res.Error == nil {
@@ -378,7 +378,7 @@ func TestUpdateInteractionResponse_Variants(t *testing.T) {
 		sess.InteractionResponseEditFunc = func(interaction *discordgo.Interaction, edit *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
 			return nil, errors.New("edit err")
 		}
-		store := &memStore{m: map[string]interface{}{"cid": &discordgo.Interaction{}}}
+		store := &memStore{m: map[string]any{"cid": &discordgo.Interaction{}}}
 		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, nil, cfg, nil, store, nil, tracer, metrics)
 		res, err := mgr.UpdateInteractionResponse(ctx, "cid", "done")
 		if err != nil || res.Error == nil {
@@ -391,7 +391,7 @@ func TestUpdateInteractionResponse_Variants(t *testing.T) {
 		sess.InteractionResponseEditFunc = func(interaction *discordgo.Interaction, edit *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
 			return &discordgo.Message{}, nil
 		}
-		store := &memStore{m: map[string]interface{}{"cid": &discordgo.Interaction{}}}
+		store := &memStore{m: map[string]any{"cid": &discordgo.Interaction{}}}
 		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, nil, cfg, nil, store, nil, tracer, metrics)
 		res, err := mgr.UpdateInteractionResponse(ctx, "cid", "updated")
 		if err != nil || res.Error != nil || res.Success == nil {
@@ -406,6 +406,6 @@ func TestUpdateInteractionResponse_Variants(t *testing.T) {
 // errStore forces Set error
 type errStore struct{ memStore }
 
-func (e *errStore) Set(_ context.Context, id string, v interface{}) error {
+func (e *errStore) Set(_ context.Context, id string, v any) error {
 	return errors.New("set err")
 }

@@ -532,7 +532,7 @@ func Test_roleManager_HandleRoleButtonPress(t *testing.T) {
 				fakeSession.InteractionResponseEditFunc = func(interaction *discordgo.Interaction, webhook *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
 					return &discordgo.Message{}, nil
 				}
-				fakeHelper.CreateNewMessageFunc = func(payload interface{}, topic string) (*message.Message, error) {
+				fakeHelper.CreateNewMessageFunc = func(payload any, topic string) (*message.Message, error) {
 					return message.NewMessage(watermill.NewUUID(), nil), nil
 				}
 				fakeInteractionStore.SetFunc = func(ctx context.Context, key string, val any) error {
