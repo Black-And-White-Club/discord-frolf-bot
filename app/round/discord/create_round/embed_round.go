@@ -105,3 +105,16 @@ func (crm *createRoundManager) SendRoundEventEmbed(guildID string, channelID str
 		return CreateRoundOperationResult{Success: msg}, nil
 	})
 }
+
+func (crm *createRoundManager) SendRoundEventURL(guildID string, channelID string, eventID string) (CreateRoundOperationResult, error) {
+	return crm.operationWrapper(context.Background(), "SendRoundEventURL", func(ctx context.Context) (CreateRoundOperationResult, error) {
+		eventURL := fmt.Sprintf("https://discord.com/events/%s/%s", guildID, eventID)
+
+		msg, err := crm.session.ChannelMessageSend(channelID, eventURL)
+		if err != nil {
+			return CreateRoundOperationResult{Error: fmt.Errorf("failed to send event url message: %w", err)}, nil
+		}
+
+		return CreateRoundOperationResult{Success: msg}, nil
+	})
+}

@@ -97,38 +97,6 @@ func registerHandler[T any](
 	)
 }
 
-// registerHandlerWithSub registers a handler using an explicit subscriber.
-// Used for fan-out patterns where multiple handlers need independent consumer
-// groups on the same topic.
-func registerHandlerWithSub[T any](
-	deps handlerDeps,
-	sub message.Subscriber,
-	topic string,
-	handler func(context.Context, *T) ([]handlerwrapper.Result, error),
-	suffix ...string,
-) {
-	handlerName := "discord-round." + topic
-	if len(suffix) > 0 {
-		handlerName += suffix[0]
-	}
-
-	deps.router.AddHandler(
-		handlerName,
-		topic,
-		sub,
-		"",
-		deps.publisher,
-		handlerwrapper.WrapTransformingTyped(
-			handlerName,
-			deps.logger,
-			deps.tracer,
-			deps.helper,
-			deps.metrics,
-			handler,
-		),
-	)
-}
-
 // Configure sets up the router.
 func (r *RoundRouter) Configure(ctx context.Context, handlers handlers.Handlers) error {
 	r.logger.InfoContext(ctx, "RoundRouter.Configure called")
@@ -169,12 +137,6 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers handlers.Ha
 	// Creation flow
 	registerHandler(deps, discordroundevents.RoundCreateModalSubmittedV1, handlers.HandleRoundCreateRequested)
 	registerHandler(deps, roundevents.RoundCreatedV1, handlers.HandleRoundCreated)
-
-	// Native Event Creation (parallel to embed creation, independent consumer group).
-	// Uses a separate subscriber with its own NATS consumer so both this handler
-	// and the embed handler above each receive every RoundCreatedV1 message (fan-out).
-	registerHandlerWithSub(deps, r.nativeSubscriber, roundevents.RoundCreatedV1, handlers.HandleRoundCreatedForNativeEvent, ".native")
-
 	registerHandler(deps, roundevents.RoundCreationFailedV1, handlers.HandleRoundCreationFailed)
 	registerHandler(deps, roundevents.RoundValidationFailedV1, handlers.HandleRoundValidationFailed)
 

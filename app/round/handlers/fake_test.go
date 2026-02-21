@@ -35,6 +35,9 @@ type FakeRoundDiscord struct {
 	GetUpdateRoundManagerFunc     func() updateround.UpdateRoundManager
 	GetTagUpdateManagerFunc       func() tagupdates.TagUpdateManager
 	GetScorecardUploadManagerFunc func() scorecardupload.ScorecardUploadManager
+	GetSessionFunc                func() discord.Session
+	GetNativeEventMapFunc         func() rounddiscord.NativeEventMap
+	GetPendingNativeEventMapFunc  func() rounddiscord.PendingNativeEventMap
 	GetMessageMapFunc             func() rounddiscord.MessageMap
 
 	// Holds the sub-fakes
@@ -48,6 +51,9 @@ type FakeRoundDiscord struct {
 	UpdateRoundManager     FakeUpdateRoundManager
 	TagUpdateManager       FakeTagUpdateManager
 	ScorecardUploadManager FakeScorecardUploadManager
+	Session                discord.Session
+	NativeEventMap         rounddiscord.NativeEventMap
+	PendingNativeEventMap  rounddiscord.PendingNativeEventMap
 	MessageMap             FakeMessageMap
 }
 
@@ -122,15 +128,33 @@ func (f *FakeRoundDiscord) GetScorecardUploadManager() scorecardupload.Scorecard
 }
 
 func (f *FakeRoundDiscord) GetSession() discord.Session {
+	if f.GetSessionFunc != nil {
+		return f.GetSessionFunc()
+	}
+	if f.Session != nil {
+		return f.Session
+	}
 	return nil
 }
 
 func (f *FakeRoundDiscord) GetNativeEventMap() rounddiscord.NativeEventMap {
+	if f.GetNativeEventMapFunc != nil {
+		return f.GetNativeEventMapFunc()
+	}
+	if f.NativeEventMap != nil {
+		return f.NativeEventMap
+	}
 	return nil
 }
 
 func (f *FakeRoundDiscord) GetPendingNativeEventMap() rounddiscord.PendingNativeEventMap {
-	return rounddiscord.NewPendingNativeEventMap()
+	if f.GetPendingNativeEventMapFunc != nil {
+		return f.GetPendingNativeEventMapFunc()
+	}
+	if f.PendingNativeEventMap == nil {
+		f.PendingNativeEventMap = rounddiscord.NewPendingNativeEventMap()
+	}
+	return f.PendingNativeEventMap
 }
 
 func (f *FakeRoundDiscord) GetMessageMap() rounddiscord.MessageMap {
@@ -174,8 +198,10 @@ type FakeCreateRoundManager struct {
 	UpdateInteractionResponseWithRetryButtonFunc func(ctx context.Context, correlationID, message string) (createround.CreateRoundOperationResult, error)
 	HandleCreateRoundModalCancelFunc             func(ctx context.Context, i *discordgo.InteractionCreate) (createround.CreateRoundOperationResult, error)
 	SendRoundEventEmbedFunc                      func(guildID string, channelID string, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, creatorID sharedtypes.DiscordID, roundID sharedtypes.RoundID) (createround.CreateRoundOperationResult, error)
+	SendRoundEventURLFunc                        func(guildID string, channelID string, eventID string) (createround.CreateRoundOperationResult, error)
 	SendCreateRoundModalFunc                     func(ctx context.Context, i *discordgo.InteractionCreate) (createround.CreateRoundOperationResult, error)
 	HandleRetryCreateRoundFunc                   func(ctx context.Context, i *discordgo.InteractionCreate) (createround.CreateRoundOperationResult, error)
+	CreateNativeEventFunc                        func(ctx context.Context, guildID string, roundID sharedtypes.RoundID, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, userID sharedtypes.DiscordID) (createround.CreateRoundOperationResult, error)
 }
 
 func (f *FakeCreateRoundManager) HandleCreateRoundCommand(ctx context.Context, i *discordgo.InteractionCreate) (createround.CreateRoundOperationResult, error) {
@@ -230,6 +256,20 @@ func (f *FakeCreateRoundManager) SendCreateRoundModal(ctx context.Context, i *di
 func (f *FakeCreateRoundManager) HandleRetryCreateRound(ctx context.Context, i *discordgo.InteractionCreate) (createround.CreateRoundOperationResult, error) {
 	if f.HandleRetryCreateRoundFunc != nil {
 		return f.HandleRetryCreateRoundFunc(ctx, i)
+	}
+	return createround.CreateRoundOperationResult{}, nil
+}
+
+func (f *FakeCreateRoundManager) SendRoundEventURL(guildID string, channelID string, eventID string) (createround.CreateRoundOperationResult, error) {
+	if f.SendRoundEventURLFunc != nil {
+		return f.SendRoundEventURLFunc(guildID, channelID, eventID)
+	}
+	return createround.CreateRoundOperationResult{}, nil
+}
+
+func (f *FakeCreateRoundManager) CreateNativeEvent(ctx context.Context, guildID string, roundID sharedtypes.RoundID, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, userID sharedtypes.DiscordID) (createround.CreateRoundOperationResult, error) {
+	if f.CreateNativeEventFunc != nil {
+		return f.CreateNativeEventFunc(ctx, guildID, roundID, title, description, startTime, location, userID)
 	}
 	return createround.CreateRoundOperationResult{}, nil
 }

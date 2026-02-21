@@ -34,8 +34,10 @@ type CreateRoundManager interface {
 	UpdateInteractionResponseWithRetryButton(ctx context.Context, correlationID, message string) (CreateRoundOperationResult, error)
 	HandleCreateRoundModalCancel(ctx context.Context, i *discordgo.InteractionCreate) (CreateRoundOperationResult, error)
 	SendRoundEventEmbed(guildID string, channelID string, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, creatorID sharedtypes.DiscordID, roundID sharedtypes.RoundID) (CreateRoundOperationResult, error)
+	SendRoundEventURL(guildID string, channelID string, eventID string) (CreateRoundOperationResult, error)
 	SendCreateRoundModal(ctx context.Context, i *discordgo.InteractionCreate) (CreateRoundOperationResult, error)
 	HandleRetryCreateRound(ctx context.Context, i *discordgo.InteractionCreate) (CreateRoundOperationResult, error)
+	CreateNativeEvent(ctx context.Context, guildID string, roundID sharedtypes.RoundID, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, userID sharedtypes.DiscordID) (CreateRoundOperationResult, error)
 }
 
 type createRoundManager struct {
