@@ -14,11 +14,6 @@ import (
 	"go.opentelemetry.io/otel/trace/noop"
 )
 
-// Helper function to get a pointer to a string
-func stringPtr(s string) *string {
-	return &s
-}
-
 func Test_createRoundManager_HandleCreateRoundCommand(t *testing.T) {
 	tests := []struct {
 		name            string

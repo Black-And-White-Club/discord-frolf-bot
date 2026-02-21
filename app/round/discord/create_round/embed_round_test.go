@@ -142,3 +142,92 @@ func Test_createRoundManager_SendRoundEventEmbed(t *testing.T) {
 		})
 	}
 }
+
+func Test_createRoundManager_SendRoundEventURL(t *testing.T) {
+	tests := []struct {
+		name          string
+		setup         func(f *discord.FakeSession)
+		expectedErr   bool
+		expectedError string
+	}{
+		{
+			name: "successful send",
+			setup: func(f *discord.FakeSession) {
+				f.ChannelMessageSendFunc = func(channelID string, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					expectedURL := "https://discord.com/events/guild-id/event-123"
+					if content != expectedURL {
+						t.Errorf("expected content to be %q, got %q", expectedURL, content)
+					}
+					return &discordgo.Message{ID: "msg-1"}, nil
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name: "send failure",
+			setup: func(f *discord.FakeSession) {
+				f.ChannelMessageSendFunc = func(channelID string, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return nil, errors.New("send failed")
+				}
+			},
+			expectedErr:   true,
+			expectedError: "failed to send event url message: send failed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fakeSession := discord.NewFakeSession()
+
+			if tt.setup != nil {
+				tt.setup(fakeSession)
+			}
+
+			manager := &createRoundManager{
+				session: fakeSession,
+				config: &config.Config{
+					Discord: config.DiscordConfig{
+						GuildID: "guild-id",
+					},
+				},
+				operationWrapper: func(ctx context.Context, name string, fn func(context.Context) (CreateRoundOperationResult, error)) (CreateRoundOperationResult, error) {
+					return fn(ctx)
+				},
+				logger: slog.Default(),
+			}
+
+			result, err := manager.SendRoundEventURL(
+				"guild-id",
+				"channel-123",
+				"event-123",
+			)
+
+			if tt.expectedErr {
+				if err == nil && result.Error == nil {
+					t.Errorf("%s: Expected error, got none", tt.name)
+				}
+				if tt.expectedError != "" {
+					var actualError string
+					if err != nil {
+						actualError = err.Error()
+					} else if result.Error != nil {
+						actualError = result.Error.Error()
+					}
+					if !strings.Contains(actualError, tt.expectedError) {
+						t.Errorf("%s: Expected error containing: %v, got: %v", tt.name, tt.expectedError, actualError)
+					}
+				}
+			} else {
+				if err != nil {
+					t.Errorf("%s: Unexpected error: %v", tt.name, err)
+				}
+				if result.Error != nil {
+					t.Errorf("%s: Unexpected result.Error: %v", tt.name, result.Error)
+				}
+				if result.Success == nil {
+					t.Errorf("%s: Expected success message, got nil", tt.name)
+				}
+			}
+		})
+	}
+}
