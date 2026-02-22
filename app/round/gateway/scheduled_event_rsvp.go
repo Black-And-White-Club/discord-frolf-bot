@@ -24,7 +24,7 @@ import (
 
 // ScheduledEventRSVPListener translates Discord Guild Scheduled Event
 // gateway events (UserAdd/UserRemove) into domain events on the event bus.
-// It also handles early event end/cancel to finalize the scorecard embed.
+// It also handles early event end/cancel lifecycle transitions.
 type ScheduledEventRSVPListener struct {
 	nativeEventMap        rounddiscord.NativeEventMap
 	messageMap            rounddiscord.MessageMap
@@ -36,6 +36,7 @@ type ScheduledEventRSVPListener struct {
 	helper                utils.Helpers
 	logger                *slog.Logger
 	startedEvents         sync.Map
+	completedEvents       sync.Map
 	lookupSubscriberMu    sync.Mutex
 	lookupSubscriberAlive bool
 	lookupSubscriberErr   error
@@ -44,8 +45,9 @@ type ScheduledEventRSVPListener struct {
 }
 
 type nativeEventLookupResult struct {
-	roundID sharedtypes.RoundID
-	found   bool
+	roundID   sharedtypes.RoundID
+	messageID string
+	found     bool
 }
 
 // NewScheduledEventRSVPListener creates a new RSVP gateway listener.
@@ -328,6 +330,7 @@ func (l *ScheduledEventRSVPListener) handleEventUpdate(event *discordgo.GuildSch
 func (l *ScheduledEventRSVPListener) handleEventCanceled(event *discordgo.GuildScheduledEvent) {
 	l.logger.Info("Handling event cancellation", attr.String("event_id", event.ID))
 	l.startedEvents.Delete(event.ID)
+	l.completedEvents.Delete(event.ID)
 	guildID := sharedtypes.GuildID(event.GuildID)
 
 	roundID, storedCreatorID, ok := l.resolveRoundID(guildID, event.ID)
@@ -382,15 +385,27 @@ func (l *ScheduledEventRSVPListener) handleEventCanceled(event *discordgo.GuildS
 		return
 	}
 
+	l.nativeEventMap.Delete(roundID)
+	l.messageMap.Delete(roundID)
+
 	l.logger.Info("Published round delete request from canceled Discord event",
 		attr.String("guild_id", string(guildID)),
 		attr.String("discord_event_id", event.ID),
 		attr.String("round_id", roundID.String()))
 }
 
-// handleEventCompleted finalizes the scorecard embed when an event is completed (ended).
+// handleEventCompleted requests backend finalization when a native event is completed.
 func (l *ScheduledEventRSVPListener) handleEventCompleted(event *discordgo.GuildScheduledEvent) {
 	l.startedEvents.Delete(event.ID)
+	// Prevent duplicate finalize command publications if Discord sends repeated updates.
+	if _, loaded := l.completedEvents.LoadOrStore(event.ID, true); loaded {
+		return
+	}
+	go func(eventID string) {
+		time.Sleep(5 * time.Minute)
+		l.completedEvents.Delete(eventID)
+	}(event.ID)
+
 	guildID := sharedtypes.GuildID(event.GuildID)
 
 	roundID, _, ok := l.resolveRoundID(guildID, event.ID)
@@ -398,40 +413,24 @@ func (l *ScheduledEventRSVPListener) handleEventCompleted(event *discordgo.Guild
 		return
 	}
 
-	messageID, ok := l.messageMap.Load(roundID)
-	if !ok {
-		l.logger.Warn("No messageID found for completed event",
-			attr.String("discord_event_id", event.ID),
-			attr.String("round_id", roundID.String()))
-		return
+	payload := roundevents.RoundFinalizeRequestedPayloadV1{
+		GuildID: guildID,
+		RoundID: roundID,
 	}
 
-	// Resolve guild-specific channel ID
-	resolvedChannelID := l.resolveEventChannel(context.Background(), string(guildID))
-
-	if resolvedChannelID == "" {
-		return
-	}
-
-	// Fetch the current embed from Discord
-	msg, err := l.session.ChannelMessage(resolvedChannelID, messageID)
-	if err != nil || len(msg.Embeds) == 0 {
-		return
-	}
-
-	embed := msg.Embeds[0]
-	embed.Color = 0x808080 // Gray for early end
-	embed.Footer = &discordgo.MessageEmbedFooter{Text: "Round ended early."}
-
-	// Edit message: update embed, remove action buttons
-	_, err = l.session.ChannelMessageEditComplex(&discordgo.MessageEdit{
-		Channel:    resolvedChannelID,
-		ID:         messageID,
-		Embeds:     &[]*discordgo.MessageEmbed{embed},
-		Components: &[]discordgo.MessageComponent{},
-	})
+	msg, err := l.helper.CreateNewMessage(payload, roundevents.RoundFinalizeRequestedV1)
 	if err != nil {
-		l.logger.Error("Failed to finalize embed for completed event",
+		l.logger.Error("Failed to create finalize request from completed Discord event",
+			attr.String("guild_id", string(guildID)),
+			attr.String("discord_event_id", event.ID),
+			attr.String("round_id", roundID.String()),
+			attr.Error(err))
+		return
+	}
+
+	if err := l.eventBus.Publish(roundevents.RoundFinalizeRequestedV1, msg); err != nil {
+		l.logger.Error("Failed to publish finalize request from completed Discord event",
+			attr.String("guild_id", string(guildID)),
 			attr.String("discord_event_id", event.ID),
 			attr.String("round_id", roundID.String()),
 			attr.Error(err))
@@ -439,8 +438,10 @@ func (l *ScheduledEventRSVPListener) handleEventCompleted(event *discordgo.Guild
 	}
 
 	l.nativeEventMap.Delete(roundID)
+	l.messageMap.Delete(roundID)
 
-	l.logger.Info("Finalized embed for completed event",
+	l.logger.Info("Published round finalize request from completed Discord event",
+		attr.String("guild_id", string(guildID)),
 		attr.String("discord_event_id", event.ID),
 		attr.String("round_id", roundID.String()))
 }
@@ -452,6 +453,7 @@ func (l *ScheduledEventRSVPListener) handleEventStartedEarly(event *discordgo.Gu
 	if _, loaded := l.startedEvents.LoadOrStore(event.ID, true); loaded {
 		return
 	}
+	l.completedEvents.Delete(event.ID)
 
 	guildID := sharedtypes.GuildID(event.GuildID)
 
@@ -634,6 +636,10 @@ func (l *ScheduledEventRSVPListener) resolveRoundID(guildID sharedtypes.GuildID,
 		// NOTE: Lookup results currently do not carry creator ID.
 		l.nativeEventMap.Store(discordEventID, lookupResult.roundID, guildID, sharedtypes.DiscordID(""))
 
+		if lookupResult.messageID != "" {
+			l.messageMap.Store(lookupResult.roundID, lookupResult.messageID)
+		}
+
 		l.logger.Info("Resolved native event via NATS lookup",
 			attr.String("guild_id", string(guildID)),
 			attr.String("discord_event_id", discordEventID),
@@ -683,8 +689,9 @@ func (l *ScheduledEventRSVPListener) consumeLookupResults(resultCh <-chan *messa
 		resultMsg.Ack()
 
 		lookupResult := nativeEventLookupResult{
-			roundID: result.RoundID,
-			found:   result.Found,
+			roundID:   result.RoundID,
+			messageID: result.MessageID,
+			found:     result.Found,
 		}
 
 		l.lookupWaitersMu.Lock()
