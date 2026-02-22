@@ -71,7 +71,7 @@ func teamRankEmoji(index, total int) string {
 		case total - 1:
 			return "🗑️"
 		default:
-			return "🏌️"
+			return "🥏"
 		}
 	}
 }
