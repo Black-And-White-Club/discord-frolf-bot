@@ -3,7 +3,7 @@ module github.com/Black-And-White-Club/discord-frolf-bot
 go 1.25.0
 
 require (
-	github.com/Black-And-White-Club/frolf-bot-shared v0.1.17
+	github.com/Black-And-White-Club/frolf-bot-shared v0.1.18
 	github.com/ThreeDotsLabs/watermill v1.5.1
 	github.com/bwmarrin/discordgo v0.29.0
 	github.com/google/uuid v1.6.0
