@@ -100,6 +100,28 @@ func RegisterHandlers(registry *interactions.Registry, messageRegistry *interact
 		manager.HandleScorecardUploadButton(ctx, i)
 	}, interactions.MutatingHandlerPolicy{RequiredPermission: interactions.PlayerRequired, RequiresSetup: true})
 
+	// Finalized-round scorecard upload button (admin/editor only).
+	registry.RegisterMutatingHandler("round_upload_scorecard_finalized|", func(ctx context.Context, i *discordgo.InteractionCreate) {
+		if i == nil || i.Interaction == nil {
+			slog.WarnContext(ctx, "Ignoring finalized scorecard upload button with nil interaction payload")
+			return
+		}
+
+		userID := interactionUserIDFromCreate(i)
+		if userID == "" {
+			slog.WarnContext(ctx, "Ignoring finalized scorecard upload button with missing user",
+				attr.String("interaction_id", i.ID))
+			return
+		}
+
+		slog.InfoContext(ctx, "Handling finalized scorecard upload button press",
+			attr.String("custom_id", i.MessageComponentData().CustomID),
+			attr.String("interaction_id", i.ID),
+			attr.String("user_id", userID),
+		)
+		manager.HandleScorecardUploadButton(ctx, i)
+	}, interactions.MutatingHandlerPolicy{RequiredPermission: interactions.EditorRequired, RequiresSetup: true})
+
 	// Scorecard upload modal submission
 	registry.RegisterMutatingHandler("scorecard_upload_modal", func(ctx context.Context, i *discordgo.InteractionCreate) {
 		if i == nil || i.Interaction == nil {

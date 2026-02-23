@@ -75,6 +75,7 @@ func TestRegisterHandlers_wiresButtonModalAndMessageHandlers(t *testing.T) {
 				EventChannelID:       "events",
 				LeaderboardChannelID: "leaderboard",
 				RegisteredRoleID:     "player",
+				EditorRoleID:         "editor",
 			}, nil
 		},
 	})
@@ -98,6 +99,22 @@ func TestRegisterHandlers_wiresButtonModalAndMessageHandlers(t *testing.T) {
 	if mgr.buttonCalls != 1 {
 		mgr.mu.Unlock()
 		t.Fatalf("expected button handler called once, got %d", mgr.buttonCalls)
+	}
+	mgr.mu.Unlock()
+
+	// Finalized upload button requires editor/admin and should route successfully for editor.
+	finalizedButtonInteraction := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
+		Type:    discordgo.InteractionMessageComponent,
+		ID:      "i1b",
+		GuildID: "g1",
+		Data:    discordgo.MessageComponentInteractionData{CustomID: "round_upload_scorecard_finalized|round-123"},
+	}}
+	finalizedButtonInteraction.Member = &discordgo.Member{User: &discordgo.User{ID: "u1"}, Roles: []string{"editor"}}
+	registry.HandleInteraction(&discordgo.Session{}, finalizedButtonInteraction)
+	mgr.mu.Lock()
+	if mgr.buttonCalls != 2 {
+		mgr.mu.Unlock()
+		t.Fatalf("expected finalized upload button handler called, got %d calls", mgr.buttonCalls)
 	}
 	mgr.mu.Unlock()
 

@@ -172,6 +172,7 @@ func TestTransformRoundToFinalizedScorecard(t *testing.T) {
 
 			if tt.wantButton {
 				require.NotEmpty(t, components)
+				require.True(t, containsButtonWithPrefix(components, "round_upload_scorecard_finalized|"), "expected finalized upload button")
 			} else {
 				require.Empty(t, components)
 			}
@@ -198,4 +199,41 @@ func findField(embed *discordgo.MessageEmbed, name string) *discordgo.MessageEmb
 
 func intPtr(v int) *int {
 	return &v
+}
+
+func containsButtonWithPrefix(components []discordgo.MessageComponent, prefix string) bool {
+	for _, component := range components {
+		switch row := component.(type) {
+		case discordgo.ActionsRow:
+			for _, inner := range row.Components {
+				switch button := inner.(type) {
+				case discordgo.Button:
+					if len(button.CustomID) >= len(prefix) && button.CustomID[:len(prefix)] == prefix {
+						return true
+					}
+				case *discordgo.Button:
+					if button != nil && len(button.CustomID) >= len(prefix) && button.CustomID[:len(prefix)] == prefix {
+						return true
+					}
+				}
+			}
+		case *discordgo.ActionsRow:
+			if row == nil {
+				continue
+			}
+			for _, inner := range row.Components {
+				switch button := inner.(type) {
+				case discordgo.Button:
+					if len(button.CustomID) >= len(prefix) && button.CustomID[:len(prefix)] == prefix {
+						return true
+					}
+				case *discordgo.Button:
+					if button != nil && len(button.CustomID) >= len(prefix) && button.CustomID[:len(prefix)] == prefix {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
 }

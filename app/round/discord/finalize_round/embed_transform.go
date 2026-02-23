@@ -19,7 +19,9 @@ const (
 	fieldStarted  = "📅 Started"
 	fieldLocation = "📍 Location"
 
-	overrideButtonID = "round_bulk_score_override"
+	overrideButtonID           = "round_bulk_score_override"
+	finalizedUploadButtonID    = "round_upload_scorecard_finalized"
+	finalizedUploadButtonEmoji = "📋"
 )
 
 type participantWithUser struct {
@@ -157,9 +159,20 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 			Timestamp: time.Now().UTC().Format(time.RFC3339),
 		}
 
+		uploadButton := discordgo.Button{
+			Label:    "Upload Scorecard",
+			Style:    discordgo.SuccessButton,
+			CustomID: fmt.Sprintf("%s|%s", finalizedUploadButtonID, payload.RoundID),
+			Emoji:    &discordgo.ComponentEmoji{Name: finalizedUploadButtonEmoji},
+		}
+
 		if len(payload.Teams) > 0 {
-			// For teams rounds, clear all buttons (no score override for doubles)
-			components = []discordgo.MessageComponent{}
+			// Teams rounds do not allow score overrides, but still allow scorecard uploads.
+			components = []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{uploadButton},
+				},
+			}
 		} else {
 			components = []discordgo.MessageComponent{
 				discordgo.ActionsRow{
@@ -170,6 +183,7 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 							CustomID: fmt.Sprintf("%s|%s", overrideButtonID, payload.RoundID),
 							Emoji:    &discordgo.ComponentEmoji{Name: "🛠️"},
 						},
+						uploadButton,
 					},
 				},
 			}
