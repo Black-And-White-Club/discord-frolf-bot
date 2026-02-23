@@ -415,3 +415,143 @@ func createTestLeaderboardWithPoints(count int) []LeaderboardEntry {
 	}
 	return entries
 }
+
+func TestSendLeaderboardEmbed_EditsTrackedMessage(t *testing.T) {
+	channelID := "test-channel"
+	trackedMessageID := "leaderboard-message-123"
+
+	fakeSession := discord.NewFakeSession()
+	fakeSession.ChannelMessageSendComplexFunc = func(channelID string, data *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+		t.Fatalf("unexpected send call when a tracked message exists")
+		return nil, nil
+	}
+	fakeSession.ChannelMessageEditComplexFunc = func(m *discordgo.MessageEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+		if m.Channel != channelID {
+			t.Fatalf("unexpected channel: got %s want %s", m.Channel, channelID)
+		}
+		if m.ID != trackedMessageID {
+			t.Fatalf("unexpected message id: got %s want %s", m.ID, trackedMessageID)
+		}
+		return &discordgo.Message{ID: m.ID, ChannelID: m.Channel}, nil
+	}
+
+	lum := &leaderboardUpdateManager{
+		logger:             slog.New(slog.NewTextHandler(io.Discard, nil)),
+		session:            fakeSession,
+		messageByChannelID: map[string]string{channelID: trackedMessageID},
+		operationWrapper: func(ctx context.Context, name string, fn func(ctx context.Context) (LeaderboardUpdateOperationResult, error)) (LeaderboardUpdateOperationResult, error) {
+			return fn(ctx)
+		},
+	}
+
+	got, err := lum.SendLeaderboardEmbed(context.Background(), channelID, createTestLeaderboard(3), 1)
+	if err != nil {
+		t.Fatalf("SendLeaderboardEmbed() error = %v", err)
+	}
+
+	msg, ok := got.Success.(*discordgo.Message)
+	if !ok {
+		t.Fatalf("expected *discordgo.Message success payload")
+	}
+	if msg.ID != trackedMessageID {
+		t.Fatalf("unexpected edited message id: got %s want %s", msg.ID, trackedMessageID)
+	}
+}
+
+func TestSendLeaderboardEmbed_UnknownTrackedMessageFallsBackToSend(t *testing.T) {
+	channelID := "test-channel"
+	oldMessageID := "deleted-message-123"
+	newMessageID := "new-message-456"
+
+	fakeSession := discord.NewFakeSession()
+	fakeSession.ChannelMessageEditComplexFunc = func(m *discordgo.MessageEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+		return nil, &discordgo.RESTError{
+			Message: &discordgo.APIErrorMessage{
+				Code:    discordgo.ErrCodeUnknownMessage,
+				Message: "Unknown Message",
+			},
+		}
+	}
+	fakeSession.ChannelMessageSendComplexFunc = func(channelID string, data *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+		return &discordgo.Message{ID: newMessageID, ChannelID: channelID}, nil
+	}
+
+	lum := &leaderboardUpdateManager{
+		logger:             slog.New(slog.NewTextHandler(io.Discard, nil)),
+		session:            fakeSession,
+		messageByChannelID: map[string]string{channelID: oldMessageID},
+		operationWrapper: func(ctx context.Context, name string, fn func(ctx context.Context) (LeaderboardUpdateOperationResult, error)) (LeaderboardUpdateOperationResult, error) {
+			return fn(ctx)
+		},
+	}
+
+	got, err := lum.SendLeaderboardEmbed(context.Background(), channelID, createTestLeaderboard(2), 1)
+	if err != nil {
+		t.Fatalf("SendLeaderboardEmbed() error = %v", err)
+	}
+
+	msg, ok := got.Success.(*discordgo.Message)
+	if !ok {
+		t.Fatalf("expected *discordgo.Message success payload")
+	}
+	if msg.ID != newMessageID {
+		t.Fatalf("unexpected sent message id: got %s want %s", msg.ID, newMessageID)
+	}
+	if tracked := lum.getTrackedMessageID(channelID); tracked != newMessageID {
+		t.Fatalf("tracked message id not updated: got %s want %s", tracked, newMessageID)
+	}
+}
+
+func TestSendLeaderboardEmbed_DiscoversExistingMessageAfterRestart(t *testing.T) {
+	channelID := "test-channel"
+	botID := "bot-123"
+	existingMessageID := "existing-message-789"
+
+	fakeSession := discord.NewFakeSession()
+	fakeSession.GetBotUserFunc = func() (*discordgo.User, error) {
+		return &discordgo.User{ID: botID}, nil
+	}
+	fakeSession.ChannelMessagesFunc = func(channelID string, limit int, beforeID, afterID, aroundID string, options ...discordgo.RequestOption) ([]*discordgo.Message, error) {
+		return []*discordgo.Message{
+			{
+				ID:        existingMessageID,
+				ChannelID: channelID,
+				Author:    &discordgo.User{ID: botID},
+				Embeds: []*discordgo.MessageEmbed{
+					{Title: leaderboardEmbedTitle},
+				},
+			},
+		}, nil
+	}
+	fakeSession.ChannelMessageEditComplexFunc = func(m *discordgo.MessageEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+		return &discordgo.Message{ID: m.ID, ChannelID: m.Channel}, nil
+	}
+	fakeSession.ChannelMessageSendComplexFunc = func(channelID string, data *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+		t.Fatalf("unexpected send call; expected edit of discovered message")
+		return nil, nil
+	}
+
+	lum := &leaderboardUpdateManager{
+		logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
+		session: fakeSession,
+		operationWrapper: func(ctx context.Context, name string, fn func(ctx context.Context) (LeaderboardUpdateOperationResult, error)) (LeaderboardUpdateOperationResult, error) {
+			return fn(ctx)
+		},
+	}
+
+	got, err := lum.SendLeaderboardEmbed(context.Background(), channelID, createTestLeaderboard(4), 1)
+	if err != nil {
+		t.Fatalf("SendLeaderboardEmbed() error = %v", err)
+	}
+
+	msg, ok := got.Success.(*discordgo.Message)
+	if !ok {
+		t.Fatalf("expected *discordgo.Message success payload")
+	}
+	if msg.ID != existingMessageID {
+		t.Fatalf("unexpected edited message id: got %s want %s", msg.ID, existingMessageID)
+	}
+	if tracked := lum.getTrackedMessageID(channelID); tracked != existingMessageID {
+		t.Fatalf("tracked message id not persisted after discovery: got %s want %s", tracked, existingMessageID)
+	}
+}

@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"context"
+	"sort"
 
+	leaderboardupdated "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/leaderboard_updated"
 	discordleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
@@ -78,6 +80,44 @@ func (h *LeaderboardHandlers) HandleLeaderboardResponse(ctx context.Context,
 		GuildID:     string(payloadData.GuildID),
 	}
 
+	channelID := h.resolveLeaderboardChannelID(ctx, string(payloadData.GuildID))
+	if channelID != "" && h.service != nil {
+		entries := make([]leaderboardupdated.LeaderboardEntry, 0, len(leaderboardData))
+		for _, entry := range leaderboardData {
+			entries = append(entries, leaderboardupdated.LeaderboardEntry{
+				Rank:         entry.TagNumber,
+				UserID:       entry.UserID,
+				TotalPoints:  entry.TotalPoints,
+				RoundsPlayed: entry.RoundsPlayed,
+			})
+		}
+
+		sort.Slice(entries, func(i, j int) bool {
+			return entries[i].Rank < entries[j].Rank
+		})
+
+		manager := h.service.GetLeaderboardUpdateManager()
+		if manager != nil {
+			result, err := manager.SendLeaderboardEmbed(ctx, channelID, entries, 1)
+			if err != nil {
+				h.logger.ErrorContext(ctx, "Failed to send leaderboard embed from full snapshot",
+					attr.Error(err),
+					attr.String("guild_id", string(payloadData.GuildID)),
+					attr.String("channel_id", channelID),
+				)
+				return nil, err
+			}
+			if result.Error != nil {
+				h.logger.ErrorContext(ctx, "Failed to send leaderboard embed from full snapshot",
+					attr.Error(result.Error),
+					attr.String("guild_id", string(payloadData.GuildID)),
+					attr.String("channel_id", channelID),
+				)
+				return nil, result.Error
+			}
+		}
+	}
+
 	h.logger.InfoContext(ctx, "Successfully processed leaderboard data",
 		attr.String("guild_id", string(payloadData.GuildID)),
 		attr.Int("entry_count", len(leaderboardData)))
@@ -88,4 +128,27 @@ func (h *LeaderboardHandlers) HandleLeaderboardResponse(ctx context.Context,
 			Payload: discordPayload,
 		},
 	}, nil
+}
+
+func (h *LeaderboardHandlers) resolveLeaderboardChannelID(ctx context.Context, guildID string) string {
+	// 1. Guild config (authoritative)
+	if h.guildConfigResolver != nil && guildID != "" {
+		if guildCfg, err := h.guildConfigResolver.GetGuildConfigWithContext(ctx, guildID); err == nil && guildCfg != nil && guildCfg.LeaderboardChannelID != "" {
+			return guildCfg.LeaderboardChannelID
+		} else if err != nil {
+			h.logger.WarnContext(ctx, "Failed to get guild config, will try static config",
+				attr.Error(err),
+				attr.String("guild_id", guildID),
+			)
+		}
+	}
+
+	// 2. Static config fallback (single-tenant / tests)
+	if h.config != nil && h.config.Discord.LeaderboardChannelID != "" {
+		return h.config.Discord.LeaderboardChannelID
+	}
+
+	h.logger.WarnContext(ctx, "No leaderboard channel could be resolved (guild config + static config empty)",
+		attr.String("guild_id", guildID))
+	return ""
 }

@@ -92,6 +92,11 @@ func TestHandleBatchTagAssigned(t *testing.T) {
 				if len(tt.payload.Assignments) > 0 && len(results) == 0 {
 					t.Errorf("expected results for non-empty assignments, got empty slice")
 				}
+				if len(tt.payload.Assignments) > 0 {
+					if got := results[0].Topic; got != leaderboardevents.GetLeaderboardRequestedV1 {
+						t.Errorf("unexpected topic: got %s want %s", got, leaderboardevents.GetLeaderboardRequestedV1)
+					}
+				}
 			}
 		})
 	}

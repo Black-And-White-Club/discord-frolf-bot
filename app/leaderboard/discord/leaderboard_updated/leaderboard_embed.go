@@ -2,12 +2,16 @@ package leaderboardupdated
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
 )
+
+const leaderboardEmbedTitle = "🏆 Leaderboard"
 
 type LeaderboardEntry struct {
 	Rank         sharedtypes.TagNumber `json:"rank"`
@@ -83,12 +87,12 @@ func (lum *leaderboardUpdateManager) SendLeaderboardEmbed(ctx context.Context, c
 		}
 
 		embed := &discordgo.MessageEmbed{
-			Title:       "🏆 Leaderboard",
+			Title:       leaderboardEmbedTitle,
 			Description: fmt.Sprintf("Page %d/%d", page, totalPages),
 			Color:       0xFFD700, // Gold color
 			Fields:      fields,
 			Footer: &discordgo.MessageEmbedFooter{
-				Text: fmt.Sprintf("Updated: %s", time.Now().Format(time.RFC1123)),
+				Text: fmt.Sprintf("Frolf Leaderboard • Updated: %s", time.Now().Format(time.RFC1123)),
 			},
 		}
 
@@ -113,6 +117,47 @@ func (lum *leaderboardUpdateManager) SendLeaderboardEmbed(ctx context.Context, c
 			})
 		}
 
+		if existingMessageID := lum.getTrackedMessageID(channelID); existingMessageID != "" {
+			editedMessage, err := lum.session.ChannelMessageEditComplex(&discordgo.MessageEdit{
+				ID:         existingMessageID,
+				Channel:    channelID,
+				Embeds:     &[]*discordgo.MessageEmbed{embed},
+				Components: &components,
+			})
+			if err == nil {
+				return LeaderboardUpdateOperationResult{Success: editedMessage}, nil
+			}
+			if isUnknownMessageError(err) {
+				lum.clearTrackedMessageID(channelID)
+			} else {
+				err := fmt.Errorf("failed to update persistent leaderboard message: %w", err)
+				lum.logger.ErrorContext(ctx, err.Error())
+				return LeaderboardUpdateOperationResult{Error: err}, err
+			}
+		}
+
+		if discoveredMessageID, err := lum.findExistingLeaderboardMessage(ctx, channelID); err != nil {
+			lum.logger.WarnContext(ctx, "Failed to discover existing leaderboard message, will post a new one", "channel_id", channelID, "error", err)
+		} else if discoveredMessageID != "" {
+			lum.setTrackedMessageID(channelID, discoveredMessageID)
+			editedMessage, editErr := lum.session.ChannelMessageEditComplex(&discordgo.MessageEdit{
+				ID:         discoveredMessageID,
+				Channel:    channelID,
+				Embeds:     &[]*discordgo.MessageEmbed{embed},
+				Components: &components,
+			})
+			if editErr == nil {
+				return LeaderboardUpdateOperationResult{Success: editedMessage}, nil
+			}
+			if isUnknownMessageError(editErr) {
+				lum.clearTrackedMessageID(channelID)
+			} else {
+				err := fmt.Errorf("failed to update discovered leaderboard message: %w", editErr)
+				lum.logger.ErrorContext(ctx, err.Error())
+				return LeaderboardUpdateOperationResult{Error: err}, err
+			}
+		}
+
 		message, err := lum.session.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
 			Embeds:     []*discordgo.MessageEmbed{embed},
 			Components: components,
@@ -123,6 +168,77 @@ func (lum *leaderboardUpdateManager) SendLeaderboardEmbed(ctx context.Context, c
 			return LeaderboardUpdateOperationResult{Error: err}, err
 		}
 
+		lum.setTrackedMessageID(channelID, message.ID)
 		return LeaderboardUpdateOperationResult{Success: message}, nil
 	})
+}
+
+func (lum *leaderboardUpdateManager) getTrackedMessageID(channelID string) string {
+	lum.messageMu.RLock()
+	defer lum.messageMu.RUnlock()
+	if lum.messageByChannelID == nil {
+		return ""
+	}
+	return lum.messageByChannelID[channelID]
+}
+
+func (lum *leaderboardUpdateManager) setTrackedMessageID(channelID, messageID string) {
+	if channelID == "" || messageID == "" {
+		return
+	}
+	lum.messageMu.Lock()
+	defer lum.messageMu.Unlock()
+	if lum.messageByChannelID == nil {
+		lum.messageByChannelID = make(map[string]string)
+	}
+	lum.messageByChannelID[channelID] = messageID
+}
+
+func (lum *leaderboardUpdateManager) clearTrackedMessageID(channelID string) {
+	lum.messageMu.Lock()
+	defer lum.messageMu.Unlock()
+	if lum.messageByChannelID == nil {
+		return
+	}
+	delete(lum.messageByChannelID, channelID)
+}
+
+func (lum *leaderboardUpdateManager) findExistingLeaderboardMessage(ctx context.Context, channelID string) (string, error) {
+	if channelID == "" {
+		return "", nil
+	}
+
+	messages, err := lum.session.ChannelMessages(channelID, 50, "", "", "")
+	if err != nil {
+		return "", err
+	}
+
+	botID := ""
+	if botUser, botErr := lum.session.GetBotUser(); botErr == nil && botUser != nil {
+		botID = botUser.ID
+	}
+
+	for _, message := range messages {
+		if message == nil || len(message.Embeds) == 0 {
+			continue
+		}
+		if botID != "" && message.Author != nil && message.Author.ID != botID {
+			continue
+		}
+		embed := message.Embeds[0]
+		if embed != nil && embed.Title == leaderboardEmbedTitle {
+			lum.logger.InfoContext(ctx, "Discovered existing leaderboard message to reuse", "channel_id", channelID, "message_id", message.ID)
+			return message.ID, nil
+		}
+	}
+
+	return "", nil
+}
+
+func isUnknownMessageError(err error) bool {
+	var restErr *discordgo.RESTError
+	if errors.As(err, &restErr) && restErr.Message != nil && restErr.Message.Code == discordgo.ErrCodeUnknownMessage {
+		return true
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "unknown message")
 }

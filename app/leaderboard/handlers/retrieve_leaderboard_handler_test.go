@@ -4,8 +4,11 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"slices"
 	"testing"
 
+	leaderboardupdated "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/leaderboard_updated"
+	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	discordleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	leaderboardtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/leaderboard"
@@ -153,5 +156,65 @@ func TestHandleLeaderboardResponse(t *testing.T) {
 				t.Errorf("expected results, got empty slice")
 			}
 		})
+	}
+}
+
+func TestHandleLeaderboardResponse_SendsFullSnapshotEmbed(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	cfg := &config.Config{}
+	cfg.Discord.LeaderboardChannelID = "leaderboard-channel"
+
+	fakeDiscord := &FakeLeaderboardDiscord{}
+	var gotChannelID string
+	var gotRanks []sharedtypes.TagNumber
+	var gotUserIDs []sharedtypes.DiscordID
+	fakeDiscord.LeaderboardUpdateManager.SendLeaderboardEmbedFunc = func(
+		ctx context.Context,
+		channelID string,
+		leaderboard []leaderboardupdated.LeaderboardEntry,
+		page int32,
+	) (leaderboardupdated.LeaderboardUpdateOperationResult, error) {
+		gotChannelID = channelID
+		gotRanks = make([]sharedtypes.TagNumber, 0, len(leaderboard))
+		gotUserIDs = make([]sharedtypes.DiscordID, 0, len(leaderboard))
+		for _, entry := range leaderboard {
+			gotRanks = append(gotRanks, entry.Rank)
+			gotUserIDs = append(gotUserIDs, entry.UserID)
+		}
+		return leaderboardupdated.LeaderboardUpdateOperationResult{Success: "ok"}, nil
+	}
+
+	h := NewLeaderboardHandlers(
+		logger,
+		cfg,
+		nil,
+		fakeDiscord,
+		nil,
+	)
+
+	payload := &leaderboardevents.GetLeaderboardResponsePayloadV1{
+		GuildID: sharedtypes.GuildID("guild123"),
+		Leaderboard: []leaderboardtypes.LeaderboardEntry{
+			{TagNumber: 13, UserID: "user13"},
+			{TagNumber: 1, UserID: "user1"},
+		},
+	}
+
+	results, err := h.HandleLeaderboardResponse(context.Background(), payload)
+	if err != nil {
+		t.Fatalf("HandleLeaderboardResponse() error = %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatalf("expected handler results, got empty")
+	}
+	if gotChannelID != "leaderboard-channel" {
+		t.Fatalf("unexpected channel: got %s want %s", gotChannelID, "leaderboard-channel")
+	}
+	if !slices.Equal(gotRanks, []sharedtypes.TagNumber{1, 13}) {
+		t.Fatalf("unexpected ranks: got %v want [1 13]", gotRanks)
+	}
+	if !slices.Equal(gotUserIDs, []sharedtypes.DiscordID{"user1", "user13"}) {
+		t.Fatalf("unexpected users: got %v want [user1 user13]", gotUserIDs)
 	}
 }

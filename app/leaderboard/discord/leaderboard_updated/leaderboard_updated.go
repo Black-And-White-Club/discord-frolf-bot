@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
@@ -39,6 +40,8 @@ type leaderboardUpdateManager struct {
 	tracer              trace.Tracer
 	metrics             discordmetrics.DiscordMetrics
 	operationWrapper    func(ctx context.Context, opName string, fn func(ctx context.Context) (LeaderboardUpdateOperationResult, error)) (LeaderboardUpdateOperationResult, error)
+	messageMu           sync.RWMutex
+	messageByChannelID  map[string]string
 }
 
 // NewLeaderboardUpdateManager creates a new LeaderboardUpdateManager instance.
@@ -71,6 +74,7 @@ func NewLeaderboardUpdateManager(
 		operationWrapper: func(ctx context.Context, opName string, fn func(ctx context.Context) (LeaderboardUpdateOperationResult, error)) (LeaderboardUpdateOperationResult, error) {
 			return wrapLeaderboardUpdateOperation(ctx, opName, fn, logger, tracer, metrics)
 		},
+		messageByChannelID: make(map[string]string),
 	}
 }
 
