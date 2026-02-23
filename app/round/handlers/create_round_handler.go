@@ -16,6 +16,16 @@ import (
 )
 
 func (h *RoundHandlers) HandleRoundCreateRequested(ctx context.Context, payload *discordroundevents.CreateRoundModalPayloadV1) ([]handlerwrapper.Result, error) {
+	if h.logger != nil {
+		h.logger.InfoContext(ctx, "publishing create round request to backend",
+			attr.ExtractCorrelationID(ctx),
+			attr.String("guild_id", string(payload.GuildID)),
+			attr.UserID(payload.UserID),
+			attr.String("title", string(payload.Title)),
+			attr.String("start_time", payload.StartTime),
+		)
+	}
+
 	// Convert to backend payload and set GuildID
 	desc := payload.Description
 	backendPayload := roundevents.CreateRoundRequestedPayloadV1{
@@ -45,6 +55,15 @@ func (h *RoundHandlers) HandleRoundCreateRequested(ctx context.Context, payload 
 // Handles the RoundCreated Event from the Backend
 func (h *RoundHandlers) HandleRoundCreated(ctx context.Context, payload *roundevents.RoundCreatedPayloadV1) ([]handlerwrapper.Result, error) {
 	roundID := payload.RoundID
+	if h.logger != nil {
+		h.logger.InfoContext(ctx, "processing round created event in discord handler",
+			attr.ExtractCorrelationID(ctx),
+			attr.String("guild_id", string(payload.GuildID)),
+			attr.RoundID("round_id", roundID),
+			attr.String("channel_id", string(payload.ChannelID)),
+		)
+	}
+
 	if payload.GuildID == "" {
 		return nil, fmt.Errorf("GuildID missing in payload for round %s", roundID.String())
 	}
@@ -138,6 +157,17 @@ func (h *RoundHandlers) HandleRoundCreated(ctx context.Context, payload *roundev
 		} else if urlResult.Error != nil {
 			h.logger.ErrorContext(ctx, "Failed to send event URL message", attr.String("round_id", roundID.String()), attr.Error(urlResult.Error))
 		}
+	}
+
+	if h.logger != nil {
+		h.logger.InfoContext(ctx, "round created event processed in discord handler",
+			attr.ExtractCorrelationID(ctx),
+			attr.String("guild_id", guildID),
+			attr.RoundID("round_id", roundID),
+			attr.String("discord_event_id", discordEventID),
+			attr.String("discord_message_id", discordMessageID),
+			attr.Int("published_events", len(results)),
+		)
 	}
 
 	return results, nil
@@ -281,6 +311,16 @@ func (h *RoundHandlers) resolveNativeEvent(ctx context.Context, payload *roundev
 }
 
 func (h *RoundHandlers) HandleRoundCreationFailed(ctx context.Context, payload *roundevents.RoundCreationFailedPayloadV1) ([]handlerwrapper.Result, error) {
+	if h.logger != nil {
+		h.logger.WarnContext(ctx, "handling round creation failed event",
+			attr.ExtractCorrelationID(ctx),
+			attr.String("guild_id", string(payload.GuildID)),
+			attr.UserID(payload.UserID),
+			attr.String("channel_id", payload.ChannelID),
+			attr.String("error_message", payload.ErrorMessage),
+		)
+	}
+
 	// Prepare the error message
 	errorMessage := "❌ Round creation failed: " + payload.ErrorMessage
 
@@ -288,7 +328,12 @@ func (h *RoundHandlers) HandleRoundCreationFailed(ctx context.Context, payload *
 	// This is a side-effect only, no outgoing messages
 	correlationID, ok := ctx.Value("correlation_id").(string)
 	if !ok {
-		// correlationID not available in context, skip update
+		if h.logger != nil {
+			h.logger.WarnContext(ctx, "skipping retry-button update because correlation_id is missing",
+				attr.String("guild_id", string(payload.GuildID)),
+				attr.UserID(payload.UserID),
+			)
+		}
 		return nil, nil
 	}
 
@@ -301,12 +346,26 @@ func (h *RoundHandlers) HandleRoundCreationFailed(ctx context.Context, payload *
 }
 
 func (h *RoundHandlers) HandleRoundValidationFailed(ctx context.Context, payload *roundevents.RoundValidationFailedPayloadV1) ([]handlerwrapper.Result, error) {
+	if h.logger != nil {
+		h.logger.WarnContext(ctx, "handling round validation failed event",
+			attr.ExtractCorrelationID(ctx),
+			attr.String("guild_id", string(payload.GuildID)),
+			attr.UserID(payload.UserID),
+			attr.Int("error_count", len(payload.ErrorMessages)),
+		)
+	}
+
 	errorMessages := payload.ErrorMessages
 	errorMessage := "❌ " + strings.Join(errorMessages, "\n") + " Please try again."
 
 	correlationID, ok := ctx.Value("correlation_id").(string)
 	if !ok {
-		// correlationID not available in context, skip update
+		if h.logger != nil {
+			h.logger.WarnContext(ctx, "skipping validation retry-button update because correlation_id is missing",
+				attr.String("guild_id", string(payload.GuildID)),
+				attr.UserID(payload.UserID),
+			)
+		}
 		return nil, nil
 	}
 

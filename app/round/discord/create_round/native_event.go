@@ -26,7 +26,7 @@ func (crm *createRoundManager) CreateNativeEvent(
 
 		// Convert sharedtypes.StartTime to time.Time
 		startTimeValue := time.Time(startTime)
-		endTimeValue := startTimeValue.Add(3 * time.Hour)
+		endTimeValue := startTimeValue.Add(6 * time.Hour)
 
 		// Create the Discord Guild Scheduled Event parameters
 		eventParams := &discordgo.GuildScheduledEventParams{
