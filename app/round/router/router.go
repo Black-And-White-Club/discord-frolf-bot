@@ -177,6 +177,7 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers handlers.Ha
 	// Lifecycle
 	registerHandler(deps, roundevents.RoundDeletedV1, handlers.HandleRoundDeleted)
 	registerHandler(deps, roundevents.RoundFinalizedDiscordV1, handlers.HandleRoundFinalized)
+	registerHandler(deps, roundevents.RoundCompletedV1, handlers.HandleRoundCompleted)
 	registerHandler(deps, roundevents.RoundStartedDiscordV1, handlers.HandleRoundStarted)
 	registerHandler(deps, sharedevents.PointsAwardedV1, handlers.HandlePointsAwarded)
 

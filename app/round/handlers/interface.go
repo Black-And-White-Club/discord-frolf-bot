@@ -48,6 +48,7 @@ type Handlers interface {
 	// Lifecycle
 	HandleRoundDeleted(ctx context.Context, payload *roundevents.RoundDeletedPayloadV1) ([]handlerwrapper.Result, error)
 	HandleRoundFinalized(ctx context.Context, payload *roundevents.RoundFinalizedDiscordPayloadV1) ([]handlerwrapper.Result, error)
+	HandleRoundCompleted(ctx context.Context, payload *roundevents.RoundCompletedPayloadV1) ([]handlerwrapper.Result, error)
 	HandleRoundStarted(ctx context.Context, payload *roundevents.DiscordRoundStartPayloadV1) ([]handlerwrapper.Result, error)
 
 	// Tag handling

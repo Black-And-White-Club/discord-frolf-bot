@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	embedpagination "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/embed_pagination"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
@@ -41,6 +42,64 @@ func (tum *tagUpdateManager) UpdateTagsInEmbed(ctx context.Context, channelID, m
 			}
 		}
 
+		usersFoundAndUpdated := make(map[sharedtypes.DiscordID]bool)
+		if snapshot, found := embedpagination.Update(messageID, func(snapshot *embedpagination.Snapshot) bool {
+			if snapshot == nil || snapshot.Kind != embedpagination.SnapshotKindLines {
+				return false
+			}
+
+			if len(snapshot.LineItems) == 0 {
+				return false
+			}
+
+			updatedLines := make([]string, 0, len(snapshot.LineItems))
+			for _, line := range snapshot.LineItems {
+				parsedUserID, parsedTagNumber, ok := tum.parseParticipantLine(ctx, line)
+				if !ok {
+					updatedLines = append(updatedLines, line)
+					continue
+				}
+
+				if newTagNumber, shouldUpdate := tagUpdates[parsedUserID]; shouldUpdate {
+					usersFoundAndUpdated[parsedUserID] = true
+					updatedLines = append(updatedLines, tum.formatParticipantLine(parsedUserID, newTagNumber))
+					continue
+				}
+
+				updatedLines = append(updatedLines, tum.formatParticipantLine(parsedUserID, parsedTagNumber))
+			}
+
+			if len(usersFoundAndUpdated) == 0 {
+				return false
+			}
+
+			snapshot.LineItems = updatedLines
+			return true
+		}); found {
+			if len(usersFoundAndUpdated) == 0 {
+				return TagUpdateOperationResult{Success: "No target users found in embed fields"}, nil
+			}
+
+			embed, components, _, _, renderErr := embedpagination.RenderPage(messageID, snapshot.CurrentPage)
+			if renderErr != nil {
+				return TagUpdateOperationResult{Error: renderErr}, fmt.Errorf("failed to render paginated tag update: %w", renderErr)
+			}
+
+			edit := &discordgo.MessageEdit{
+				Channel:    resolvedChannelID,
+				ID:         messageID,
+				Embeds:     &[]*discordgo.MessageEmbed{embed},
+				Components: &components,
+			}
+
+			updatedMsg, err := tum.session.ChannelMessageEditComplex(edit)
+			if err != nil {
+				return TagUpdateOperationResult{Error: err}, fmt.Errorf("failed to edit message for tag update: %w", err)
+			}
+
+			return TagUpdateOperationResult{Success: updatedMsg}, nil
+		}
+
 		// 1. Fetch the existing message and embed
 		message, err := tum.session.ChannelMessage(resolvedChannelID, messageID)
 		if err != nil {
@@ -66,7 +125,7 @@ func (tum *tagUpdateManager) UpdateTagsInEmbed(ctx context.Context, channelID, m
 
 		// Assuming the round embed is the first embed
 		embed := message.Embeds[0]
-		usersFoundAndUpdated := make(map[sharedtypes.DiscordID]bool)
+		usersFoundAndUpdated = make(map[sharedtypes.DiscordID]bool)
 
 		// 2. Iterate through relevant embed fields (Accepted, Tentative, etc.)
 		participantFields := []*discordgo.MessageEmbedField{}

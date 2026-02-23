@@ -11,6 +11,7 @@ import (
 	rounddiscord "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord"
 	createround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/create_round"
 	deleteround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/delete_round"
+	embedpagination "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/embed_pagination"
 	roundrsvp "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/round_rsvp"
 	scoreround "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/score_round"
 	scorecardupload "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/scorecard_upload"
@@ -79,6 +80,12 @@ func InitializeRoundModule(
 	scoreround.RegisterHandlers(interactionRegistry, roundDiscord.GetScoreRoundManager())
 	updateround.RegisterHandlers(interactionRegistry, roundDiscord.GetUpdateRoundManager())
 	scorecardupload.RegisterHandlers(interactionRegistry, messageRegistry, roundDiscord.GetScorecardUploadManager())
+	embedpagination.ConfigurePersistence(embedpagination.PersistenceConfig{
+		EventBus: eventBus,
+		Helper:   helper,
+		Logger:   logger.With("component", "round-embed-pagination"),
+	})
+	embedpagination.RegisterHandlers(interactionRegistry, roundDiscord.GetSession())
 
 	// Register Native Event RSVP gateway listeners (GuildScheduledEventUserAdd/Remove)
 	rsvpListener := gateway.NewScheduledEventRSVPListener(

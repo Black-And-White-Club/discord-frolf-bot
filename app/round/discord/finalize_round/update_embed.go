@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	embedpagination "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/embed_pagination"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
@@ -79,15 +80,59 @@ func (frm *finalizeRoundManager) FinalizeScorecardEmbed(
 			return FinalizeRoundOperationResult{}, fmt.Errorf("transformed embed is nil")
 		}
 
+		pagedEmbed := embed
+		pagedComponents := components
+		if len(embedPayload.Teams) > 0 {
+			embedpagination.Delete(eventMessageID)
+		} else {
+			targetPage := 0
+			if existingSnapshot, found := embedpagination.Get(eventMessageID); found {
+				targetPage = existingSnapshot.CurrentPage
+			}
+
+			staticFields := make([]*discordgo.MessageEmbedField, 0, len(embed.Fields))
+			participantFields := make([]*discordgo.MessageEmbedField, 0, len(embed.Fields))
+			for _, field := range embed.Fields {
+				if field == nil {
+					continue
+				}
+				if field.Name == fieldStarted || field.Name == fieldLocation {
+					staticFields = append(staticFields, field)
+					continue
+				}
+				participantFields = append(participantFields, field)
+			}
+
+			snapshot := embedpagination.NewFieldSnapshot(
+				eventMessageID,
+				embed,
+				components,
+				staticFields,
+				participantFields,
+			)
+			embedpagination.Set(snapshot)
+
+			renderedEmbed, renderedComponents, _, totalPages, renderErr := embedpagination.RenderPage(eventMessageID, targetPage)
+			if renderErr != nil {
+				return FinalizeRoundOperationResult{}, fmt.Errorf("failed to render paginated finalized embed: %w", renderErr)
+			}
+			pagedEmbed = renderedEmbed
+			pagedComponents = renderedComponents
+			if totalPages <= 1 {
+				// No paging needed anymore; remove stored snapshot immediately.
+				embedpagination.Delete(eventMessageID)
+			}
+		}
+
 		edit := &discordgo.MessageEdit{
 			Channel: resolvedChannelID,
 			ID:      eventMessageID,
-			Embeds:  &[]*discordgo.MessageEmbed{embed},
+			Embeds:  &[]*discordgo.MessageEmbed{pagedEmbed},
 		}
 
 		// Explicitly set components only when provided
-		if components != nil {
-			edit.Components = &components
+		if pagedComponents != nil {
+			edit.Components = &pagedComponents
 		}
 
 		updatedMsg, err := frm.session.ChannelMessageEditComplex(edit)
