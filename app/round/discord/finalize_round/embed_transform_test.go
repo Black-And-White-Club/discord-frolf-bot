@@ -127,6 +127,26 @@ func TestTransformRoundToFinalizedScorecard(t *testing.T) {
 			},
 			wantButton: true,
 		},
+		{
+			name: "guest participant uses raw name without mention",
+			payload: roundevents.RoundFinalizedEmbedUpdatePayloadV1{
+				RoundID:   roundID,
+				Location:  "Test Course",
+				StartTime: start,
+				Participants: []roundtypes.Participant{
+					{UserID: "", RawName: "flatgolfballin", Score: score(-3)},
+					{UserID: "u1", Score: score(-1)},
+				},
+			},
+			mockUsers: map[string]string{
+				"u1": "Alice",
+			},
+			wantFields: []string{
+				"🥇 flatgolfballin | Score: -3",
+				"🗑️ Alice | Score: -1 (<@u1>)",
+			},
+			wantButton: true,
+		},
 	}
 
 	for _, tt := range tests {

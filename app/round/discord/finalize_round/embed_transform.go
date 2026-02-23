@@ -27,6 +27,7 @@ const (
 type participantWithUser struct {
 	UserID    sharedtypes.DiscordID
 	Username  string
+	Mention   string
 	Score     *sharedtypes.Score
 	TagNumber *sharedtypes.TagNumber
 	Points    *int
@@ -62,10 +63,23 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 		}
 
 		participants := make(map[sharedtypes.DiscordID]*participantWithUser)
+		guests := make([]*participantWithUser, 0)
 
 		for i, p := range payload.Participants {
 			if p.UserID == "" {
-				frm.logger.WarnContext(ctx, "Skipping participant with empty UserID", attr.Int("index", i))
+				if p.RawName == "" {
+					frm.logger.WarnContext(ctx, "Skipping participant with empty UserID and empty raw name", attr.Int("index", i))
+					continue
+				}
+
+				guests = append(guests, &participantWithUser{
+					UserID:    "",
+					Username:  p.RawName,
+					Mention:   "",
+					Score:     p.Score,
+					TagNumber: p.TagNumber,
+					Points:    p.Points,
+				})
 				continue
 			}
 
@@ -86,6 +100,7 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 			participants[p.UserID] = &participantWithUser{
 				UserID:    p.UserID,
 				Username:  username,
+				Mention:   fmt.Sprintf("(<@%s>)", p.UserID),
 				Score:     p.Score,
 				TagNumber: p.TagNumber,
 				Points:    p.Points,
@@ -96,6 +111,7 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 		for _, p := range participants {
 			ordered = append(ordered, p)
 		}
+		ordered = append(ordered, guests...)
 
 		sort.Slice(ordered, func(i, j int) bool {
 			a, b := ordered[i], ordered[j]
@@ -221,6 +237,9 @@ func compareByTagThenUser(a, b *participantWithUser) bool {
 	if b.TagNumber != nil {
 		return false
 	}
+	if a.Username != b.Username {
+		return a.Username < b.Username
+	}
 	return string(a.UserID) < string(b.UserID)
 }
 
@@ -246,12 +265,19 @@ func buildParticipantFields(participants []*participantWithUser) []*discordgo.Me
 
 		fields = append(fields, &discordgo.MessageEmbedField{
 			Name:   fmt.Sprintf("%s %s", emoji, p.Username),
-			Value:  fmt.Sprintf("%s (<@%s>)", score, p.UserID),
+			Value:  formatParticipantScoreLine(score, p.Mention),
 			Inline: false,
 		})
 	}
 
 	return fields
+}
+
+func formatParticipantScoreLine(score string, mention string) string {
+	if mention == "" {
+		return score
+	}
+	return fmt.Sprintf("%s %s", score, mention)
 }
 
 func rankEmoji(index, total int) string {
