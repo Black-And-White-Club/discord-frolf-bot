@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"strings"
 
+	embedpagination "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/embed_pagination"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
 )
 
-// parseParticipantLine parses a line in the embed to extract userID and optional tag
+// parseParticipantLine parses a line in the embed to extract userID and optional tag.
 func parseParticipantLine(line string) (userID sharedtypes.DiscordID, score *sharedtypes.Score, tag *sharedtypes.TagNumber, ok bool) {
 	line = strings.TrimSpace(line)
 	if !strings.HasPrefix(line, "<@") || !strings.Contains(line, ">") {
@@ -25,7 +26,7 @@ func parseParticipantLine(line string) (userID sharedtypes.DiscordID, score *sha
 		left := strings.TrimSpace(parts[0])
 		if strings.HasPrefix(left, tagPrefix) {
 			var t int
-			// tagPrefix includes the colon ("Tag:"), so match that format
+			// tagPrefix includes the colon ("Tag:"), so match that format.
 			if _, err := fmt.Sscanf(left, tagPrefix+" %d", &t); err == nil {
 				v := sharedtypes.TagNumber(t)
 				tag = &v
@@ -35,7 +36,7 @@ func parseParticipantLine(line string) (userID sharedtypes.DiscordID, score *sha
 	if len(parts) > 1 {
 		var s int
 		right := strings.TrimSpace(parts[1])
-		// scorePrefix includes the colon ("Score:"), accept optional sign
+		// scorePrefix includes the colon ("Score:"), accept optional sign.
 		if _, err := fmt.Sscanf(right, scorePrefix+" %+d", &s); err != nil {
 			if _, err2 := fmt.Sscanf(right, scorePrefix+" %d", &s); err2 == nil {
 				v := sharedtypes.Score(s)
@@ -49,11 +50,7 @@ func parseParticipantLine(line string) (userID sharedtypes.DiscordID, score *sha
 	return userID, score, tag, true
 }
 
-// ============================
-// Score Update Functions
-// ============================
-
-// UpdateScoreEmbed updates a single participant's score in an embed
+// UpdateScoreEmbed updates a single participant's score in an embed.
 func (srm *scoreRoundManager) UpdateScoreEmbed(ctx context.Context, channelID, messageID string, userID sharedtypes.DiscordID, score *sharedtypes.Score) (ScoreRoundOperationResult, error) {
 	return srm.operationWrapper(ctx, "update_score_embed", func(ctx context.Context) (ScoreRoundOperationResult, error) {
 		message, err := srm.session.ChannelMessage(channelID, messageID)
@@ -63,6 +60,51 @@ func (srm *scoreRoundManager) UpdateScoreEmbed(ctx context.Context, channelID, m
 		if len(message.Embeds) == 0 {
 			return ScoreRoundOperationResult{Success: "No embeds found to update"}, nil
 		}
+
+		if messageHasPager(message.Components) {
+			if snapshot, found := embedpagination.Update(messageID, func(snapshot *embedpagination.Snapshot) bool {
+				if snapshot == nil {
+					return false
+				}
+
+				switch snapshot.Kind {
+				case embedpagination.SnapshotKindFields:
+					updatedFields, updated := updateFieldItemsScore(snapshot.FieldItems, userID, score)
+					if !updated {
+						return false
+					}
+					snapshot.FieldItems = updatedFields
+					return true
+				default:
+					updatedLines, updated := updateLineItemsScore(snapshot.LineItems, userID, score)
+					if !updated {
+						return false
+					}
+					snapshot.LineItems = updatedLines
+					return true
+				}
+			}); found {
+				embed, components, _, _, renderErr := embedpagination.RenderPage(messageID, snapshot.CurrentPage)
+				if renderErr != nil {
+					return ScoreRoundOperationResult{Error: renderErr}, renderErr
+				}
+
+				edit := &discordgo.MessageEdit{
+					Channel:    channelID,
+					ID:         messageID,
+					Embeds:     &[]*discordgo.MessageEmbed{embed},
+					Components: &components,
+				}
+
+				updatedMsg, err := srm.session.ChannelMessageEditComplex(edit)
+				if err != nil {
+					return ScoreRoundOperationResult{Error: err}, err
+				}
+
+				return ScoreRoundOperationResult{Success: updatedMsg}, nil
+			}
+		}
+
 		embed := message.Embeds[0]
 
 		userFound := false
@@ -100,7 +142,7 @@ func (srm *scoreRoundManager) UpdateScoreEmbed(ctx context.Context, channelID, m
 	})
 }
 
-// UpdateScoreEmbedBulk updates multiple participants in an embed
+// UpdateScoreEmbedBulk updates multiple participants in an embed.
 func (srm *scoreRoundManager) UpdateScoreEmbedBulk(ctx context.Context, channelID, messageID string, participants []roundtypes.Participant) (ScoreRoundOperationResult, error) {
 	return srm.operationWrapper(ctx, "update_score_embed_bulk", func(ctx context.Context) (ScoreRoundOperationResult, error) {
 		message, err := srm.session.ChannelMessage(channelID, messageID)
@@ -110,48 +152,74 @@ func (srm *scoreRoundManager) UpdateScoreEmbedBulk(ctx context.Context, channelI
 		if len(message.Embeds) == 0 {
 			return ScoreRoundOperationResult{Success: "no embeds"}, nil
 		}
+
+		if messageHasPager(message.Components) {
+			if snapshot, found := embedpagination.Update(messageID, func(snapshot *embedpagination.Snapshot) bool {
+				if snapshot == nil {
+					return false
+				}
+
+				switch snapshot.Kind {
+				case embedpagination.SnapshotKindFields:
+					snapshot.FieldItems = updateFieldItemsFromParticipants(snapshot.FieldItems, participants)
+				default:
+					snapshot.LineItems = participantsToEmbedLines(participants)
+				}
+				return true
+			}); found {
+				embed, components, _, _, renderErr := embedpagination.RenderPage(messageID, snapshot.CurrentPage)
+				if renderErr != nil {
+					return ScoreRoundOperationResult{Error: renderErr}, renderErr
+				}
+
+				edit := &discordgo.MessageEdit{
+					Channel:    channelID,
+					ID:         messageID,
+					Embeds:     &[]*discordgo.MessageEmbed{embed},
+					Components: &components,
+				}
+
+				updatedMsg, err := srm.session.ChannelMessageEditComplex(edit)
+				if err != nil {
+					return ScoreRoundOperationResult{Error: err}, err
+				}
+
+				return ScoreRoundOperationResult{Success: updatedMsg}, nil
+			}
+		}
+
 		embed := message.Embeds[0]
 
-		// Filter out all existing participant fields to "clean" the embed and avoid duplicates
+		// Filter out all existing participant fields to "clean" the embed and avoid duplicates.
 		var newFields []*discordgo.MessageEmbedField
 		participantFieldIndex := -1
 
 		for _, f := range embed.Fields {
 			if isParticipantField(f.Name, f.Value) {
-				// Stick to the first location we find for participants
+				// Stick to the first location we find for participants.
 				if participantFieldIndex == -1 {
 					participantFieldIndex = len(newFields)
-					// Append a placeholder that we will overwrite shortly
+					// Append a placeholder that we will overwrite shortly.
 					newFields = append(newFields, f)
 				}
-				// Skip subsequent participant fields (consolidating them)
+				// Skip subsequent participant fields (consolidating them).
 			} else {
 				newFields = append(newFields, f)
 			}
 		}
 		embed.Fields = newFields
 
-		// Sort participants for consistent display (Tag > Name)
-		// We can't easily sort roundtypes.Participant here unless we implement Sort interface or use a helper
-		// but standard practice is to trust the order or just append.
-		// For now, we'll just format them directly.
-
-		// Generate new field value
 		lines := participantsToEmbedLines(participants)
 		newValue := strings.Join(lines, "\n")
 		if len(lines) == 0 {
 			newValue = placeholderNoParticipants
 		}
 
-		// Standardize field name
 		fieldName := "👥 Participants"
-
 		if participantFieldIndex != -1 {
-			// Update existing field location
 			embed.Fields[participantFieldIndex].Name = fieldName
 			embed.Fields[participantFieldIndex].Value = newValue
 		} else {
-			// Append new field if none existed
 			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
 				Name:  fieldName,
 				Value: newValue,
@@ -173,7 +241,7 @@ func (srm *scoreRoundManager) UpdateScoreEmbedBulk(ctx context.Context, channelI
 	})
 }
 
-// AddLateParticipantToScorecard appends new participants to an embed
+// AddLateParticipantToScorecard appends new participants to an embed.
 func (srm *scoreRoundManager) AddLateParticipantToScorecard(ctx context.Context, channelID, messageID string, participants []roundtypes.Participant) (ScoreRoundOperationResult, error) {
 	return srm.operationWrapper(ctx, "add_late_participant", func(ctx context.Context) (ScoreRoundOperationResult, error) {
 		message, err := srm.session.ChannelMessage(channelID, messageID)
@@ -183,6 +251,36 @@ func (srm *scoreRoundManager) AddLateParticipantToScorecard(ctx context.Context,
 		if len(message.Embeds) == 0 {
 			return ScoreRoundOperationResult{Success: "No embeds to update"}, nil
 		}
+
+		if messageHasPager(message.Components) {
+			if snapshot, found := embedpagination.Update(messageID, func(snapshot *embedpagination.Snapshot) bool {
+				if snapshot == nil || snapshot.Kind != embedpagination.SnapshotKindLines {
+					return false
+				}
+				snapshot.LineItems = appendMissingParticipantLines(snapshot.LineItems, participants)
+				return true
+			}); found {
+				embed, components, _, _, renderErr := embedpagination.RenderPage(messageID, snapshot.CurrentPage)
+				if renderErr != nil {
+					return ScoreRoundOperationResult{Error: renderErr}, renderErr
+				}
+
+				edit := &discordgo.MessageEdit{
+					Channel:    channelID,
+					ID:         messageID,
+					Embeds:     &[]*discordgo.MessageEmbed{embed},
+					Components: &components,
+				}
+
+				updatedMsg, err := srm.session.ChannelMessageEditComplex(edit)
+				if err != nil {
+					return ScoreRoundOperationResult{Error: err}, err
+				}
+
+				return ScoreRoundOperationResult{Success: updatedMsg}, nil
+			}
+		}
+
 		embed := message.Embeds[0]
 
 		for _, p := range participants {

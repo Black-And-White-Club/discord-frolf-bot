@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	embedpagination "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/embed_pagination"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	"github.com/bwmarrin/discordgo"
@@ -73,11 +74,46 @@ func (m *startRoundManager) UpdateRoundToScorecard(ctx context.Context, channelI
 			return StartRoundOperationResult{Error: err}, nil
 		}
 
+		targetPage := 0
+		if existingSnapshot, found := embedpagination.Get(messageID); found {
+			targetPage = existingSnapshot.CurrentPage
+		}
+
+		staticFields := make([]*discordgo.MessageEmbedField, 0, len(transformedData.Embed.Fields))
+		participantLines := []string{}
+		for _, field := range transformedData.Embed.Fields {
+			if field == nil {
+				continue
+			}
+			if field.Name == fieldNameParticipants {
+				participantLines = embedpagination.ParticipantLinesFromFieldValue(field.Value)
+				continue
+			}
+			staticFields = append(staticFields, field)
+		}
+
+		snapshot := embedpagination.NewLineSnapshot(
+			messageID,
+			transformedData.Embed,
+			transformedData.Components,
+			staticFields,
+			fieldNameParticipants,
+			participantLines,
+		)
+		embedpagination.Set(snapshot)
+
+		pagedEmbed, pagedComponents, _, _, err := embedpagination.RenderPage(messageID, targetPage)
+		if err != nil {
+			m.logger.ErrorContext(ctx, "Failed to render paginated scorecard embed",
+				attr.Error(err), attr.String("message_id", messageID))
+			return StartRoundOperationResult{Error: fmt.Errorf("failed to render paginated embed: %w", err)}, nil
+		}
+
 		_, err = m.session.ChannelMessageEditComplex(&discordgo.MessageEdit{
 			Channel:    resolvedChannelID,
 			ID:         messageID,
-			Embeds:     &[]*discordgo.MessageEmbed{transformedData.Embed},
-			Components: &transformedData.Components,
+			Embeds:     &[]*discordgo.MessageEmbed{pagedEmbed},
+			Components: &pagedComponents,
 		})
 		if err != nil {
 			m.logger.ErrorContext(ctx, "Failed to update round embed to scorecard",

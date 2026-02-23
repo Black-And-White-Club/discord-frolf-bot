@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	embedpagination "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/embed_pagination"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	"github.com/bwmarrin/discordgo"
@@ -74,16 +75,65 @@ func (rrm *roundRsvpManager) UpdateRoundEventEmbed(ctx context.Context, channelI
 
 		// Update the single Participants field at index 2
 		embed.Fields[2].Value = rrm.formatParticipants(ctx, participants)
+		participantLines := embedpagination.ParticipantLinesFromFieldValue(embed.Fields[2].Value)
 
 		// PRESERVED: old 3-field update — may be reused in PWA
 		// embed.Fields[2].Value = rrm.formatParticipants(ctx, acceptedParticipants)
 		// embed.Fields[3].Value = rrm.formatParticipants(ctx, declinedParticipants)
 		// embed.Fields[4].Value = rrm.formatParticipants(ctx, tentativeParticipants)
 
-		// Update the message in the channel
-		updatedMsg, err := rrm.session.ChannelMessageEditEmbed(resolvedChannelID, messageID, embed)
+		targetPage := 0
+		if existingSnapshot, found := embedpagination.Get(messageID); found {
+			targetPage = existingSnapshot.CurrentPage
+		}
+
+		staticFields := make([]*discordgo.MessageEmbedField, 0, len(embed.Fields))
+		for i, field := range embed.Fields {
+			if i == 2 {
+				continue
+			}
+			staticFields = append(staticFields, field)
+		}
+
+		snapshot := embedpagination.NewLineSnapshot(
+			messageID,
+			embed,
+			msg.Components,
+			staticFields,
+			embed.Fields[2].Name,
+			participantLines,
+		)
+		embedpagination.Set(snapshot)
+
+		pagedEmbed, pagedComponents, _, totalPages, err := embedpagination.RenderPage(messageID, targetPage)
 		if err != nil {
-			wrappedErr := fmt.Errorf("failed to update embed: %w", err)
+			wrappedErr := fmt.Errorf("failed to render paginated embed: %w", err)
+			rrm.logger.ErrorContext(ctx, "Failed to render paginated round event embed",
+				attr.Error(wrappedErr),
+				attr.String("channel_id", resolvedChannelID),
+				attr.String("discord_message_id", messageID))
+			return RoundRsvpOperationResult{Error: wrappedErr}, wrappedErr
+		}
+
+		// Update the message in the channel
+		var (
+			updatedMsg *discordgo.Message
+			errEdit    error
+		)
+		hasPager := roundMessageHasPager(msg.Components)
+		if totalPages <= 1 && !hasPager {
+			updatedMsg, errEdit = rrm.session.ChannelMessageEditEmbed(resolvedChannelID, messageID, pagedEmbed)
+		} else {
+			edit := &discordgo.MessageEdit{
+				Channel:    resolvedChannelID,
+				ID:         messageID,
+				Embeds:     &[]*discordgo.MessageEmbed{pagedEmbed},
+				Components: &pagedComponents,
+			}
+			updatedMsg, errEdit = rrm.session.ChannelMessageEditComplex(edit)
+		}
+		if errEdit != nil {
+			wrappedErr := fmt.Errorf("failed to update embed: %w", errEdit)
 			rrm.logger.ErrorContext(ctx, "Failed to update round event embed",
 				attr.Error(wrappedErr),
 				attr.String("channel_id", resolvedChannelID),
@@ -141,4 +191,32 @@ func (rrm *roundRsvpManager) formatParticipants(_ context.Context, participants 
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+func roundMessageHasPager(components []discordgo.MessageComponent) bool {
+	for _, component := range components {
+		row, ok := component.(discordgo.ActionsRow)
+		if !ok {
+			rowPtr, ok := component.(*discordgo.ActionsRow)
+			if !ok || rowPtr == nil {
+				continue
+			}
+			row = *rowPtr
+		}
+		for _, rowComponent := range row.Components {
+			button, ok := rowComponent.(discordgo.Button)
+			if !ok {
+				buttonPtr, ok := rowComponent.(*discordgo.Button)
+				if !ok || buttonPtr == nil {
+					continue
+				}
+				button = *buttonPtr
+			}
+			if embedpagination.IsPagerCustomID(button.CustomID) {
+				return true
+			}
+		}
+	}
+
+	return false
 }

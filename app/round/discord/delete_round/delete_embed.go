@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	embedpagination "github.com/Black-And-White-Club/discord-frolf-bot/app/round/discord/embed_pagination"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	"github.com/bwmarrin/discordgo"
 )
@@ -62,6 +63,7 @@ func (drm *deleteRoundManager) DeleteRoundEventEmbed(ctx context.Context, discor
 		drm.logger.InfoContext(ctx, "Successfully sent Discord API delete command for message",
 			attr.String("channel_id", resolvedChannelID),
 			attr.String("discord_message_id", discordMessageID))
+		embedpagination.Delete(discordMessageID)
 
 		return DeleteRoundOperationResult{Success: true}, nil
 	})
