@@ -193,12 +193,24 @@ func runStandaloneMode(ctx context.Context) error {
 		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
 		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+
+		var handler http.Handler = mux
+		if token := strings.TrimSpace(os.Getenv("PPROF_AUTH_TOKEN")); token != "" {
+			handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Header.Get("Authorization") != "Bearer "+token {
+					http.Error(w, "unauthorized", http.StatusUnauthorized)
+					return
+				}
+				mux.ServeHTTP(w, r)
+			})
+		}
+
 		go func() {
 			logger.Info("pprof enabled", attr.String("addr", addr))
 			if !strings.HasPrefix(addr, "127.0.0.1:") && !strings.HasPrefix(addr, "localhost:") {
 				logger.Warn("pprof is listening on a non-loopback address", attr.String("addr", addr))
 			}
-			if err := http.ListenAndServe(addr, mux); err != nil && err != http.ErrServerClosed {
+			if err := http.ListenAndServe(addr, handler); err != nil && err != http.ErrServerClosed {
 				logger.Error("pprof server failed", attr.Error(err))
 			}
 		}()
