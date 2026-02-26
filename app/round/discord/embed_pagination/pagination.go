@@ -299,6 +299,12 @@ func buildFooter(base *discordgo.MessageEmbedFooter, page, totalPages int, range
 	baseText := ""
 	if base != nil {
 		baseText = strings.TrimSpace(base.Text)
+
+		// Strip off any existing pagination suffix so it doesn't duplicate
+		// The suffix format is " | Page X/Y" or " | Page X/Y • Z-W of V"
+		if idx := strings.Index(baseText, " | Page "); idx != -1 {
+			baseText = strings.TrimSpace(baseText[:idx])
+		}
 	}
 
 	// Only show page label when there is actually more than one page.
