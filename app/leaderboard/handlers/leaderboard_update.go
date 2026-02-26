@@ -18,7 +18,7 @@ func (h *LeaderboardHandlers) HandleBatchTagAssigned(ctx context.Context,
 
 	guildID := string(batchPayload.GuildID)
 
-	if len(batchPayload.Assignments) == 0 {
+	if batchPayload.AssignmentCount == 0 {
 		h.logger.WarnContext(ctx, "Received empty batch assignment data",
 			attr.String("guild_id", guildID))
 		return []handlerwrapper.Result{}, nil
