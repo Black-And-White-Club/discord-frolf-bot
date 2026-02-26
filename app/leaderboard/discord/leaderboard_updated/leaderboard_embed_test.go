@@ -352,8 +352,10 @@ func Test_leaderboardUpdateManager_SendLeaderboardEmbed(t *testing.T) {
 			}
 
 			lum := &leaderboardUpdateManager{
-				logger:  mockLogger,
-				session: fakeSession,
+				logger:             mockLogger,
+				session:            fakeSession,
+				dataByChannelID:    make(map[string][]LeaderboardEntry),
+				messageByChannelID: make(map[string]string),
 				operationWrapper: func(ctx context.Context, name string, fn func(ctx context.Context) (LeaderboardUpdateOperationResult, error)) (LeaderboardUpdateOperationResult, error) {
 					return fn(ctx)
 				},
@@ -438,6 +440,7 @@ func TestSendLeaderboardEmbed_EditsTrackedMessage(t *testing.T) {
 	lum := &leaderboardUpdateManager{
 		logger:             slog.New(slog.NewTextHandler(io.Discard, nil)),
 		session:            fakeSession,
+		dataByChannelID:    make(map[string][]LeaderboardEntry),
 		messageByChannelID: map[string]string{channelID: trackedMessageID},
 		operationWrapper: func(ctx context.Context, name string, fn func(ctx context.Context) (LeaderboardUpdateOperationResult, error)) (LeaderboardUpdateOperationResult, error) {
 			return fn(ctx)
@@ -479,6 +482,7 @@ func TestSendLeaderboardEmbed_UnknownTrackedMessageFallsBackToSend(t *testing.T)
 	lum := &leaderboardUpdateManager{
 		logger:             slog.New(slog.NewTextHandler(io.Discard, nil)),
 		session:            fakeSession,
+		dataByChannelID:    make(map[string][]LeaderboardEntry),
 		messageByChannelID: map[string]string{channelID: oldMessageID},
 		operationWrapper: func(ctx context.Context, name string, fn func(ctx context.Context) (LeaderboardUpdateOperationResult, error)) (LeaderboardUpdateOperationResult, error) {
 			return fn(ctx)
@@ -532,8 +536,10 @@ func TestSendLeaderboardEmbed_DiscoversExistingMessageAfterRestart(t *testing.T)
 	}
 
 	lum := &leaderboardUpdateManager{
-		logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
-		session: fakeSession,
+		logger:             slog.New(slog.NewTextHandler(io.Discard, nil)),
+		session:            fakeSession,
+		dataByChannelID:    make(map[string][]LeaderboardEntry),
+		messageByChannelID: make(map[string]string),
 		operationWrapper: func(ctx context.Context, name string, fn func(ctx context.Context) (LeaderboardUpdateOperationResult, error)) (LeaderboardUpdateOperationResult, error) {
 			return fn(ctx)
 		},

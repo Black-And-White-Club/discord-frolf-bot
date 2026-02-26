@@ -20,102 +20,94 @@ type LeaderboardEntry struct {
 	RoundsPlayed int                   `json:"rounds_played"`
 }
 
-func (lum *leaderboardUpdateManager) SendLeaderboardEmbed(ctx context.Context, channelID string, leaderboard []LeaderboardEntry, page int32) (LeaderboardUpdateOperationResult, error) {
-	return lum.operationWrapper(ctx, "send_leaderboard_embed", func(ctx context.Context) (LeaderboardUpdateOperationResult, error) {
-		const entriesPerPage = int32(10)
-		totalPages := (int32(len(leaderboard)) + entriesPerPage - 1) / entriesPerPage
+// buildLeaderboardEmbed builds an embed and pagination components for a given page of the leaderboard.
+func buildLeaderboardEmbed(leaderboard []LeaderboardEntry, page int32) (*discordgo.MessageEmbed, []discordgo.MessageComponent) {
+	const entriesPerPage = int32(10)
+	totalPages := (int32(len(leaderboard)) + entriesPerPage - 1) / entriesPerPage
+	if totalPages == 0 {
+		totalPages = 1
+	}
+	if page < 1 {
+		page = 1
+	} else if page > totalPages {
+		page = totalPages
+	}
 
-		if totalPages == 0 {
-			totalPages = 1
-		}
+	start := (page - 1) * entriesPerPage
+	end := min(start+entriesPerPage, int32(len(leaderboard)))
 
-		// Ensure page is within valid range
-		if page < 1 {
-			page = 1
-		} else if page > totalPages {
-			page = totalPages
-		}
-
-		// Calculate slice range
-		start := (page - 1) * entriesPerPage
-		end := min(start+entriesPerPage, int32(len(leaderboard)))
-
-		// Build leaderboard fields with ranking emojis
-		fields := []*discordgo.MessageEmbedField{}
-		totalEntries := len(leaderboard)
-
-		// Only create fields if there are entries to show
-		if totalEntries > 0 {
-			// Build leaderboard as a single formatted table instead of multiple fields
-			var leaderboardText string
-
-			for i, entry := range leaderboard[start:end] {
-				// Calculate the actual position in the full leaderboard
-				actualPosition := int(start) + i + 1
-
-				// Determine emoji based on position and total entries
-				var emoji string
-				switch {
-				case actualPosition == 1:
-					emoji = "🥇" // Gold medal for 1st place
-				case actualPosition == 2:
-					emoji = "🥈" // Silver medal for 2nd place
-				case actualPosition == 3:
-					emoji = "🥉" // Bronze medal for 3rd place
-				case actualPosition == totalEntries && totalEntries > 1:
-					emoji = "🗑️" // Trash can for last place
-				default:
-					emoji = "🏷️" // Tag emoji for everyone else
-				}
-
-				// Format each row with proper spacing
-				if entry.TotalPoints > 0 {
-					leaderboardText += fmt.Sprintf("%s **Tag #%-3d** <@%s> • %d pts (%d rds)\n", emoji, entry.Rank, entry.UserID, entry.TotalPoints, entry.RoundsPlayed)
-				} else {
-					leaderboardText += fmt.Sprintf("%s **Tag #%-3d** <@%s>\n", emoji, entry.Rank, entry.UserID)
-				}
+	fields := []*discordgo.MessageEmbedField{}
+	totalEntries := len(leaderboard)
+	if totalEntries > 0 {
+		var leaderboardText string
+		for i, entry := range leaderboard[start:end] {
+			actualPosition := int(start) + i + 1
+			var emoji string
+			switch {
+			case actualPosition == 1:
+				emoji = "🥇"
+			case actualPosition == 2:
+				emoji = "🥈"
+			case actualPosition == 3:
+				emoji = "🥉"
+			case actualPosition == totalEntries && totalEntries > 1:
+				emoji = "🗑️"
+			default:
+				emoji = "🏷️"
 			}
-
-			// Create a single field with the formatted table
-			fields = []*discordgo.MessageEmbedField{
-				{
-					Name:   "Tags",
-					Value:  leaderboardText,
-					Inline: false,
-				},
+			if entry.TotalPoints > 0 {
+				leaderboardText += fmt.Sprintf("%s **Tag #%-3d** <@%s> • %d pts (%d rds)\n", emoji, entry.Rank, entry.UserID, entry.TotalPoints, entry.RoundsPlayed)
+			} else {
+				leaderboardText += fmt.Sprintf("%s **Tag #%-3d** <@%s>\n", emoji, entry.Rank, entry.UserID)
 			}
 		}
-
-		embed := &discordgo.MessageEmbed{
-			Title:       leaderboardEmbedTitle,
-			Description: fmt.Sprintf("Page %d/%d", page, totalPages),
-			Color:       0xFFD700, // Gold color
-			Fields:      fields,
-			Footer: &discordgo.MessageEmbedFooter{
-				Text: fmt.Sprintf("Frolf Leaderboard • Updated: %s", time.Now().Format(time.RFC1123)),
+		fields = []*discordgo.MessageEmbedField{
+			{
+				Name:   "Tags",
+				Value:  leaderboardText,
+				Inline: false,
 			},
 		}
+	}
 
-		// Create pagination buttons
-		components := []discordgo.MessageComponent{}
-		if totalPages > 1 {
-			components = append(components, discordgo.ActionsRow{
-				Components: []discordgo.MessageComponent{
-					discordgo.Button{
-						Label:    "⬅️ Previous",
-						Style:    discordgo.PrimaryButton,
-						CustomID: fmt.Sprintf("leaderboard_prev|%d", page-1),
-						Disabled: page == 1,
-					},
-					discordgo.Button{
-						Label:    "➡️ Next",
-						Style:    discordgo.PrimaryButton,
-						CustomID: fmt.Sprintf("leaderboard_next|%d", page+1),
-						Disabled: page == totalPages,
-					},
+	embed := &discordgo.MessageEmbed{
+		Title:       leaderboardEmbedTitle,
+		Description: fmt.Sprintf("Page %d/%d", page, totalPages),
+		Color:       0xFFD700,
+		Fields:      fields,
+		Footer: &discordgo.MessageEmbedFooter{
+			Text: fmt.Sprintf("Frolf Leaderboard • Updated: %s", time.Now().Format(time.RFC1123)),
+		},
+	}
+
+	components := []discordgo.MessageComponent{}
+	if totalPages > 1 {
+		components = append(components, discordgo.ActionsRow{
+			Components: []discordgo.MessageComponent{
+				discordgo.Button{
+					Label:    "⬅️ Previous",
+					Style:    discordgo.PrimaryButton,
+					CustomID: fmt.Sprintf("leaderboard_prev|%d", page-1),
+					Disabled: page == 1,
 				},
-			})
-		}
+				discordgo.Button{
+					Label:    "➡️ Next",
+					Style:    discordgo.PrimaryButton,
+					CustomID: fmt.Sprintf("leaderboard_next|%d", page+1),
+					Disabled: page == totalPages,
+				},
+			},
+		})
+	}
+
+	return embed, components
+}
+
+func (lum *leaderboardUpdateManager) SendLeaderboardEmbed(ctx context.Context, channelID string, leaderboard []LeaderboardEntry, page int32) (LeaderboardUpdateOperationResult, error) {
+	return lum.operationWrapper(ctx, "send_leaderboard_embed", func(ctx context.Context) (LeaderboardUpdateOperationResult, error) {
+		lum.setCachedLeaderboard(channelID, leaderboard)
+
+		embed, components := buildLeaderboardEmbed(leaderboard, page)
 
 		if existingMessageID := lum.getTrackedMessageID(channelID); existingMessageID != "" {
 			editedMessage, err := lum.session.ChannelMessageEditComplex(&discordgo.MessageEdit{

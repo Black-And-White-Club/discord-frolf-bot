@@ -301,14 +301,20 @@ func buildFooter(base *discordgo.MessageEmbedFooter, page, totalPages int, range
 		baseText = strings.TrimSpace(base.Text)
 	}
 
-	pagerText := fmt.Sprintf("Page %d/%d", page+1, max(1, totalPages))
-	if rangeLabel != "" {
-		pagerText = fmt.Sprintf("%s • %s", pagerText, rangeLabel)
-	}
-
-	footerText := pagerText
-	if baseText != "" {
-		footerText = fmt.Sprintf("%s | %s", baseText, pagerText)
+	// Only show page label when there is actually more than one page.
+	var footerText string
+	if totalPages > 1 {
+		pagerText := fmt.Sprintf("Page %d/%d", page+1, totalPages)
+		if rangeLabel != "" {
+			pagerText = fmt.Sprintf("%s • %s", pagerText, rangeLabel)
+		}
+		if baseText != "" {
+			footerText = fmt.Sprintf("%s | %s", baseText, pagerText)
+		} else {
+			footerText = pagerText
+		}
+	} else {
+		footerText = baseText
 	}
 
 	if len(footerText) > maxFooterTextLength {
@@ -317,6 +323,9 @@ func buildFooter(base *discordgo.MessageEmbedFooter, page, totalPages int, range
 
 	footer := cloneFooter(base)
 	if footer == nil {
+		if footerText == "" {
+			return nil
+		}
 		footer = &discordgo.MessageEmbedFooter{}
 	}
 	footer.Text = footerText

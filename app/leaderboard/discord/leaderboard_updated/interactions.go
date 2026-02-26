@@ -38,60 +38,35 @@ func (lum *leaderboardUpdateManager) HandleLeaderboardPagination(ctx context.Con
 			return LeaderboardUpdateOperationResult{Error: err}, nil
 		}
 
-		if len(i.Message.Embeds) == 0 {
-			err := fmt.Errorf("no embeds found in message")
-			lum.logger.ErrorContext(ctx, err.Error())
-			return LeaderboardUpdateOperationResult{Error: err}, nil
-		}
-		embed := i.Message.Embeds[0]
+		// Determine the channel from the message
+		channelID := i.ChannelID
 
-		var currentPage, totalPages int
-		if _, err := fmt.Sscanf(embed.Description, "Page %d/%d", &currentPage, &totalPages); err != nil {
-			err := fmt.Errorf("error parsing embed page numbers: %w", err)
-			lum.logger.ErrorContext(ctx, err.Error())
-			return LeaderboardUpdateOperationResult{Error: err}, nil
-		}
-
-		if newPage < 1 || newPage > totalPages {
-			err := fmt.Errorf("requested page out of bounds: %d", newPage)
-			lum.logger.WarnContext(ctx, err.Error())
-			return LeaderboardUpdateOperationResult{Failure: "page out of range"}, nil
-		}
-
-		const entriesPerPage = 10
-		start := (newPage - 1) * entriesPerPage
-		end := start + entriesPerPage
-		if end > len(embed.Fields) {
-			end = len(embed.Fields)
-		}
-
-		newEmbed := *embed
-		newEmbed.Description = fmt.Sprintf("Page %d/%d", newPage, totalPages)
-		newEmbed.Fields = embed.Fields[start:end]
-
-		components := []discordgo.MessageComponent{
-			discordgo.ActionsRow{
-				Components: []discordgo.MessageComponent{
-					discordgo.Button{
-						Label:    "⬅️ Previous",
-						Style:    discordgo.PrimaryButton,
-						CustomID: fmt.Sprintf("leaderboard_prev|%d", newPage-1),
-						Disabled: newPage == 1,
-					},
-					discordgo.Button{
-						Label:    "➡️ Next",
-						Style:    discordgo.PrimaryButton,
-						CustomID: fmt.Sprintf("leaderboard_next|%d", newPage+1),
-						Disabled: newPage == totalPages,
-					},
+		// Pull the cached leaderboard data for this channel
+		leaderboard := lum.getCachedLeaderboard(channelID)
+		if len(leaderboard) == 0 {
+			lum.logger.WarnContext(ctx, "No cached leaderboard data found for pagination, bot may have restarted",
+				attr.String("channel_id", channelID),
+			)
+			// Gracefully inform the user — ephemeral so it doesn't clutter the channel
+			err := lum.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "⏳ The leaderboard data is being refreshed. Please wait a moment and try again, or use `/leaderboard` to reload.",
+					Flags:   discordgo.MessageFlagsEphemeral,
 				},
-			},
+			})
+			if err != nil {
+				lum.logger.ErrorContext(ctx, "Failed to send cache-miss response", attr.Error(err))
+			}
+			return LeaderboardUpdateOperationResult{Failure: "no cached leaderboard data"}, nil
 		}
+
+		embed, components := buildLeaderboardEmbed(leaderboard, int32(newPage))
 
 		err = lum.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseUpdateMessage,
 			Data: &discordgo.InteractionResponseData{
-				Embeds:     []*discordgo.MessageEmbed{&newEmbed},
+				Embeds:     []*discordgo.MessageEmbed{embed},
 				Components: components,
 			},
 		})

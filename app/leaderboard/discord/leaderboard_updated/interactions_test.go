@@ -3,11 +3,13 @@ package leaderboardupdated
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"testing"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -15,12 +17,25 @@ var testOperationWrapper = func(ctx context.Context, operationName string, opera
 	return operationFunc(ctx)
 }
 
+// makeTestLeaderboard creates n simple entries for channel-cache seeding.
+func makeTestLeaderboard(n int) []LeaderboardEntry {
+	entries := make([]LeaderboardEntry, n)
+	for i := range entries {
+		entries[i] = LeaderboardEntry{
+			Rank:   sharedtypes.TagNumber(i + 1),
+			UserID: sharedtypes.DiscordID(fmt.Sprintf("user%d", i+1)),
+		}
+	}
+	return entries
+}
+
 func Test_leaderboardUpdateManager_HandleLeaderboardPagination(t *testing.T) {
+	const testChannelID = "test-channel"
+
 	tests := []struct {
 		name                string
 		customID            string
-		embedDescription    string
-		embedFields         []*discordgo.MessageEmbedField
+		cachedLeaderboard   []LeaderboardEntry // pre-seeded cache
 		mockRespondErr      error
 		expectSuccess       string
 		expectFailure       string
@@ -30,56 +45,47 @@ func Test_leaderboardUpdateManager_HandleLeaderboardPagination(t *testing.T) {
 		{
 			name:                "pagination successful",
 			customID:            "leaderboard_next|2",
-			embedDescription:    "Page 1/3",
-			embedFields:         make([]*discordgo.MessageEmbedField, 25), // Multiple pages of data
+			cachedLeaderboard:   makeTestLeaderboard(25), // 3 pages
 			expectSuccess:       "pagination updated",
 			expectRespondCalled: true,
 		},
 		{
-			name:             "invalid custom_id format",
-			customID:         "invalid_format",
-			embedDescription: "Page 1/3",
-			embedFields:      make([]*discordgo.MessageEmbedField, 25),
-			expectErrSubstr:  "invalid CustomID format",
+			name:            "invalid custom_id format",
+			customID:        "invalid_format",
+			cachedLeaderboard: makeTestLeaderboard(25),
+			expectErrSubstr: "invalid CustomID format",
 		},
 		{
-			name:             "invalid page number",
-			customID:         "leaderboard_next|invalid",
-			embedDescription: "Page 1/3",
-			embedFields:      make([]*discordgo.MessageEmbedField, 25),
-			expectErrSubstr:  "error parsing page number",
+			name:            "invalid page number",
+			customID:        "leaderboard_next|invalid",
+			cachedLeaderboard: makeTestLeaderboard(25),
+			expectErrSubstr: "error parsing page number",
 		},
 		{
-			name:            "no embeds in message",
-			customID:        "leaderboard_next|2",
-			expectErrSubstr: "no embeds found in message",
+			name:          "no cached data (bot restarted)",
+			customID:      "leaderboard_next|2",
+			// cachedLeaderboard intentionally empty / nil
+			expectFailure:       "no cached leaderboard data",
+			expectRespondCalled: true, // sends an ephemeral cache-miss message
 		},
 		{
-			name:             "invalid embed description format",
-			customID:         "leaderboard_next|2",
-			embedDescription: "Invalid description",
-			embedFields:      make([]*discordgo.MessageEmbedField, 25),
-			expectErrSubstr:  "error parsing embed page numbers",
+			name:                "page clamped to min (page 0 → page 1)",
+			customID:            "leaderboard_prev|0",
+			cachedLeaderboard:   makeTestLeaderboard(25),
+			expectSuccess:       "pagination updated",
+			expectRespondCalled: true,
 		},
 		{
-			name:             "page out of bounds - below min",
-			customID:         "leaderboard_prev|0",
-			embedDescription: "Page 1/3",
-			embedFields:      make([]*discordgo.MessageEmbedField, 25),
-			expectFailure:    "page out of range",
-		},
-		{
-			name:             "page out of bounds - above max",
-			customID:         "leaderboard_next|999",
-			embedDescription: "Page 1/3",
-			embedFields:      make([]*discordgo.MessageEmbedField, 25),
-			expectFailure:    "page out of range",
+			name:                "page clamped to max (page 999 → last page)",
+			customID:            "leaderboard_next|999",
+			cachedLeaderboard:   makeTestLeaderboard(25),
+			expectSuccess:       "pagination updated",
+			expectRespondCalled: true,
 		},
 		{
 			name:                "discord respond error",
 			customID:            "leaderboard_next|2",
-			embedDescription:    "Page 1/3",
-			embedFields:         make([]*discordgo.MessageEmbedField, 25),
+			cachedLeaderboard:   makeTestLeaderboard(25),
 			mockRespondErr:      errors.New("discord API error"),
 			expectErrSubstr:     "error updating leaderboard message",
 			expectRespondCalled: true,
@@ -88,38 +94,32 @@ func Test_leaderboardUpdateManager_HandleLeaderboardPagination(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Use FakeSession instead of gomock
 			fakeSession := discord.NewFakeSession()
 
-			// Setup fake for InteractionRespond if needed
-			if tt.expectRespondCalled {
-				fakeSession.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
-					return tt.mockRespondErr
-				}
+			respondCalled := false
+			fakeSession.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
+				respondCalled = true
+				return tt.mockRespondErr
 			}
 
-			// Create the real leaderboard manager with faked dependencies
 			manager := &leaderboardUpdateManager{
 				session:          fakeSession,
 				logger:           slog.Default(),
-				operationWrapper: testOperationWrapper, // Use a simple wrapper for testing
+				operationWrapper: testOperationWrapper,
+				dataByChannelID:  make(map[string][]LeaderboardEntry),
+				messageByChannelID: make(map[string]string),
 			}
 
-			// Create interaction with proper structure
-			var embeds []*discordgo.MessageEmbed
-			if tt.embedDescription != "" {
-				embeds = []*discordgo.MessageEmbed{
-					{
-						Description: tt.embedDescription,
-						Fields:      tt.embedFields,
-					},
-				}
+			// Seed the cache when the test requires it
+			if len(tt.cachedLeaderboard) > 0 {
+				manager.setCachedLeaderboard(testChannelID, tt.cachedLeaderboard)
 			}
 
 			interaction := &discordgo.InteractionCreate{
 				Interaction: &discordgo.Interaction{
-					ID:   "test-interaction",
-					Type: discordgo.InteractionMessageComponent,
+					ID:        "test-interaction",
+					ChannelID: testChannelID,
+					Type:      discordgo.InteractionMessageComponent,
 					Member: &discordgo.Member{
 						User: &discordgo.User{ID: "user123"},
 					},
@@ -127,30 +127,33 @@ func Test_leaderboardUpdateManager_HandleLeaderboardPagination(t *testing.T) {
 						CustomID:      tt.customID,
 						ComponentType: discordgo.ButtonComponent,
 					},
-					Message: &discordgo.Message{
-						Embeds: embeds,
-					},
+					Message: &discordgo.Message{},
 				},
 			}
 
-			// Call the method with context and capture both return values
 			result, err := manager.HandleLeaderboardPagination(context.Background(), interaction)
 
-			// Modify the assertion section to check result.Error instead of err
+			// Error substring check (lives in result.Error for non-API errors)
 			if tt.expectErrSubstr != "" {
-				if result.Error == nil {
+				var target error
+				if result.Error != nil {
+					target = result.Error
+				} else if err != nil {
+					target = err
+				}
+				if target == nil {
 					t.Errorf("expected error containing %q, got nil", tt.expectErrSubstr)
-				} else if !strings.Contains(result.Error.Error(), tt.expectErrSubstr) {
-					t.Errorf("expected error to contain %q, got %q", tt.expectErrSubstr, result.Error.Error())
+				} else if !strings.Contains(target.Error(), tt.expectErrSubstr) {
+					t.Errorf("expected error to contain %q, got %q", tt.expectErrSubstr, target.Error())
 				}
 			}
 
-			// Remove the err checks for non-API errors
+			// API-level error propagation
 			if tt.mockRespondErr != nil {
 				if err == nil {
 					t.Error("expected error from InteractionRespond, got nil")
 				}
-			} else {
+			} else if tt.expectErrSubstr == "" {
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
@@ -166,6 +169,10 @@ func Test_leaderboardUpdateManager_HandleLeaderboardPagination(t *testing.T) {
 				if result.Success != tt.expectSuccess {
 					t.Errorf("expected success %q, got %q", tt.expectSuccess, result.Success)
 				}
+			}
+
+			if tt.expectRespondCalled && !respondCalled {
+				t.Error("expected InteractionRespond to be called, but it was not")
 			}
 		})
 	}
