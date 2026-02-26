@@ -585,14 +585,24 @@ func (l *ScheduledEventRSVPListener) resolveRoundID(guildID sharedtypes.GuildID,
 	// Fast path: check the in-memory map
 	roundID, _, creatorID, ok := l.nativeEventMap.LookupByDiscordEventID(discordEventID)
 	if ok {
-		l.logger.Info("Resolved round ID from memory map", attr.String("event_id", discordEventID), attr.String("round_id", roundID.String()))
-		return roundID, creatorID, true
+		// Verify we also have the message ID. If not, it means we reconciled the native event
+		// after a restart but haven't fetched the message ID yet. Fall back to NATS.
+		if _, msgFound := l.messageMap.Load(roundID); msgFound {
+			l.logger.Info("Resolved round ID from memory map", attr.String("event_id", discordEventID), attr.String("round_id", roundID.String()))
+			return roundID, creatorID, true
+		}
+		l.logger.Info("NativeEventMap hit but MessageMap miss, forcing NATS lookup",
+			attr.String("guild_id", string(guildID)),
+			attr.String("discord_event_id", discordEventID),
+			attr.String("round_id", roundID.String()))
 	}
 
 	// Slow path: request-reply via event bus (post-restart fallback)
-	l.logger.Info("NativeEventMap miss, falling back to NATS lookup",
-		attr.String("guild_id", string(guildID)),
-		attr.String("discord_event_id", discordEventID))
+	if !ok {
+		l.logger.Info("NativeEventMap miss, falling back to NATS lookup",
+			attr.String("guild_id", string(guildID)),
+			attr.String("discord_event_id", discordEventID))
+	}
 
 	if err := l.ensureLookupSubscriber(); err != nil {
 		l.logger.Warn("Failed to start native event lookup result subscriber",
