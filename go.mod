@@ -3,7 +3,7 @@ module github.com/Black-And-White-Club/discord-frolf-bot
 go 1.25.0
 
 require (
-	github.com/Black-And-White-Club/frolf-bot-shared v0.1.24
+	github.com/Black-And-White-Club/frolf-bot-shared v0.1.25
 	github.com/ThreeDotsLabs/watermill v1.5.1
 	github.com/bwmarrin/discordgo v0.29.0
 	github.com/google/uuid v1.6.0
@@ -44,7 +44,7 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.40.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.9.0 // indirect
 	golang.org/x/crypto v0.48.0 // indirect
-	golang.org/x/net v0.50.0 // indirect
+	golang.org/x/net v0.51.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260223185530-2f722ef697dc // indirect
