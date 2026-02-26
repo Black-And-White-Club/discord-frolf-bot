@@ -11,7 +11,11 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-const leaderboardEmbedTitle = "🏆 Leaderboard"
+const (
+	leaderboardEmbedTitle   = "🏆 Leaderboard"
+	maxDescriptionLength    = 4096
+	maxDescriptionTruncMark = "\n*(list truncated — too many entries to display)*"
+)
 
 type LeaderboardEntry struct {
 	Rank         sharedtypes.TagNumber `json:"rank"`
@@ -20,101 +24,84 @@ type LeaderboardEntry struct {
 	RoundsPlayed int                   `json:"rounds_played"`
 }
 
-// buildLeaderboardEmbed builds an embed and pagination components for a given page of the leaderboard.
-func buildLeaderboardEmbed(leaderboard []LeaderboardEntry, page int32) (*discordgo.MessageEmbed, []discordgo.MessageComponent) {
-	const entriesPerPage = int32(10)
-	totalPages := (int32(len(leaderboard)) + entriesPerPage - 1) / entriesPerPage
-	if totalPages == 0 {
-		totalPages = 1
-	}
-	if page < 1 {
-		page = 1
-	} else if page > totalPages {
-		page = totalPages
+// buildLeaderboardDescription formats all leaderboard entries as a single
+// description string, capped at Discord's 4096-char description limit.
+// No pagination — entries beyond the character cap are silently truncated
+// with a note.
+func buildLeaderboardDescription(leaderboard []LeaderboardEntry) string {
+	if len(leaderboard) == 0 {
+		return "*No entries yet.*"
 	}
 
-	start := (page - 1) * entriesPerPage
-	end := min(start+entriesPerPage, int32(len(leaderboard)))
-
-	fields := []*discordgo.MessageEmbedField{}
 	totalEntries := len(leaderboard)
-	if totalEntries > 0 {
-		var leaderboardText string
-		for i, entry := range leaderboard[start:end] {
-			actualPosition := int(start) + i + 1
-			var emoji string
-			switch {
-			case actualPosition == 1:
-				emoji = "🥇"
-			case actualPosition == 2:
-				emoji = "🥈"
-			case actualPosition == 3:
-				emoji = "🥉"
-			case actualPosition == totalEntries && totalEntries > 1:
-				emoji = "🗑️"
-			default:
-				emoji = "🏷️"
-			}
-			if entry.TotalPoints > 0 {
-				leaderboardText += fmt.Sprintf("%s **Tag #%-3d** <@%s> • %d pts (%d rds)\n", emoji, entry.Rank, entry.UserID, entry.TotalPoints, entry.RoundsPlayed)
-			} else {
-				leaderboardText += fmt.Sprintf("%s **Tag #%-3d** <@%s>\n", emoji, entry.Rank, entry.UserID)
-			}
+	var sb strings.Builder
+
+	for i, entry := range leaderboard {
+		position := i + 1
+
+		var emoji string
+		switch {
+		case position == 1:
+			emoji = "🥇"
+		case position == 2:
+			emoji = "🥈"
+		case position == 3:
+			emoji = "🥉"
+		case position == totalEntries && totalEntries > 1:
+			emoji = "🗑️"
+		default:
+			emoji = "🏷️"
 		}
-		fields = []*discordgo.MessageEmbedField{
-			{
-				Name:   "Tags",
-				Value:  leaderboardText,
-				Inline: false,
-			},
+
+		var line string
+		if entry.TotalPoints > 0 {
+			line = fmt.Sprintf("%s **Tag #%-3d** <@%s> • %d pts (%d rds)\n", emoji, entry.Rank, entry.UserID, entry.TotalPoints, entry.RoundsPlayed)
+		} else {
+			line = fmt.Sprintf("%s **Tag #%-3d** <@%s>\n", emoji, entry.Rank, entry.UserID)
 		}
+
+		// Check if adding this line would exceed the limit (leave room for truncation mark)
+		if sb.Len()+len(line) > maxDescriptionLength-len(maxDescriptionTruncMark) {
+			sb.WriteString(maxDescriptionTruncMark)
+			return sb.String()
+		}
+
+		sb.WriteString(line)
 	}
+
+	return sb.String()
+}
+
+// buildLeaderboardEmbed constructs the embed with all entries in the description.
+// The page parameter is accepted for interface compatibility but ignored.
+func buildLeaderboardEmbed(leaderboard []LeaderboardEntry, _ int32) (*discordgo.MessageEmbed, []discordgo.MessageComponent) {
+	desc := buildLeaderboardDescription(leaderboard)
 
 	embed := &discordgo.MessageEmbed{
 		Title:       leaderboardEmbedTitle,
-		Description: fmt.Sprintf("Page %d/%d", page, totalPages),
-		Color:       0xFFD700,
-		Fields:      fields,
+		Description: desc,
+		Color:       0xFFD700, // Gold
 		Footer: &discordgo.MessageEmbedFooter{
 			Text: fmt.Sprintf("Frolf Leaderboard • Updated: %s", time.Now().Format(time.RFC1123)),
 		},
 	}
 
-	components := []discordgo.MessageComponent{}
-	if totalPages > 1 {
-		components = append(components, discordgo.ActionsRow{
-			Components: []discordgo.MessageComponent{
-				discordgo.Button{
-					Label:    "⬅️ Previous",
-					Style:    discordgo.PrimaryButton,
-					CustomID: fmt.Sprintf("leaderboard_prev|%d", page-1),
-					Disabled: page == 1,
-				},
-				discordgo.Button{
-					Label:    "➡️ Next",
-					Style:    discordgo.PrimaryButton,
-					CustomID: fmt.Sprintf("leaderboard_next|%d", page+1),
-					Disabled: page == totalPages,
-				},
-			},
-		})
-	}
-
-	return embed, components
+	// No pagination buttons — the embed is a shared channel message and
+	// editing it would change the view for everyone.
+	return embed, nil
 }
 
 func (lum *leaderboardUpdateManager) SendLeaderboardEmbed(ctx context.Context, channelID string, leaderboard []LeaderboardEntry, page int32) (LeaderboardUpdateOperationResult, error) {
 	return lum.operationWrapper(ctx, "send_leaderboard_embed", func(ctx context.Context) (LeaderboardUpdateOperationResult, error) {
-		lum.setCachedLeaderboard(channelID, leaderboard)
-
-		embed, components := buildLeaderboardEmbed(leaderboard, page)
+		embed, _ := buildLeaderboardEmbed(leaderboard, page)
 
 		if existingMessageID := lum.getTrackedMessageID(channelID); existingMessageID != "" {
 			editedMessage, err := lum.session.ChannelMessageEditComplex(&discordgo.MessageEdit{
-				ID:         existingMessageID,
-				Channel:    channelID,
-				Embeds:     &[]*discordgo.MessageEmbed{embed},
-				Components: &components,
+				ID:      existingMessageID,
+				Channel: channelID,
+				Embeds:  &[]*discordgo.MessageEmbed{embed},
+				// Clear any old pagination components
+				Components: &[]discordgo.MessageComponent{},
 			})
 			if err == nil {
 				return LeaderboardUpdateOperationResult{Success: editedMessage}, nil
@@ -136,7 +123,7 @@ func (lum *leaderboardUpdateManager) SendLeaderboardEmbed(ctx context.Context, c
 				ID:         discoveredMessageID,
 				Channel:    channelID,
 				Embeds:     &[]*discordgo.MessageEmbed{embed},
-				Components: &components,
+				Components: &[]discordgo.MessageComponent{},
 			})
 			if editErr == nil {
 				return LeaderboardUpdateOperationResult{Success: editedMessage}, nil
@@ -151,8 +138,7 @@ func (lum *leaderboardUpdateManager) SendLeaderboardEmbed(ctx context.Context, c
 		}
 
 		message, err := lum.session.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
-			Embeds:     []*discordgo.MessageEmbed{embed},
-			Components: components,
+			Embeds: []*discordgo.MessageEmbed{embed},
 		})
 		if err != nil {
 			err := fmt.Errorf("failed to send leaderboard message: %w", err)

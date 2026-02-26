@@ -42,8 +42,6 @@ type leaderboardUpdateManager struct {
 	operationWrapper    func(ctx context.Context, opName string, fn func(ctx context.Context) (LeaderboardUpdateOperationResult, error)) (LeaderboardUpdateOperationResult, error)
 	messageMu           sync.RWMutex
 	messageByChannelID  map[string]string
-	dataMu              sync.RWMutex
-	dataByChannelID     map[string][]LeaderboardEntry
 }
 
 // NewLeaderboardUpdateManager creates a new LeaderboardUpdateManager instance.
@@ -77,23 +75,7 @@ func NewLeaderboardUpdateManager(
 			return wrapLeaderboardUpdateOperation(ctx, opName, fn, logger, tracer, metrics)
 		},
 		messageByChannelID: make(map[string]string),
-		dataByChannelID:    make(map[string][]LeaderboardEntry),
 	}
-}
-
-func (lum *leaderboardUpdateManager) getCachedLeaderboard(channelID string) []LeaderboardEntry {
-	lum.dataMu.RLock()
-	defer lum.dataMu.RUnlock()
-	return lum.dataByChannelID[channelID]
-}
-
-func (lum *leaderboardUpdateManager) setCachedLeaderboard(channelID string, entries []LeaderboardEntry) {
-	if channelID == "" {
-		return
-	}
-	lum.dataMu.Lock()
-	defer lum.dataMu.Unlock()
-	lum.dataByChannelID[channelID] = entries
 }
 
 func wrapLeaderboardUpdateOperation(

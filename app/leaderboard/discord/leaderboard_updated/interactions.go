@@ -31,51 +31,25 @@ func (lum *leaderboardUpdateManager) HandleLeaderboardPagination(ctx context.Con
 			return LeaderboardUpdateOperationResult{Error: err}, nil
 		}
 
-		newPage, err := strconv.Atoi(customIDParts[1])
-		if err != nil {
+		if _, err := strconv.Atoi(customIDParts[1]); err != nil {
 			err := fmt.Errorf("error parsing page number: %w", err)
 			lum.logger.ErrorContext(ctx, err.Error())
 			return LeaderboardUpdateOperationResult{Error: err}, nil
 		}
 
-		// Determine the channel from the message
-		channelID := i.ChannelID
-
-		// Pull the cached leaderboard data for this channel
-		leaderboard := lum.getCachedLeaderboard(channelID)
-		if len(leaderboard) == 0 {
-			lum.logger.WarnContext(ctx, "No cached leaderboard data found for pagination, bot may have restarted",
-				attr.String("channel_id", channelID),
-			)
-			// Gracefully inform the user — ephemeral so it doesn't clutter the channel
-			err := lum.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: "⏳ The leaderboard data is being refreshed. Please wait a moment and try again, or use `/leaderboard` to reload.",
-					Flags:   discordgo.MessageFlagsEphemeral,
-				},
-			})
-			if err != nil {
-				lum.logger.ErrorContext(ctx, "Failed to send cache-miss response", attr.Error(err))
-			}
-			return LeaderboardUpdateOperationResult{Failure: "no cached leaderboard data"}, nil
-		}
-
-		embed, components := buildLeaderboardEmbed(leaderboard, int32(newPage))
-
-		err = lum.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseUpdateMessage,
+		// Leaderboard pagination has been replaced with a single-page description embed.
+		// Old embeds with pagination buttons may still exist; respond ephemerally.
+		lum.logger.InfoContext(ctx, "Leaderboard pagination button pressed on old embed — pagination no longer used")
+		err := lum.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
-				Embeds:     []*discordgo.MessageEmbed{embed},
-				Components: components,
+				Content: "ℹ️ The leaderboard has been updated and no longer uses pagination. The next leaderboard refresh will replace this embed.",
+				Flags:   discordgo.MessageFlagsEphemeral,
 			},
 		})
 		if err != nil {
-			err := fmt.Errorf("error updating leaderboard message: %w", err)
-			lum.logger.ErrorContext(ctx, err.Error())
-			return LeaderboardUpdateOperationResult{Error: err}, err
+			lum.logger.ErrorContext(ctx, "Failed to respond to stale pagination button", attr.Error(err))
 		}
-
-		return LeaderboardUpdateOperationResult{Success: "pagination updated"}, nil
+		return LeaderboardUpdateOperationResult{Failure: "pagination no longer supported"}, nil
 	})
 }
