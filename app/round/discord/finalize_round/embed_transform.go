@@ -31,6 +31,7 @@ type participantWithUser struct {
 	Score     *sharedtypes.Score
 	TagNumber *sharedtypes.TagNumber
 	Points    *int
+	IsDNF     bool
 }
 
 func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roundevents.RoundFinalizedEmbedUpdatePayloadV1) (*discordgo.MessageEmbed, []discordgo.MessageComponent, error) {
@@ -79,6 +80,7 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 					Score:     p.Score,
 					TagNumber: p.TagNumber,
 					Points:    p.Points,
+					IsDNF:     p.IsDNF,
 				})
 				continue
 			}
@@ -104,6 +106,7 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 				Score:     p.Score,
 				TagNumber: p.TagNumber,
 				Points:    p.Points,
+				IsDNF:     p.IsDNF,
 			}
 		}
 
@@ -116,6 +119,9 @@ func (frm *finalizeRoundManager) TransformRoundToFinalizedScorecard(payload roun
 		sort.Slice(ordered, func(i, j int) bool {
 			a, b := ordered[i], ordered[j]
 
+			if a.IsDNF != b.IsDNF {
+				return !a.IsDNF
+			}
 			if a.Score == nil && b.Score == nil {
 				return compareByTagThenUser(a, b)
 			}
@@ -249,7 +255,9 @@ func buildParticipantFields(participants []*participantWithUser) []*discordgo.Me
 
 	for i, p := range participants {
 		score := "Score: --"
-		if p.Score != nil {
+		if p.IsDNF {
+			score = "Score: DNF"
+		} else if p.Score != nil {
 			if *p.Score == 0 {
 				score = "Score: Even"
 			} else {
@@ -257,7 +265,7 @@ func buildParticipantFields(participants []*participantWithUser) []*discordgo.Me
 			}
 		}
 
-		if p.Points != nil {
+		if p.Points != nil && !p.IsDNF {
 			score = fmt.Sprintf("%s • %d pts", score, *p.Points)
 		}
 

@@ -108,7 +108,7 @@ func updateFieldItemsScore(fields []*discordgo.MessageEmbedField, userID sharedt
 		if !ok || mentionID != string(userID) {
 			continue
 		}
-		field.Value = formatFinalizedParticipantValue(field.Value, mentionBlock, score)
+		field.Value = formatFinalizedParticipantValue(field.Value, mentionBlock, score, false)
 		updated[i] = field
 		found = true
 	}
@@ -122,9 +122,9 @@ func updateFieldItemsFromParticipants(fields []*discordgo.MessageEmbedField, par
 		return updated
 	}
 
-	scoreByUser := make(map[string]*sharedtypes.Score, len(participants))
+	participantByUser := make(map[string]roundtypes.Participant, len(participants))
 	for _, participant := range participants {
-		scoreByUser[string(participant.UserID)] = participant.Score
+		participantByUser[string(participant.UserID)] = participant
 	}
 
 	for i, field := range updated {
@@ -135,8 +135,11 @@ func updateFieldItemsFromParticipants(fields []*discordgo.MessageEmbedField, par
 		if !ok {
 			continue
 		}
-		score := scoreByUser[mentionID]
-		field.Value = formatFinalizedParticipantValue(field.Value, mentionBlock, score)
+		participant, found := participantByUser[mentionID]
+		if !found {
+			continue
+		}
+		field.Value = formatFinalizedParticipantValue(field.Value, mentionBlock, participant.Score, participant.IsDNF)
 		updated[i] = field
 	}
 
@@ -186,15 +189,21 @@ func parseMentionFromFinalizedValue(value string) (userID string, mentionBlock s
 	return userID, mentionBlock, true
 }
 
-func formatFinalizedParticipantValue(original, mentionBlock string, score *sharedtypes.Score) string {
+func formatFinalizedParticipantValue(original, mentionBlock string, score *sharedtypes.Score, isDNF bool) string {
 	prefix := strings.TrimSpace(strings.TrimSuffix(original, mentionBlock))
 	pointsPart := ""
 	if idx := strings.Index(prefix, "•"); idx != -1 {
 		pointsPart = strings.TrimSpace(prefix[idx:])
 	}
 
+	if !isDNF && strings.Contains(strings.ToUpper(prefix), "SCORE: DNF") {
+		isDNF = true
+	}
+
 	scorePart := fmt.Sprintf("%s %s", scorePrefix, scoreNoData)
-	if score != nil {
+	if isDNF {
+		scorePart = fmt.Sprintf("%s DNF", scorePrefix)
+	} else if score != nil {
 		if *score == 0 {
 			scorePart = fmt.Sprintf("%s Even", scorePrefix)
 		} else {
@@ -202,7 +211,7 @@ func formatFinalizedParticipantValue(original, mentionBlock string, score *share
 		}
 	}
 
-	if pointsPart != "" {
+	if pointsPart != "" && !isDNF {
 		scorePart = fmt.Sprintf("%s • %s", scorePart, strings.TrimPrefix(pointsPart, "• "))
 	}
 

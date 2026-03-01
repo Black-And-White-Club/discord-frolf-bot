@@ -93,6 +93,27 @@ func TestTransformRoundToFinalizedScorecard(t *testing.T) {
 			wantButton: true,
 		},
 		{
+			name: "dnf rendered as DNF and sorted after scored players",
+			payload: roundevents.RoundFinalizedEmbedUpdatePayloadV1{
+				RoundID:   roundID,
+				Location:  "Test Course",
+				StartTime: start,
+				Participants: []roundtypes.Participant{
+					{UserID: "u1", Score: score(-2)},
+					{UserID: "u2", Score: score(1), IsDNF: true},
+				},
+			},
+			mockUsers: map[string]string{
+				"u1": "Alice",
+				"u2": "Bob",
+			},
+			wantFields: []string{
+				"🥇 Alice | Score: -2 (<@u1>)",
+				"🗑️ Bob | Score: DNF (<@u2>)",
+			},
+			wantButton: true,
+		},
+		{
 			name: "participant skipped when user fetch fails",
 			payload: roundevents.RoundFinalizedEmbedUpdatePayloadV1{
 				RoundID:   roundID,

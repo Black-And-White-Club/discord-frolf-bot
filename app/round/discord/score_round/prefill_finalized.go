@@ -39,6 +39,10 @@ func parseFinalizedEmbedParticipants(embed *discordgo.MessageEmbed) map[string]*
 			result[id] = nil
 			continue
 		}
+		if strings.EqualFold(raw, "DNF") {
+			result[id] = nil
+			continue
+		}
 		if strings.EqualFold(raw, "Even") {
 			z := 0
 			result[id] = &z
