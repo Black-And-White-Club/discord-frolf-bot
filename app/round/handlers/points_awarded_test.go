@@ -11,6 +11,7 @@ import (
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
 	roundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/round"
 	sharedevents "github.com/Black-And-White-Club/frolf-bot-shared/events/shared"
+	roundtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/round"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/google/uuid"
 )
@@ -116,6 +117,52 @@ func TestRoundHandlers_HandlePointsAwarded(t *testing.T) {
 			setup: func(f *FakeRoundDiscord) {
 			},
 			wantErr: false, // Handled as warning, returns nil results
+		},
+		{
+			// After the FinishRank tie fix, two players that finished tied receive
+			// identical point values. This test verifies the handler correctly
+			// propagates equal points to both participant embed entries.
+			name: "tied_players_receive_equal_points_in_embed",
+			payload: &sharedevents.PointsAwardedPayloadV1{
+				GuildID:        testGuildID,
+				RoundID:        testRoundID,
+				EventMessageID: testMessageID,
+				Points: map[sharedtypes.DiscordID]int{
+					user1: 1400,
+					user2: 1400, // same as user1 — they tied
+				},
+				Participants: []roundtypes.Participant{
+					{UserID: user1, Response: "accepted"},
+					{UserID: user2, Response: "accepted"},
+				},
+			},
+			ctx: context.WithValue(context.Background(), "discord_message_id", testMessageID),
+			setup: func(f *FakeRoundDiscord) {
+				f.FinalizeRoundManager.FinalizeScorecardEmbedFunc = func(ctx context.Context, msgID, chID string, payload roundevents.RoundFinalizedEmbedUpdatePayloadV1) (finalizeround.FinalizeRoundOperationResult, error) {
+					// Both tied players must have their points set and equal
+					gotPoints := make(map[sharedtypes.DiscordID]int, len(payload.Participants))
+					for _, p := range payload.Participants {
+						if p.Points == nil {
+							return finalizeround.FinalizeRoundOperationResult{}, errors.New("participant missing points")
+						}
+						gotPoints[p.UserID] = *p.Points
+					}
+					if gotPoints[user1] != 1400 {
+						return finalizeround.FinalizeRoundOperationResult{},
+							errors.New("user1 should have 1400 pts")
+					}
+					if gotPoints[user2] != 1400 {
+						return finalizeround.FinalizeRoundOperationResult{},
+							errors.New("user2 should have 1400 pts")
+					}
+					if gotPoints[user1] != gotPoints[user2] {
+						return finalizeround.FinalizeRoundOperationResult{},
+							errors.New("tied players should have equal points in embed")
+					}
+					return finalizeround.FinalizeRoundOperationResult{}, nil
+				}
+			},
+			wantErr: false,
 		},
 	}
 
