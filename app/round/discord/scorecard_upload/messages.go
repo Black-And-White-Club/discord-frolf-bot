@@ -43,17 +43,6 @@ func (m *scorecardUploadManager) HandleFileUploadMessage(s discord.Session, msg 
 		return
 	}
 
-	// Note: accept uploads sent in any channel; pending uploads are keyed by
-	// user:channel so we'll look up pending context below. Previously this
-	// returned early for guild channels which prevented processing when tests
-	// expect uploads to be accepted in guild channels where a pending upload
-	// existed.
-
-	// Check if message has attachments
-	if len(msg.Attachments) == 0 {
-		return
-	}
-
 	if !m.allowUploadIngress(msg.GuildID, msg.Author.ID) {
 		m.logger.WarnContext(ctx, "Rate limited scorecard upload ingress",
 			attr.String("user_id", msg.Author.ID),
@@ -64,14 +53,34 @@ func (m *scorecardUploadManager) HandleFileUploadMessage(s discord.Session, msg 
 		return
 	}
 
-	// Look for CSV or XLSX files
-	var scorecardFile *discordgo.MessageAttachment
-	for _, attachment := range msg.Attachments {
-		if strings.HasSuffix(strings.ToLower(attachment.Filename), ".csv") ||
-			strings.HasSuffix(strings.ToLower(attachment.Filename), ".xlsx") {
-			scorecardFile = attachment
-			break
+	scorecardFile := firstScorecardAttachment(msg.Attachments)
+	udiscURL := extractFirstUDiscURL(msg.Content)
+	if scorecardFile == nil && udiscURL == "" {
+		return
+	}
+
+	// Look up pending upload for this user/channel
+	key := fmt.Sprintf("%s:%s", msg.Author.ID, msg.ChannelID)
+	m.pendingMutex.RLock()
+	_, exists := m.pendingUploads[key]
+	m.pendingMutex.RUnlock()
+
+	threadCtx, threadCtxExists := m.threadUploadContext(msg.ChannelID)
+	if !exists && !threadCtxExists {
+		if scorecardFile != nil {
+			m.logger.WarnContext(ctx, "File upload received but no pending upload found",
+				attr.String("filename", scorecardFile.Filename),
+				attr.String("user_id", msg.Author.ID),
+				attr.String("channel_id", msg.ChannelID),
+			)
 		}
+		m.sendFileUploadErrorMessage(ctx, s, msg.ChannelID, "No pending scorecard upload found. Please click the 'Upload Scorecard' button first.")
+		return
+	}
+
+	if scorecardFile == nil && udiscURL != "" {
+		m.handleRoundThreadURLUpload(ctx, s, msg, key, udiscURL, exists, threadCtx, threadCtxExists)
+		return
 	}
 
 	if scorecardFile == nil {
@@ -84,23 +93,6 @@ func (m *scorecardUploadManager) HandleFileUploadMessage(s discord.Session, msg 
 		attr.String("channel_id", msg.ChannelID),
 		attr.String("guild_id", msg.GuildID),
 	)
-
-	// Look up pending upload for this user/channel
-	key := fmt.Sprintf("%s:%s", msg.Author.ID, msg.ChannelID)
-	m.pendingMutex.RLock()
-	_, exists := m.pendingUploads[key]
-	m.pendingMutex.RUnlock()
-
-	if !exists {
-		m.logger.WarnContext(ctx, "File upload received but no pending upload found",
-			attr.String("filename", scorecardFile.Filename),
-			attr.String("user_id", msg.Author.ID),
-			attr.String("channel_id", msg.ChannelID),
-		)
-		m.sendFileUploadErrorMessage(ctx, s, msg.ChannelID,
-			"No pending scorecard upload found. Please click the 'Upload Scorecard' button first.")
-		return
-	}
 
 	// Download the file after confirming there's a pending upload context.
 	if scorecardFile.Size > maxAttachmentBytes {
@@ -137,43 +129,60 @@ func (m *scorecardUploadManager) HandleFileUploadMessage(s discord.Session, msg 
 		)
 	}
 
-	m.pendingMutex.Lock()
-	pending, exists := m.pendingUploads[key]
+	var (
+		guildID        sharedtypes.GuildID
+		roundID        sharedtypes.RoundID
+		notes          string
+		eventMessageID string
+	)
 	if exists {
-		delete(m.pendingUploads, key) // Consume the pending upload
-	}
-	m.pendingMutex.Unlock()
+		m.pendingMutex.Lock()
+		pending, pendingExists := m.pendingUploads[key]
+		if pendingExists {
+			delete(m.pendingUploads, key) // Consume the pending upload only after file retrieval succeeded.
+			guildID = pending.GuildID
+			roundID = pending.RoundID
+			notes = pending.Notes
+			eventMessageID = pending.EventMessageID
+		}
+		m.pendingMutex.Unlock()
 
-	if !exists {
-		m.logger.WarnContext(ctx, "Pending upload no longer exists after attachment download",
-			attr.String("user_id", msg.Author.ID),
-			attr.String("channel_id", msg.ChannelID),
-		)
-		m.sendFileUploadErrorMessage(ctx, s, msg.ChannelID,
-			"No pending scorecard upload found. Please click the 'Upload Scorecard' button first.")
-		return
+		if guildID == "" || roundID.String() == "" {
+			m.logger.WarnContext(ctx, "Pending upload no longer exists after attachment download",
+				attr.String("user_id", msg.Author.ID),
+				attr.String("channel_id", msg.ChannelID),
+			)
+			m.sendFileUploadErrorMessage(ctx, s, msg.ChannelID, "No pending scorecard upload found. Please click the 'Upload Scorecard' button first.")
+			return
+		}
+	} else {
+		guildID = threadCtx.GuildID
+		roundID = threadCtx.RoundID
+		eventMessageID = threadCtx.EventMessageID
+		notes = ""
 	}
 
 	m.logger.InfoContext(ctx, "Processing file upload with pending context",
 		attr.String("filename", scorecardFile.Filename),
 		attr.Int("file_size", scorecardFile.Size),
 		attr.Bool("file_data_inline", len(fileData) > 0),
-		attr.String("round_id", pending.RoundID.String()),
+		attr.String("round_id", roundID.String()),
 		attr.String("user_id", msg.Author.ID),
+		attr.Bool("thread_auto_ingress", threadCtxExists && !exists),
 	)
 
 	// Publish scorecard upload event
 	importID, err := m.publishScorecardUploadEvent(
 		ctx,
-		pending.GuildID,
-		pending.RoundID,
+		guildID,
+		roundID,
 		sharedtypes.DiscordID(msg.Author.ID),
 		msg.ChannelID,
-		pending.EventMessageID,
+		eventMessageID,
 		fileData,
 		scorecardFile.URL,
 		scorecardFile.Filename,
-		pending.Notes,
+		notes,
 	)
 	if err != nil {
 		m.logger.ErrorContext(ctx, "Failed to publish scorecard upload event",
@@ -186,12 +195,101 @@ func (m *scorecardUploadManager) HandleFileUploadMessage(s discord.Session, msg 
 
 	// Send confirmation
 	_, err = s.ChannelMessageSend(msg.ChannelID,
-		fmt.Sprintf("✅ Scorecard uploaded successfully! Import ID: `%s`\n\nI'll match the players and notify you when ready.", importID))
+		fmt.Sprintf("✅ Scorecard import started! Import ID: `%s`\n\nI'll match the players and notify you when ready.", importID))
 	if err != nil {
 		m.logger.ErrorContext(ctx, "Failed to send file upload confirmation",
 			attr.Error(err),
 		)
 	}
+}
+
+func (m *scorecardUploadManager) handleRoundThreadURLUpload(
+	ctx context.Context,
+	s discord.Session,
+	msg *discordgo.MessageCreate,
+	pendingKey string,
+	udiscURL string,
+	hasPending bool,
+	threadCtx *threadUploadContext,
+	hasThreadCtx bool,
+) {
+	var (
+		guildID        sharedtypes.GuildID
+		roundID        sharedtypes.RoundID
+		eventMessageID string
+		notes          string
+	)
+
+	if hasPending {
+		m.pendingMutex.Lock()
+		pending, exists := m.pendingUploads[pendingKey]
+		if exists {
+			delete(m.pendingUploads, pendingKey)
+			guildID = pending.GuildID
+			roundID = pending.RoundID
+			eventMessageID = pending.EventMessageID
+			notes = pending.Notes
+		}
+		m.pendingMutex.Unlock()
+		if guildID == "" || roundID.String() == "" {
+			m.sendFileUploadErrorMessage(ctx, s, msg.ChannelID, "No pending scorecard upload found. Please click the 'Upload Scorecard' button first.")
+			return
+		}
+	} else if hasThreadCtx {
+		guildID = threadCtx.GuildID
+		roundID = threadCtx.RoundID
+		eventMessageID = threadCtx.EventMessageID
+	} else {
+		m.sendFileUploadErrorMessage(ctx, s, msg.ChannelID, "No pending scorecard upload found. Please click the 'Upload Scorecard' button first.")
+		return
+	}
+
+	importID, err := m.publishScorecardURLEvent(ctx, guildID, roundID, sharedtypes.DiscordID(msg.Author.ID), msg.ChannelID, eventMessageID, udiscURL, notes)
+	if err != nil {
+		m.logger.ErrorContext(ctx, "Failed to publish scorecard URL event from message",
+			attr.Error(err),
+			attr.String("channel_id", msg.ChannelID),
+			attr.String("round_id", roundID.String()),
+		)
+		m.sendFileUploadErrorMessage(ctx, s, msg.ChannelID, "Failed to process scorecard URL. Please try again.")
+		return
+	}
+
+	_, err = s.ChannelMessageSend(msg.ChannelID,
+		fmt.Sprintf("✅ Scorecard import started! Import ID: `%s`\n\nI'll match the players and notify you when ready.", importID))
+	if err != nil {
+		m.logger.ErrorContext(ctx, "Failed to send URL upload confirmation",
+			attr.Error(err),
+			attr.String("channel_id", msg.ChannelID),
+		)
+	}
+}
+
+func firstScorecardAttachment(attachments []*discordgo.MessageAttachment) *discordgo.MessageAttachment {
+	for _, attachment := range attachments {
+		filename := strings.ToLower(strings.TrimSpace(attachment.Filename))
+		if strings.HasSuffix(filename, ".csv") || strings.HasSuffix(filename, ".xlsx") {
+			return attachment
+		}
+	}
+	return nil
+}
+
+func extractFirstUDiscURL(content string) string {
+	if strings.TrimSpace(content) == "" {
+		return ""
+	}
+	candidates := strings.Fields(content)
+	for _, candidate := range candidates {
+		trimmed := strings.Trim(candidate, " \t\r\n<>()[]{}.,!?:;\"'")
+		if trimmed == "" {
+			continue
+		}
+		if err := validateUDiscURL(trimmed); err == nil {
+			return trimmed
+		}
+	}
+	return ""
 }
 
 // SendUploadError sends an error message. If the channel is a guild channel,

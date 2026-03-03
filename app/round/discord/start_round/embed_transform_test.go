@@ -37,12 +37,6 @@ func Test_startRoundManager_TransformRoundToScorecard(t *testing.T) {
 						CustomID: fmt.Sprintf("round_join_late|%s", roundID),
 						Emoji:    &discordgo.ComponentEmoji{Name: "🏃"},
 					},
-					discordgo.Button{
-						Label:    "Upload Scorecard",
-						Style:    discordgo.SuccessButton,
-						CustomID: fmt.Sprintf("round_upload_scorecard|%s", roundID),
-						Emoji:    &discordgo.ComponentEmoji{Name: "📋"},
-					},
 				},
 			},
 		}

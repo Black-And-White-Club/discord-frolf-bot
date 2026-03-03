@@ -17,8 +17,12 @@ func (h *LeaderboardHandlers) HandleBatchTagAssigned(ctx context.Context,
 	batchPayload := payload
 
 	guildID := string(batchPayload.GuildID)
+	assignmentCount := batchPayload.AssignmentCount
+	if assignmentCount == 0 && len(batchPayload.Assignments) > 0 {
+		assignmentCount = len(batchPayload.Assignments)
+	}
 
-	if batchPayload.AssignmentCount == 0 {
+	if assignmentCount == 0 {
 		h.logger.WarnContext(ctx, "Received empty batch assignment data",
 			attr.String("guild_id", guildID))
 		return []handlerwrapper.Result{}, nil
@@ -34,7 +38,7 @@ func (h *LeaderboardHandlers) HandleBatchTagAssigned(ctx context.Context,
 
 	// Update the interaction if this was initiated by a user command
 	if correlationID != "" {
-		successMessage := fmt.Sprintf("✅ Successfully assigned %d tags!", batchPayload.AssignmentCount)
+		successMessage := fmt.Sprintf("✅ Successfully assigned %d tags!", assignmentCount)
 		// We use fmt to maximize compatibility since we need to import fmt
 		if h.service != nil {
 			claimTagManager := h.service.GetClaimTagManager()

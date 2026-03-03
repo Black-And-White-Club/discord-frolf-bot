@@ -45,6 +45,14 @@ func (h *RoundHandlers) HandleRoundStarted(ctx context.Context, payload *roundev
 		return nil, fmt.Errorf("failed to update round to scorecard: %w", err)
 	}
 
+	if err := h.service.GetScorecardUploadManager().EnsureRoundThreadInstructions(ctx, payload.GuildID, payload.RoundID, channelID, eventMessageID); err != nil {
+		h.logger.WarnContext(ctx, "failed to post round scorecard upload instructions",
+			attr.String("round_id", payload.RoundID.String()),
+			attr.String("guild_id", string(payload.GuildID)),
+			attr.Error(err),
+		)
+	}
+
 	// Set the native Discord Scheduled Event to ACTIVE (best-effort).
 	if payload.DiscordEventID != "" {
 		session := h.service.GetSession()

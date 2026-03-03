@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 	"runtime/debug"
-	"strings"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/interactions"
@@ -186,13 +185,10 @@ func isLikelyScorecardUploadMessage(m *discordgo.MessageCreate) bool {
 	if m == nil || m.Message == nil || m.Author == nil || m.Author.Bot {
 		return false
 	}
-	for _, attachment := range m.Attachments {
-		filename := strings.ToLower(attachment.Filename)
-		if strings.HasSuffix(filename, ".csv") || strings.HasSuffix(filename, ".xlsx") {
-			return true
-		}
+	if firstScorecardAttachment(m.Attachments) != nil {
+		return true
 	}
-	return false
+	return extractFirstUDiscURL(m.Content) != ""
 }
 
 func interactionUserIDFromCreate(i *discordgo.InteractionCreate) string {

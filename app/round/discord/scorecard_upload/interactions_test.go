@@ -368,7 +368,7 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_PendingExists_Publishes
 		if cID != channelID {
 			t.Fatalf("channel_id mismatch: got %q want %q", cID, channelID)
 		}
-		if !strings.Contains(content, "Scorecard uploaded successfully") {
+		if !strings.Contains(content, "Scorecard import started") {
 			t.Fatalf("unexpected confirmation content: %q", content)
 		}
 		if !strings.Contains(content, "Import ID") {
@@ -387,6 +387,81 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_PendingExists_Publishes
 	if stillThere {
 		t.Fatalf("expected pending upload to be consumed")
 	}
+}
+
+func Test_scorecardUploadManager_HandleFileUploadMessage_ThreadURL_PublishesAndConfirms(t *testing.T) {
+	fakeSession := discord.NewFakeSession()
+	fakePublisher := &testutils.FakeEventBus{}
+
+	guildID := "guild-id"
+	threadID := "thread-channel-id"
+	userID := "user-id"
+	roundUUID := uuid.New()
+	eventMessageID := "event-message-id"
+	udiscURL := "https://udisc.com/scorecards/example.csv"
+
+	msg := &discordgo.MessageCreate{Message: &discordgo.Message{
+		ID:        "message-id",
+		GuildID:   guildID,
+		ChannelID: threadID,
+		Content:   udiscURL,
+		Author:    &discordgo.User{ID: userID, Bot: false},
+	}}
+
+	m := &scorecardUploadManager{
+		session:   fakeSession,
+		publisher: fakePublisher,
+		logger:    discardLogger(),
+		threadContexts: map[string]*threadUploadContext{
+			threadID: {
+				RoundID:        sharedtypes.RoundID(roundUUID),
+				GuildID:        sharedtypes.GuildID(guildID),
+				EventMessageID: eventMessageID,
+				CreatedAt:      time.Now(),
+			},
+		},
+		operationWrapper: func(ctx context.Context, _ string, fn func(context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error) {
+			return fn(ctx)
+		},
+	}
+
+	fakePublisher.PublishFunc = func(topic string, messages ...*message.Message) error {
+		if topic != roundevents.ScorecardURLRequestedV1 {
+			t.Fatalf("unexpected topic: %q", topic)
+		}
+		if len(messages) != 1 {
+			t.Fatalf("expected 1 message")
+		}
+		var payload roundevents.ScorecardURLRequestedPayloadV1
+		if err := json.Unmarshal(messages[0].Payload, &payload); err != nil {
+			t.Fatalf("failed to unmarshal payload: %v", err)
+		}
+		if payload.RoundID.String() != roundUUID.String() {
+			t.Fatalf("round_id mismatch: got %q want %q", payload.RoundID.String(), roundUUID.String())
+		}
+		if payload.UDiscURL != udiscURL {
+			t.Fatalf("udisc_url mismatch: got %q want %q", payload.UDiscURL, udiscURL)
+		}
+		if payload.ChannelID != threadID {
+			t.Fatalf("channel_id mismatch: got %q want %q", payload.ChannelID, threadID)
+		}
+		if payload.MessageID != eventMessageID {
+			t.Fatalf("event_message_id mismatch: got %q want %q", payload.MessageID, eventMessageID)
+		}
+		return nil
+	}
+
+	fakeSession.ChannelMessageSendFunc = func(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+		if channelID != threadID {
+			t.Fatalf("channel mismatch: got %q want %q", channelID, threadID)
+		}
+		if !strings.Contains(content, "Scorecard import started") {
+			t.Fatalf("unexpected confirmation message: %q", content)
+		}
+		return &discordgo.Message{ID: "confirmation"}, nil
+	}
+
+	m.HandleFileUploadMessage(fakeSession, msg)
 }
 
 func Test_scorecardUploadManager_HandleFileUploadMessage_LargeAttachment_PublishesURLReferenceWithoutDownload(t *testing.T) {
@@ -602,7 +677,12 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_PublishError_SendsError
 			return fn(ctx)
 		},
 		pendingUploads: map[string]*pendingUpload{
-			key: {RoundID: sharedtypes.RoundID(uuid.New()), Notes: ""},
+			key: {
+				RoundID:        sharedtypes.RoundID(uuid.New()),
+				GuildID:        "guild-id",
+				EventMessageID: "event-message-id",
+				Notes:          "",
+			},
 		},
 	}
 

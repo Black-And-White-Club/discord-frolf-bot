@@ -32,13 +32,11 @@ const (
 	scoreNoData = "--"
 	tagPrefix   = "Tag:"
 
-	customIDEnterScore      = "round_enter_score"
-	customIDJoinLate        = "round_join_late"
-	customIDUploadScorecard = "round_upload_scorecard"
+	customIDEnterScore = "round_enter_score"
+	customIDJoinLate   = "round_join_late"
 
-	emojiEnterScore      = "💰"
-	emojiJoinLate        = "🏃"
-	emojiUploadScorecard = "📋"
+	emojiEnterScore = "💰"
+	emojiJoinLate   = "🏃"
 
 	colorRoundStarted = 0x00AA00
 )
@@ -255,12 +253,6 @@ func (m *startRoundManager) TransformRoundToScorecard(
 						Style:    discordgo.SecondaryButton,
 						CustomID: fmt.Sprintf("%s|%s", customIDJoinLate, payload.RoundID),
 						Emoji:    &discordgo.ComponentEmoji{Name: emojiJoinLate},
-					},
-					discordgo.Button{
-						Label:    "Upload Scorecard",
-						Style:    discordgo.SuccessButton,
-						CustomID: fmt.Sprintf("%s|%s", customIDUploadScorecard, payload.RoundID),
-						Emoji:    &discordgo.ComponentEmoji{Name: emojiUploadScorecard},
 					},
 				},
 			},

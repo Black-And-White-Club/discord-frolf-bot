@@ -28,6 +28,14 @@ type pendingUpload struct {
 	CreatedAt      time.Time
 }
 
+type threadUploadContext struct {
+	RoundID            sharedtypes.RoundID
+	GuildID            sharedtypes.GuildID
+	EventMessageID     string
+	InstructionsPosted bool
+	CreatedAt          time.Time
+}
+
 const (
 	maxAttachmentBytes           = 10 * 1024 * 1024 // 10 MB
 	maxUploadsPerMinutePerUserID = 10
@@ -38,6 +46,7 @@ type ScorecardUploadManager interface {
 	HandleScorecardUploadButton(ctx context.Context, i *discordgo.InteractionCreate) (ScorecardUploadOperationResult, error)
 	HandleScorecardUploadModalSubmit(ctx context.Context, i *discordgo.InteractionCreate) (ScorecardUploadOperationResult, error)
 	HandleFileUploadMessage(s discord.Session, m *discordgo.MessageCreate)
+	EnsureRoundThreadInstructions(ctx context.Context, guildID sharedtypes.GuildID, roundID sharedtypes.RoundID, parentChannelID, eventMessageID string) error
 	SendUploadError(ctx context.Context, channelID, userID, errorMsg string) error
 }
 
@@ -54,6 +63,8 @@ type scorecardUploadManager struct {
 	operationWrapper func(ctx context.Context, opName string, fn func(ctx context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error)
 	pendingUploads   map[string]*pendingUpload // key: "userID:channelID"
 	pendingMutex     sync.RWMutex
+	threadContexts   map[string]*threadUploadContext // key: "threadChannelID"
+	threadMutex      sync.RWMutex
 	ingressWindows   map[string][]time.Time // key: "guildID:userID" (guildID can be empty for DM)
 	ingressMutex     sync.Mutex
 	httpClient       *http.Client
@@ -85,6 +96,7 @@ func NewScorecardUploadManager(
 		tracer:           tracer,
 		metrics:          metrics,
 		pendingUploads:   make(map[string]*pendingUpload),
+		threadContexts:   make(map[string]*threadUploadContext),
 		ingressWindows:   make(map[string][]time.Time),
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
@@ -163,6 +175,14 @@ func (m *scorecardUploadManager) cleanupPendingUploads(ctx context.Context) {
 				}
 			}
 			m.pendingMutex.Unlock()
+
+			m.threadMutex.Lock()
+			for key, threadCtx := range m.threadContexts {
+				if now.Sub(threadCtx.CreatedAt) > 24*time.Hour {
+					delete(m.threadContexts, key)
+				}
+			}
+			m.threadMutex.Unlock()
 		}
 	}
 }
