@@ -123,3 +123,86 @@ func TestRoundHandlers_HandleRoundStarted(t *testing.T) {
 		})
 	}
 }
+
+func TestRoundHandlers_HandleRoundStarted_PostsUploadInstructionsBestEffort(t *testing.T) {
+	testRoundID := sharedtypes.RoundID(uuid.New())
+	testEventMessageID := "event-message-123"
+	testChannelID := "channel-123"
+	instructionsCalled := false
+
+	fakeRoundDiscord := &FakeRoundDiscord{}
+	fakeRoundDiscord.StartRoundManager.UpdateRoundToScorecardFunc = func(ctx context.Context, channelID, messageID string, payload *roundevents.DiscordRoundStartPayloadV1) (startround.StartRoundOperationResult, error) {
+		return startround.StartRoundOperationResult{Success: true}, nil
+	}
+	fakeRoundDiscord.ScorecardUploadManager.EnsureRoundThreadInstructionsFunc = func(ctx context.Context, guildID sharedtypes.GuildID, roundID sharedtypes.RoundID, parentChannelID, eventMessageID string) error {
+		instructionsCalled = true
+		if roundID != testRoundID {
+			t.Fatalf("unexpected round id: %s", roundID)
+		}
+		if parentChannelID != testChannelID {
+			t.Fatalf("unexpected channel id: %s", parentChannelID)
+		}
+		if eventMessageID != testEventMessageID {
+			t.Fatalf("unexpected event message id: %s", eventMessageID)
+		}
+		return nil
+	}
+
+	h := NewRoundHandlers(
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		&config.Config{},
+		nil,
+		fakeRoundDiscord,
+		nil,
+	)
+
+	_, err := h.HandleRoundStarted(context.Background(), &roundevents.DiscordRoundStartPayloadV1{
+		GuildID:          "guild-1",
+		RoundID:          testRoundID,
+		EventMessageID:   testEventMessageID,
+		DiscordChannelID: testChannelID,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !instructionsCalled {
+		t.Fatalf("expected upload instructions to be posted")
+	}
+}
+
+func TestRoundHandlers_HandleRoundStarted_InstructionPostingErrorIsNonFatal(t *testing.T) {
+	testRoundID := sharedtypes.RoundID(uuid.New())
+	testEventMessageID := "event-message-123"
+	testChannelID := "channel-123"
+	instructionsCalled := false
+
+	fakeRoundDiscord := &FakeRoundDiscord{}
+	fakeRoundDiscord.StartRoundManager.UpdateRoundToScorecardFunc = func(ctx context.Context, channelID, messageID string, payload *roundevents.DiscordRoundStartPayloadV1) (startround.StartRoundOperationResult, error) {
+		return startround.StartRoundOperationResult{Success: true}, nil
+	}
+	fakeRoundDiscord.ScorecardUploadManager.EnsureRoundThreadInstructionsFunc = func(ctx context.Context, guildID sharedtypes.GuildID, roundID sharedtypes.RoundID, parentChannelID, eventMessageID string) error {
+		instructionsCalled = true
+		return errors.New("thread post failed")
+	}
+
+	h := NewRoundHandlers(
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		&config.Config{},
+		nil,
+		fakeRoundDiscord,
+		nil,
+	)
+
+	_, err := h.HandleRoundStarted(context.Background(), &roundevents.DiscordRoundStartPayloadV1{
+		GuildID:          "guild-1",
+		RoundID:          testRoundID,
+		EventMessageID:   testEventMessageID,
+		DiscordChannelID: testChannelID,
+	})
+	if err != nil {
+		t.Fatalf("expected nil error when instruction posting fails, got %v", err)
+	}
+	if !instructionsCalled {
+		t.Fatalf("expected EnsureRoundThreadInstructions to be called")
+	}
+}

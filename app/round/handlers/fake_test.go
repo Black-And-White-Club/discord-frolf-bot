@@ -519,6 +519,7 @@ type FakeScorecardUploadManager struct {
 	HandleScorecardUploadButtonFunc      func(ctx context.Context, i *discordgo.InteractionCreate) (scorecardupload.ScorecardUploadOperationResult, error)
 	HandleScorecardUploadModalSubmitFunc func(ctx context.Context, i *discordgo.InteractionCreate) (scorecardupload.ScorecardUploadOperationResult, error)
 	HandleFileUploadMessageFunc          func(s discord.Session, m *discordgo.MessageCreate)
+	EnsureRoundThreadInstructionsFunc    func(ctx context.Context, guildID sharedtypes.GuildID, roundID sharedtypes.RoundID, parentChannelID, eventMessageID string) error
 	SendUploadErrorFunc                  func(ctx context.Context, channelID, userID, errorMsg string) error
 }
 
@@ -540,6 +541,13 @@ func (f *FakeScorecardUploadManager) HandleFileUploadMessage(s discord.Session, 
 	if f.HandleFileUploadMessageFunc != nil {
 		f.HandleFileUploadMessageFunc(s, m)
 	}
+}
+
+func (f *FakeScorecardUploadManager) EnsureRoundThreadInstructions(ctx context.Context, guildID sharedtypes.GuildID, roundID sharedtypes.RoundID, parentChannelID, eventMessageID string) error {
+	if f.EnsureRoundThreadInstructionsFunc != nil {
+		return f.EnsureRoundThreadInstructionsFunc(ctx, guildID, roundID, parentChannelID, eventMessageID)
+	}
+	return nil
 }
 
 func (f *FakeScorecardUploadManager) SendUploadError(ctx context.Context, channelID, userID, errorMsg string) error {

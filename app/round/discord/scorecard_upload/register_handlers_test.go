@@ -12,6 +12,7 @@ import (
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/testutils"
 	loggerfrolfbot "github.com/Black-And-White-Club/frolf-bot-shared/observability/otel/logging"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -46,6 +47,10 @@ func (m *fakeScorecardUploadManager) HandleFileUploadMessage(s discord.Session, 
 	m.lastSession = s
 	m.lastMsg = msg
 	m.mu.Unlock()
+}
+
+func (m *fakeScorecardUploadManager) EnsureRoundThreadInstructions(ctx context.Context, guildID sharedtypes.GuildID, roundID sharedtypes.RoundID, parentChannelID, eventMessageID string) error {
+	return nil
 }
 
 func (m *fakeScorecardUploadManager) SendUploadError(ctx context.Context, channelID, errorMsg, messageID string) error {
