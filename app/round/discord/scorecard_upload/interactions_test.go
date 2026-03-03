@@ -804,6 +804,58 @@ func Test_scorecardUploadManager_HandleFileUploadMessage_NoPending_SendsError(t 
 	}
 }
 
+func Test_scorecardUploadManager_HandleFileUploadMessage_URLNoPendingOrThread_Ignored(t *testing.T) {
+	fakeSession := discord.NewFakeSession()
+	fakePublisher := &testutils.FakeEventBus{}
+
+	msg := &discordgo.MessageCreate{Message: &discordgo.Message{
+		ID:        "message-id",
+		GuildID:   "guild-id",
+		ChannelID: "general-channel-id",
+		Content:   "https://udisc.com/scorecards/example.csv",
+		Author:    &discordgo.User{ID: "user-id", Bot: false},
+	}}
+
+	channelSends := 0
+	fakeSession.ChannelMessageSendFunc = func(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+		channelSends++
+		return &discordgo.Message{ID: "msg-id"}, nil
+	}
+
+	publishCalls := 0
+	fakePublisher.PublishFunc = func(topic string, messages ...*message.Message) error {
+		publishCalls++
+		return nil
+	}
+
+	m := &scorecardUploadManager{
+		session:        fakeSession,
+		publisher:      fakePublisher,
+		logger:         discardLogger(),
+		pendingUploads: make(map[string]*pendingUpload),
+		threadContexts: make(map[string]*threadUploadContext),
+		operationWrapper: func(ctx context.Context, _ string, fn func(context.Context) (ScorecardUploadOperationResult, error)) (ScorecardUploadOperationResult, error) {
+			return fn(ctx)
+		},
+	}
+
+	m.HandleFileUploadMessage(fakeSession, msg)
+
+	if channelSends != 0 {
+		t.Fatalf("expected no channel messages for URL in unrelated channel, got %d", channelSends)
+	}
+	if publishCalls != 0 {
+		t.Fatalf("expected no publish calls for URL in unrelated channel, got %d", publishCalls)
+	}
+}
+
+func Test_extractFirstUDiscURL_AutolinkedURL(t *testing.T) {
+	got := extractFirstUDiscURL("Check this out: <https://udisc.com/scorecards/example.csv>")
+	if got != "https://udisc.com/scorecards/example.csv" {
+		t.Fatalf("unexpected extracted URL: %q", got)
+	}
+}
+
 func Test_scorecardUploadManager_HandleFileUploadMessage_NonScorecardAttachment_Ignored(t *testing.T) {
 	fakeSession := discord.NewFakeSession()
 

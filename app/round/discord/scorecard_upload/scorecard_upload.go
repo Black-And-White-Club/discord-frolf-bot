@@ -29,11 +29,12 @@ type pendingUpload struct {
 }
 
 type threadUploadContext struct {
-	RoundID            sharedtypes.RoundID
-	GuildID            sharedtypes.GuildID
-	EventMessageID     string
-	InstructionsPosted bool
-	CreatedAt          time.Time
+	RoundID             sharedtypes.RoundID
+	GuildID             sharedtypes.GuildID
+	EventMessageID      string
+	InstructionsPosted  bool
+	InstructionsPosting bool
+	CreatedAt           time.Time
 }
 
 const (

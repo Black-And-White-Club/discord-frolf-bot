@@ -42,20 +42,31 @@ func (m *scorecardUploadManager) EnsureRoundThreadInstructions(
 		threadCtx.CreatedAt = time.Now()
 	}
 	alreadyPosted := threadCtx.InstructionsPosted
+	alreadyPosting := threadCtx.InstructionsPosting
+	if !alreadyPosted && !alreadyPosting {
+		threadCtx.InstructionsPosting = true
+	}
 	m.threadMutex.Unlock()
 
-	if alreadyPosted {
+	if alreadyPosted || alreadyPosting {
 		return nil
 	}
 
 	_, err = m.session.ChannelMessageSend(threadID, roundThreadUploadInstructions(roundID))
 	if err != nil {
+		m.threadMutex.Lock()
+		if current, ok := m.threadContexts[threadID]; ok {
+			current.InstructionsPosting = false
+			current.CreatedAt = time.Now()
+		}
+		m.threadMutex.Unlock()
 		return fmt.Errorf("failed to send round upload instructions: %w", err)
 	}
 
 	m.threadMutex.Lock()
 	if current, ok := m.threadContexts[threadID]; ok {
 		current.InstructionsPosted = true
+		current.InstructionsPosting = false
 		current.CreatedAt = time.Now()
 	}
 	m.threadMutex.Unlock()
@@ -90,6 +101,9 @@ func (m *scorecardUploadManager) resolveOrCreateRoundThread(
 		return "", fmt.Errorf("failed creating scorecard upload thread: %w", err)
 	}
 
+	// Discord can return "already exists" or, in rare cases, no thread object on a
+	// successful creation response. In both cases, fetch the message and use the
+	// attached thread reference.
 	message, fetchErr := m.session.ChannelMessage(parentChannelID, eventMessageID)
 	if fetchErr != nil || message == nil || message.Thread == nil {
 		if err != nil {
@@ -104,6 +118,8 @@ func threadCreationAlreadyExists(err error) bool {
 	if err == nil {
 		return false
 	}
+	// Discord API error code 160004 indicates a thread already exists for this message.
+	// We keep string matching as a fallback because discordgo may surface typed or plain errors.
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "thread already exists") || strings.Contains(msg, "160004")
 }
