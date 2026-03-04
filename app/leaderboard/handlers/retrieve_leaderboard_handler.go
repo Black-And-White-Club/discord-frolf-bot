@@ -220,13 +220,16 @@ func preferredProfileDisplayName(profile *usertypes.UserProfile) string {
 		return ""
 	}
 
-	if displayName := strings.TrimSpace(profile.DisplayName); displayName != "" {
-		return displayName
-	}
+	displayName := strings.TrimSpace(profile.DisplayName)
 	if profile.UDiscUsername != nil {
 		if username := strings.TrimSpace(*profile.UDiscUsername); username != "" {
-			return username
+			if displayName == "" || strings.Contains(strings.ToLower(displayName), "placeholder") {
+				return username
+			}
 		}
+	}
+	if displayName != "" {
+		return displayName
 	}
 	if profile.UDiscName != nil {
 		if name := strings.TrimSpace(*profile.UDiscName); name != "" {

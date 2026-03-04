@@ -39,11 +39,11 @@ func Test_buildLeaderboardDescription(t *testing.T) {
 	t.Run("display name is shown when present", func(t *testing.T) {
 		entries := []LeaderboardEntry{{Rank: 1, UserID: "839877196898238526", DisplayName: "Alice"}}
 		got := buildLeaderboardDescription(entries)
-		if !strings.Contains(got, "**Alice**") {
-			t.Errorf("expected display name, got: %q", got)
+		if !strings.Contains(got, "@Alice") {
+			t.Errorf("expected @display name, got: %q", got)
 		}
-		if !strings.Contains(got, "(<@839877196898238526>)") {
-			t.Errorf("expected mention alongside display name, got: %q", got)
+		if strings.Contains(got, "<@839877196898238526>") {
+			t.Errorf("expected no mention when display name is available, got: %q", got)
 		}
 	})
 
@@ -66,6 +66,28 @@ func Test_buildLeaderboardDescription(t *testing.T) {
 		}
 		if strings.Contains(got, "<@23>") {
 			t.Errorf("expected no mention for short pseudo-id, got: %q", got)
+		}
+	})
+
+	t.Run("short numeric pseudo-id prefers display name when available", func(t *testing.T) {
+		entries := []LeaderboardEntry{{Rank: 1, UserID: "23", DisplayName: "muffinmaster123"}}
+		got := buildLeaderboardDescription(entries)
+		if !strings.Contains(got, "@muffinmaster123") {
+			t.Errorf("expected display-name fallback label, got: %q", got)
+		}
+		if strings.Contains(got, "@23") {
+			t.Errorf("expected numeric pseudo-id to be replaced by display name, got: %q", got)
+		}
+	})
+
+	t.Run("placeholder user labels prefer display name when available", func(t *testing.T) {
+		entries := []LeaderboardEntry{{Rank: 1, UserID: "Tag 23 Placeholder", DisplayName: "muffinmaster123"}}
+		got := buildLeaderboardDescription(entries)
+		if !strings.Contains(got, "@muffinmaster123") {
+			t.Errorf("expected display-name fallback label, got: %q", got)
+		}
+		if strings.Contains(got, "@Tag 23 Placeholder") {
+			t.Errorf("expected placeholder label to be replaced, got: %q", got)
 		}
 	})
 

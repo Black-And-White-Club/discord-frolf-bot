@@ -75,18 +75,24 @@ func buildLeaderboardDescription(leaderboard []LeaderboardEntry) string {
 }
 
 func formatLeaderboardUser(entry LeaderboardEntry) string {
+	rawUserID := strings.TrimSpace(string(entry.UserID))
 	displayName := sanitizeDisplayName(entry.DisplayName)
-	mention := formatUserMention(entry.UserID)
+	normalizedID := normalizeDiscordUserID(rawUserID)
 
 	switch {
-	case displayName != "" && mention != "":
-		return fmt.Sprintf("**%s** (%s)", displayName, mention)
+	case normalizedID == "" && rawUserID != "":
+		// For human-readable handles (non-Discord IDs), keep the original @label.
+		// But prefer enriched display names for legacy placeholder/numeric IDs.
+		if displayName != "" && (isNumericLeaderboardID(rawUserID) || isPlaceholderLeaderboardLabel(rawUserID)) {
+			return formatRawLeaderboardUserLabel(displayName)
+		}
+		return formatRawLeaderboardUserLabel(rawUserID)
 	case displayName != "":
-		return fmt.Sprintf("**%s**", displayName)
-	case mention != "":
-		return mention
+		return formatRawLeaderboardUserLabel(displayName)
+	case normalizedID != "":
+		return fmt.Sprintf("<@%s>", normalizedID)
 	default:
-		return formatRawLeaderboardUserLabel(string(entry.UserID))
+		return formatRawLeaderboardUserLabel(rawUserID)
 	}
 }
 
@@ -128,6 +134,22 @@ func isLikelyDiscordSnowflake(candidate string) bool {
 
 	length := len(candidate)
 	return length >= minSnowflakeLen && length <= maxSnowflakeLen
+}
+
+func isNumericLeaderboardID(raw string) bool {
+	if raw == "" {
+		return false
+	}
+	for _, ch := range raw {
+		if ch < '0' || ch > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func isPlaceholderLeaderboardLabel(raw string) bool {
+	return strings.Contains(strings.ToLower(raw), "placeholder")
 }
 
 func formatRawLeaderboardUserLabel(raw string) string {

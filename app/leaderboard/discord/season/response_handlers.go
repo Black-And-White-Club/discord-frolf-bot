@@ -198,18 +198,19 @@ func (sm *seasonManager) formatSeasonStandingMemberLabel(
 	guildID sharedtypes.GuildID,
 	memberID sharedtypes.DiscordID,
 ) string {
+	rawMemberID := strings.TrimSpace(string(memberID))
 	displayName := sm.lookupSeasonMemberDisplayName(ctx, string(guildID), memberID)
-	mention := formatSeasonMemberMention(memberID)
+	normalizedID := normalizeSeasonDiscordUserID(rawMemberID)
 
 	switch {
-	case displayName != "" && mention != "":
-		return fmt.Sprintf("**%s** (%s)", displayName, mention)
+	case normalizedID == "" && rawMemberID != "":
+		return formatRawSeasonMemberLabel(rawMemberID)
 	case displayName != "":
-		return fmt.Sprintf("**%s**", displayName)
-	case mention != "":
-		return mention
+		return formatRawSeasonMemberLabel(displayName)
+	case normalizedID != "":
+		return fmt.Sprintf("<@%s>", normalizedID)
 	default:
-		return formatRawSeasonMemberLabel(string(memberID))
+		return formatRawSeasonMemberLabel(rawMemberID)
 	}
 }
 
