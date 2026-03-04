@@ -31,8 +31,52 @@ func Test_buildLeaderboardDescription(t *testing.T) {
 		if !strings.Contains(got, "🥇") {
 			t.Errorf("expected gold medal, got: %q", got)
 		}
-		if !strings.Contains(got, "<@user1>") {
-			t.Errorf("expected user mention, got: %q", got)
+		if !strings.Contains(got, "@user1") {
+			t.Errorf("expected user label, got: %q", got)
+		}
+	})
+
+	t.Run("display name is shown when present", func(t *testing.T) {
+		entries := []LeaderboardEntry{{Rank: 1, UserID: "839877196898238526", DisplayName: "Alice"}}
+		got := buildLeaderboardDescription(entries)
+		if !strings.Contains(got, "**Alice**") {
+			t.Errorf("expected display name, got: %q", got)
+		}
+		if !strings.Contains(got, "(<@839877196898238526>)") {
+			t.Errorf("expected mention alongside display name, got: %q", got)
+		}
+	})
+
+	t.Run("mention-formatted IDs are normalized", func(t *testing.T) {
+		entries := []LeaderboardEntry{{Rank: 1, UserID: "<@!839877196898238526>"}}
+		got := buildLeaderboardDescription(entries)
+		if !strings.Contains(got, "<@839877196898238526>") {
+			t.Errorf("expected normalized mention id, got: %q", got)
+		}
+		if strings.Contains(got, "<@<@!839877196898238526>>") {
+			t.Errorf("expected no nested mention format, got: %q", got)
+		}
+	})
+
+	t.Run("short numeric pseudo-id falls back to plain label", func(t *testing.T) {
+		entries := []LeaderboardEntry{{Rank: 1, UserID: "23"}}
+		got := buildLeaderboardDescription(entries)
+		if !strings.Contains(got, "@23") {
+			t.Errorf("expected plain pseudo-id label, got: %q", got)
+		}
+		if strings.Contains(got, "<@23>") {
+			t.Errorf("expected no mention for short pseudo-id, got: %q", got)
+		}
+	})
+
+	t.Run("raw @handle is preserved without double @", func(t *testing.T) {
+		entries := []LeaderboardEntry{{Rank: 1, UserID: "@farrmich"}}
+		got := buildLeaderboardDescription(entries)
+		if !strings.Contains(got, "@farrmich") {
+			t.Errorf("expected raw handle, got: %q", got)
+		}
+		if strings.Contains(got, "@@farrmich") {
+			t.Errorf("expected no duplicated @ prefix, got: %q", got)
 		}
 	})
 
@@ -115,7 +159,7 @@ func Test_leaderboardUpdateManager_SendLeaderboardEmbed(t *testing.T) {
 					if !strings.Contains(embed.Description, "🥇") {
 						t.Errorf("Expected gold medal in description, got: %q", embed.Description)
 					}
-					if !strings.Contains(embed.Description, "<@user1>") {
+					if !strings.Contains(embed.Description, "@user1") {
 						t.Errorf("Expected user1 in description, got: %q", embed.Description)
 					}
 					if len(embed.Fields) != 0 {

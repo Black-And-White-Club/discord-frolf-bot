@@ -7,6 +7,7 @@ import (
 
 	leaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/leaderboard"
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
+	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
 )
 
 type contextKey string
@@ -80,7 +81,8 @@ func (sm *seasonManager) HandleSeasonStandings(ctx context.Context, payload *lea
 			sb.WriteString(fmt.Sprintf("\n... and %d more", len(payload.Standings)-10))
 			break
 		}
-		sb.WriteString(fmt.Sprintf("\n%d. <@%s> - **%d** pts (%d rounds)", i+1, string(s.MemberID), s.TotalPoints, s.RoundsPlayed))
+		memberLabel := sm.formatSeasonStandingMemberLabel(ctx, payload.GuildID, s.MemberID)
+		sb.WriteString(fmt.Sprintf("\n%d. %s - **%d** pts (%d rounds)", i+1, memberLabel, s.TotalPoints, s.RoundsPlayed))
 	}
 	sm.logger.InfoContext(ctx, sb.String())
 
@@ -189,4 +191,127 @@ func (sm *seasonManager) getChannelID(ctx context.Context, guildID string) strin
 	}
 
 	return ""
+}
+
+func (sm *seasonManager) formatSeasonStandingMemberLabel(
+	ctx context.Context,
+	guildID sharedtypes.GuildID,
+	memberID sharedtypes.DiscordID,
+) string {
+	displayName := sm.lookupSeasonMemberDisplayName(ctx, string(guildID), memberID)
+	mention := formatSeasonMemberMention(memberID)
+
+	switch {
+	case displayName != "" && mention != "":
+		return fmt.Sprintf("**%s** (%s)", displayName, mention)
+	case displayName != "":
+		return fmt.Sprintf("**%s**", displayName)
+	case mention != "":
+		return mention
+	default:
+		return formatRawSeasonMemberLabel(string(memberID))
+	}
+}
+
+func (sm *seasonManager) lookupSeasonMemberDisplayName(
+	ctx context.Context,
+	guildID string,
+	memberID sharedtypes.DiscordID,
+) string {
+	normalizedID := normalizeSeasonDiscordUserID(string(memberID))
+	if guildID == "" || normalizedID == "" {
+		return ""
+	}
+
+	member, err := sm.session.GuildMember(guildID, normalizedID)
+	if err != nil || member == nil {
+		return ""
+	}
+
+	if displayName := strings.TrimSpace(member.Nick); displayName != "" {
+		return sanitizeSeasonDisplayName(displayName)
+	}
+	if member.User == nil {
+		return ""
+	}
+	if displayName := strings.TrimSpace(member.User.GlobalName); displayName != "" {
+		return sanitizeSeasonDisplayName(displayName)
+	}
+	if displayName := strings.TrimSpace(member.User.Username); displayName != "" {
+		return sanitizeSeasonDisplayName(displayName)
+	}
+	return ""
+}
+
+func formatSeasonMemberMention(memberID sharedtypes.DiscordID) string {
+	normalizedID := normalizeSeasonDiscordUserID(string(memberID))
+	if normalizedID == "" {
+		return ""
+	}
+	return fmt.Sprintf("<@%s>", normalizedID)
+}
+
+func normalizeSeasonDiscordUserID(raw string) string {
+	candidate := strings.TrimSpace(raw)
+	if candidate == "" {
+		return ""
+	}
+
+	if strings.HasPrefix(candidate, "<@") && strings.HasSuffix(candidate, ">") {
+		candidate = strings.TrimSuffix(strings.TrimPrefix(candidate, "<@"), ">")
+	}
+
+	candidate = strings.TrimPrefix(candidate, "!")
+	candidate = strings.TrimPrefix(candidate, "@")
+	if candidate == "" || strings.ContainsAny(candidate, "<>@ \t\r\n") {
+		return ""
+	}
+	if !sharedtypes.DiscordID(candidate).IsValid() || !isLikelySeasonDiscordSnowflake(candidate) {
+		return ""
+	}
+	return candidate
+}
+
+func isLikelySeasonDiscordSnowflake(candidate string) bool {
+	const (
+		minSnowflakeLen = 17
+		maxSnowflakeLen = 20
+	)
+
+	length := len(candidate)
+	return length >= minSnowflakeLen && length <= maxSnowflakeLen
+}
+
+func formatRawSeasonMemberLabel(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "@unknown-user"
+	}
+	if strings.HasPrefix(trimmed, "<@") && strings.HasSuffix(trimmed, ">") {
+		return sanitizeSeasonDisplayName(trimmed)
+	}
+
+	sanitized := sanitizeSeasonDisplayName(trimmed)
+	if strings.HasPrefix(sanitized, "@") {
+		return sanitized
+	}
+	return fmt.Sprintf("@%s", sanitized)
+}
+
+func sanitizeSeasonDisplayName(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+
+	normalizedWhitespace := strings.Join(strings.Fields(trimmed), " ")
+	replacer := strings.NewReplacer(
+		`\`, `\\`,
+		`*`, `\*`,
+		`_`, `\_`,
+		"`", "\\`",
+		`~`, `\~`,
+		`|`, `\|`,
+	)
+	return replacer.Replace(normalizedWhitespace)
 }

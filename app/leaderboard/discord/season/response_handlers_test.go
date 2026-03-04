@@ -131,12 +131,21 @@ func TestSeasonManager_HandleSeasonStandings(t *testing.T) {
 	fakeGuildConfigCache.GetFunc = func(ctx context.Context, key string) (storage.GuildConfig, error) {
 		return storage.GuildConfig{LeaderboardChannelID: "leaderboard-channel"}, nil
 	}
+	fakeSession.GuildMemberFunc = func(guildID, userID string, options ...discordgo.RequestOption) (*discordgo.Member, error) {
+		return &discordgo.Member{
+			User: &discordgo.User{
+				ID:       userID,
+				Username: "fallback-user",
+			},
+			Nick: "Farr",
+		}, nil
+	}
 
 	messageSent := false
 	fakeSession.ChannelMessageSendFunc = func(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
 		messageSent = true
-		if !strings.Contains(content, "<@user-1>") {
-			t.Errorf("expected message to contain '<@user-1>', got %s", content)
+		if !strings.Contains(content, "**Farr** (<@839877196898238526>)") {
+			t.Errorf("expected message to contain formatted member label, got %s", content)
 		}
 		return &discordgo.Message{}, nil
 	}
@@ -145,10 +154,59 @@ func TestSeasonManager_HandleSeasonStandings(t *testing.T) {
 		SeasonID: "season-1",
 		GuildID:  sharedtypes.GuildID("guild-1"),
 		Standings: []leaderboardevents.SeasonStandingItemV1{
-			{MemberID: "user-1", TotalPoints: 100, RoundsPlayed: 5}, // We'll mock username resolution or just check ID in string if username fetch isn't happening here (it's not, it uses <@ID>)
+			{MemberID: "839877196898238526", TotalPoints: 100, RoundsPlayed: 5},
 		},
 	}
-	// The code uses <@MemberID> so we don't need to mock User resolution in Session.
+
+	manager.HandleSeasonStandings(context.Background(), payload)
+
+	if !messageSent {
+		t.Error("expected ChannelMessageSend to be called")
+	}
+}
+
+func TestSeasonManager_HandleSeasonStandings_RawHandleFallback(t *testing.T) {
+	fakeSession := discord.NewFakeSession()
+	fakeGuildConfigCache := &testutils.FakeStorage[storage.GuildConfig]{}
+	logger := testutils.NoOpLogger()
+	fakeMetrics := &testutils.FakeDiscordMetrics{}
+
+	manager := NewSeasonManager(
+		fakeSession,
+		nil,
+		logger,
+		nil,
+		nil,
+		nil,
+		nil,
+		fakeGuildConfigCache,
+		otel.Tracer("test"),
+		fakeMetrics,
+	)
+
+	fakeGuildConfigCache.GetFunc = func(ctx context.Context, key string) (storage.GuildConfig, error) {
+		return storage.GuildConfig{LeaderboardChannelID: "leaderboard-channel"}, nil
+	}
+
+	messageSent := false
+	fakeSession.ChannelMessageSendFunc = func(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+		messageSent = true
+		if !strings.Contains(content, "@farrmich") {
+			t.Errorf("expected message to contain raw handle, got %s", content)
+		}
+		if strings.Contains(content, "@@farrmich") {
+			t.Errorf("expected no duplicated @ prefix, got %s", content)
+		}
+		return &discordgo.Message{}, nil
+	}
+
+	payload := &leaderboardevents.GetSeasonStandingsResponsePayloadV1{
+		SeasonID: "season-1",
+		GuildID:  sharedtypes.GuildID("guild-1"),
+		Standings: []leaderboardevents.SeasonStandingItemV1{
+			{MemberID: "@farrmich", TotalPoints: 100, RoundsPlayed: 5},
+		},
+	}
 
 	manager.HandleSeasonStandings(context.Background(), payload)
 

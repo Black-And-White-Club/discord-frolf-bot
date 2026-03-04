@@ -20,6 +20,7 @@ const (
 type LeaderboardEntry struct {
 	Rank         sharedtypes.TagNumber `json:"rank"`
 	UserID       sharedtypes.DiscordID `json:"user_id"`
+	DisplayName  string                `json:"display_name,omitempty"`
 	TotalPoints  int                   `json:"total_points"`
 	RoundsPlayed int                   `json:"rounds_played"`
 }
@@ -38,6 +39,7 @@ func buildLeaderboardDescription(leaderboard []LeaderboardEntry) string {
 
 	for i, entry := range leaderboard {
 		position := i + 1
+		userLabel := formatLeaderboardUser(entry)
 
 		var emoji string
 		switch {
@@ -55,9 +57,9 @@ func buildLeaderboardDescription(leaderboard []LeaderboardEntry) string {
 
 		var line string
 		if entry.TotalPoints > 0 {
-			line = fmt.Sprintf("%s **Tag #%-3d** <@%s> • %d pts (%d rds)\n", emoji, entry.Rank, entry.UserID, entry.TotalPoints, entry.RoundsPlayed)
+			line = fmt.Sprintf("%s **Tag #%-3d** %s • %d pts (%d rds)\n", emoji, entry.Rank, userLabel, entry.TotalPoints, entry.RoundsPlayed)
 		} else {
-			line = fmt.Sprintf("%s **Tag #%-3d** <@%s>\n", emoji, entry.Rank, entry.UserID)
+			line = fmt.Sprintf("%s **Tag #%-3d** %s\n", emoji, entry.Rank, userLabel)
 		}
 
 		// Check if adding this line would exceed the limit (leave room for truncation mark)
@@ -70,6 +72,102 @@ func buildLeaderboardDescription(leaderboard []LeaderboardEntry) string {
 	}
 
 	return sb.String()
+}
+
+func formatLeaderboardUser(entry LeaderboardEntry) string {
+	displayName := sanitizeDisplayName(entry.DisplayName)
+	mention := formatUserMention(entry.UserID)
+
+	switch {
+	case displayName != "" && mention != "":
+		return fmt.Sprintf("**%s** (%s)", displayName, mention)
+	case displayName != "":
+		return fmt.Sprintf("**%s**", displayName)
+	case mention != "":
+		return mention
+	default:
+		return formatRawLeaderboardUserLabel(string(entry.UserID))
+	}
+}
+
+func formatUserMention(userID sharedtypes.DiscordID) string {
+	normalizedID := normalizeDiscordUserID(string(userID))
+	if normalizedID == "" {
+		return ""
+	}
+	return fmt.Sprintf("<@%s>", normalizedID)
+}
+
+func normalizeDiscordUserID(raw string) string {
+	candidate := strings.TrimSpace(raw)
+	if candidate == "" {
+		return ""
+	}
+
+	if strings.HasPrefix(candidate, "<@") && strings.HasSuffix(candidate, ">") {
+		candidate = strings.TrimSuffix(strings.TrimPrefix(candidate, "<@"), ">")
+	}
+
+	candidate = strings.TrimPrefix(candidate, "!")
+	candidate = strings.TrimPrefix(candidate, "@")
+	if candidate == "" || strings.ContainsAny(candidate, "<>@ \t\r\n") {
+		return ""
+	}
+	if !sharedtypes.DiscordID(candidate).IsValid() || !isLikelyDiscordSnowflake(candidate) {
+		return ""
+	}
+
+	return candidate
+}
+
+func isLikelyDiscordSnowflake(candidate string) bool {
+	const (
+		minSnowflakeLen = 17
+		maxSnowflakeLen = 20
+	)
+
+	length := len(candidate)
+	return length >= minSnowflakeLen && length <= maxSnowflakeLen
+}
+
+func formatRawLeaderboardUserLabel(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "@unknown-user"
+	}
+
+	if strings.HasPrefix(trimmed, "<@") && strings.HasSuffix(trimmed, ">") {
+		return sanitizeDisplayName(trimmed)
+	}
+
+	sanitized := sanitizeDisplayName(trimmed)
+	if strings.HasPrefix(sanitized, "@") {
+		return sanitized
+	}
+
+	return fmt.Sprintf("@%s", sanitized)
+}
+
+func sanitizeDisplayName(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+
+	normalizedWhitespace := strings.Join(strings.Fields(trimmed), " ")
+	return escapeDiscordMarkdown(normalizedWhitespace)
+}
+
+func escapeDiscordMarkdown(raw string) string {
+	replacer := strings.NewReplacer(
+		`\`, `\\`,
+		`*`, `\*`,
+		`_`, `\_`,
+		"`", "\\`",
+		`~`, `\~`,
+		`|`, `\|`,
+	)
+	return replacer.Replace(raw)
 }
 
 // buildLeaderboardEmbed constructs the embed with all entries in the description.

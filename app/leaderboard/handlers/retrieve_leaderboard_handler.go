@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"sort"
+	"strings"
 
 	leaderboardupdated "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/leaderboard_updated"
 	discordleaderboardevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/leaderboard"
@@ -10,6 +11,7 @@ import (
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 	leaderboardtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/leaderboard"
 	sharedtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/shared"
+	usertypes "github.com/Black-And-White-Club/frolf-bot-shared/types/user"
 	"github.com/Black-And-White-Club/frolf-bot-shared/utils/handlerwrapper"
 )
 
@@ -87,6 +89,7 @@ func (h *LeaderboardHandlers) HandleLeaderboardResponse(ctx context.Context,
 			entries = append(entries, leaderboardupdated.LeaderboardEntry{
 				Rank:         entry.TagNumber,
 				UserID:       entry.UserID,
+				DisplayName:  resolveProfileDisplayName(entry.UserID, payloadData.Profiles),
 				TotalPoints:  entry.TotalPoints,
 				RoundsPlayed: entry.RoundsPlayed,
 			})
@@ -150,5 +153,86 @@ func (h *LeaderboardHandlers) resolveLeaderboardChannelID(ctx context.Context, g
 
 	h.logger.WarnContext(ctx, "No leaderboard channel could be resolved (guild config + static config empty)",
 		attr.String("guild_id", guildID))
+	return ""
+}
+
+func resolveProfileDisplayName(
+	userID sharedtypes.DiscordID,
+	profiles map[sharedtypes.DiscordID]*usertypes.UserProfile,
+) string {
+	if len(profiles) == 0 {
+		return ""
+	}
+
+	if profile, ok := profiles[userID]; ok && profile != nil {
+		if displayName := preferredProfileDisplayName(profile); displayName != "" {
+			return displayName
+		}
+	}
+
+	normalizedUserID := normalizeDiscordUserIDForProfileLookup(string(userID))
+	if normalizedUserID == "" {
+		return ""
+	}
+
+	if profile, ok := profiles[sharedtypes.DiscordID(normalizedUserID)]; ok && profile != nil {
+		if displayName := preferredProfileDisplayName(profile); displayName != "" {
+			return displayName
+		}
+	}
+
+	for profileUserID, profile := range profiles {
+		if profile == nil {
+			continue
+		}
+		if normalizeDiscordUserIDForProfileLookup(string(profileUserID)) != normalizedUserID {
+			continue
+		}
+		if displayName := preferredProfileDisplayName(profile); displayName != "" {
+			return displayName
+		}
+	}
+
+	return ""
+}
+
+func normalizeDiscordUserIDForProfileLookup(raw string) string {
+	candidate := strings.TrimSpace(raw)
+	if candidate == "" {
+		return ""
+	}
+
+	if strings.HasPrefix(candidate, "<@") && strings.HasSuffix(candidate, ">") {
+		candidate = strings.TrimSuffix(strings.TrimPrefix(candidate, "<@"), ">")
+	}
+
+	candidate = strings.TrimPrefix(candidate, "!")
+	candidate = strings.TrimPrefix(candidate, "@")
+	if candidate == "" || strings.ContainsAny(candidate, "<>@ \t\r\n") {
+		return ""
+	}
+
+	return candidate
+}
+
+func preferredProfileDisplayName(profile *usertypes.UserProfile) string {
+	if profile == nil {
+		return ""
+	}
+
+	if displayName := strings.TrimSpace(profile.DisplayName); displayName != "" {
+		return displayName
+	}
+	if profile.UDiscUsername != nil {
+		if username := strings.TrimSpace(*profile.UDiscUsername); username != "" {
+			return username
+		}
+	}
+	if profile.UDiscName != nil {
+		if name := strings.TrimSpace(*profile.UDiscName); name != "" {
+			return name
+		}
+	}
+
 	return ""
 }
