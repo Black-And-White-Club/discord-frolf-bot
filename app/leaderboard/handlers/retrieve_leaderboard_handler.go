@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"sort"
+	"strconv"
 	"strings"
 
 	leaderboardupdated "github.com/Black-And-White-Club/discord-frolf-bot/app/leaderboard/discord/leaderboard_updated"
@@ -89,7 +90,7 @@ func (h *LeaderboardHandlers) HandleLeaderboardResponse(ctx context.Context,
 			entries = append(entries, leaderboardupdated.LeaderboardEntry{
 				Rank:         entry.TagNumber,
 				UserID:       entry.UserID,
-				DisplayName:  resolveProfileDisplayName(entry.UserID, payloadData.Profiles),
+				DisplayName:  resolveProfileDisplayName(entry.TagNumber, entry.UserID, payloadData.Profiles),
 				TotalPoints:  entry.TotalPoints,
 				RoundsPlayed: entry.RoundsPlayed,
 			})
@@ -157,6 +158,7 @@ func (h *LeaderboardHandlers) resolveLeaderboardChannelID(ctx context.Context, g
 }
 
 func resolveProfileDisplayName(
+	tagNumber sharedtypes.TagNumber,
 	userID sharedtypes.DiscordID,
 	profiles map[sharedtypes.DiscordID]*usertypes.UserProfile,
 ) string {
@@ -171,6 +173,23 @@ func resolveProfileDisplayName(
 	}
 
 	normalizedUserID := normalizeDiscordUserIDForProfileLookup(string(userID))
+	if placeholderTagID := extractPlaceholderTagID(string(userID)); placeholderTagID != "" {
+		if profile, ok := profiles[sharedtypes.DiscordID(placeholderTagID)]; ok && profile != nil {
+			if displayName := preferredProfileDisplayName(profile); displayName != "" {
+				return displayName
+			}
+		}
+	}
+
+	if tagNumber > 0 {
+		tagProfileID := strconv.Itoa(int(tagNumber))
+		if profile, ok := profiles[sharedtypes.DiscordID(tagProfileID)]; ok && profile != nil {
+			if displayName := preferredProfileDisplayName(profile); displayName != "" {
+				return displayName
+			}
+		}
+	}
+
 	if normalizedUserID == "" {
 		return ""
 	}
@@ -190,6 +209,25 @@ func resolveProfileDisplayName(
 		}
 		if displayName := preferredProfileDisplayName(profile); displayName != "" {
 			return displayName
+		}
+	}
+
+	return ""
+}
+
+func extractPlaceholderTagID(raw string) string {
+	lower := strings.ToLower(strings.TrimSpace(raw))
+	if lower == "" || !strings.Contains(lower, "placeholder") {
+		return ""
+	}
+
+	for _, field := range strings.Fields(lower) {
+		candidate := strings.TrimPrefix(strings.TrimSpace(field), "#")
+		if candidate == "" {
+			continue
+		}
+		if _, err := strconv.Atoi(candidate); err == nil {
+			return candidate
 		}
 	}
 

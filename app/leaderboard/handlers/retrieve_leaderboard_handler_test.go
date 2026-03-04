@@ -335,3 +335,109 @@ func TestHandleLeaderboardResponse_ProfilePlaceholderDisplayNameFallsBackToUDisc
 		t.Fatalf("unexpected display names: got %v want [muffinmaster123]", gotDisplayNames)
 	}
 }
+
+func TestHandleLeaderboardResponse_PlaceholderUserIDResolvesProfileByTagID(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	cfg := &config.Config{}
+	cfg.Discord.LeaderboardChannelID = "leaderboard-channel"
+
+	fakeDiscord := &FakeLeaderboardDiscord{}
+	var gotDisplayNames []string
+	fakeDiscord.LeaderboardUpdateManager.SendLeaderboardEmbedFunc = func(
+		ctx context.Context,
+		channelID string,
+		leaderboard []leaderboardupdated.LeaderboardEntry,
+		page int32,
+	) (leaderboardupdated.LeaderboardUpdateOperationResult, error) {
+		gotDisplayNames = make([]string, 0, len(leaderboard))
+		for _, entry := range leaderboard {
+			gotDisplayNames = append(gotDisplayNames, entry.DisplayName)
+		}
+		return leaderboardupdated.LeaderboardUpdateOperationResult{Success: "ok"}, nil
+	}
+
+	h := NewLeaderboardHandlers(
+		logger,
+		cfg,
+		nil,
+		fakeDiscord,
+		nil,
+	)
+
+	udiscUsername := "muffinmaster123"
+	payload := &leaderboardevents.GetLeaderboardResponsePayloadV1{
+		GuildID: sharedtypes.GuildID("guild123"),
+		Leaderboard: []leaderboardtypes.LeaderboardEntry{
+			{TagNumber: 23, UserID: "Tag 23 Placeholder"},
+		},
+		Profiles: map[sharedtypes.DiscordID]*usertypes.UserProfile{
+			"23": {
+				UserID:        "23",
+				DisplayName:   "Tag 23 Placeholder",
+				UDiscUsername: &udiscUsername,
+			},
+		},
+	}
+
+	_, err := h.HandleLeaderboardResponse(context.Background(), payload)
+	if err != nil {
+		t.Fatalf("HandleLeaderboardResponse() error = %v", err)
+	}
+	if !slices.Equal(gotDisplayNames, []string{"muffinmaster123"}) {
+		t.Fatalf("unexpected display names: got %v want [muffinmaster123]", gotDisplayNames)
+	}
+}
+
+func TestHandleLeaderboardResponse_TagNumberResolvesProfileWhenUserIDUnmapped(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	cfg := &config.Config{}
+	cfg.Discord.LeaderboardChannelID = "leaderboard-channel"
+
+	fakeDiscord := &FakeLeaderboardDiscord{}
+	var gotDisplayNames []string
+	fakeDiscord.LeaderboardUpdateManager.SendLeaderboardEmbedFunc = func(
+		ctx context.Context,
+		channelID string,
+		leaderboard []leaderboardupdated.LeaderboardEntry,
+		page int32,
+	) (leaderboardupdated.LeaderboardUpdateOperationResult, error) {
+		gotDisplayNames = make([]string, 0, len(leaderboard))
+		for _, entry := range leaderboard {
+			gotDisplayNames = append(gotDisplayNames, entry.DisplayName)
+		}
+		return leaderboardupdated.LeaderboardUpdateOperationResult{Success: "ok"}, nil
+	}
+
+	h := NewLeaderboardHandlers(
+		logger,
+		cfg,
+		nil,
+		fakeDiscord,
+		nil,
+	)
+
+	udiscUsername := "muffinmaster123"
+	payload := &leaderboardevents.GetLeaderboardResponsePayloadV1{
+		GuildID: sharedtypes.GuildID("guild123"),
+		Leaderboard: []leaderboardtypes.LeaderboardEntry{
+			{TagNumber: 23, UserID: "legacy-unmapped-id"},
+		},
+		Profiles: map[sharedtypes.DiscordID]*usertypes.UserProfile{
+			"23": {
+				UserID:        "23",
+				DisplayName:   "",
+				UDiscUsername: &udiscUsername,
+			},
+		},
+	}
+
+	_, err := h.HandleLeaderboardResponse(context.Background(), payload)
+	if err != nil {
+		t.Fatalf("HandleLeaderboardResponse() error = %v", err)
+	}
+	if !slices.Equal(gotDisplayNames, []string{"muffinmaster123"}) {
+		t.Fatalf("unexpected display names: got %v want [muffinmaster123]", gotDisplayNames)
+	}
+}
