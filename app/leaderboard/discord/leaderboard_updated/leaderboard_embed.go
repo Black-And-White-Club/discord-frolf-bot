@@ -80,7 +80,11 @@ func formatLeaderboardUser(entry LeaderboardEntry) string {
 	normalizedID := normalizeDiscordUserID(rawUserID)
 
 	switch {
-	case normalizedID == "" && rawUserID != "":
+	case normalizedID != "":
+		// Real Discord IDs should always render as mentions so Discord resolves
+		// to the current server-visible @name.
+		return fmt.Sprintf("<@%s>", normalizedID)
+	case rawUserID != "":
 		// For human-readable handles (non-Discord IDs), keep the original @label.
 		// But prefer enriched display names for legacy placeholder/numeric IDs.
 		if displayName != "" && (isNumericLeaderboardID(rawUserID) || isPlaceholderLeaderboardLabel(rawUserID)) {
@@ -89,8 +93,6 @@ func formatLeaderboardUser(entry LeaderboardEntry) string {
 		return formatRawLeaderboardUserLabel(rawUserID)
 	case displayName != "":
 		return formatRawLeaderboardUserLabel(displayName)
-	case normalizedID != "":
-		return fmt.Sprintf("<@%s>", normalizedID)
 	default:
 		return formatRawLeaderboardUserLabel(rawUserID)
 	}

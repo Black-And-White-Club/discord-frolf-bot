@@ -144,11 +144,8 @@ func TestSeasonManager_HandleSeasonStandings(t *testing.T) {
 	messageSent := false
 	fakeSession.ChannelMessageSendFunc = func(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
 		messageSent = true
-		if !strings.Contains(content, "@Farr") {
+		if !strings.Contains(content, "<@839877196898238526>") {
 			t.Errorf("expected message to contain formatted member label, got %s", content)
-		}
-		if strings.Contains(content, "<@839877196898238526>") {
-			t.Errorf("expected no mention when display label is available, got %s", content)
 		}
 		return &discordgo.Message{}, nil
 	}

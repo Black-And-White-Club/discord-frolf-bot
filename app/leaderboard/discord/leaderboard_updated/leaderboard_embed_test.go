@@ -36,14 +36,11 @@ func Test_buildLeaderboardDescription(t *testing.T) {
 		}
 	})
 
-	t.Run("display name is shown when present", func(t *testing.T) {
+	t.Run("valid discord id prefers mention over display name", func(t *testing.T) {
 		entries := []LeaderboardEntry{{Rank: 1, UserID: "839877196898238526", DisplayName: "Alice"}}
 		got := buildLeaderboardDescription(entries)
-		if !strings.Contains(got, "@Alice") {
-			t.Errorf("expected @display name, got: %q", got)
-		}
-		if strings.Contains(got, "<@839877196898238526>") {
-			t.Errorf("expected no mention when display name is available, got: %q", got)
+		if !strings.Contains(got, "<@839877196898238526>") {
+			t.Errorf("expected discord mention for valid ID, got: %q", got)
 		}
 	})
 

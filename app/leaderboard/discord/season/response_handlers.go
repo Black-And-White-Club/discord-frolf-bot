@@ -203,12 +203,13 @@ func (sm *seasonManager) formatSeasonStandingMemberLabel(
 	normalizedID := normalizeSeasonDiscordUserID(rawMemberID)
 
 	switch {
-	case normalizedID == "" && rawMemberID != "":
+	case normalizedID != "":
+		// Prefer mentions for real Discord IDs so Discord resolves to @name.
+		return fmt.Sprintf("<@%s>", normalizedID)
+	case rawMemberID != "":
 		return formatRawSeasonMemberLabel(rawMemberID)
 	case displayName != "":
 		return formatRawSeasonMemberLabel(displayName)
-	case normalizedID != "":
-		return fmt.Sprintf("<@%s>", normalizedID)
 	default:
 		return formatRawSeasonMemberLabel(rawMemberID)
 	}
