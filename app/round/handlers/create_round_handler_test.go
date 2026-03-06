@@ -305,196 +305,216 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 }
 
 func TestRoundHandlers_HandleRoundCreated_RetriesEmbedAfterNativeEventSuccess(t *testing.T) {
-	testRoundID := sharedtypes.RoundID(uuid.New())
-	parsedTime, _ := time.Parse(time.RFC3339, "2024-01-01T12:00:00Z")
-	startTime := sharedtypes.StartTime(parsedTime)
-	guildID := sharedtypes.GuildID("123456789")
-	channelID := "1344376922888474625"
-
-	nativeMap := rounddiscord.NewNativeEventMap()
-	createNativeCalls := 0
-	sendEmbedCalls := 0
-
-	fakeRoundDiscord := &FakeRoundDiscord{
-		NativeEventMap: nativeMap,
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
-	fakeRoundDiscord.CreateRoundManager.CreateNativeEventFunc = func(ctx context.Context, guildID string, roundID sharedtypes.RoundID, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, userID sharedtypes.DiscordID) (createround.CreateRoundOperationResult, error) {
-		createNativeCalls++
-		return createround.CreateRoundOperationResult{
-			Success: &discordgo.GuildScheduledEvent{
-				ID: "native-event-123",
-			},
-		}, nil
-	}
-	fakeRoundDiscord.CreateRoundManager.SendRoundEventEmbedFunc = func(guildID string, channelID string, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, creatorID sharedtypes.DiscordID, roundID sharedtypes.RoundID) (createround.CreateRoundOperationResult, error) {
-		sendEmbedCalls++
-		if sendEmbedCalls == 1 {
-			return createround.CreateRoundOperationResult{}, errors.New("discord transient failure")
-		}
-		return createround.CreateRoundOperationResult{
-			Success: &discordgo.Message{
-				ID:        "discord-message-123",
+
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			testRoundID := sharedtypes.RoundID(uuid.New())
+			parsedTime, _ := time.Parse(time.RFC3339, "2024-01-01T12:00:00Z")
+			startTime := sharedtypes.StartTime(parsedTime)
+			guildID := sharedtypes.GuildID("123456789")
+			channelID := "1344376922888474625"
+
+			nativeMap := rounddiscord.NewNativeEventMap()
+			createNativeCalls := 0
+			sendEmbedCalls := 0
+
+			fakeRoundDiscord := &FakeRoundDiscord{
+				NativeEventMap: nativeMap,
+			}
+			fakeRoundDiscord.CreateRoundManager.CreateNativeEventFunc = func(ctx context.Context, guildID string, roundID sharedtypes.RoundID, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, userID sharedtypes.DiscordID) (createround.CreateRoundOperationResult, error) {
+				createNativeCalls++
+				return createround.CreateRoundOperationResult{
+					Success: &discordgo.GuildScheduledEvent{
+						ID: "native-event-123",
+					},
+				}, nil
+			}
+			fakeRoundDiscord.CreateRoundManager.SendRoundEventEmbedFunc = func(guildID string, channelID string, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, creatorID sharedtypes.DiscordID, roundID sharedtypes.RoundID) (createround.CreateRoundOperationResult, error) {
+				sendEmbedCalls++
+				if sendEmbedCalls == 1 {
+					return createround.CreateRoundOperationResult{}, errors.New("discord transient failure")
+				}
+				return createround.CreateRoundOperationResult{
+					Success: &discordgo.Message{
+						ID:        "discord-message-123",
+						ChannelID: channelID,
+					},
+				}, nil
+			}
+
+			h := NewRoundHandlers(
+				slog.New(slog.NewTextHandler(io.Discard, nil)),
+				&config.Config{},
+				nil,
+				fakeRoundDiscord,
+				nil,
+			)
+
+			payload := &roundevents.RoundCreatedPayloadV1{
+				GuildID: guildID,
+				BaseRoundPayload: roundtypes.BaseRoundPayload{
+					RoundID:     testRoundID,
+					Title:       roundtypes.Title("Retry Round"),
+					Description: roundtypes.Description("Retry Description"),
+					Location:    roundtypes.Location("Retry Location"),
+					StartTime:   &startTime,
+					UserID:      sharedtypes.DiscordID("user_id"),
+				},
 				ChannelID: channelID,
-			},
-		}, nil
-	}
+			}
 
-	h := NewRoundHandlers(
-		slog.New(slog.NewTextHandler(io.Discard, nil)),
-		&config.Config{},
-		nil,
-		fakeRoundDiscord,
-		nil,
-	)
+			firstResults, firstErr := h.HandleRoundCreated(context.Background(), payload)
+			if firstErr == nil {
+				t.Fatalf("first HandleRoundCreated() error = nil, want non-nil")
+			}
+			if len(firstResults) != 0 {
+				t.Fatalf("first HandleRoundCreated() results len = %d, want 0", len(firstResults))
+			}
+			if createNativeCalls != 1 {
+				t.Fatalf("first HandleRoundCreated() CreateNativeEvent calls = %d, want 1", createNativeCalls)
+			}
 
-	payload := &roundevents.RoundCreatedPayloadV1{
-		GuildID: guildID,
-		BaseRoundPayload: roundtypes.BaseRoundPayload{
-			RoundID:     testRoundID,
-			Title:       roundtypes.Title("Retry Round"),
-			Description: roundtypes.Description("Retry Description"),
-			Location:    roundtypes.Location("Retry Location"),
-			StartTime:   &startTime,
-			UserID:      sharedtypes.DiscordID("user_id"),
-		},
-		ChannelID: channelID,
-	}
+			secondResults, secondErr := h.HandleRoundCreated(context.Background(), payload)
+			if secondErr != nil {
+				t.Fatalf("second HandleRoundCreated() error = %v, want nil", secondErr)
+			}
+			if createNativeCalls != 1 {
+				t.Fatalf("second HandleRoundCreated() CreateNativeEvent calls = %d, want 1 (reuse native map)", createNativeCalls)
+			}
+			if sendEmbedCalls != 2 {
+				t.Fatalf("HandleRoundCreated() SendRoundEventEmbed calls = %d, want 2", sendEmbedCalls)
+			}
 
-	firstResults, firstErr := h.HandleRoundCreated(context.Background(), payload)
-	if firstErr == nil {
-		t.Fatalf("first HandleRoundCreated() error = nil, want non-nil")
-	}
-	if len(firstResults) != 0 {
-		t.Fatalf("first HandleRoundCreated() results len = %d, want 0", len(firstResults))
-	}
-	if createNativeCalls != 1 {
-		t.Fatalf("first HandleRoundCreated() CreateNativeEvent calls = %d, want 1", createNativeCalls)
-	}
+			foundNativeCreated := false
+			foundEmbedUpdate := false
+			for _, result := range secondResults {
+				switch result.Topic {
+				case roundevents.NativeEventCreatedV1:
+					foundNativeCreated = true
+				case roundevents.RoundEventMessageIDUpdateV1:
+					foundEmbedUpdate = true
+				}
+			}
+			if !foundNativeCreated {
+				t.Fatalf("second HandleRoundCreated() expected NativeEventCreatedV1 result")
+			}
+			if !foundEmbedUpdate {
+				t.Fatalf("second HandleRoundCreated() expected RoundEventMessageIDUpdateV1 result")
+			}
 
-	secondResults, secondErr := h.HandleRoundCreated(context.Background(), payload)
-	if secondErr != nil {
-		t.Fatalf("second HandleRoundCreated() error = %v, want nil", secondErr)
-	}
-	if createNativeCalls != 1 {
-		t.Fatalf("second HandleRoundCreated() CreateNativeEvent calls = %d, want 1 (reuse native map)", createNativeCalls)
-	}
-	if sendEmbedCalls != 2 {
-		t.Fatalf("HandleRoundCreated() SendRoundEventEmbed calls = %d, want 2", sendEmbedCalls)
-	}
-
-	foundNativeCreated := false
-	foundEmbedUpdate := false
-	for _, result := range secondResults {
-		switch result.Topic {
-		case roundevents.NativeEventCreatedV1:
-			foundNativeCreated = true
-		case roundevents.RoundEventMessageIDUpdateV1:
-			foundEmbedUpdate = true
-		}
-	}
-	if !foundNativeCreated {
-		t.Fatalf("second HandleRoundCreated() expected NativeEventCreatedV1 result")
-	}
-	if !foundEmbedUpdate {
-		t.Fatalf("second HandleRoundCreated() expected RoundEventMessageIDUpdateV1 result")
-	}
-
-	if mappedEventID, ok := nativeMap.LookupByRoundID(testRoundID); !ok || mappedEventID != "native-event-123" {
-		t.Fatalf("NativeEventMap.LookupByRoundID() = (%s, %v), want (native-event-123, true)", mappedEventID, ok)
+			if mappedEventID, ok := nativeMap.LookupByRoundID(testRoundID); !ok || mappedEventID != "native-event-123" {
+				t.Fatalf("NativeEventMap.LookupByRoundID() = (%s, %v), want (native-event-123, true)", mappedEventID, ok)
+			}
+		})
 	}
 }
 
 func TestRoundHandlers_HandleRoundCreated_ReusesPendingNativeEvent(t *testing.T) {
-	testRoundID := sharedtypes.RoundID(uuid.New())
-	parsedTime, _ := time.Parse(time.RFC3339, "2024-01-01T12:00:00Z")
-	startTime := sharedtypes.StartTime(parsedTime)
-	guildID := sharedtypes.GuildID("123456789")
-
-	pendingMap := rounddiscord.NewPendingNativeEventMap()
-	pendingMap.Store(string(guildID)+"|Pending Round", "existing-native-event-123")
-	nativeMap := rounddiscord.NewNativeEventMap()
-
-	session := discord.NewFakeSession()
-	editCalled := false
-	session.GuildScheduledEventEditFunc = func(guildID, eventID string, params *discordgo.GuildScheduledEventParams, options ...discordgo.RequestOption) (*discordgo.GuildScheduledEvent, error) {
-		editCalled = true
-		if eventID != "existing-native-event-123" {
-			t.Fatalf("GuildScheduledEventEdit() eventID = %s, want existing-native-event-123", eventID)
-		}
-		if params == nil || params.Description == "" {
-			t.Fatalf("GuildScheduledEventEdit() missing description")
-		}
-		return &discordgo.GuildScheduledEvent{ID: eventID}, nil
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
 
-	createNativeCalled := false
-	fakeRoundDiscord := &FakeRoundDiscord{
-		PendingNativeEventMap: pendingMap,
-		NativeEventMap:        nativeMap,
-		Session:               session,
-	}
-	fakeRoundDiscord.CreateRoundManager.CreateNativeEventFunc = func(ctx context.Context, guildID string, roundID sharedtypes.RoundID, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, userID sharedtypes.DiscordID) (createround.CreateRoundOperationResult, error) {
-		createNativeCalled = true
-		return createround.CreateRoundOperationResult{}, nil
-	}
-	fakeRoundDiscord.CreateRoundManager.SendRoundEventEmbedFunc = func(guildID string, channelID string, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, creatorID sharedtypes.DiscordID, roundID sharedtypes.RoundID) (createround.CreateRoundOperationResult, error) {
-		return createround.CreateRoundOperationResult{
-			Success: &discordgo.Message{
-				ID:        "discord-message-123",
-				ChannelID: channelID,
-			},
-		}, nil
-	}
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			testRoundID := sharedtypes.RoundID(uuid.New())
+			parsedTime, _ := time.Parse(time.RFC3339, "2024-01-01T12:00:00Z")
+			startTime := sharedtypes.StartTime(parsedTime)
+			guildID := sharedtypes.GuildID("123456789")
 
-	h := NewRoundHandlers(
-		slog.New(slog.NewTextHandler(io.Discard, nil)),
-		&config.Config{},
-		nil,
-		fakeRoundDiscord,
-		nil,
-	)
+			pendingMap := rounddiscord.NewPendingNativeEventMap()
+			pendingMap.Store(string(guildID)+"|Pending Round", "existing-native-event-123")
+			nativeMap := rounddiscord.NewNativeEventMap()
 
-	results, err := h.HandleRoundCreated(context.Background(), &roundevents.RoundCreatedPayloadV1{
-		GuildID: guildID,
-		BaseRoundPayload: roundtypes.BaseRoundPayload{
-			RoundID:     testRoundID,
-			Title:       roundtypes.Title("Pending Round"),
-			Description: roundtypes.Description("Pending Description"),
-			Location:    roundtypes.Location("Pending Location"),
-			StartTime:   &startTime,
-			UserID:      sharedtypes.DiscordID("user_id"),
-		},
-		ChannelID: "channel-id",
-	})
-	if err != nil {
-		t.Fatalf("HandleRoundCreated() error = %v", err)
-	}
-	if createNativeCalled {
-		t.Fatalf("HandleRoundCreated() unexpectedly called CreateNativeEvent for pending native event")
-	}
-	if !editCalled {
-		t.Fatalf("HandleRoundCreated() expected GuildScheduledEventEdit to be called for pending native event")
-	}
+			session := discord.NewFakeSession()
+			editCalled := false
+			session.GuildScheduledEventEditFunc = func(guildID, eventID string, params *discordgo.GuildScheduledEventParams, options ...discordgo.RequestOption) (*discordgo.GuildScheduledEvent, error) {
+				editCalled = true
+				if eventID != "existing-native-event-123" {
+					t.Fatalf("GuildScheduledEventEdit() eventID = %s, want existing-native-event-123", eventID)
+				}
+				if params == nil || params.Description == "" {
+					t.Fatalf("GuildScheduledEventEdit() missing description")
+				}
+				return &discordgo.GuildScheduledEvent{ID: eventID}, nil
+			}
 
-	foundNativeCreated := false
-	foundJoinRequested := false
-	for _, result := range results {
-		switch result.Topic {
-		case roundevents.NativeEventCreatedV1:
-			foundNativeCreated = true
-		case roundevents.RoundParticipantJoinRequestedV1:
-			foundJoinRequested = true
-		}
-	}
-	if !foundNativeCreated {
-		t.Fatalf("HandleRoundCreated() expected NativeEventCreatedV1 result for pending native event")
-	}
-	if !foundJoinRequested {
-		t.Fatalf("HandleRoundCreated() expected RoundParticipantJoinRequestedV1 for event creator")
-	}
+			createNativeCalled := false
+			fakeRoundDiscord := &FakeRoundDiscord{
+				PendingNativeEventMap: pendingMap,
+				NativeEventMap:        nativeMap,
+				Session:               session,
+			}
+			fakeRoundDiscord.CreateRoundManager.CreateNativeEventFunc = func(ctx context.Context, guildID string, roundID sharedtypes.RoundID, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, userID sharedtypes.DiscordID) (createround.CreateRoundOperationResult, error) {
+				createNativeCalled = true
+				return createround.CreateRoundOperationResult{}, nil
+			}
+			fakeRoundDiscord.CreateRoundManager.SendRoundEventEmbedFunc = func(guildID string, channelID string, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, creatorID sharedtypes.DiscordID, roundID sharedtypes.RoundID) (createround.CreateRoundOperationResult, error) {
+				return createround.CreateRoundOperationResult{
+					Success: &discordgo.Message{
+						ID:        "discord-message-123",
+						ChannelID: channelID,
+					},
+				}, nil
+			}
 
-	if mappedEventID, ok := nativeMap.LookupByRoundID(testRoundID); !ok || mappedEventID != "existing-native-event-123" {
-		t.Fatalf("NativeEventMap.LookupByRoundID() = (%s, %v), want (existing-native-event-123, true)", mappedEventID, ok)
+			h := NewRoundHandlers(
+				slog.New(slog.NewTextHandler(io.Discard, nil)),
+				&config.Config{},
+				nil,
+				fakeRoundDiscord,
+				nil,
+			)
+
+			results, err := h.HandleRoundCreated(context.Background(), &roundevents.RoundCreatedPayloadV1{
+				GuildID: guildID,
+				BaseRoundPayload: roundtypes.BaseRoundPayload{
+					RoundID:     testRoundID,
+					Title:       roundtypes.Title("Pending Round"),
+					Description: roundtypes.Description("Pending Description"),
+					Location:    roundtypes.Location("Pending Location"),
+					StartTime:   &startTime,
+					UserID:      sharedtypes.DiscordID("user_id"),
+				},
+				ChannelID: "channel-id",
+			})
+			if err != nil {
+				t.Fatalf("HandleRoundCreated() error = %v", err)
+			}
+			if createNativeCalled {
+				t.Fatalf("HandleRoundCreated() unexpectedly called CreateNativeEvent for pending native event")
+			}
+			if !editCalled {
+				t.Fatalf("HandleRoundCreated() expected GuildScheduledEventEdit to be called for pending native event")
+			}
+
+			foundNativeCreated := false
+			foundJoinRequested := false
+			for _, result := range results {
+				switch result.Topic {
+				case roundevents.NativeEventCreatedV1:
+					foundNativeCreated = true
+				case roundevents.RoundParticipantJoinRequestedV1:
+					foundJoinRequested = true
+				}
+			}
+			if !foundNativeCreated {
+				t.Fatalf("HandleRoundCreated() expected NativeEventCreatedV1 result for pending native event")
+			}
+			if !foundJoinRequested {
+				t.Fatalf("HandleRoundCreated() expected RoundParticipantJoinRequestedV1 for event creator")
+			}
+
+			if mappedEventID, ok := nativeMap.LookupByRoundID(testRoundID); !ok || mappedEventID != "existing-native-event-123" {
+				t.Fatalf("NativeEventMap.LookupByRoundID() = (%s, %v), want (existing-native-event-123, true)", mappedEventID, ok)
+			}
+		})
 	}
 }
 

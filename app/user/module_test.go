@@ -16,33 +16,43 @@ import (
 )
 
 func TestInitializeUserModule_Succeeds(t *testing.T) {
-	ctx := context.Background()
-	session := &discord.FakeSession{}
-	publisher := &testutils.FakeEventBus{}
-	logger := slog.New(loggerfrolfbot.NewTestHandler())
-	helper := &testutils.FakeHelpers{}
-	cfg := &config.Config{}
-	interactionStore := testutils.NewFakeStorage[any]()
-	metrics := &discordmetrics.NoOpMetrics{}
-	guildCfg := &testutils.FakeGuildConfigResolver{}
-
-	router, err := message.NewRouter(message.RouterConfig{}, watermill.NopLogger{})
-	if err != nil {
-		t.Fatalf("failed to create router: %v", err)
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
 
-	ireg := interactions.NewRegistry()
-	rreg := interactions.NewReactionRegistry(logger)
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			ctx := context.Background()
+			session := &discord.FakeSession{}
+			publisher := &testutils.FakeEventBus{}
+			logger := slog.New(loggerfrolfbot.NewTestHandler())
+			helper := &testutils.FakeHelpers{}
+			cfg := &config.Config{}
+			interactionStore := testutils.NewFakeStorage[any]()
+			metrics := &discordmetrics.NoOpMetrics{}
+			guildCfg := &testutils.FakeGuildConfigResolver{}
 
-	userRouter, initErr := InitializeUserModule(ctx, session, router, ireg, rreg, publisher, logger, cfg, helper, interactionStore, nil, metrics, guildCfg)
-	if initErr != nil {
-		t.Fatalf("InitializeUserModule returned error: %v", initErr)
-	}
-	if userRouter == nil || userRouter.Router == nil {
-		t.Fatalf("expected non-nil user router")
-	}
+			router, err := message.NewRouter(message.RouterConfig{}, watermill.NopLogger{})
+			if err != nil {
+				t.Fatalf("failed to create router: %v", err)
+			}
 
-	// Note: We don't call Close() on the router here because the Watermill
-	// router wasn't started in this unit test, and calling Close() without
-	// Run() can lead to a timeout error from the library.
+			ireg := interactions.NewRegistry()
+			rreg := interactions.NewReactionRegistry(logger)
+
+			userRouter, initErr := InitializeUserModule(ctx, session, router, ireg, rreg, publisher, logger, cfg, helper, interactionStore, nil, metrics, guildCfg)
+			if initErr != nil {
+				t.Fatalf("InitializeUserModule returned error: %v", initErr)
+			}
+			if userRouter == nil || userRouter.Router == nil {
+				t.Fatalf("expected non-nil user router")
+			}
+
+			// Note: We don't call Close() on the router here because the Watermill
+			// router wasn't started in this unit test, and calling Close() without
+			// Run() can lead to a timeout error from the library.
+		})
+	}
 }

@@ -8,24 +8,34 @@ import (
 )
 
 func TestNewLeaderboardHandlers(t *testing.T) {
-	t.Run("Constructs handler with dependencies", func(t *testing.T) {
-		// Use Fakes instead of Mocks
-		fakeLeaderboardDiscord := &FakeLeaderboardDiscord{}
-		fakeGuildConfigResolver := &FakeGuildConfigResolver{}
-		fakeHelpers := &FakeHelpers{}
-		logger := loggerfrolfbot.NoOpLogger
-		cfg := &config.Config{}
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
+	}
 
-		handlers := NewLeaderboardHandlers(
-			logger,
-			cfg,
-			fakeHelpers,
-			fakeLeaderboardDiscord,
-			fakeGuildConfigResolver,
-		)
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			t.Run("Constructs handler with dependencies", func(t *testing.T) {
+				// Use Fakes instead of Mocks
+				fakeLeaderboardDiscord := &FakeLeaderboardDiscord{}
+				fakeGuildConfigResolver := &FakeGuildConfigResolver{}
+				fakeHelpers := &FakeHelpers{}
+				logger := loggerfrolfbot.NoOpLogger
+				cfg := &config.Config{}
 
-		if handlers == nil {
-			t.Error("expected non-nil handlers")
-		}
-	})
+				handlers := NewLeaderboardHandlers(
+					logger,
+					cfg,
+					fakeHelpers,
+					fakeLeaderboardDiscord,
+					fakeGuildConfigResolver,
+				)
+
+				if handlers == nil {
+					t.Error("expected non-nil handlers")
+				}
+			})
+		})
+	}
 }

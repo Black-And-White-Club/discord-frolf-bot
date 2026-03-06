@@ -26,260 +26,340 @@ func testLogger() *slog.Logger {
 }
 
 func TestSyncGuildCommands_EmptyGuildList_NoRegistrarCalls(t *testing.T) {
-	bot := &DiscordBot{
-		Logger:           testLogger(),
-		commandSyncDelay: 0,
-		commandRegistrar: func(_ discord.Session, _ *slog.Logger, _ string) error {
-			t.Fatalf("registrar should not be called for empty guild list")
-			return nil
-		},
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
 
-	bot.syncGuildCommands(context.Background(), nil)
-	bot.syncGuildCommands(context.Background(), []*discordgo.Guild{})
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			bot := &DiscordBot{
+				Logger:           testLogger(),
+				commandSyncDelay: 0,
+				commandRegistrar: func(_ discord.Session, _ *slog.Logger, _ string) error {
+					t.Fatalf("registrar should not be called for empty guild list")
+					return nil
+				},
+			}
+
+			bot.syncGuildCommands(context.Background(), nil)
+			bot.syncGuildCommands(context.Background(), []*discordgo.Guild{})
+		})
+	}
 }
 
 func TestSyncGuildCommands_SkipsGuildsWithIncompleteSetup(t *testing.T) {
-	resolver := &testutils.FakeGuildConfigResolver{}
-	resolver.IsGuildSetupCompleteFunc = func(guildID string) bool {
-		return guildID != "g1"
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
 
-	called := 0
-	bot := &DiscordBot{
-		Logger:              testLogger(),
-		GuildConfigResolver: resolver,
-		commandSyncDelay:    0,
-		commandRegistrar: func(_ discord.Session, _ *slog.Logger, _ string) error {
-			called++
-			return nil
-		},
-	}
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			resolver := &testutils.FakeGuildConfigResolver{}
+			resolver.IsGuildSetupCompleteFunc = func(guildID string) bool {
+				return guildID != "g1"
+			}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+			called := 0
+			bot := &DiscordBot{
+				Logger:              testLogger(),
+				GuildConfigResolver: resolver,
+				commandSyncDelay:    0,
+				commandRegistrar: func(_ discord.Session, _ *slog.Logger, _ string) error {
+					called++
+					return nil
+				},
+			}
 
-	bot.syncGuildCommands(ctx, []*discordgo.Guild{{ID: "g1"}})
-	if called != 0 {
-		t.Fatalf("expected registrar not to be called, got %d", called)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			bot.syncGuildCommands(ctx, []*discordgo.Guild{{ID: "g1"}})
+			if called != 0 {
+				t.Fatalf("expected registrar not to be called, got %d", called)
+			}
+		})
 	}
 }
 
 func TestSyncGuildCommands_RegistersSetupCompleteGuilds_ContinuesOnError(t *testing.T) {
-	resolver := &testutils.FakeGuildConfigResolver{}
-	resolver.IsGuildSetupCompleteFunc = func(guildID string) bool {
-		return guildID == "g1" || guildID == "g2"
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
 
-	var got []string
-	bot := &DiscordBot{
-		Logger:              testLogger(),
-		GuildConfigResolver: resolver,
-		commandSyncDelay:    0,
-		commandRegistrar: func(_ discord.Session, _ *slog.Logger, guildID string) error {
-			got = append(got, guildID)
-			if guildID == "g1" {
-				return errors.New("boom")
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			resolver := &testutils.FakeGuildConfigResolver{}
+			resolver.IsGuildSetupCompleteFunc = func(guildID string) bool {
+				return guildID == "g1" || guildID == "g2"
 			}
-			return nil
-		},
-	}
 
-	bot.syncGuildCommands(context.Background(), []*discordgo.Guild{{ID: "g1"}, {ID: "g2"}})
-	if len(got) != 2 || got[0] != "g1" || got[1] != "g2" {
-		t.Fatalf("unexpected registrar calls: %v", got)
+			var got []string
+			bot := &DiscordBot{
+				Logger:              testLogger(),
+				GuildConfigResolver: resolver,
+				commandSyncDelay:    0,
+				commandRegistrar: func(_ discord.Session, _ *slog.Logger, guildID string) error {
+					got = append(got, guildID)
+					if guildID == "g1" {
+						return errors.New("boom")
+					}
+					return nil
+				},
+			}
+
+			bot.syncGuildCommands(context.Background(), []*discordgo.Guild{{ID: "g1"}, {ID: "g2"}})
+			if len(got) != 2 || got[0] != "g1" || got[1] != "g2" {
+				t.Fatalf("unexpected registrar calls: %v", got)
+			}
+		})
 	}
 }
 
 func TestSyncGuildCommands_CanceledContext_StopsImmediately(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	bot := &DiscordBot{
-		Logger:           testLogger(),
-		commandSyncDelay: 0,
-		commandRegistrar: func(_ discord.Session, _ *slog.Logger, _ string) error {
-			t.Fatalf("registrar should not be called when context is canceled")
-			return nil
-		},
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
 
-	bot.syncGuildCommands(ctx, []*discordgo.Guild{{ID: "g1"}})
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			bot := &DiscordBot{
+				Logger:           testLogger(),
+				commandSyncDelay: 0,
+				commandRegistrar: func(_ discord.Session, _ *slog.Logger, _ string) error {
+					t.Fatalf("registrar should not be called when context is canceled")
+					return nil
+				},
+			}
+
+			bot.syncGuildCommands(ctx, []*discordgo.Guild{{ID: "g1"}})
+		})
+	}
 }
 
 func TestSyncGuildCommands_SkipsAlreadySyncedManifest(t *testing.T) {
-	resolver := &testutils.FakeGuildConfigResolver{}
-	resolver.IsGuildSetupCompleteFunc = func(guildID string) bool {
-		return guildID == "g1"
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
 
-	calls := 0
-	bot := &DiscordBot{
-		Logger:                 testLogger(),
-		GuildConfigResolver:    resolver,
-		commandSyncDelay:       0,
-		commandSyncWorkers:     1,
-		commandManifestVersion: "v-test",
-		commandRegistrar: func(_ discord.Session, _ *slog.Logger, guildID string) error {
-			calls++
-			return nil
-		},
-	}
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			resolver := &testutils.FakeGuildConfigResolver{}
+			resolver.IsGuildSetupCompleteFunc = func(guildID string) bool {
+				return guildID == "g1"
+			}
 
-	guilds := []*discordgo.Guild{{ID: "g1"}}
-	bot.syncGuildCommands(context.Background(), guilds)
-	bot.syncGuildCommands(context.Background(), guilds)
+			calls := 0
+			bot := &DiscordBot{
+				Logger:                 testLogger(),
+				GuildConfigResolver:    resolver,
+				commandSyncDelay:       0,
+				commandSyncWorkers:     1,
+				commandManifestVersion: "v-test",
+				commandRegistrar: func(_ discord.Session, _ *slog.Logger, guildID string) error {
+					calls++
+					return nil
+				},
+			}
 
-	if calls != 1 {
-		t.Fatalf("expected registrar to run once for current manifest, got %d", calls)
+			guilds := []*discordgo.Guild{{ID: "g1"}}
+			bot.syncGuildCommands(context.Background(), guilds)
+			bot.syncGuildCommands(context.Background(), guilds)
+
+			if calls != 1 {
+				t.Fatalf("expected registrar to run once for current manifest, got %d", calls)
+			}
+		})
 	}
 }
 
 func TestSyncGuildCommands_RetriesPreviouslySkippedGuild(t *testing.T) {
-	var setupChecks atomic.Int32
-	resolver := &testutils.FakeGuildConfigResolver{}
-	resolver.IsGuildSetupCompleteFunc = func(guildID string) bool {
-		return setupChecks.Add(1) >= 2
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
 
-	synced := make(chan struct{}, 1)
-	bot := &DiscordBot{
-		Logger:                 testLogger(),
-		GuildConfigResolver:    resolver,
-		commandSyncDelay:       0,
-		commandSyncWorkers:     1,
-		commandSyncRetryDelay:  10 * time.Millisecond,
-		commandManifestVersion: "v-test",
-		commandRegistrar: func(_ discord.Session, _ *slog.Logger, guildID string) error {
-			select {
-			case synced <- struct{}{}:
-			default:
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			var setupChecks atomic.Int32
+			resolver := &testutils.FakeGuildConfigResolver{}
+			resolver.IsGuildSetupCompleteFunc = func(guildID string) bool {
+				return setupChecks.Add(1) >= 2
 			}
-			return nil
-		},
-	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
-	defer cancel()
+			synced := make(chan struct{}, 1)
+			bot := &DiscordBot{
+				Logger:                 testLogger(),
+				GuildConfigResolver:    resolver,
+				commandSyncDelay:       0,
+				commandSyncWorkers:     1,
+				commandSyncRetryDelay:  10 * time.Millisecond,
+				commandManifestVersion: "v-test",
+				commandRegistrar: func(_ discord.Session, _ *slog.Logger, guildID string) error {
+					select {
+					case synced <- struct{}{}:
+					default:
+					}
+					return nil
+				},
+			}
 
-	bot.syncGuildCommands(ctx, []*discordgo.Guild{{ID: "g1"}})
+			ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+			defer cancel()
 
-	select {
-	case <-synced:
-	case <-ctx.Done():
-		t.Fatal("expected retry sync to register commands after setup completes")
+			bot.syncGuildCommands(ctx, []*discordgo.Guild{{ID: "g1"}})
+
+			select {
+			case <-synced:
+			case <-ctx.Done():
+				t.Fatal("expected retry sync to register commands after setup completes")
+			}
+		})
 	}
 }
 
 func TestNewDiscordBot_ReturnsResolverInitializationError(t *testing.T) {
-	t.Cleanup(func() {
-		newEventBusFactory = eventbus.NewEventBus
-		newGuildConfigResolverFactory = guildconfig.NewResolver
-	})
-
-	newEventBusFactory = func(
-		ctx context.Context,
-		natsURL string,
-		logger *slog.Logger,
-		serviceName string,
-		metrics eventbusmetrics.EventBusMetrics,
-		tracer trace.Tracer,
-	) (eventbus.EventBus, error) {
-		return &testutils.FakeEventBus{}, nil
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
 
-	wantErr := errors.New("resolver init failed")
-	newGuildConfigResolverFactory = func(
-		ctx context.Context,
-		eventBus eventbus.EventBus,
-		cache storage.ISInterface[storage.GuildConfig],
-		cfg *guildconfig.ResolverConfig,
-	) (*guildconfig.Resolver, error) {
-		return nil, wantErr
-	}
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			t.Cleanup(func() {
+				newEventBusFactory = eventbus.NewEventBus
+				newGuildConfigResolverFactory = guildconfig.NewResolver
+			})
 
-	cfg := &config.Config{}
-	stores := storage.NewStores(context.Background())
-	bot, err := NewDiscordBot(
-		discord.NewFakeSession(),
-		cfg,
-		testLogger(),
-		stores,
-		&testutils.FakeDiscordMetrics{},
-		eventbusmetrics.NewNoop(),
-		trace.NewNoopTracerProvider().Tracer("test"),
-		utils.NewHelper(testLogger()),
-	)
-	if err == nil {
-		t.Fatalf("expected constructor error")
-	}
-	if !errors.Is(err, wantErr) {
-		t.Fatalf("expected wrapped resolver error, got %v", err)
-	}
-	if bot != nil {
-		t.Fatalf("expected nil bot when constructor fails")
+			newEventBusFactory = func(
+				ctx context.Context,
+				natsURL string,
+				logger *slog.Logger,
+				serviceName string,
+				metrics eventbusmetrics.EventBusMetrics,
+				tracer trace.Tracer,
+			) (eventbus.EventBus, error) {
+				return &testutils.FakeEventBus{}, nil
+			}
+
+			wantErr := errors.New("resolver init failed")
+			newGuildConfigResolverFactory = func(
+				ctx context.Context,
+				eventBus eventbus.EventBus,
+				cache storage.ISInterface[storage.GuildConfig],
+				cfg *guildconfig.ResolverConfig,
+			) (*guildconfig.Resolver, error) {
+				return nil, wantErr
+			}
+
+			cfg := &config.Config{}
+			stores := storage.NewStores(context.Background())
+			bot, err := NewDiscordBot(
+				discord.NewFakeSession(),
+				cfg,
+				testLogger(),
+				stores,
+				&testutils.FakeDiscordMetrics{},
+				eventbusmetrics.NewNoop(),
+				trace.NewNoopTracerProvider().Tracer("test"),
+				utils.NewHelper(testLogger()),
+			)
+			if err == nil {
+				t.Fatalf("expected constructor error")
+			}
+			if !errors.Is(err, wantErr) {
+				t.Fatalf("expected wrapped resolver error, got %v", err)
+			}
+			if bot != nil {
+				t.Fatalf("expected nil bot when constructor fails")
+			}
+		})
 	}
 }
 
 func TestRegisterGatewayLifecycleHandlers_EmitsMetrics(t *testing.T) {
-	fakeSession := discord.NewFakeSession()
-
-	var (
-		connectHandler    func(*discordgo.Session, *discordgo.Connect)
-		disconnectHandler func(*discordgo.Session, *discordgo.Disconnect)
-		resumedHandler    func(*discordgo.Session, *discordgo.Resumed)
-	)
-	fakeSession.AddHandlerFunc = func(handler interface{}) func() {
-		switch h := handler.(type) {
-		case func(*discordgo.Session, *discordgo.Connect):
-			connectHandler = h
-		case func(*discordgo.Session, *discordgo.Disconnect):
-			disconnectHandler = h
-		case func(*discordgo.Session, *discordgo.Resumed):
-			resumedHandler = h
-		}
-		return func() {}
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
 
-	var eventTypes []string
-	var reconnects int
-	var disconnectReasons []string
-	metrics := &testutils.FakeDiscordMetrics{
-		RecordWebsocketEventFunc: func(ctx context.Context, eventType string) {
-			eventTypes = append(eventTypes, eventType)
-		},
-		RecordWebsocketReconnectFunc: func(ctx context.Context) {
-			reconnects++
-		},
-		RecordWebsocketDisconnectFunc: func(ctx context.Context, reason string) {
-			disconnectReasons = append(disconnectReasons, reason)
-		},
-	}
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			fakeSession := discord.NewFakeSession()
 
-	bot := &DiscordBot{
-		Session: fakeSession,
-		Logger:  testLogger(),
-		Metrics: metrics,
-	}
-	bot.setGatewayContext("session-123", 7)
-	bot.registerGatewayLifecycleHandlers()
+			var (
+				connectHandler    func(*discordgo.Session, *discordgo.Connect)
+				disconnectHandler func(*discordgo.Session, *discordgo.Disconnect)
+				resumedHandler    func(*discordgo.Session, *discordgo.Resumed)
+			)
+			fakeSession.AddHandlerFunc = func(handler interface{}) func() {
+				switch h := handler.(type) {
+				case func(*discordgo.Session, *discordgo.Connect):
+					connectHandler = h
+				case func(*discordgo.Session, *discordgo.Disconnect):
+					disconnectHandler = h
+				case func(*discordgo.Session, *discordgo.Resumed):
+					resumedHandler = h
+				}
+				return func() {}
+			}
 
-	if connectHandler == nil || disconnectHandler == nil || resumedHandler == nil {
-		t.Fatalf("expected connect/disconnect/resumed handlers to be registered")
-	}
+			var eventTypes []string
+			var reconnects int
+			var disconnectReasons []string
+			metrics := &testutils.FakeDiscordMetrics{
+				RecordWebsocketEventFunc: func(ctx context.Context, eventType string) {
+					eventTypes = append(eventTypes, eventType)
+				},
+				RecordWebsocketReconnectFunc: func(ctx context.Context) {
+					reconnects++
+				},
+				RecordWebsocketDisconnectFunc: func(ctx context.Context, reason string) {
+					disconnectReasons = append(disconnectReasons, reason)
+				},
+			}
 
-	connectHandler(&discordgo.Session{}, &discordgo.Connect{})
-	connectHandler(&discordgo.Session{}, &discordgo.Connect{})
-	disconnectHandler(&discordgo.Session{}, &discordgo.Disconnect{})
-	resumedHandler(&discordgo.Session{}, &discordgo.Resumed{})
+			bot := &DiscordBot{
+				Session: fakeSession,
+				Logger:  testLogger(),
+				Metrics: metrics,
+			}
+			bot.setGatewayContext("session-123", 7)
+			bot.registerGatewayLifecycleHandlers()
 
-	if len(eventTypes) != 3 || eventTypes[0] != "connect" || eventTypes[1] != "connect" || eventTypes[2] != "resumed" {
-		t.Fatalf("unexpected websocket event sequence: %#v", eventTypes)
-	}
-	if reconnects != 2 {
-		t.Fatalf("expected 2 reconnect metric emissions, got %d", reconnects)
-	}
-	if len(disconnectReasons) != 1 || disconnectReasons[0] != "gateway_disconnect" {
-		t.Fatalf("unexpected disconnect reasons: %#v", disconnectReasons)
+			if connectHandler == nil || disconnectHandler == nil || resumedHandler == nil {
+				t.Fatalf("expected connect/disconnect/resumed handlers to be registered")
+			}
+
+			connectHandler(&discordgo.Session{}, &discordgo.Connect{})
+			connectHandler(&discordgo.Session{}, &discordgo.Connect{})
+			disconnectHandler(&discordgo.Session{}, &discordgo.Disconnect{})
+			resumedHandler(&discordgo.Session{}, &discordgo.Resumed{})
+
+			if len(eventTypes) != 3 || eventTypes[0] != "connect" || eventTypes[1] != "connect" || eventTypes[2] != "resumed" {
+				t.Fatalf("unexpected websocket event sequence: %#v", eventTypes)
+			}
+			if reconnects != 2 {
+				t.Fatalf("expected 2 reconnect metric emissions, got %d", reconnects)
+			}
+			if len(disconnectReasons) != 1 || disconnectReasons[0] != "gateway_disconnect" {
+				t.Fatalf("unexpected disconnect reasons: %#v", disconnectReasons)
+			}
+		})
 	}
 }

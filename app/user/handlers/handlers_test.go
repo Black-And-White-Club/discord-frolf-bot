@@ -9,28 +9,48 @@ import (
 )
 
 func TestNewUserHandlers(t *testing.T) {
-	// Create fakes & mock dependencies
-	fakeUserDiscord := &FakeUserDiscord{}
-	logger := loggerfrolfbot.NoOpLogger
-	helpers := &testutils.FakeHelpers{}
-	cfg := &config.Config{}
-	fakeGuildConfig := &FakeGuildConfigResolver{}
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
+	}
 
-	// Call the function being tested
-	handlers := NewUserHandlers(logger, cfg, helpers, fakeUserDiscord, fakeGuildConfig)
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			// Create fakes & mock dependencies
+			fakeUserDiscord := &FakeUserDiscord{}
+			logger := loggerfrolfbot.NoOpLogger
+			helpers := &testutils.FakeHelpers{}
+			cfg := &config.Config{}
+			fakeGuildConfig := &FakeGuildConfigResolver{}
 
-	// Verify returns non-nil handlers
-	if handlers == nil {
-		t.Fatal("expected non-nil handlers")
+			// Call the function being tested
+			handlers := NewUserHandlers(logger, cfg, helpers, fakeUserDiscord, fakeGuildConfig)
+
+			// Verify returns non-nil handlers
+			if handlers == nil {
+				t.Fatal("expected non-nil handlers")
+			}
+		})
 	}
 }
 
 func TestNewUserHandlersWithNilDependencies(t *testing.T) {
-	// Call with nil dependencies
-	handlers := NewUserHandlers(nil, nil, nil, nil, nil)
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
+	}
 
-	// Verify returns non-nil handlers
-	if handlers == nil {
-		t.Fatal("expected non-nil handlers")
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			// Call with nil dependencies
+			handlers := NewUserHandlers(nil, nil, nil, nil, nil)
+
+			// Verify returns non-nil handlers
+			if handlers == nil {
+				t.Fatal("expected non-nil handlers")
+			}
+		})
 	}
 }

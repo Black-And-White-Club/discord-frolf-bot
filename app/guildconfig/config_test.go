@@ -88,10 +88,20 @@ func TestNewResolverConfigForEnvironment(t *testing.T) {
 }
 
 func TestDefaultResolverConfig(t *testing.T) {
-	got := DefaultResolverConfig()
-	want := &ResolverConfig{RequestTimeout: 10 * time.Second, ResponseTimeout: 30 * time.Second}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("DefaultResolverConfig mismatch: got %+v want %+v", got, want)
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
+	}
+
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			got := DefaultResolverConfig()
+			want := &ResolverConfig{RequestTimeout: 10 * time.Second, ResponseTimeout: 30 * time.Second}
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("DefaultResolverConfig mismatch: got %+v want %+v", got, want)
+			}
+		})
 	}
 }
 

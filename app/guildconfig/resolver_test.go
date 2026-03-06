@@ -47,49 +47,89 @@ func (f *fakeEventBus) SubscribeForTest(ctx context.Context, topic string) (<-ch
 }
 
 func TestNewResolver_ReturnsErrorOnInvalidConfig(t *testing.T) {
-	fb := &fakeEventBus{}
-	bad := &ResolverConfig{RequestTimeout: 0, ResponseTimeout: time.Second}
-	_, err := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), bad)
-	if err == nil {
-		t.Fatalf("expected validation error")
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
+	}
+
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			fb := &fakeEventBus{}
+			bad := &ResolverConfig{RequestTimeout: 0, ResponseTimeout: time.Second}
+			_, err := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), bad)
+			if err == nil {
+				t.Fatalf("expected validation error")
+			}
+		})
 	}
 }
 
 func TestNewResolver_OK(t *testing.T) {
-	fb := &fakeEventBus{}
-	cfg := &ResolverConfig{RequestTimeout: 5 * time.Millisecond, ResponseTimeout: 10 * time.Millisecond}
-	r, err := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), cfg)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
-	if r.config != cfg {
-		t.Fatalf("resolver did not keep provided config")
+
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			fb := &fakeEventBus{}
+			cfg := &ResolverConfig{RequestTimeout: 5 * time.Millisecond, ResponseTimeout: 10 * time.Millisecond}
+			r, err := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), cfg)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if r.config != cfg {
+				t.Fatalf("resolver did not keep provided config")
+			}
+		})
 	}
 }
 
 func TestNewResolverWithDefaults(t *testing.T) {
-	fb := &fakeEventBus{}
-	r, err := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), DefaultResolverConfig())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
-	def := DefaultResolverConfig()
-	if r.config.RequestTimeout != def.RequestTimeout || r.config.ResponseTimeout != def.ResponseTimeout {
-		t.Fatalf("defaults mismatch: got %+v want %+v", r.config, def)
+
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			fb := &fakeEventBus{}
+			r, err := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), DefaultResolverConfig())
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			def := DefaultResolverConfig()
+			if r.config.RequestTimeout != def.RequestTimeout || r.config.ResponseTimeout != def.ResponseTimeout {
+				t.Fatalf("defaults mismatch: got %+v want %+v", r.config, def)
+			}
+		})
 	}
 }
 
 func TestResolver_GetGuildConfig_DelegatesToContextVersion(t *testing.T) {
-	fb := &fakeEventBus{}
-	cfg := &ResolverConfig{RequestTimeout: 5 * time.Millisecond, ResponseTimeout: 5 * time.Millisecond * 2}
-	r, err := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), cfg)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
-	// Force a timeout path: no backend response -> expect ConfigLoadingError after response timeout
-	_, err = r.GetGuildConfig("g1")
-	if err == nil {
-		t.Fatalf("expected error due to timeout/loading")
+
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			fb := &fakeEventBus{}
+			cfg := &ResolverConfig{RequestTimeout: 5 * time.Millisecond, ResponseTimeout: 5 * time.Millisecond * 2}
+			r, err := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), cfg)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			// Force a timeout path: no backend response -> expect ConfigLoadingError after response timeout
+			_, err = r.GetGuildConfig("g1")
+			if err == nil {
+				t.Fatalf("expected error due to timeout/loading")
+			}
+		})
 	}
 }
 
@@ -172,109 +212,169 @@ func TestResolver_GetGuildConfigWithContext_Scenarios(t *testing.T) {
 }
 
 func TestResolver_coordinateConfigRequest_PublishErrorSetsTemporaryError(t *testing.T) {
-	fb := &fakeEventBus{publishErr: errors.New("publish fail")}
-	cfg := &ResolverConfig{RequestTimeout: 5 * time.Millisecond, ResponseTimeout: 10 * time.Millisecond}
-	r, err := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), cfg)
-	if err != nil {
-		t.Fatalf("unexpected constructor error: %v", err)
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
-	req := &configRequest{ready: make(chan struct{})}
-	r.inflightRequests.Store("g", req)
-	r.coordinateConfigRequest(context.Background(), "g", req)
-	<-req.ready
-	if req.err == nil || reflect.TypeOf(req.err) != reflect.TypeOf(&ConfigTemporaryError{}) {
-		t.Fatalf("expected temporary error got %v", req.err)
+
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			fb := &fakeEventBus{publishErr: errors.New("publish fail")}
+			cfg := &ResolverConfig{RequestTimeout: 5 * time.Millisecond, ResponseTimeout: 10 * time.Millisecond}
+			r, err := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), cfg)
+			if err != nil {
+				t.Fatalf("unexpected constructor error: %v", err)
+			}
+			req := &configRequest{ready: make(chan struct{})}
+			r.inflightRequests.Store("g", req)
+			r.coordinateConfigRequest(context.Background(), "g", req)
+			<-req.ready
+			if req.err == nil || reflect.TypeOf(req.err) != reflect.TypeOf(&ConfigTemporaryError{}) {
+				t.Fatalf("expected temporary error got %v", req.err)
+			}
+		})
 	}
 }
 
 func TestResolver_HandleGuildConfigReceived_CompletesRequest(t *testing.T) {
-	fb := &fakeEventBus{}
-	cfg := &ResolverConfig{RequestTimeout: 5 * time.Millisecond, ResponseTimeout: 10 * time.Millisecond}
-	r, err := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), cfg)
-	if err != nil {
-		t.Fatalf("unexpected constructor error: %v", err)
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
-	req := &configRequest{ready: make(chan struct{})}
-	r.inflightRequests.Store("g", req)
-	gc := &storage.GuildConfig{GuildID: "g", SignupChannelID: "c", EventChannelID: "e", LeaderboardChannelID: "l", RegisteredRoleID: "r"}
-	r.HandleGuildConfigReceived(context.Background(), "g", gc)
-	<-req.ready
-	if req.config != gc || req.err != nil {
-		t.Fatalf("expected config set without error")
+
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			fb := &fakeEventBus{}
+			cfg := &ResolverConfig{RequestTimeout: 5 * time.Millisecond, ResponseTimeout: 10 * time.Millisecond}
+			r, err := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), cfg)
+			if err != nil {
+				t.Fatalf("unexpected constructor error: %v", err)
+			}
+			req := &configRequest{ready: make(chan struct{})}
+			r.inflightRequests.Store("g", req)
+			gc := &storage.GuildConfig{GuildID: "g", SignupChannelID: "c", EventChannelID: "e", LeaderboardChannelID: "l", RegisteredRoleID: "r"}
+			r.HandleGuildConfigReceived(context.Background(), "g", gc)
+			<-req.ready
+			if req.config != gc || req.err != nil {
+				t.Fatalf("expected config set without error")
+			}
+		})
 	}
 }
 
 func TestResolver_HandleGuildConfigRetrievalFailed_CompletesRequest(t *testing.T) {
-	fb := &fakeEventBus{}
-	cfg := &ResolverConfig{RequestTimeout: 5 * time.Millisecond, ResponseTimeout: 10 * time.Millisecond}
-	r, err := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), cfg)
-	if err != nil {
-		t.Fatalf("unexpected constructor error: %v", err)
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
-	req := &configRequest{ready: make(chan struct{})}
-	r.inflightRequests.Store("g", req)
-	r.HandleGuildConfigRetrievalFailed(context.Background(), "g", "temporary failure: x", false)
-	<-req.ready
-	if req.err == nil || reflect.TypeOf(req.err) != reflect.TypeOf(&ConfigTemporaryError{}) {
-		t.Fatalf("expected temporary failure error")
+
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			fb := &fakeEventBus{}
+			cfg := &ResolverConfig{RequestTimeout: 5 * time.Millisecond, ResponseTimeout: 10 * time.Millisecond}
+			r, err := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), cfg)
+			if err != nil {
+				t.Fatalf("unexpected constructor error: %v", err)
+			}
+			req := &configRequest{ready: make(chan struct{})}
+			r.inflightRequests.Store("g", req)
+			r.HandleGuildConfigRetrievalFailed(context.Background(), "g", "temporary failure: x", false)
+			<-req.ready
+			if req.err == nil || reflect.TypeOf(req.err) != reflect.TypeOf(&ConfigTemporaryError{}) {
+				t.Fatalf("expected temporary failure error")
+			}
+		})
 	}
 }
 
 func TestResolver_HandleBackendError_Classification(t *testing.T) {
-	fb := &fakeEventBus{}
-	cfg := &ResolverConfig{RequestTimeout: 5 * time.Millisecond, ResponseTimeout: 10 * time.Millisecond}
-	r, err := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), cfg)
-	if err != nil {
-		t.Fatalf("unexpected constructor error: %v", err)
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
-	req := &configRequest{ready: make(chan struct{})}
-	r.inflightRequests.Store("g", req)
-	r.HandleBackendError(context.Background(), "g", errors.New("guild not configured"))
-	<-req.ready
-	if _, ok := req.err.(*ConfigNotFoundError); !ok {
-		t.Fatalf("expected ConfigNotFoundError got %v", req.err)
+
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			fb := &fakeEventBus{}
+			cfg := &ResolverConfig{RequestTimeout: 5 * time.Millisecond, ResponseTimeout: 10 * time.Millisecond}
+			r, err := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), cfg)
+			if err != nil {
+				t.Fatalf("unexpected constructor error: %v", err)
+			}
+			req := &configRequest{ready: make(chan struct{})}
+			r.inflightRequests.Store("g", req)
+			r.HandleBackendError(context.Background(), "g", errors.New("guild not configured"))
+			<-req.ready
+			if _, ok := req.err.(*ConfigNotFoundError); !ok {
+				t.Fatalf("expected ConfigNotFoundError got %v", req.err)
+			}
+		})
 	}
 }
 
 func TestResolver_IsGuildSetupComplete(t *testing.T) {
-	fb := &fakeEventBus{}
-	cfg := &ResolverConfig{RequestTimeout: 5 * time.Millisecond, ResponseTimeout: 15 * time.Millisecond}
-	r, err := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), cfg)
-	if err != nil {
-		t.Fatalf("unexpected constructor error: %v", err)
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
-	// Success path: respond with config
-	go func() {
-		time.Sleep(2 * time.Millisecond)
-		r.HandleGuildConfigReceived(context.Background(), "g", &storage.GuildConfig{GuildID: "g", SignupChannelID: "c", EventChannelID: "e", LeaderboardChannelID: "l", RegisteredRoleID: "r"})
-	}()
-	if !r.IsGuildSetupComplete("g") {
-		t.Fatalf("expected setup complete true")
-	}
-	// Failure path: timeout leads to false
-	if r.IsGuildSetupComplete("missing") {
-		t.Fatalf("expected setup incomplete for missing guild")
+
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			fb := &fakeEventBus{}
+			cfg := &ResolverConfig{RequestTimeout: 5 * time.Millisecond, ResponseTimeout: 15 * time.Millisecond}
+			r, err := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), cfg)
+			if err != nil {
+				t.Fatalf("unexpected constructor error: %v", err)
+			}
+			// Success path: respond with config
+			go func() {
+				time.Sleep(2 * time.Millisecond)
+				r.HandleGuildConfigReceived(context.Background(), "g", &storage.GuildConfig{GuildID: "g", SignupChannelID: "c", EventChannelID: "e", LeaderboardChannelID: "l", RegisteredRoleID: "r"})
+			}()
+			if !r.IsGuildSetupComplete("g") {
+				t.Fatalf("expected setup complete true")
+			}
+			// Failure path: timeout leads to false
+			if r.IsGuildSetupComplete("missing") {
+				t.Fatalf("expected setup incomplete for missing guild")
+			}
+		})
 	}
 }
 
 func TestResolver_recordErrorAndMetrics(t *testing.T) {
-	fb := &fakeEventBus{}
-	cfg := &ResolverConfig{RequestTimeout: 5 * time.Millisecond, ResponseTimeout: 10 * time.Millisecond}
-	r, err := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), cfg)
-	if err != nil {
-		t.Fatalf("unexpected constructor error: %v", err)
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
-	r.recordError(context.Background(), "g", "temporary")
-	r.recordError(context.Background(), "g", "temporary")
-	r.recordError(context.Background(), "g", "permanent")
-	m := r.GetErrorMetrics()
-	if m.TotalErrors != 3 || m.ErrorsByType["temporary"] != 2 || m.ErrorsByType["permanent"] != 1 || m.ErrorsByGuild["g"] != 3 {
-		t.Fatalf("unexpected metrics %+v", m)
-	}
-	r.ResetErrorMetrics()
-	m2 := r.GetErrorMetrics()
-	if m2.TotalErrors != 0 || len(m2.ErrorsByType) != 0 || len(m2.ErrorsByGuild) != 0 {
-		t.Fatalf("expected cleared metrics %+v", m2)
+
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			fb := &fakeEventBus{}
+			cfg := &ResolverConfig{RequestTimeout: 5 * time.Millisecond, ResponseTimeout: 10 * time.Millisecond}
+			r, err := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), cfg)
+			if err != nil {
+				t.Fatalf("unexpected constructor error: %v", err)
+			}
+			r.recordError(context.Background(), "g", "temporary")
+			r.recordError(context.Background(), "g", "temporary")
+			r.recordError(context.Background(), "g", "permanent")
+			m := r.GetErrorMetrics()
+			if m.TotalErrors != 3 || m.ErrorsByType["temporary"] != 2 || m.ErrorsByType["permanent"] != 1 || m.ErrorsByGuild["g"] != 3 {
+				t.Fatalf("unexpected metrics %+v", m)
+			}
+			r.ResetErrorMetrics()
+			m2 := r.GetErrorMetrics()
+			if m2.TotalErrors != 0 || len(m2.ErrorsByType) != 0 || len(m2.ErrorsByGuild) != 0 {
+				t.Fatalf("expected cleared metrics %+v", m2)
+			}
+		})
 	}
 }
 
@@ -283,25 +383,45 @@ func TestResolver_recordErrorAndMetrics(t *testing.T) {
 // (ResetErrorMetrics tested within TestResolver_recordErrorAndMetrics)
 
 func TestResolver_LogConfigEvent_NoPanic(t *testing.T) {
-	fb := &fakeEventBus{}
-	r, err := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), DefaultResolverConfig())
-	if err != nil {
-		t.Fatalf("unexpected constructor error: %v", err)
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
-	r.LogConfigEvent(context.Background(), "test_event", "g", slog.String("k", "v"))
+
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			fb := &fakeEventBus{}
+			r, err := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), DefaultResolverConfig())
+			if err != nil {
+				t.Fatalf("unexpected constructor error: %v", err)
+			}
+			r.LogConfigEvent(context.Background(), "test_event", "g", slog.String("k", "v"))
+		})
+	}
 }
 
 func Test_convertAttrsToAny(t *testing.T) {
-	attrs := []slog.Attr{slog.String("a", "b"), slog.Int("n", 1)}
-	got := convertAttrsToAny(attrs)
-	if len(got) != len(attrs) {
-		t.Fatalf("expected len %d got %d", len(attrs), len(got))
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
-	// Assert element types are slog.Attr
-	if _, ok := got[0].(slog.Attr); !ok {
-		t.Fatalf("expected first element to be slog.Attr, got %T", got[0])
-	}
-	if _, ok := got[1].(slog.Attr); !ok {
-		t.Fatalf("expected second element to be slog.Attr, got %T", got[1])
+
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			attrs := []slog.Attr{slog.String("a", "b"), slog.Int("n", 1)}
+			got := convertAttrsToAny(attrs)
+			if len(got) != len(attrs) {
+				t.Fatalf("expected len %d got %d", len(attrs), len(got))
+			}
+			// Assert element types are slog.Attr
+			if _, ok := got[0].(slog.Attr); !ok {
+				t.Fatalf("expected first element to be slog.Attr, got %T", got[0])
+			}
+			if _, ok := got[1].(slog.Attr); !ok {
+				t.Fatalf("expected second element to be slog.Attr, got %T", got[1])
+			}
+		})
 	}
 }

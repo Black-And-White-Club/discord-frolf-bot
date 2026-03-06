@@ -120,50 +120,60 @@ func Test_setupManager_HandleSetupModalSubmit(t *testing.T) {
 }
 
 func TestHandleSetupModalSubmit_SkipsWhenAlreadyConfigured(t *testing.T) {
-	interaction := validSetupInteraction("frolf", "Frolf Player", "Frolf Admin", "React!", "🥏")
-
-	fakeSession := discord.NewFakeSession()
-	fakeResolver := &guildconfig.FakeGuildConfigResolver{}
-
-	fakeSession.GuildFunc = func(guildID string, options ...discordgo.RequestOption) (*discordgo.Guild, error) {
-		return &discordgo.Guild{ID: guildID, Name: "Test Guild"}, nil
-	}
-	fakeSession.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
-		return nil
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
 
-	fakeResolver.GetGuildConfigWithContextFunc = func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
-		return &storage.GuildConfig{
-			GuildID:              guildID,
-			SignupChannelID:      "signup",
-			EventChannelID:       "events",
-			LeaderboardChannelID: "leaders",
-			RegisteredRoleID:     "role-player",
-			EditorRoleID:         "role-editor",
-			AdminRoleID:          "role-admin",
-			SignupMessageID:      "msg-123",
-			SignupEmoji:          "🥏",
-		}, nil
-	}
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			interaction := validSetupInteraction("frolf", "Frolf Player", "Frolf Admin", "React!", "🥏")
 
-	fakeSession.FollowupMessageCreateFunc = func(interaction *discordgo.Interaction, wait bool, params *discordgo.WebhookParams, options ...discordgo.RequestOption) (*discordgo.Message, error) {
-		if params == nil || !strings.Contains(params.Content, "already configured") {
-			t.Fatalf("expected follow-up content to mention existing configuration, got %v", params)
-		}
-		return &discordgo.Message{ID: "ok"}, nil
-	}
+			fakeSession := discord.NewFakeSession()
+			fakeResolver := &guildconfig.FakeGuildConfigResolver{}
 
-	sm := &setupManager{
-		session:             fakeSession,
-		logger:              discardLogger(),
-		guildConfigResolver: fakeResolver,
-		operationWrapper: func(ctx context.Context, _ string, fn func(ctx context.Context) error) error {
-			return fn(ctx)
-		},
-	}
+			fakeSession.GuildFunc = func(guildID string, options ...discordgo.RequestOption) (*discordgo.Guild, error) {
+				return &discordgo.Guild{ID: guildID, Name: "Test Guild"}, nil
+			}
+			fakeSession.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
+				return nil
+			}
 
-	if err := sm.HandleSetupModalSubmit(context.Background(), interaction); err != nil {
-		t.Fatalf("HandleSetupModalSubmit returned error: %v", err)
+			fakeResolver.GetGuildConfigWithContextFunc = func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
+				return &storage.GuildConfig{
+					GuildID:              guildID,
+					SignupChannelID:      "signup",
+					EventChannelID:       "events",
+					LeaderboardChannelID: "leaders",
+					RegisteredRoleID:     "role-player",
+					EditorRoleID:         "role-editor",
+					AdminRoleID:          "role-admin",
+					SignupMessageID:      "msg-123",
+					SignupEmoji:          "🥏",
+				}, nil
+			}
+
+			fakeSession.FollowupMessageCreateFunc = func(interaction *discordgo.Interaction, wait bool, params *discordgo.WebhookParams, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+				if params == nil || !strings.Contains(params.Content, "already configured") {
+					t.Fatalf("expected follow-up content to mention existing configuration, got %v", params)
+				}
+				return &discordgo.Message{ID: "ok"}, nil
+			}
+
+			sm := &setupManager{
+				session:             fakeSession,
+				logger:              discardLogger(),
+				guildConfigResolver: fakeResolver,
+				operationWrapper: func(ctx context.Context, _ string, fn func(ctx context.Context) error) error {
+					return fn(ctx)
+				},
+			}
+
+			if err := sm.HandleSetupModalSubmit(context.Background(), interaction); err != nil {
+				t.Fatalf("HandleSetupModalSubmit returned error: %v", err)
+			}
+		})
 	}
 }
 

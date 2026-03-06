@@ -16,48 +16,58 @@ import (
 )
 
 func TestNewCreateRoundManager(t *testing.T) {
-	fakeSession := discord.NewFakeSession()
-	fakeEventBus := &testutils.FakeEventBus{}
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	fakeHelper := &testutils.FakeHelpers{}
-	cfg := &config.Config{}
-	fakeInteractionStore := testutils.NewFakeStorage[any]()
-	fakeMetrics := &testutils.FakeDiscordMetrics{}
-	tracer := noop.NewTracerProvider().Tracer("test")
-	fakeGuildConfigResolver := &testutils.FakeGuildConfigResolver{}
-
-	manager := NewCreateRoundManager(fakeSession, fakeEventBus, logger, fakeHelper, cfg, fakeInteractionStore, nil, tracer, fakeMetrics, fakeGuildConfigResolver)
-	impl, ok := manager.(*createRoundManager)
-	if !ok {
-		t.Fatalf("Expected *createRoundManager, got %T", manager)
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
 
-	if impl.session != fakeSession {
-		t.Error("Expected session to be assigned")
-	}
-	if impl.publisher != fakeEventBus {
-		t.Error("Expected publisher to be assigned")
-	}
-	if impl.logger != logger {
-		t.Error("Expected logger to be assigned")
-	}
-	if impl.helper != fakeHelper {
-		t.Error("Expected helper to be assigned")
-	}
-	if impl.config != cfg {
-		t.Error("Expected config to be assigned")
-	}
-	if impl.interactionStore != fakeInteractionStore {
-		t.Error("Expected interactionStore to be assigned")
-	}
-	if impl.tracer != tracer {
-		t.Error("Expected tracer to be assigned")
-	}
-	if impl.metrics != fakeMetrics {
-		t.Error("Expected metrics to be assigned")
-	}
-	if impl.operationWrapper == nil {
-		t.Error("Expected operationWrapper to be set")
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			fakeSession := discord.NewFakeSession()
+			fakeEventBus := &testutils.FakeEventBus{}
+			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+			fakeHelper := &testutils.FakeHelpers{}
+			cfg := &config.Config{}
+			fakeInteractionStore := testutils.NewFakeStorage[any]()
+			fakeMetrics := &testutils.FakeDiscordMetrics{}
+			tracer := noop.NewTracerProvider().Tracer("test")
+			fakeGuildConfigResolver := &testutils.FakeGuildConfigResolver{}
+
+			manager := NewCreateRoundManager(fakeSession, fakeEventBus, logger, fakeHelper, cfg, fakeInteractionStore, nil, tracer, fakeMetrics, fakeGuildConfigResolver)
+			impl, ok := manager.(*createRoundManager)
+			if !ok {
+				t.Fatalf("Expected *createRoundManager, got %T", manager)
+			}
+
+			if impl.session != fakeSession {
+				t.Error("Expected session to be assigned")
+			}
+			if impl.publisher != fakeEventBus {
+				t.Error("Expected publisher to be assigned")
+			}
+			if impl.logger != logger {
+				t.Error("Expected logger to be assigned")
+			}
+			if impl.helper != fakeHelper {
+				t.Error("Expected helper to be assigned")
+			}
+			if impl.config != cfg {
+				t.Error("Expected config to be assigned")
+			}
+			if impl.interactionStore != fakeInteractionStore {
+				t.Error("Expected interactionStore to be assigned")
+			}
+			if impl.tracer != tracer {
+				t.Error("Expected tracer to be assigned")
+			}
+			if impl.metrics != fakeMetrics {
+				t.Error("Expected metrics to be assigned")
+			}
+			if impl.operationWrapper == nil {
+				t.Error("Expected operationWrapper to be set")
+			}
+		})
 	}
 }
 

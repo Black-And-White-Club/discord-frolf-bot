@@ -16,31 +16,41 @@ import (
 
 // Minimal nil-safe stubs; NewLeaderboardDiscord shouldn't invoke any methods during construction
 func TestNewLeaderboardDiscord_ConstructsAndExposesManagers(t *testing.T) {
-	ctx := context.Background()
-
-	// Use FakeSession instead of gomock
-	fakeSession := discordgo.NewFakeSession()
-	var publisher eventbus.EventBus = nil
-	var helper utils.Helpers = nil
-	cfg := &config.Config{}
-	var resolver guildconfig.GuildConfigResolver = nil
-	var store storage.ISInterface[any] = nil
-	tracer := otel.Tracer("test")
-	var metrics discordmetrics.DiscordMetrics = nil
-	ld, err := NewLeaderboardDiscord(ctx, fakeSession, publisher, nil, helper, cfg, resolver, store, nil, tracer, metrics)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if ld == nil {
-		t.Fatalf("expected non-nil LeaderboardDiscordInterface")
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
 
-	// Verify getters return non-nil managers
-	if ld.GetLeaderboardUpdateManager() == nil {
-		t.Fatalf("expected non-nil LeaderboardUpdateManager")
-	}
-	if ld.GetClaimTagManager() == nil {
-		t.Fatalf("expected non-nil ClaimTagManager")
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			// Use FakeSession instead of gomock
+			fakeSession := discordgo.NewFakeSession()
+			var publisher eventbus.EventBus = nil
+			var helper utils.Helpers = nil
+			cfg := &config.Config{}
+			var resolver guildconfig.GuildConfigResolver = nil
+			var store storage.ISInterface[any] = nil
+			tracer := otel.Tracer("test")
+			var metrics discordmetrics.DiscordMetrics = nil
+			ld, err := NewLeaderboardDiscord(ctx, fakeSession, publisher, nil, helper, cfg, resolver, store, nil, tracer, metrics)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if ld == nil {
+				t.Fatalf("expected non-nil LeaderboardDiscordInterface")
+			}
+
+			// Verify getters return non-nil managers
+			if ld.GetLeaderboardUpdateManager() == nil {
+				t.Fatalf("expected non-nil LeaderboardUpdateManager")
+			}
+			if ld.GetClaimTagManager() == nil {
+				t.Fatalf("expected non-nil ClaimTagManager")
+			}
+		})
 	}
 }
 

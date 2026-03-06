@@ -7,13 +7,23 @@ import (
 )
 
 func TestNewScoreHandlers(t *testing.T) {
-	t.Run("Constructs handler with dependencies", func(t *testing.T) {
-		logger := loggerfrolfbot.NoOpLogger
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
+	}
 
-		handlers := NewScoreHandlers(logger)
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			t.Run("Constructs handler with dependencies", func(t *testing.T) {
+				logger := loggerfrolfbot.NoOpLogger
 
-		if handlers == nil {
-			t.Fatalf("Expected non-nil Handlers")
-		}
-	})
+				handlers := NewScoreHandlers(logger)
+
+				if handlers == nil {
+					t.Fatalf("Expected non-nil Handlers")
+				}
+			})
+		})
+	}
 }

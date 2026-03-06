@@ -20,53 +20,63 @@ import (
 )
 
 func TestNewScoreRoundManager(t *testing.T) {
-	fakeSession := discord.NewFakeSession()
-	fakeEventBus := &testutils.FakeEventBus{}
-	testHandler := loggerfrolfbot.NewTestHandler()
-	logger := slog.New(testHandler)
-	fakeHelper := &testutils.FakeHelpers{}
-	fakeConfig := &config.Config{}
-	mockTracer := noop.NewTracerProvider().Tracer("test")
-	fakeMetrics := &testutils.FakeDiscordMetrics{}
-	fakeGuildConfigResolver := &testutils.FakeGuildConfigResolver{}
-	fakeInteractionStore := testutils.NewFakeStorage[any]()
-	fakeGuildConfigCache := testutils.NewFakeStorage[storage.GuildConfig]()
-
-	manager := NewScoreRoundManager(fakeSession, fakeEventBus, logger, fakeHelper, fakeConfig, fakeInteractionStore, fakeGuildConfigCache, mockTracer, fakeMetrics, fakeGuildConfigResolver)
-	impl, ok := manager.(*scoreRoundManager)
-	if !ok {
-		t.Fatalf("Expected *scoreRoundManager, got %T", manager)
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
 
-	if impl.session != fakeSession {
-		t.Error("Expected session to be assigned")
-	}
-	if impl.publisher != fakeEventBus {
-		t.Error("Expected publisher to be assigned")
-	}
-	if impl.logger != logger {
-		t.Error("Expected logger to be assigned")
-	}
-	if impl.helper != fakeHelper {
-		t.Error("Expected helper to be assigned")
-	}
-	if impl.config != fakeConfig {
-		t.Error("Expected config to be assigned")
-	}
-	if impl.tracer != mockTracer {
-		t.Error("Expected tracer to be assigned")
-	}
-	if impl.metrics != fakeMetrics {
-		t.Error("Expected metrics to be assigned")
-	}
-	if impl.operationWrapper == nil {
-		t.Error("Expected operationWrapper to be set")
-	}
-	if impl.interactionStore != fakeInteractionStore {
-		t.Error("Expected interactionStore to be assigned")
-	}
-	if impl.guildConfigCache != fakeGuildConfigCache {
-		t.Error("Expected guildConfigCache to be assigned")
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			fakeSession := discord.NewFakeSession()
+			fakeEventBus := &testutils.FakeEventBus{}
+			testHandler := loggerfrolfbot.NewTestHandler()
+			logger := slog.New(testHandler)
+			fakeHelper := &testutils.FakeHelpers{}
+			fakeConfig := &config.Config{}
+			mockTracer := noop.NewTracerProvider().Tracer("test")
+			fakeMetrics := &testutils.FakeDiscordMetrics{}
+			fakeGuildConfigResolver := &testutils.FakeGuildConfigResolver{}
+			fakeInteractionStore := testutils.NewFakeStorage[any]()
+			fakeGuildConfigCache := testutils.NewFakeStorage[storage.GuildConfig]()
+
+			manager := NewScoreRoundManager(fakeSession, fakeEventBus, logger, fakeHelper, fakeConfig, fakeInteractionStore, fakeGuildConfigCache, mockTracer, fakeMetrics, fakeGuildConfigResolver)
+			impl, ok := manager.(*scoreRoundManager)
+			if !ok {
+				t.Fatalf("Expected *scoreRoundManager, got %T", manager)
+			}
+
+			if impl.session != fakeSession {
+				t.Error("Expected session to be assigned")
+			}
+			if impl.publisher != fakeEventBus {
+				t.Error("Expected publisher to be assigned")
+			}
+			if impl.logger != logger {
+				t.Error("Expected logger to be assigned")
+			}
+			if impl.helper != fakeHelper {
+				t.Error("Expected helper to be assigned")
+			}
+			if impl.config != fakeConfig {
+				t.Error("Expected config to be assigned")
+			}
+			if impl.tracer != mockTracer {
+				t.Error("Expected tracer to be assigned")
+			}
+			if impl.metrics != fakeMetrics {
+				t.Error("Expected metrics to be assigned")
+			}
+			if impl.operationWrapper == nil {
+				t.Error("Expected operationWrapper to be set")
+			}
+			if impl.interactionStore != fakeInteractionStore {
+				t.Error("Expected interactionStore to be assigned")
+			}
+			if impl.guildConfigCache != fakeGuildConfigCache {
+				t.Error("Expected guildConfigCache to be assigned")
+			}
+		})
 	}
 }
 
@@ -205,300 +215,330 @@ func Test_wrapScoreRoundOperation(t *testing.T) {
 }
 
 func Test_HandleScoreButton(t *testing.T) {
-	fakeSession := discord.NewFakeSession()
-	fakeEventBus := &testutils.FakeEventBus{}
-	testHandler := loggerfrolfbot.NewTestHandler()
-	logger := slog.New(testHandler)
-	fakeHelper := &testutils.FakeHelpers{}
-	fakeConfig := &config.Config{}
-	tracer := noop.NewTracerProvider().Tracer("test")
-	fakeInteractionStore := testutils.NewFakeStorage[any]()
-	fakeGuildConfigCache := testutils.NewFakeStorage[storage.GuildConfig]()
-	fakeGuildCfg := &testutils.FakeGuildConfigResolver{}
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
+	}
 
-	// Pass nil metrics so wrapper doesn't record metrics during tests
-	manager := NewScoreRoundManager(fakeSession, fakeEventBus, logger, fakeHelper, fakeConfig, fakeInteractionStore, fakeGuildConfigCache, tracer, nil, fakeGuildCfg)
-	srm := manager.(*scoreRoundManager)
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			fakeSession := discord.NewFakeSession()
+			fakeEventBus := &testutils.FakeEventBus{}
+			testHandler := loggerfrolfbot.NewTestHandler()
+			logger := slog.New(testHandler)
+			fakeHelper := &testutils.FakeHelpers{}
+			fakeConfig := &config.Config{}
+			tracer := noop.NewTracerProvider().Tracer("test")
+			fakeInteractionStore := testutils.NewFakeStorage[any]()
+			fakeGuildConfigCache := testutils.NewFakeStorage[storage.GuildConfig]()
+			fakeGuildCfg := &testutils.FakeGuildConfigResolver{}
 
-	t.Run("single modal path", func(t *testing.T) {
-		i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
-			ID:        "id1",
-			Type:      discordgo.InteractionMessageComponent,
-			GuildID:   "g1",
-			ChannelID: "c1",
-			Member:    &discordgo.Member{User: &discordgo.User{ID: "u1"}},
-			Message:   &discordgo.Message{ID: "m1"},
-			Data:      discordgo.MessageComponentInteractionData{CustomID: scoreButtonPrefix + "round-123|extra"},
-		}}
+			// Pass nil metrics so wrapper doesn't record metrics during tests
+			manager := NewScoreRoundManager(fakeSession, fakeEventBus, logger, fakeHelper, fakeConfig, fakeInteractionStore, fakeGuildConfigCache, tracer, nil, fakeGuildCfg)
+			srm := manager.(*scoreRoundManager)
 
-		fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
-			return nil
-		}
+			t.Run("single modal path", func(t *testing.T) {
+				i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
+					ID:        "id1",
+					Type:      discordgo.InteractionMessageComponent,
+					GuildID:   "g1",
+					ChannelID: "c1",
+					Member:    &discordgo.Member{User: &discordgo.User{ID: "u1"}},
+					Message:   &discordgo.Message{ID: "m1"},
+					Data:      discordgo.MessageComponentInteractionData{CustomID: scoreButtonPrefix + "round-123|extra"},
+				}}
 
-		res, err := srm.HandleScoreButton(context.Background(), i)
-		if err != nil || res.Error != nil {
-			t.Fatalf("unexpected error: %v %v", err, res.Error)
-		}
-	})
+				fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return nil
+				}
 
-	t.Run("bulk modal with prefill", func(t *testing.T) {
-		i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
-			ID:        "id2",
-			Type:      discordgo.InteractionMessageComponent,
-			GuildID:   "g1",
-			ChannelID: "c1",
-			Member:    &discordgo.Member{User: &discordgo.User{ID: "u2"}},
-			Message: &discordgo.Message{ID: "m2", Embeds: []*discordgo.MessageEmbed{{
-				Fields: []*discordgo.MessageEmbedField{{Name: "Final", Value: "Score: +1 (<@123>)"}},
-			}}},
-			Data: discordgo.MessageComponentInteractionData{CustomID: bulkOverrideButtonPrefix + "round-xyz|extra"},
-		}}
+				res, err := srm.HandleScoreButton(context.Background(), i)
+				if err != nil || res.Error != nil {
+					t.Fatalf("unexpected error: %v %v", err, res.Error)
+				}
+			})
 
-		// grant admin override permissions via config role match
-		srm.config = &config.Config{Discord: config.DiscordConfig{AdminRoleID: "admin"}}
-		i.Member.Roles = []string{"admin"}
+			t.Run("bulk modal with prefill", func(t *testing.T) {
+				i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
+					ID:        "id2",
+					Type:      discordgo.InteractionMessageComponent,
+					GuildID:   "g1",
+					ChannelID: "c1",
+					Member:    &discordgo.Member{User: &discordgo.User{ID: "u2"}},
+					Message: &discordgo.Message{ID: "m2", Embeds: []*discordgo.MessageEmbed{{
+						Fields: []*discordgo.MessageEmbedField{{Name: "Final", Value: "Score: +1 (<@123>)"}},
+					}}},
+					Data: discordgo.MessageComponentInteractionData{CustomID: bulkOverrideButtonPrefix + "round-xyz|extra"},
+				}}
 
-		fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
-			return nil
-		}
+				// grant admin override permissions via config role match
+				srm.config = &config.Config{Discord: config.DiscordConfig{AdminRoleID: "admin"}}
+				i.Member.Roles = []string{"admin"}
 
-		res, err := srm.HandleScoreButton(context.Background(), i)
-		if err != nil || res.Error != nil {
-			t.Fatalf("unexpected error: %v %v", err, res.Error)
-		}
-	})
+				fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return nil
+				}
 
-	t.Run("invalid custom id", func(t *testing.T) {
-		i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
-			ID:     "id3",
-			Type:   discordgo.InteractionMessageComponent,
-			Member: &discordgo.Member{User: &discordgo.User{ID: "u3"}},
-			// Use a CustomID without the required delimiter to trigger error branch
-			Data: discordgo.MessageComponentInteractionData{CustomID: "round_enter_score"},
-		}}
+				res, err := srm.HandleScoreButton(context.Background(), i)
+				if err != nil || res.Error != nil {
+					t.Fatalf("unexpected error: %v %v", err, res.Error)
+				}
+			})
 
-		res, err := srm.HandleScoreButton(context.Background(), i)
-		if err != nil {
-			t.Fatalf("unexpected wrapper error: %v", err)
-		}
-		if res.Error == nil {
-			t.Fatalf("expected error result for invalid custom id")
-		}
-	})
+			t.Run("invalid custom id", func(t *testing.T) {
+				i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
+					ID:     "id3",
+					Type:   discordgo.InteractionMessageComponent,
+					Member: &discordgo.Member{User: &discordgo.User{ID: "u3"}},
+					// Use a CustomID without the required delimiter to trigger error branch
+					Data: discordgo.MessageComponentInteractionData{CustomID: "round_enter_score"},
+				}}
 
-	t.Run("permission denied for override", func(t *testing.T) {
-		i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
-			ID:        "id4",
-			Type:      discordgo.InteractionMessageComponent,
-			GuildID:   "g1",
-			ChannelID: "c1",
-			Member:    &discordgo.Member{User: &discordgo.User{ID: "u4"}},
-			Data:      discordgo.MessageComponentInteractionData{CustomID: bulkOverrideButtonPrefix + "round-xyz|extra"},
-		}}
+				res, err := srm.HandleScoreButton(context.Background(), i)
+				if err != nil {
+					t.Fatalf("unexpected wrapper error: %v", err)
+				}
+				if res.Error == nil {
+					t.Fatalf("expected error result for invalid custom id")
+				}
+			})
 
-		fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
-			return nil
-		}
+			t.Run("permission denied for override", func(t *testing.T) {
+				i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
+					ID:        "id4",
+					Type:      discordgo.InteractionMessageComponent,
+					GuildID:   "g1",
+					ChannelID: "c1",
+					Member:    &discordgo.Member{User: &discordgo.User{ID: "u4"}},
+					Data:      discordgo.MessageComponentInteractionData{CustomID: bulkOverrideButtonPrefix + "round-xyz|extra"},
+				}}
 
-		res, err := srm.HandleScoreButton(context.Background(), i)
-		if err != nil || res.Error != nil {
-			t.Fatalf("unexpected error: %v %v", err, res.Error)
-		}
-		if res.Success == nil {
-			t.Fatalf("expected success result indicating permission denied branch handled")
-		}
-	})
+				fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return nil
+				}
+
+				res, err := srm.HandleScoreButton(context.Background(), i)
+				if err != nil || res.Error != nil {
+					t.Fatalf("unexpected error: %v %v", err, res.Error)
+				}
+				if res.Success == nil {
+					t.Fatalf("expected success result indicating permission denied branch handled")
+				}
+			})
+		})
+	}
 }
 
 func Test_HandleScoreSubmission_Single(t *testing.T) {
-	fakeSession := discord.NewFakeSession()
-	fakeEventBus := &testutils.FakeEventBus{}
-	testHandler := loggerfrolfbot.NewTestHandler()
-	logger := slog.New(testHandler)
-	fakeHelper := &testutils.FakeHelpers{}
-	fakeConfig := &config.Config{}
-	tracer := noop.NewTracerProvider().Tracer("test")
-	fakeInteractionStore := testutils.NewFakeStorage[any]()
-	fakeGuildConfigCache := testutils.NewFakeStorage[storage.GuildConfig]()
-	fakeGuildCfg := &testutils.FakeGuildConfigResolver{}
-
-	// Pass nil metrics so wrapper doesn't record metrics during tests
-	manager := NewScoreRoundManager(fakeSession, fakeEventBus, logger, fakeHelper, fakeConfig, fakeInteractionStore, fakeGuildConfigCache, tracer, nil, fakeGuildCfg)
-
-	srm := manager.(*scoreRoundManager)
-
-	build := func(customID string, components []discordgo.MessageComponent) *discordgo.InteractionCreate {
-		return &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
-			ID:      "id-sub",
-			Type:    discordgo.InteractionModalSubmit,
-			GuildID: "g1",
-			Member:  &discordgo.Member{User: &discordgo.User{ID: "u1"}},
-			Message: &discordgo.Message{ID: "m1"},
-			Data: discordgo.ModalSubmitInteractionData{
-				CustomID:   customID,
-				Components: components,
-			},
-		}}
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
 
-	t.Run("invalid custom id format", func(t *testing.T) {
-		i := build(submitSingleModalPrefix+"bad", nil)
-		// Ephemeral error response expected
-		fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
-			return nil
-		}
-		res, err := srm.HandleScoreSubmission(context.Background(), i)
-		if err != nil || res.Error == nil {
-			t.Fatalf("expected error result, got err=%v res=%v", err, res)
-		}
-	})
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			fakeSession := discord.NewFakeSession()
+			fakeEventBus := &testutils.FakeEventBus{}
+			testHandler := loggerfrolfbot.NewTestHandler()
+			logger := slog.New(testHandler)
+			fakeHelper := &testutils.FakeHelpers{}
+			fakeConfig := &config.Config{}
+			tracer := noop.NewTracerProvider().Tracer("test")
+			fakeInteractionStore := testutils.NewFakeStorage[any]()
+			fakeGuildConfigCache := testutils.NewFakeStorage[storage.GuildConfig]()
+			fakeGuildCfg := &testutils.FakeGuildConfigResolver{}
 
-	t.Run("invalid round id", func(t *testing.T) {
-		i := build(submitSingleModalPrefix+"not-a-uuid|u1", nil)
-		fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
-			return nil
-		}
-		res, err := srm.HandleScoreSubmission(context.Background(), i)
-		if err != nil || res.Error == nil {
-			t.Fatalf("expected error result for invalid round id")
-		}
-	})
+			// Pass nil metrics so wrapper doesn't record metrics during tests
+			manager := NewScoreRoundManager(fakeSession, fakeEventBus, logger, fakeHelper, fakeConfig, fakeInteractionStore, fakeGuildConfigCache, tracer, nil, fakeGuildCfg)
 
-	t.Run("empty score", func(t *testing.T) {
-		i := build(submitSingleModalPrefix+"550e8400-e29b-41d4-a716-446655440000|u1", []discordgo.MessageComponent{
-			discordgo.ActionsRow{Components: []discordgo.MessageComponent{discordgo.TextInput{CustomID: "score_input", Value: ""}}},
+			srm := manager.(*scoreRoundManager)
+
+			build := func(customID string, components []discordgo.MessageComponent) *discordgo.InteractionCreate {
+				return &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
+					ID:      "id-sub",
+					Type:    discordgo.InteractionModalSubmit,
+					GuildID: "g1",
+					Member:  &discordgo.Member{User: &discordgo.User{ID: "u1"}},
+					Message: &discordgo.Message{ID: "m1"},
+					Data: discordgo.ModalSubmitInteractionData{
+						CustomID:   customID,
+						Components: components,
+					},
+				}}
+			}
+
+			t.Run("invalid custom id format", func(t *testing.T) {
+				i := build(submitSingleModalPrefix+"bad", nil)
+				// Ephemeral error response expected
+				fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return nil
+				}
+				res, err := srm.HandleScoreSubmission(context.Background(), i)
+				if err != nil || res.Error == nil {
+					t.Fatalf("expected error result, got err=%v res=%v", err, res)
+				}
+			})
+
+			t.Run("invalid round id", func(t *testing.T) {
+				i := build(submitSingleModalPrefix+"not-a-uuid|u1", nil)
+				fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return nil
+				}
+				res, err := srm.HandleScoreSubmission(context.Background(), i)
+				if err != nil || res.Error == nil {
+					t.Fatalf("expected error result for invalid round id")
+				}
+			})
+
+			t.Run("empty score", func(t *testing.T) {
+				i := build(submitSingleModalPrefix+"550e8400-e29b-41d4-a716-446655440000|u1", []discordgo.MessageComponent{
+					discordgo.ActionsRow{Components: []discordgo.MessageComponent{discordgo.TextInput{CustomID: "score_input", Value: ""}}},
+				})
+				fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return nil
+				}
+				fakeSession.FollowupMessageCreateFunc = func(i *discordgo.Interaction, wait bool, data *discordgo.WebhookParams, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{}, nil
+				}
+				res, err := srm.HandleScoreSubmission(context.Background(), i)
+				if err != nil || res.Error == nil {
+					t.Fatalf("expected error result for empty score")
+				}
+			})
+
+			t.Run("invalid number", func(t *testing.T) {
+				i := build(submitSingleModalPrefix+"550e8400-e29b-41d4-a716-446655440000|u1", []discordgo.MessageComponent{
+					discordgo.ActionsRow{Components: []discordgo.MessageComponent{discordgo.TextInput{CustomID: "score_input", Value: "abc"}}},
+				})
+				fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return nil
+				}
+				fakeSession.FollowupMessageCreateFunc = func(i *discordgo.Interaction, wait bool, data *discordgo.WebhookParams, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{}, nil
+				}
+				res, err := srm.HandleScoreSubmission(context.Background(), i)
+				if err != nil || res.Error == nil {
+					t.Fatalf("expected error result for invalid number")
+				}
+			})
+
+			t.Run("out of range", func(t *testing.T) {
+				i := build(submitSingleModalPrefix+"550e8400-e29b-41d4-a716-446655440000|u1", []discordgo.MessageComponent{
+					discordgo.ActionsRow{Components: []discordgo.MessageComponent{discordgo.TextInput{CustomID: "score_input", Value: "1000"}}},
+				})
+				fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return nil
+				}
+				fakeSession.FollowupMessageCreateFunc = func(i *discordgo.Interaction, wait bool, data *discordgo.WebhookParams, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{}, nil
+				}
+				res, err := srm.HandleScoreSubmission(context.Background(), i)
+				if err != nil || res.Error == nil {
+					t.Fatalf("expected error result for out-of-range")
+				}
+			})
+
+			t.Run("success publish", func(t *testing.T) {
+				i := build(submitSingleModalPrefix+"550e8400-e29b-41d4-a716-446655440000|u1", []discordgo.MessageComponent{
+					discordgo.ActionsRow{Components: []discordgo.MessageComponent{discordgo.TextInput{CustomID: "score_input", Value: "5"}}},
+				})
+				fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return nil
+				}
+				// After validation it sends a followup on success at end
+				fakeHelper.CreateResultMessageFunc = func(originalMsg *message.Message, payload interface{}, topic string) (*message.Message, error) {
+					return &message.Message{UUID: "x"}, nil
+				}
+				fakeEventBus.PublishFunc = func(topic string, messages ...*message.Message) error {
+					return nil
+				}
+				fakeSession.FollowupMessageCreateFunc = func(i *discordgo.Interaction, wait bool, data *discordgo.WebhookParams, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+					return &discordgo.Message{}, nil
+				}
+				res, err := srm.HandleScoreSubmission(context.Background(), i)
+				if err != nil || res.Error != nil {
+					t.Fatalf("unexpected error: %v %v", err, res.Error)
+				}
+			})
 		})
-		fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
-			return nil
-		}
-		fakeSession.FollowupMessageCreateFunc = func(i *discordgo.Interaction, wait bool, data *discordgo.WebhookParams, options ...discordgo.RequestOption) (*discordgo.Message, error) {
-			return &discordgo.Message{}, nil
-		}
-		res, err := srm.HandleScoreSubmission(context.Background(), i)
-		if err != nil || res.Error == nil {
-			t.Fatalf("expected error result for empty score")
-		}
-	})
-
-	t.Run("invalid number", func(t *testing.T) {
-		i := build(submitSingleModalPrefix+"550e8400-e29b-41d4-a716-446655440000|u1", []discordgo.MessageComponent{
-			discordgo.ActionsRow{Components: []discordgo.MessageComponent{discordgo.TextInput{CustomID: "score_input", Value: "abc"}}},
-		})
-		fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
-			return nil
-		}
-		fakeSession.FollowupMessageCreateFunc = func(i *discordgo.Interaction, wait bool, data *discordgo.WebhookParams, options ...discordgo.RequestOption) (*discordgo.Message, error) {
-			return &discordgo.Message{}, nil
-		}
-		res, err := srm.HandleScoreSubmission(context.Background(), i)
-		if err != nil || res.Error == nil {
-			t.Fatalf("expected error result for invalid number")
-		}
-	})
-
-	t.Run("out of range", func(t *testing.T) {
-		i := build(submitSingleModalPrefix+"550e8400-e29b-41d4-a716-446655440000|u1", []discordgo.MessageComponent{
-			discordgo.ActionsRow{Components: []discordgo.MessageComponent{discordgo.TextInput{CustomID: "score_input", Value: "1000"}}},
-		})
-		fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
-			return nil
-		}
-		fakeSession.FollowupMessageCreateFunc = func(i *discordgo.Interaction, wait bool, data *discordgo.WebhookParams, options ...discordgo.RequestOption) (*discordgo.Message, error) {
-			return &discordgo.Message{}, nil
-		}
-		res, err := srm.HandleScoreSubmission(context.Background(), i)
-		if err != nil || res.Error == nil {
-			t.Fatalf("expected error result for out-of-range")
-		}
-	})
-
-	t.Run("success publish", func(t *testing.T) {
-		i := build(submitSingleModalPrefix+"550e8400-e29b-41d4-a716-446655440000|u1", []discordgo.MessageComponent{
-			discordgo.ActionsRow{Components: []discordgo.MessageComponent{discordgo.TextInput{CustomID: "score_input", Value: "5"}}},
-		})
-		fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
-			return nil
-		}
-		// After validation it sends a followup on success at end
-		fakeHelper.CreateResultMessageFunc = func(originalMsg *message.Message, payload interface{}, topic string) (*message.Message, error) {
-			return &message.Message{UUID: "x"}, nil
-		}
-		fakeEventBus.PublishFunc = func(topic string, messages ...*message.Message) error {
-			return nil
-		}
-		fakeSession.FollowupMessageCreateFunc = func(i *discordgo.Interaction, wait bool, data *discordgo.WebhookParams, options ...discordgo.RequestOption) (*discordgo.Message, error) {
-			return &discordgo.Message{}, nil
-		}
-		res, err := srm.HandleScoreSubmission(context.Background(), i)
-		if err != nil || res.Error != nil {
-			t.Fatalf("unexpected error: %v %v", err, res.Error)
-		}
-	})
+	}
 }
 
 func Test_HandleScoreSubmission_Bulk(t *testing.T) {
-	fakeSession := discord.NewFakeSession()
-	fakeEventBus := &testutils.FakeEventBus{}
-	testHandler := loggerfrolfbot.NewTestHandler()
-	logger := slog.New(testHandler)
-	fakeHelper := &testutils.FakeHelpers{}
-	fakeConfig := &config.Config{}
-	tracer := noop.NewTracerProvider().Tracer("test")
-	fakeInteractionStore := testutils.NewFakeStorage[any]()
-	fakeGuildConfigCache := testutils.NewFakeStorage[storage.GuildConfig]()
-	fakeGuildCfg := &testutils.FakeGuildConfigResolver{}
-
-	// Pass nil metrics so wrapper doesn't record metrics during tests
-	manager := NewScoreRoundManager(fakeSession, fakeEventBus, logger, fakeHelper, fakeConfig, fakeInteractionStore, fakeGuildConfigCache, tracer, nil, fakeGuildCfg)
-
-	srm := manager.(*scoreRoundManager)
-
-	build := func(customID string, bulk string, embed *discordgo.MessageEmbed) *discordgo.InteractionCreate {
-		comps := []discordgo.MessageComponent{discordgo.ActionsRow{Components: []discordgo.MessageComponent{discordgo.TextInput{CustomID: "bulk_scores_input", Value: bulk}}}}
-		return &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
-			ID:        "id-bulk",
-			Type:      discordgo.InteractionModalSubmit,
-			GuildID:   "g1",
-			ChannelID: "c1",
-			Member:    &discordgo.Member{User: &discordgo.User{ID: "u1"}},
-			Message:   &discordgo.Message{ID: "m1", Embeds: []*discordgo.MessageEmbed{embed}},
-			Data:      discordgo.ModalSubmitInteractionData{CustomID: customID, Components: comps},
-		}}
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
 	}
 
-	t.Run("no updates found summarizes", func(t *testing.T) {
-		// Empty bulk input should result in no updates
-		i := build(submitBulkOverridePrefix+"550e8400-e29b-41d4-a716-446655440000|u1", "", &discordgo.MessageEmbed{})
-		fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
-			return nil
-		}
-		res, err := srm.HandleScoreSubmission(context.Background(), i)
-		if err != nil || res.Error != nil {
-			t.Fatalf("unexpected error: %v %v", err, res.Error)
-		}
-	})
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			fakeSession := discord.NewFakeSession()
+			fakeEventBus := &testutils.FakeEventBus{}
+			testHandler := loggerfrolfbot.NewTestHandler()
+			logger := slog.New(testHandler)
+			fakeHelper := &testutils.FakeHelpers{}
+			fakeConfig := &config.Config{}
+			tracer := noop.NewTracerProvider().Tracer("test")
+			fakeInteractionStore := testutils.NewFakeStorage[any]()
+			fakeGuildConfigCache := testutils.NewFakeStorage[storage.GuildConfig]()
+			fakeGuildCfg := &testutils.FakeGuildConfigResolver{}
 
-	t.Run("publishes updates when present", func(t *testing.T) {
-		embed := &discordgo.MessageEmbed{Fields: []*discordgo.MessageEmbedField{{Name: "Final", Value: "Score: +1 (<@123>)"}}}
-		// Change 123 from +1 to +2
-		i := build(submitBulkOverridePrefix+"550e8400-e29b-41d4-a716-446655440000|u1", "<@123>=+2", embed)
+			// Pass nil metrics so wrapper doesn't record metrics during tests
+			manager := NewScoreRoundManager(fakeSession, fakeEventBus, logger, fakeHelper, fakeConfig, fakeInteractionStore, fakeGuildConfigCache, tracer, nil, fakeGuildCfg)
 
-		fakeSession.GuildMemberFunc = func(guildID, userID string, options ...discordgo.RequestOption) (*discordgo.Member, error) {
-			return &discordgo.Member{User: &discordgo.User{ID: "123", Username: "x"}}, nil
-		}
-		fakeHelper.CreateResultMessageFunc = func(originalMsg *message.Message, payload interface{}, topic string) (*message.Message, error) {
-			return &message.Message{UUID: "bulk"}, nil
-		}
-		fakeEventBus.PublishFunc = func(topic string, messages ...*message.Message) error {
-			return nil
-		}
-		fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
-			return nil
-		}
+			srm := manager.(*scoreRoundManager)
 
-		res, err := srm.HandleScoreSubmission(context.Background(), i)
-		if err != nil || res.Error != nil {
-			t.Fatalf("unexpected error: %v %v", err, res.Error)
-		}
-	})
+			build := func(customID string, bulk string, embed *discordgo.MessageEmbed) *discordgo.InteractionCreate {
+				comps := []discordgo.MessageComponent{discordgo.ActionsRow{Components: []discordgo.MessageComponent{discordgo.TextInput{CustomID: "bulk_scores_input", Value: bulk}}}}
+				return &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
+					ID:        "id-bulk",
+					Type:      discordgo.InteractionModalSubmit,
+					GuildID:   "g1",
+					ChannelID: "c1",
+					Member:    &discordgo.Member{User: &discordgo.User{ID: "u1"}},
+					Message:   &discordgo.Message{ID: "m1", Embeds: []*discordgo.MessageEmbed{embed}},
+					Data:      discordgo.ModalSubmitInteractionData{CustomID: customID, Components: comps},
+				}}
+			}
+
+			t.Run("no updates found summarizes", func(t *testing.T) {
+				// Empty bulk input should result in no updates
+				i := build(submitBulkOverridePrefix+"550e8400-e29b-41d4-a716-446655440000|u1", "", &discordgo.MessageEmbed{})
+				fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return nil
+				}
+				res, err := srm.HandleScoreSubmission(context.Background(), i)
+				if err != nil || res.Error != nil {
+					t.Fatalf("unexpected error: %v %v", err, res.Error)
+				}
+			})
+
+			t.Run("publishes updates when present", func(t *testing.T) {
+				embed := &discordgo.MessageEmbed{Fields: []*discordgo.MessageEmbedField{{Name: "Final", Value: "Score: +1 (<@123>)"}}}
+				// Change 123 from +1 to +2
+				i := build(submitBulkOverridePrefix+"550e8400-e29b-41d4-a716-446655440000|u1", "<@123>=+2", embed)
+
+				fakeSession.GuildMemberFunc = func(guildID, userID string, options ...discordgo.RequestOption) (*discordgo.Member, error) {
+					return &discordgo.Member{User: &discordgo.User{ID: "123", Username: "x"}}, nil
+				}
+				fakeHelper.CreateResultMessageFunc = func(originalMsg *message.Message, payload interface{}, topic string) (*message.Message, error) {
+					return &message.Message{UUID: "bulk"}, nil
+				}
+				fakeEventBus.PublishFunc = func(topic string, messages ...*message.Message) error {
+					return nil
+				}
+				fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+					return nil
+				}
+
+				res, err := srm.HandleScoreSubmission(context.Background(), i)
+				if err != nil || res.Error != nil {
+					t.Fatalf("unexpected error: %v %v", err, res.Error)
+				}
+			})
+		})
+	}
 }

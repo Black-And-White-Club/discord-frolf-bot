@@ -12,59 +12,79 @@ import (
 )
 
 func TestHandleSeasonEndedResponse(t *testing.T) {
-	ctx := context.Background()
-	guildID := sharedtypes.GuildID("guild-123")
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
+	}
 
-	t.Run("Calls SeasonManager", func(t *testing.T) {
-		seasonMgr := &FakeSeasonManager{
-			HandleSeasonEndedFunc: func(ctx context.Context, payload *leaderboardevents.EndSeasonSuccessPayloadV1) {
-				assert.Equal(t, guildID, payload.GuildID)
-			},
-		}
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			ctx := context.Background()
+			guildID := sharedtypes.GuildID("guild-123")
 
-		discordMock := &FakeLeaderboardDiscord{
-			GetSeasonManagerFunc: func() season.SeasonManager {
-				return seasonMgr
-			},
-		}
+			t.Run("Calls SeasonManager", func(t *testing.T) {
+				seasonMgr := &FakeSeasonManager{
+					HandleSeasonEndedFunc: func(ctx context.Context, payload *leaderboardevents.EndSeasonSuccessPayloadV1) {
+						assert.Equal(t, guildID, payload.GuildID)
+					},
+				}
 
-		handlers := &LeaderboardHandlers{
-			service: discordMock,
-			logger:  slog.Default(),
-		}
-		payload := &leaderboardevents.EndSeasonSuccessPayloadV1{GuildID: guildID}
+				discordMock := &FakeLeaderboardDiscord{
+					GetSeasonManagerFunc: func() season.SeasonManager {
+						return seasonMgr
+					},
+				}
 
-		_, err := handlers.HandleSeasonEndedResponse(ctx, payload)
-		assert.NoError(t, err)
-	})
+				handlers := &LeaderboardHandlers{
+					service: discordMock,
+					logger:  slog.Default(),
+				}
+				payload := &leaderboardevents.EndSeasonSuccessPayloadV1{GuildID: guildID}
+
+				_, err := handlers.HandleSeasonEndedResponse(ctx, payload)
+				assert.NoError(t, err)
+			})
+		})
+	}
 }
 
 func TestHandleSeasonEndFailedResponse(t *testing.T) {
-	ctx := context.Background()
-	guildID := sharedtypes.GuildID("guild-123")
-	reason := "some error"
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
+	}
 
-	t.Run("Calls SeasonManager", func(t *testing.T) {
-		seasonMgr := &FakeSeasonManager{
-			HandleSeasonEndFailedFunc: func(ctx context.Context, payload *leaderboardevents.AdminFailedPayloadV1) {
-				assert.Equal(t, guildID, payload.GuildID)
-				assert.Equal(t, reason, payload.Reason)
-			},
-		}
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			ctx := context.Background()
+			guildID := sharedtypes.GuildID("guild-123")
+			reason := "some error"
 
-		discordMock := &FakeLeaderboardDiscord{
-			GetSeasonManagerFunc: func() season.SeasonManager {
-				return seasonMgr
-			},
-		}
+			t.Run("Calls SeasonManager", func(t *testing.T) {
+				seasonMgr := &FakeSeasonManager{
+					HandleSeasonEndFailedFunc: func(ctx context.Context, payload *leaderboardevents.AdminFailedPayloadV1) {
+						assert.Equal(t, guildID, payload.GuildID)
+						assert.Equal(t, reason, payload.Reason)
+					},
+				}
 
-		handlers := &LeaderboardHandlers{
-			service: discordMock,
-			logger:  slog.Default(),
-		}
-		payload := &leaderboardevents.AdminFailedPayloadV1{GuildID: guildID, Reason: reason}
+				discordMock := &FakeLeaderboardDiscord{
+					GetSeasonManagerFunc: func() season.SeasonManager {
+						return seasonMgr
+					},
+				}
 
-		_, err := handlers.HandleSeasonEndFailedResponse(ctx, payload)
-		assert.NoError(t, err)
-	})
+				handlers := &LeaderboardHandlers{
+					service: discordMock,
+					logger:  slog.Default(),
+				}
+				payload := &leaderboardevents.AdminFailedPayloadV1{GuildID: guildID, Reason: reason}
+
+				_, err := handlers.HandleSeasonEndFailedResponse(ctx, payload)
+				assert.NoError(t, err)
+			})
+		})
+	}
 }

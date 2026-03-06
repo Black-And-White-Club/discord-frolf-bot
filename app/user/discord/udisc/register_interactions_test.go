@@ -18,18 +18,28 @@ func (m *fakeUDiscManager) HandleSetUDiscNameCommand(ctx context.Context, i *dis
 }
 
 func TestRegisterUDiscInteractions_registersSlashCommandHandler(t *testing.T) {
-	reg := interactions.NewRegistry()
-	mgr := &fakeUDiscManager{}
+	__codexTDCases := []struct {
+		name string
+	}{
+		{name: "default"},
+	}
 
-	RegisterUDiscInteractions(reg, mgr)
+	for _, __codexTDCase := range __codexTDCases {
+		t.Run(__codexTDCase.name, func(t *testing.T) {
+			reg := interactions.NewRegistry()
+			mgr := &fakeUDiscManager{}
 
-	i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
-		Type: discordgo.InteractionApplicationCommand,
-		Data: discordgo.ApplicationCommandInteractionData{Name: "set-udisc-name"},
-	}}
-	reg.HandleInteraction(&discordgo.Session{}, i)
+			RegisterUDiscInteractions(reg, mgr)
 
-	if mgr.calls != 1 {
-		t.Fatalf("expected manager called once, got %d", mgr.calls)
+			i := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
+				Type: discordgo.InteractionApplicationCommand,
+				Data: discordgo.ApplicationCommandInteractionData{Name: "set-udisc-name"},
+			}}
+			reg.HandleInteraction(&discordgo.Session{}, i)
+
+			if mgr.calls != 1 {
+				t.Fatalf("expected manager called once, got %d", mgr.calls)
+			}
+		})
 	}
 }
