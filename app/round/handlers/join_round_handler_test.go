@@ -92,8 +92,8 @@ func TestRoundHandlers_HandleRoundParticipantJoinRequest(t *testing.T) {
 
 			if tt.wantLen > 0 {
 				result := got[0]
-				if result.Topic != roundevents.RoundParticipantJoinRequestedV1 {
-					t.Errorf("HandleRoundParticipantJoinRequest() topic = %s, want %s", result.Topic, roundevents.RoundParticipantJoinRequestedV1)
+				if result.Topic != roundevents.RoundParticipantJoinRequestedV2 {
+					t.Errorf("HandleRoundParticipantJoinRequest() topic = %s, want %s", result.Topic, roundevents.RoundParticipantJoinRequestedV2)
 				}
 				if result.Payload == nil {
 					t.Errorf("HandleRoundParticipantJoinRequest() payload is nil")

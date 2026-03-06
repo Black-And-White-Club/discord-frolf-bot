@@ -74,14 +74,14 @@ func (m *dashboardManager) HandleDashboardCommand(ctx context.Context, i *discor
 		CorrelationID: correlationID,
 	}
 
-	msg, err := m.helper.CreateNewMessage(payload, authevents.MagicLinkRequestedV1)
+	msg, err := m.helper.CreateNewMessage(payload, authevents.MagicLinkRequestedV2)
 	if err != nil {
 		m.logger.ErrorContext(ctx, "Failed to create magic link request message", attr.Error(err))
 		m.interactionStore.Delete(ctx, correlationID)
 		return m.sendErrorFollowup(i, "Unable to request dashboard link. Please try again.")
 	}
 
-	if err := m.eventBus.Publish(authevents.MagicLinkRequestedV1, msg); err != nil {
+	if err := m.eventBus.Publish(authevents.MagicLinkRequestedV2, msg); err != nil {
 		m.logger.ErrorContext(ctx, "Failed to publish magic link request", attr.Error(err))
 		m.interactionStore.Delete(ctx, correlationID)
 		return m.sendErrorFollowup(i, "Unable to request dashboard link. Please try again.")

@@ -76,8 +76,8 @@ func TestRoundHandlers_HandleRoundUpdateRequested(t *testing.T) {
 
 			if tt.wantLen > 0 {
 				result := got[0]
-				if result.Topic != roundevents.RoundUpdateRequestedV1 {
-					t.Errorf("HandleRoundUpdateRequested() topic = %s, want %s", result.Topic, roundevents.RoundUpdateRequestedV1)
+				if result.Topic != roundevents.RoundUpdateRequestedV2 {
+					t.Errorf("HandleRoundUpdateRequested() topic = %s, want %s", result.Topic, roundevents.RoundUpdateRequestedV2)
 				}
 				if result.Payload == nil {
 					t.Errorf("HandleRoundUpdateRequested() payload is nil")

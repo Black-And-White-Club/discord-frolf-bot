@@ -13,7 +13,7 @@ import (
 )
 
 // HandleRoundDeleteRequested handles the RoundDeleteRequestDiscordV1 event
-// and publishes the domain event RoundDeleteRequestedV1.
+// and publishes the domain event RoundDeleteRequestedV2.
 func (h *RoundHandlers) HandleRoundDeleteRequested(ctx context.Context, payload *discordroundevents.RoundDeleteRequestDiscordPayloadV1) ([]handlerwrapper.Result, error) {
 	// Map to domain payload
 	domainPayload := roundevents.RoundDeleteRequestPayloadV1{
@@ -24,7 +24,7 @@ func (h *RoundHandlers) HandleRoundDeleteRequested(ctx context.Context, payload 
 
 	return []handlerwrapper.Result{
 		{
-			Topic:   roundevents.RoundDeleteRequestedV1,
+			Topic:   roundevents.RoundDeleteRequestedV2,
 			Payload: domainPayload,
 		},
 	}, nil

@@ -57,7 +57,7 @@ func (h *RoundHandlers) HandleRoundParticipantJoinRequest(ctx context.Context, p
 
 	return []handlerwrapper.Result{
 		{
-			Topic:   roundevents.RoundParticipantJoinRequestedV1,
+			Topic:   roundevents.RoundParticipantJoinRequestedV2,
 			Payload: backendPayload,
 		},
 	}, nil

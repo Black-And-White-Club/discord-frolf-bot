@@ -41,7 +41,7 @@ func (h *RoundHandlers) HandleRoundCreateRequested(ctx context.Context, payload 
 
 	return []handlerwrapper.Result{
 		{
-			Topic:   roundevents.RoundCreationRequestedV1,
+			Topic:   roundevents.RoundCreationRequestedV2,
 			Payload: backendPayload,
 			Metadata: map[string]string{
 				"submitted_at":   time.Now().UTC().Format(time.RFC3339),
@@ -230,7 +230,7 @@ func (h *RoundHandlers) resolveNativeEvent(ctx context.Context, payload *roundev
 			if payload.UserID != "" {
 				zeroTag := sharedtypes.TagNumber(0)
 				results = append(results, handlerwrapper.Result{
-					Topic: roundevents.RoundParticipantJoinRequestedV1,
+					Topic: roundevents.RoundParticipantJoinRequestedV2,
 					Payload: roundevents.ParticipantJoinRequestPayloadV1{
 						GuildID:   payload.GuildID,
 						RoundID:   roundID,

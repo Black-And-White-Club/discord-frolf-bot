@@ -71,8 +71,8 @@ func TestRoundHandlers_HandleDiscordRoundScoreUpdate(t *testing.T) {
 
 			if tt.wantLen > 0 {
 				result := got[0]
-				if result.Topic != sharedroundevents.RoundScoreUpdateRequestedV1 {
-					t.Errorf("HandleDiscordRoundScoreUpdate() topic = %s, want %s", result.Topic, sharedroundevents.RoundScoreUpdateRequestedV1)
+				if result.Topic != sharedroundevents.RoundScoreUpdateRequestedV2 {
+					t.Errorf("HandleDiscordRoundScoreUpdate() topic = %s, want %s", result.Topic, sharedroundevents.RoundScoreUpdateRequestedV2)
 				}
 			}
 		})

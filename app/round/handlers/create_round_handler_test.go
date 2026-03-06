@@ -76,8 +76,8 @@ func TestRoundHandlers_HandleRoundCreateRequested(t *testing.T) {
 
 			if tt.wantLen > 0 {
 				result := got[0]
-				if result.Topic != roundevents.RoundCreationRequestedV1 {
-					t.Errorf("HandleRoundCreateRequested() topic = %s, want %s", result.Topic, roundevents.RoundCreationRequestedV1)
+				if result.Topic != roundevents.RoundCreationRequestedV2 {
+					t.Errorf("HandleRoundCreateRequested() topic = %s, want %s", result.Topic, roundevents.RoundCreationRequestedV2)
 				}
 				if result.Payload == nil {
 					t.Errorf("HandleRoundCreateRequested() payload is nil")
@@ -500,7 +500,7 @@ func TestRoundHandlers_HandleRoundCreated_ReusesPendingNativeEvent(t *testing.T)
 				switch result.Topic {
 				case roundevents.NativeEventCreatedV1:
 					foundNativeCreated = true
-				case roundevents.RoundParticipantJoinRequestedV1:
+				case roundevents.RoundParticipantJoinRequestedV2:
 					foundJoinRequested = true
 				}
 			}
@@ -508,7 +508,7 @@ func TestRoundHandlers_HandleRoundCreated_ReusesPendingNativeEvent(t *testing.T)
 				t.Fatalf("HandleRoundCreated() expected NativeEventCreatedV1 result for pending native event")
 			}
 			if !foundJoinRequested {
-				t.Fatalf("HandleRoundCreated() expected RoundParticipantJoinRequestedV1 for event creator")
+				t.Fatalf("HandleRoundCreated() expected RoundParticipantJoinRequestedV2 for event creator")
 			}
 
 			if mappedEventID, ok := nativeMap.LookupByRoundID(testRoundID); !ok || mappedEventID != "existing-native-event-123" {
