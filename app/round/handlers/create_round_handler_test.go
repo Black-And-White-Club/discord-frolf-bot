@@ -81,6 +81,14 @@ func TestRoundHandlers_HandleRoundCreateRequested(t *testing.T) {
 				}
 				if result.Payload == nil {
 					t.Errorf("HandleRoundCreateRequested() payload is nil")
+					return
+				}
+				payload, ok := result.Payload.(roundevents.CreateRoundRequestedPayloadV1)
+				if !ok {
+					t.Fatalf("HandleRoundCreateRequested() payload type = %T, want roundevents.CreateRoundRequestedPayloadV1", result.Payload)
+				}
+				if payload.RequestSource == nil || *payload.RequestSource != "discord" {
+					t.Fatalf("HandleRoundCreateRequested() request source = %+v, want discord", payload.RequestSource)
 				}
 			}
 		})
@@ -280,6 +288,7 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 			foundNativeCreated := false
 			foundNativeFailed := false
 			foundEmbedUpdate := false
+			var nativeEventPlanned *bool
 			for _, result := range got {
 				switch result.Topic {
 				case roundevents.NativeEventCreatedV1:
@@ -288,6 +297,11 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 					foundNativeFailed = true
 				case roundevents.RoundEventMessageIDUpdateV1:
 					foundEmbedUpdate = true
+					payload, ok := result.Payload.(roundevents.RoundMessageIDUpdatePayloadV1)
+					if !ok {
+						t.Fatalf("HandleRoundCreated() RoundEventMessageIDUpdateV1 payload type = %T", result.Payload)
+					}
+					nativeEventPlanned = payload.NativeEventPlanned
 				}
 			}
 
@@ -299,6 +313,12 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 			}
 			if foundEmbedUpdate != tt.wantEmbedUpdate {
 				t.Errorf("HandleRoundCreated() RoundEventMessageIDUpdateV1 present = %v, want %v", foundEmbedUpdate, tt.wantEmbedUpdate)
+			}
+			if tt.wantEmbedUpdate {
+				wantPlanned := tt.wantNativeCreated
+				if nativeEventPlanned == nil || *nativeEventPlanned != wantPlanned {
+					t.Fatalf("HandleRoundCreated() native event planned = %+v, want %v", nativeEventPlanned, wantPlanned)
+				}
 			}
 		})
 	}

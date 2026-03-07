@@ -155,15 +155,17 @@ func (l *ScheduledEventRSVPListener) handleEventCreate(event *discordgo.GuildSch
 	channelID := l.resolveEventChannel(context.Background(), event.GuildID)
 
 	desc := roundtypes.Description(event.Description)
+	requestSource := "discord"
 	payload := roundevents.CreateRoundRequestedPayloadV1{
-		GuildID:     sharedtypes.GuildID(event.GuildID),
-		Title:       roundtypes.Title(event.Name),
-		Description: &desc,
-		StartTime:   startTimeStr,
-		Location:    roundtypes.Location(location),
-		UserID:      sharedtypes.DiscordID(creatorID),
-		ChannelID:   channelID,
-		Timezone:    roundtypes.Timezone("UTC"),
+		GuildID:       sharedtypes.GuildID(event.GuildID),
+		Title:         roundtypes.Title(event.Name),
+		Description:   &desc,
+		StartTime:     startTimeStr,
+		Location:      roundtypes.Location(location),
+		UserID:        sharedtypes.DiscordID(creatorID),
+		ChannelID:     channelID,
+		Timezone:      roundtypes.Timezone("UTC"),
+		RequestSource: &requestSource,
 	}
 
 	msg, err := l.helper.CreateNewMessage(payload, roundevents.RoundCreationRequestedV2)
