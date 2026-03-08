@@ -63,7 +63,7 @@ func (h *LeaderboardHandlers) HandleTagAssignRequest(ctx context.Context,
 
 	return []handlerwrapper.Result{
 		{
-			Topic:   leaderboardevents.LeaderboardBatchTagAssignmentRequestedV1,
+			Topic:   leaderboardevents.LeaderboardBatchTagAssignmentRequestedV2,
 			Payload: backendPayload,
 			Metadata: map[string]string{
 				"user_id":      string(discordPayload.TargetUserID),

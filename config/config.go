@@ -108,7 +108,7 @@ func LoadConfigFromEnvironment() (*Config, error) {
 
 	// Service config
 	cfg.Service.Name = getEnvOrDefault("SERVICE_NAME", "discord-frolf-bot")
-	cfg.Service.Version = getEnvOrDefault("SERVICE_VERSION", "1.0.0")
+	cfg.Service.Version = getEnvOrDefault("SERVICE_VERSION", "")
 
 	// Observability config
 	cfg.Observability.LokiURL = os.Getenv("LOKI_URL")
@@ -154,7 +154,7 @@ func LoadBaseConfig() (*Config, error) {
 		},
 		Service: ServiceConfig{
 			Name:    getEnvOrDefault("SERVICE_NAME", "discord-frolf-bot"),
-			Version: getEnvOrDefault("SERVICE_VERSION", "1.0.0"),
+			Version: getEnvOrDefault("SERVICE_VERSION", ""),
 		},
 		Observability: ObservabilityConfig{
 			Environment:     getEnvOrDefault("ENVIRONMENT", "production"),

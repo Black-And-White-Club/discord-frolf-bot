@@ -44,7 +44,7 @@ func (h *RoundHandlers) HandleScoreOverrideSuccess(ctx context.Context, payload 
 
 	return []handlerwrapper.Result{
 		{
-			Topic:   roundevents.RoundParticipantScoreUpdatedV1,
+			Topic:   roundevents.RoundParticipantScoreUpdatedV2,
 			Payload: participantPayload,
 			Metadata: map[string]string{
 				"discord_message_id": messageID,

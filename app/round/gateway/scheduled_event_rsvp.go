@@ -155,18 +155,20 @@ func (l *ScheduledEventRSVPListener) handleEventCreate(event *discordgo.GuildSch
 	channelID := l.resolveEventChannel(context.Background(), event.GuildID)
 
 	desc := roundtypes.Description(event.Description)
+	requestSource := "discord"
 	payload := roundevents.CreateRoundRequestedPayloadV1{
-		GuildID:     sharedtypes.GuildID(event.GuildID),
-		Title:       roundtypes.Title(event.Name),
-		Description: &desc,
-		StartTime:   startTimeStr,
-		Location:    roundtypes.Location(location),
-		UserID:      sharedtypes.DiscordID(creatorID),
-		ChannelID:   channelID,
-		Timezone:    roundtypes.Timezone("UTC"),
+		GuildID:       sharedtypes.GuildID(event.GuildID),
+		Title:         roundtypes.Title(event.Name),
+		Description:   &desc,
+		StartTime:     startTimeStr,
+		Location:      roundtypes.Location(location),
+		UserID:        sharedtypes.DiscordID(creatorID),
+		ChannelID:     channelID,
+		Timezone:      roundtypes.Timezone("UTC"),
+		RequestSource: &requestSource,
 	}
 
-	msg, err := l.helper.CreateNewMessage(payload, roundevents.RoundCreationRequestedV1)
+	msg, err := l.helper.CreateNewMessage(payload, roundevents.RoundCreationRequestedV2)
 	if err != nil {
 		l.pendingNativeEventMap.LoadAndDelete(pendingKey)
 		l.logger.Error("Failed to create round creation request from Discord event",
@@ -177,7 +179,7 @@ func (l *ScheduledEventRSVPListener) handleEventCreate(event *discordgo.GuildSch
 		return
 	}
 
-	if err := l.eventBus.Publish(roundevents.RoundCreationRequestedV1, msg); err != nil {
+	if err := l.eventBus.Publish(roundevents.RoundCreationRequestedV2, msg); err != nil {
 		l.pendingNativeEventMap.LoadAndDelete(pendingKey)
 		l.logger.Error("Failed to publish round creation request from Discord event",
 			attr.String("guild_id", event.GuildID),
@@ -214,7 +216,7 @@ func (l *ScheduledEventRSVPListener) handleUserAdd(event *discordgo.GuildSchedul
 		TagNumber: &zeroTag,
 	}
 
-	msg, err := l.helper.CreateNewMessage(payload, roundevents.RoundParticipantJoinRequestedV1)
+	msg, err := l.helper.CreateNewMessage(payload, roundevents.RoundParticipantJoinRequestedV2)
 	if err != nil {
 		l.logger.Error("Failed to create join request message from native event RSVP",
 			attr.String("guild_id", string(guildID)),
@@ -235,7 +237,7 @@ func (l *ScheduledEventRSVPListener) handleUserAdd(event *discordgo.GuildSchedul
 		msg.Metadata.Set("channel_id", resolvedChannelID)
 	}
 
-	if err := l.eventBus.Publish(roundevents.RoundParticipantJoinRequestedV1, msg); err != nil {
+	if err := l.eventBus.Publish(roundevents.RoundParticipantJoinRequestedV2, msg); err != nil {
 		l.logger.Error("Failed to publish join request from native event RSVP",
 			attr.String("guild_id", string(guildID)),
 			attr.String("user_id", string(userID)),
@@ -269,7 +271,7 @@ func (l *ScheduledEventRSVPListener) handleUserRemove(event *discordgo.GuildSche
 		UserID:  userID,
 	}
 
-	msg, err := l.helper.CreateNewMessage(payload, roundevents.RoundParticipantRemovalRequestedV1)
+	msg, err := l.helper.CreateNewMessage(payload, roundevents.RoundParticipantRemovalRequestedV2)
 	if err != nil {
 		l.logger.Error("Failed to create removal request message from native event RSVP",
 			attr.String("guild_id", string(guildID)),
@@ -290,7 +292,7 @@ func (l *ScheduledEventRSVPListener) handleUserRemove(event *discordgo.GuildSche
 		msg.Metadata.Set("channel_id", resolvedChannelID)
 	}
 
-	if err := l.eventBus.Publish(roundevents.RoundParticipantRemovalRequestedV1, msg); err != nil {
+	if err := l.eventBus.Publish(roundevents.RoundParticipantRemovalRequestedV2, msg); err != nil {
 		l.logger.Error("Failed to publish removal request from native event RSVP",
 			attr.String("guild_id", string(guildID)),
 			attr.String("user_id", string(userID)),
@@ -355,7 +357,7 @@ func (l *ScheduledEventRSVPListener) handleEventCanceled(event *discordgo.GuildS
 		RequestingUserUserID: sharedtypes.DiscordID(creatorID),
 	}
 
-	msg, err := l.helper.CreateNewMessage(payload, roundevents.RoundDeleteRequestedV1)
+	msg, err := l.helper.CreateNewMessage(payload, roundevents.RoundDeleteRequestedV2)
 	if err != nil {
 		l.logger.Error("Failed to create delete request from canceled Discord event",
 			attr.String("guild_id", string(guildID)),
@@ -376,7 +378,7 @@ func (l *ScheduledEventRSVPListener) handleEventCanceled(event *discordgo.GuildS
 		msg.Metadata.Set("channel_id", resolvedChannelID)
 	}
 
-	if err := l.eventBus.Publish(roundevents.RoundDeleteRequestedV1, msg); err != nil {
+	if err := l.eventBus.Publish(roundevents.RoundDeleteRequestedV2, msg); err != nil {
 		l.logger.Error("Failed to publish delete request from canceled Discord event",
 			attr.String("guild_id", string(guildID)),
 			attr.String("discord_event_id", event.ID),
@@ -548,7 +550,7 @@ func (l *ScheduledEventRSVPListener) handleEventFieldUpdate(event *discordgo.Gui
 		Location:    &location,
 	}
 
-	msg, err := l.helper.CreateNewMessage(payload, roundevents.RoundUpdateRequestedV1)
+	msg, err := l.helper.CreateNewMessage(payload, roundevents.RoundUpdateRequestedV2)
 	if err != nil {
 		l.logger.Error("Failed to create update request from Discord event update",
 			attr.String("guild_id", string(guildID)),
@@ -563,7 +565,7 @@ func (l *ScheduledEventRSVPListener) handleEventFieldUpdate(event *discordgo.Gui
 	msg.Metadata.Set("message_id", messageID)
 	msg.Metadata.Set("discord_message_id", messageID)
 
-	if err := l.eventBus.Publish(roundevents.RoundUpdateRequestedV1, msg); err != nil {
+	if err := l.eventBus.Publish(roundevents.RoundUpdateRequestedV2, msg); err != nil {
 		l.logger.Error("Failed to publish update request from Discord event update",
 			attr.String("guild_id", string(guildID)),
 			attr.String("discord_event_id", event.ID),

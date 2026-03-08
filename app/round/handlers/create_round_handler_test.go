@@ -76,11 +76,19 @@ func TestRoundHandlers_HandleRoundCreateRequested(t *testing.T) {
 
 			if tt.wantLen > 0 {
 				result := got[0]
-				if result.Topic != roundevents.RoundCreationRequestedV1 {
-					t.Errorf("HandleRoundCreateRequested() topic = %s, want %s", result.Topic, roundevents.RoundCreationRequestedV1)
+				if result.Topic != roundevents.RoundCreationRequestedV2 {
+					t.Errorf("HandleRoundCreateRequested() topic = %s, want %s", result.Topic, roundevents.RoundCreationRequestedV2)
 				}
 				if result.Payload == nil {
 					t.Errorf("HandleRoundCreateRequested() payload is nil")
+					return
+				}
+				payload, ok := result.Payload.(roundevents.CreateRoundRequestedPayloadV1)
+				if !ok {
+					t.Fatalf("HandleRoundCreateRequested() payload type = %T, want roundevents.CreateRoundRequestedPayloadV1", result.Payload)
+				}
+				if payload.RequestSource == nil || *payload.RequestSource != "discord" {
+					t.Fatalf("HandleRoundCreateRequested() request source = %+v, want discord", payload.RequestSource)
 				}
 			}
 		})
@@ -280,6 +288,7 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 			foundNativeCreated := false
 			foundNativeFailed := false
 			foundEmbedUpdate := false
+			var nativeEventPlanned *bool
 			for _, result := range got {
 				switch result.Topic {
 				case roundevents.NativeEventCreatedV1:
@@ -288,6 +297,11 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 					foundNativeFailed = true
 				case roundevents.RoundEventMessageIDUpdateV1:
 					foundEmbedUpdate = true
+					payload, ok := result.Payload.(roundevents.RoundMessageIDUpdatePayloadV1)
+					if !ok {
+						t.Fatalf("HandleRoundCreated() RoundEventMessageIDUpdateV1 payload type = %T", result.Payload)
+					}
+					nativeEventPlanned = payload.NativeEventPlanned
 				}
 			}
 
@@ -299,6 +313,12 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 			}
 			if foundEmbedUpdate != tt.wantEmbedUpdate {
 				t.Errorf("HandleRoundCreated() RoundEventMessageIDUpdateV1 present = %v, want %v", foundEmbedUpdate, tt.wantEmbedUpdate)
+			}
+			if tt.wantEmbedUpdate {
+				wantPlanned := tt.wantNativeCreated
+				if nativeEventPlanned == nil || *nativeEventPlanned != wantPlanned {
+					t.Fatalf("HandleRoundCreated() native event planned = %+v, want %v", nativeEventPlanned, wantPlanned)
+				}
 			}
 		})
 	}
@@ -482,7 +502,7 @@ func TestRoundHandlers_HandleRoundCreated_ReusesPendingNativeEvent(t *testing.T)
 		switch result.Topic {
 		case roundevents.NativeEventCreatedV1:
 			foundNativeCreated = true
-		case roundevents.RoundParticipantJoinRequestedV1:
+		case roundevents.RoundParticipantJoinRequestedV2:
 			foundJoinRequested = true
 		}
 	}
@@ -490,7 +510,7 @@ func TestRoundHandlers_HandleRoundCreated_ReusesPendingNativeEvent(t *testing.T)
 		t.Fatalf("HandleRoundCreated() expected NativeEventCreatedV1 result for pending native event")
 	}
 	if !foundJoinRequested {
-		t.Fatalf("HandleRoundCreated() expected RoundParticipantJoinRequestedV1 for event creator")
+		t.Fatalf("HandleRoundCreated() expected RoundParticipantJoinRequestedV2 for event creator")
 	}
 
 	if mappedEventID, ok := nativeMap.LookupByRoundID(testRoundID); !ok || mappedEventID != "existing-native-event-123" {

@@ -43,7 +43,7 @@ func (h *RoundHandlers) HandleDiscordRoundScoreUpdate(
 	}
 
 	return []handlerwrapper.Result{{
-		Topic:    roundevents.RoundScoreUpdateRequestedV1,
+		Topic:    roundevents.RoundScoreUpdateRequestedV2,
 		Payload:  backendPayload,
 		Metadata: md,
 	}}, nil

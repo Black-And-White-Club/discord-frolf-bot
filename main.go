@@ -24,6 +24,24 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// Version is set at build time via ldflags in CI.
+var Version = "dev"
+
+func runtimeServiceVersion(configured string) string {
+	// `configured` comes from config loading, but we still prefer a late env override
+	// so runtime and CI can stamp the deployed version without rewriting config files.
+	if value := strings.TrimSpace(os.Getenv("SERVICE_VERSION")); value != "" {
+		return value
+	}
+	if value := strings.TrimSpace(configured); value != "" {
+		return value
+	}
+	if value := strings.TrimSpace(Version); value != "" {
+		return value
+	}
+	return "dev"
+}
+
 func main() {
 	// Create context that will be cancelled on interrupt signals
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
@@ -72,6 +90,7 @@ func runStandaloneMode(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to load base config: %w", err)
 	}
+	cfg.Service.Version = runtimeServiceVersion(cfg.Service.Version)
 
 	obsConfig := observability.Config{
 		ServiceName:     "discord-frolf-bot",
