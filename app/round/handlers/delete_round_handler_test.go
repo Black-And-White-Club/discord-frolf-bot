@@ -69,8 +69,8 @@ func TestRoundHandlers_HandleRoundDeleteRequested(t *testing.T) {
 
 			if tt.wantLen > 0 {
 				result := got[0]
-				if result.Topic != roundevents.RoundDeleteRequestedV1 {
-					t.Errorf("HandleRoundDeleteRequested() topic = %s, want %s", result.Topic, roundevents.RoundDeleteRequestedV1)
+				if result.Topic != roundevents.RoundDeleteRequestedV2 {
+					t.Errorf("HandleRoundDeleteRequested() topic = %s, want %s", result.Topic, roundevents.RoundDeleteRequestedV2)
 				}
 				if result.Payload == nil {
 					t.Errorf("HandleRoundDeleteRequested() payload is nil")

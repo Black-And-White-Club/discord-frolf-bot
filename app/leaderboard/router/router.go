@@ -131,7 +131,7 @@ func (r *LeaderboardRouter) RegisterHandlers(ctx context.Context, handlers leade
 
 	// Tag Swap
 	registerHandler(deps, discordleaderboardevents.LeaderboardTagSwapRequestV1, handlers.HandleTagSwapRequest)
-	registerHandler(deps, leaderboardevents.TagSwapProcessedV1, handlers.HandleTagSwappedResponse)
+	registerHandler(deps, leaderboardevents.TagSwapProcessedV2, handlers.HandleTagSwappedResponse)
 	registerHandler(deps, leaderboardevents.TagSwapFailedV1, handlers.HandleTagSwapFailedResponse)
 
 	// Tag Lookup
@@ -141,11 +141,11 @@ func (r *LeaderboardRouter) RegisterHandlers(ctx context.Context, handlers leade
 
 	// Leaderboard Retrieval
 	registerHandler(deps, discordleaderboardevents.LeaderboardRetrieveRequestV1, handlers.HandleLeaderboardRetrieveRequest)
-	registerHandler(deps, leaderboardevents.LeaderboardUpdatedV1, handlers.HandleLeaderboardUpdatedNotification)
+	registerHandler(deps, leaderboardevents.LeaderboardUpdatedV2, handlers.HandleLeaderboardUpdatedNotification)
 	registerHandler(deps, leaderboardevents.GetLeaderboardResponseV1, handlers.HandleLeaderboardResponse)
 
 	// Leaderboard Updates
-	registerHandler(deps, leaderboardevents.LeaderboardBatchTagAssignedV1, handlers.HandleBatchTagAssigned)
+	registerHandler(deps, leaderboardevents.LeaderboardBatchTagAssignedV2, handlers.HandleBatchTagAssigned)
 
 	// Leaderboard Errors
 	registerHandler(deps, leaderboardevents.LeaderboardUpdateFailedV1, handlers.HandleLeaderboardUpdateFailed)

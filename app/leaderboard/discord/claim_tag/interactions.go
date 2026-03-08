@@ -87,7 +87,7 @@ func (ctm *claimTagManager) HandleClaimTagCommand(ctx context.Context, i *discor
 		}
 
 		// Create and publish the message using the batch topic (keep batch topic as requested)
-		msg, err := ctm.helper.CreateNewMessage(batchPayload, leaderboardevents.LeaderboardBatchTagAssignmentRequestedV1)
+		msg, err := ctm.helper.CreateNewMessage(batchPayload, leaderboardevents.LeaderboardBatchTagAssignmentRequestedV2)
 		if err != nil {
 			ctm.logger.ErrorContext(ctx, "Failed to create tag claim message", attr.Error(err))
 			return ClaimTagOperationResult{Error: err}, err
@@ -100,7 +100,7 @@ func (ctm *claimTagManager) HandleClaimTagCommand(ctx context.Context, i *discor
 		msg.Metadata.Set("correlation_id", requestID)
 
 		// Publish the request
-		err = ctm.eventBus.Publish(leaderboardevents.LeaderboardBatchTagAssignmentRequestedV1, msg)
+		err = ctm.eventBus.Publish(leaderboardevents.LeaderboardBatchTagAssignmentRequestedV2, msg)
 		if err != nil {
 			ctm.logger.ErrorContext(ctx, "Failed to publish tag claim request", attr.Error(err))
 			return ClaimTagOperationResult{Error: err}, err

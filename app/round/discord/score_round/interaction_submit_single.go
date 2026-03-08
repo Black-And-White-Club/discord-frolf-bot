@@ -165,7 +165,7 @@ func (srm *scoreRoundManager) HandleScoreSubmission(ctx context.Context, i *disc
 			scoreMsg.Metadata = message.Metadata{}
 		}
 		// Publish the canonical domain topic so round handlers receive it directly
-		scoreMsg.Metadata.Set("topic", roundevents.RoundScoreUpdateRequestedV1)
+		scoreMsg.Metadata.Set("topic", roundevents.RoundScoreUpdateRequestedV2)
 		if i.GuildID != "" {
 			scoreMsg.Metadata.Set("guild_id", i.GuildID)
 		}
@@ -177,12 +177,12 @@ func (srm *scoreRoundManager) HandleScoreSubmission(ctx context.Context, i *disc
 			scoreMsg.Metadata.Set("channel_id", i.ChannelID)
 		}
 
-		resultScoreMsg, err := srm.helper.CreateResultMessage(scoreMsg, scorePayload, roundevents.RoundScoreUpdateRequestedV1)
+		resultScoreMsg, err := srm.helper.CreateResultMessage(scoreMsg, scorePayload, roundevents.RoundScoreUpdateRequestedV2)
 		if err != nil {
 			_, _ = srm.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{Content: "Something went wrong while submitting your score. Please try again later.", Flags: discordgo.MessageFlagsEphemeral})
 			return ScoreRoundOperationResult{Error: fmt.Errorf("failed to create result message")}, nil
 		}
-		if err = srm.publisher.Publish(roundevents.RoundScoreUpdateRequestedV1, resultScoreMsg); err != nil {
+		if err = srm.publisher.Publish(roundevents.RoundScoreUpdateRequestedV2, resultScoreMsg); err != nil {
 			_, _ = srm.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{Content: "Failed to submit your score. Please try again later.", Flags: discordgo.MessageFlagsEphemeral})
 			return ScoreRoundOperationResult{Error: fmt.Errorf("failed to publish message")}, nil
 		}

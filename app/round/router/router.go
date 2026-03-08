@@ -136,25 +136,25 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers handlers.Ha
 
 	// Creation flow
 	registerHandler(deps, discordroundevents.RoundCreateModalSubmittedV1, handlers.HandleRoundCreateRequested)
-	registerHandler(deps, roundevents.RoundCreatedV1, handlers.HandleRoundCreated)
+	registerHandler(deps, roundevents.RoundCreatedV2, handlers.HandleRoundCreated)
 	registerHandler(deps, roundevents.RoundCreationFailedV1, handlers.HandleRoundCreationFailed)
 	registerHandler(deps, roundevents.RoundValidationFailedV1, handlers.HandleRoundValidationFailed)
 
 	// Update flow
 	registerHandler(deps, discordroundevents.RoundUpdateModalSubmittedV1, handlers.HandleRoundUpdateRequested)
-	registerHandler(deps, roundevents.RoundUpdatedV1, handlers.HandleRoundUpdated)
+	registerHandler(deps, roundevents.RoundUpdatedV2, handlers.HandleRoundUpdated)
 	registerHandler(deps, roundevents.RoundUpdateErrorV1, handlers.HandleRoundUpdateFailed)
 
 	// Participation
 	registerHandler(deps, discordroundevents.RoundParticipantJoinRequestDiscordV1, handlers.HandleRoundParticipantJoinRequest)
-	registerHandler(deps, roundevents.RoundParticipantRemovedV1, handlers.HandleRoundParticipantRemoved)
+	registerHandler(deps, roundevents.RoundParticipantRemovedV2, handlers.HandleRoundParticipantRemoved)
 
 	// Scoring
 	// Discord->Round bridge: translate discord-scoped round score submissions
 	// into the canonical round domain topic so the round handlers can process
 	// first-time submissions and participant creation.
 	registerHandler(deps, discordroundevents.RoundScoreUpdateRequestDiscordV1, handlers.HandleDiscordRoundScoreUpdate)
-	registerHandler(deps, roundevents.RoundParticipantScoreUpdatedV1, handlers.HandleParticipantScoreUpdated)
+	registerHandler(deps, roundevents.RoundParticipantScoreUpdatedV2, handlers.HandleParticipantScoreUpdated)
 	registerHandler(deps, roundevents.RoundScoresBulkUpdatedV1, handlers.HandleScoresBulkUpdated)
 	registerHandler(deps, roundevents.RoundScoreUpdateErrorV1, handlers.HandleScoreUpdateError)
 
@@ -175,14 +175,14 @@ func (r *RoundRouter) RegisterHandlers(ctx context.Context, handlers handlers.Ha
 	registerHandler(deps, discordroundevents.RoundDeleteRequestDiscordV1, handlers.HandleRoundDeleteRequested)
 
 	// Lifecycle
-	registerHandler(deps, roundevents.RoundDeletedV1, handlers.HandleRoundDeleted)
+	registerHandler(deps, roundevents.RoundDeletedV2, handlers.HandleRoundDeleted)
 	registerHandler(deps, roundevents.RoundFinalizedDiscordV1, handlers.HandleRoundFinalized)
 	registerHandler(deps, roundevents.RoundCompletedV1, handlers.HandleRoundCompleted)
-	registerHandler(deps, roundevents.RoundStartedDiscordV1, handlers.HandleRoundStarted)
+	registerHandler(deps, roundevents.RoundStartedDiscordV2, handlers.HandleRoundStarted)
 	registerHandler(deps, sharedevents.PointsAwardedV1, handlers.HandlePointsAwarded)
 
 	// Tag handling
-	registerHandler(deps, roundevents.RoundParticipantJoinedV1, handlers.HandleRoundParticipantJoined)
+	registerHandler(deps, roundevents.RoundParticipantJoinedV2, handlers.HandleRoundParticipantJoined)
 	registerHandler(deps, roundevents.RoundParticipantsUpdatedV1, handlers.HandleRoundParticipantsUpdated)
 
 	// Reminders

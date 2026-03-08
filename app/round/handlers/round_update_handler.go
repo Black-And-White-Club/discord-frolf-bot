@@ -35,7 +35,7 @@ func (h *RoundHandlers) HandleRoundUpdateRequested(ctx context.Context, payload 
 
 	return []handlerwrapper.Result{
 		{
-			Topic:   roundevents.RoundUpdateRequestedV1,
+			Topic:   roundevents.RoundUpdateRequestedV2,
 			Payload: backendPayload,
 			Metadata: map[string]string{
 				"discord_message_id": payload.MessageID,

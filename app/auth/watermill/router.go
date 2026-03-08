@@ -95,7 +95,7 @@ func (r *AuthRouter) registerHandlers(handlers *authhandlers.AuthHandlers) error
 		metrics:    metrics,
 	}
 
-	registerHandler(deps, authevents.MagicLinkGeneratedV1, handlers.HandleMagicLinkGenerated)
+	registerHandler(deps, authevents.MagicLinkGeneratedV2, handlers.HandleMagicLinkGenerated)
 
 	return nil
 }

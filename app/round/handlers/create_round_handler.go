@@ -29,19 +29,20 @@ func (h *RoundHandlers) HandleRoundCreateRequested(ctx context.Context, payload 
 	// Convert to backend payload and set GuildID
 	desc := payload.Description
 	backendPayload := roundevents.CreateRoundRequestedPayloadV1{
-		GuildID:     sharedtypes.GuildID(payload.GuildID),
-		Title:       payload.Title,
-		Description: &desc,
-		StartTime:   payload.StartTime,
-		Location:    payload.Location,
-		UserID:      payload.UserID,
-		ChannelID:   payload.ChannelID,
-		Timezone:    payload.Timezone,
+		GuildID:       sharedtypes.GuildID(payload.GuildID),
+		Title:         payload.Title,
+		Description:   &desc,
+		StartTime:     payload.StartTime,
+		Location:      payload.Location,
+		UserID:        payload.UserID,
+		ChannelID:     payload.ChannelID,
+		Timezone:      payload.Timezone,
+		RequestSource: stringPtr("discord"),
 	}
 
 	return []handlerwrapper.Result{
 		{
-			Topic:   roundevents.RoundCreationRequestedV1,
+			Topic:   roundevents.RoundCreationRequestedV2,
 			Payload: backendPayload,
 			Metadata: map[string]string{
 				"submitted_at":   time.Now().UTC().Format(time.RFC3339),
@@ -139,8 +140,9 @@ func (h *RoundHandlers) HandleRoundCreated(ctx context.Context, payload *roundev
 	results = append(results, handlerwrapper.Result{
 		Topic: roundevents.RoundEventMessageIDUpdateV1,
 		Payload: roundevents.RoundMessageIDUpdatePayloadV1{
-			GuildID: payload.GuildID,
-			RoundID: roundID,
+			GuildID:            payload.GuildID,
+			RoundID:            roundID,
+			NativeEventPlanned: boolPtr(discordEventID != ""),
 		},
 		Metadata: map[string]string{
 			"discord_message_id": discordMessageID,
@@ -230,7 +232,7 @@ func (h *RoundHandlers) resolveNativeEvent(ctx context.Context, payload *roundev
 			if payload.UserID != "" {
 				zeroTag := sharedtypes.TagNumber(0)
 				results = append(results, handlerwrapper.Result{
-					Topic: roundevents.RoundParticipantJoinRequestedV1,
+					Topic: roundevents.RoundParticipantJoinRequestedV2,
 					Payload: roundevents.ParticipantJoinRequestPayloadV1{
 						GuildID:   payload.GuildID,
 						RoundID:   roundID,
@@ -343,6 +345,14 @@ func (h *RoundHandlers) HandleRoundCreationFailed(ctx context.Context, payload *
 	}
 
 	return nil, nil
+}
+
+func boolPtr(v bool) *bool {
+	return &v
+}
+
+func stringPtr(v string) *string {
+	return &v
 }
 
 func (h *RoundHandlers) HandleRoundValidationFailed(ctx context.Context, payload *roundevents.RoundValidationFailedPayloadV1) ([]handlerwrapper.Result, error) {
