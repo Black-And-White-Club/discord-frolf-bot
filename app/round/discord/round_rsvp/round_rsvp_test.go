@@ -17,60 +17,50 @@ import (
 )
 
 func TestNewRoundRsvpManager(t *testing.T) {
-	__codexTDCases := []struct {
-		name string
-	}{
-		{name: "default"},
+	fakeSession := discord.NewFakeSession()
+	fakeEventBus := &testutils.FakeEventBus{}
+	testHandler := loggerfrolfbot.NewTestHandler()
+	logger := slog.New(testHandler)
+	fakeHelper := &testutils.FakeHelpers{}
+	fakeConfig := &config.Config{}
+	fakeInteractionStore := testutils.NewFakeStorage[any]()
+	fakeGuildConfigCache := testutils.NewFakeStorage[storage.GuildConfig]()
+	fakeMetrics := &testutils.FakeDiscordMetrics{}
+	tracer := noop.NewTracerProvider().Tracer("test")
+	fakeGuildConfigResolver := &testutils.FakeGuildConfigResolver{}
+
+	manager := NewRoundRsvpManager(fakeSession, fakeEventBus, logger, fakeHelper, fakeConfig, fakeInteractionStore, fakeGuildConfigCache, tracer, fakeMetrics, fakeGuildConfigResolver)
+	impl, ok := manager.(*roundRsvpManager)
+	if !ok {
+		t.Fatalf("Expected *roundRsvpManager, got %T", manager)
 	}
 
-	for _, __codexTDCase := range __codexTDCases {
-		t.Run(__codexTDCase.name, func(t *testing.T) {
-			fakeSession := discord.NewFakeSession()
-			fakeEventBus := &testutils.FakeEventBus{}
-			testHandler := loggerfrolfbot.NewTestHandler()
-			logger := slog.New(testHandler)
-			fakeHelper := &testutils.FakeHelpers{}
-			fakeConfig := &config.Config{}
-			fakeInteractionStore := testutils.NewFakeStorage[any]()
-			fakeGuildConfigCache := testutils.NewFakeStorage[storage.GuildConfig]()
-			fakeMetrics := &testutils.FakeDiscordMetrics{}
-			tracer := noop.NewTracerProvider().Tracer("test")
-			fakeGuildConfigResolver := &testutils.FakeGuildConfigResolver{}
-
-			manager := NewRoundRsvpManager(fakeSession, fakeEventBus, logger, fakeHelper, fakeConfig, fakeInteractionStore, fakeGuildConfigCache, tracer, fakeMetrics, fakeGuildConfigResolver)
-			impl, ok := manager.(*roundRsvpManager)
-			if !ok {
-				t.Fatalf("Expected *roundRsvpManager, got %T", manager)
-			}
-
-			if impl.session != fakeSession {
-				t.Error("Expected session to be assigned")
-			}
-			if impl.publisher != fakeEventBus {
-				t.Error("Expected publisher to be assigned")
-			}
-			if impl.logger != logger {
-				t.Error("Expected logger to be assigned")
-			}
-			if impl.helper != fakeHelper {
-				t.Error("Expected helper to be assigned")
-			}
-			if impl.config != fakeConfig {
-				t.Error("Expected config to be assigned")
-			}
-			if impl.interactionStore != fakeInteractionStore {
-				t.Error("Expected interactionStore to be assigned")
-			}
-			if impl.tracer != tracer {
-				t.Error("Expected tracer to be assigned")
-			}
-			if impl.metrics != fakeMetrics {
-				t.Error("Expected metrics to be assigned")
-			}
-			if impl.operationWrapper == nil {
-				t.Error("Expected operationWrapper to be set")
-			}
-		})
+	if impl.session != fakeSession {
+		t.Error("Expected session to be assigned")
+	}
+	if impl.publisher != fakeEventBus {
+		t.Error("Expected publisher to be assigned")
+	}
+	if impl.logger != logger {
+		t.Error("Expected logger to be assigned")
+	}
+	if impl.helper != fakeHelper {
+		t.Error("Expected helper to be assigned")
+	}
+	if impl.config != fakeConfig {
+		t.Error("Expected config to be assigned")
+	}
+	if impl.interactionStore != fakeInteractionStore {
+		t.Error("Expected interactionStore to be assigned")
+	}
+	if impl.tracer != tracer {
+		t.Error("Expected tracer to be assigned")
+	}
+	if impl.metrics != fakeMetrics {
+		t.Error("Expected metrics to be assigned")
+	}
+	if impl.operationWrapper == nil {
+		t.Error("Expected operationWrapper to be set")
 	}
 }
 

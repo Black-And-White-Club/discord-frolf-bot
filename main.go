@@ -28,6 +28,8 @@ import (
 var Version = "dev"
 
 func runtimeServiceVersion(configured string) string {
+	// `configured` comes from config loading, but we still prefer a late env override
+	// so runtime and CI can stamp the deployed version without rewriting config files.
 	if value := strings.TrimSpace(os.Getenv("SERVICE_VERSION")); value != "" {
 		return value
 	}

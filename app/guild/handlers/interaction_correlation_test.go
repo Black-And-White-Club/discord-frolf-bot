@@ -17,126 +17,106 @@ import (
 )
 
 func TestGuildHandlers_CorrelationIDIsolationForConcurrentSetupResponses(t *testing.T) {
-	__codexTDCases := []struct {
-		name string
-	}{
-		{name: "default"},
+	session := discord.NewFakeSession()
+
+	var (
+		mu       sync.Mutex
+		editedID = make(map[string]int)
+	)
+	session.InteractionResponseEditFunc = func(interaction *discordgo.Interaction, _ *discordgo.WebhookEdit, _ ...discordgo.RequestOption) (*discordgo.Message, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		editedID[interaction.ID]++
+		return &discordgo.Message{ID: "ok"}, nil
 	}
 
-	for _, __codexTDCase := range __codexTDCases {
-		t.Run(__codexTDCase.name, func(t *testing.T) {
-			session := discord.NewFakeSession()
+	store := testutils.NewFakeStorage[any]()
+	if err := store.Set(context.Background(), "corr-1", &discordgo.Interaction{ID: "interaction-1", GuildID: "g1"}); err != nil {
+		t.Fatalf("failed to seed store: %v", err)
+	}
+	if err := store.Set(context.Background(), "corr-2", &discordgo.Interaction{ID: "interaction-2", GuildID: "g1"}); err != nil {
+		t.Fatalf("failed to seed store: %v", err)
+	}
 
-			var (
-				mu       sync.Mutex
-				editedID = make(map[string]int)
-			)
-			session.InteractionResponseEditFunc = func(interaction *discordgo.Interaction, _ *discordgo.WebhookEdit, _ ...discordgo.RequestOption) (*discordgo.Message, error) {
-				mu.Lock()
-				defer mu.Unlock()
-				editedID[interaction.ID]++
-				return &discordgo.Message{ID: "ok"}, nil
-			}
+	fakeGuildDiscord := &FakeGuildDiscord{
+		RegisterAllCommandsFunc: func(guildID string) error { return nil },
+	}
 
-			store := testutils.NewFakeStorage[any]()
-			if err := store.Set(context.Background(), "corr-1", &discordgo.Interaction{ID: "interaction-1", GuildID: "g1"}); err != nil {
-				t.Fatalf("failed to seed store: %v", err)
-			}
-			if err := store.Set(context.Background(), "corr-2", &discordgo.Interaction{ID: "interaction-2", GuildID: "g1"}); err != nil {
-				t.Fatalf("failed to seed store: %v", err)
-			}
+	handler := NewGuildHandlers(
+		loggerfrolfbot.NoOpLogger,
+		&config.Config{},
+		fakeGuildDiscord,
+		&guildconfig.FakeGuildConfigResolver{},
+		nil,
+		store,
+		session,
+	)
 
-			fakeGuildDiscord := &FakeGuildDiscord{
-				RegisterAllCommandsFunc: func(guildID string) error { return nil },
-			}
+	payload := &guildevents.GuildConfigCreatedPayloadV1{
+		GuildID: sharedtypes.GuildID("g1"),
+		Config: guildtypes.GuildConfig{
+			GuildID:              sharedtypes.GuildID("g1"),
+			SignupChannelID:      "signup",
+			EventChannelID:       "events",
+			LeaderboardChannelID: "leaderboard",
+		},
+	}
 
-			handler := NewGuildHandlers(
-				loggerfrolfbot.NoOpLogger,
-				&config.Config{},
-				fakeGuildDiscord,
-				&guildconfig.FakeGuildConfigResolver{},
-				nil,
-				store,
-				session,
-			)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		_, _ = handler.HandleGuildConfigCreated(context.WithValue(context.Background(), "correlation_id", "corr-1"), payload)
+	}()
+	go func() {
+		defer wg.Done()
+		_, _ = handler.HandleGuildConfigCreated(context.WithValue(context.Background(), "correlation_id", "corr-2"), payload)
+	}()
+	wg.Wait()
 
-			payload := &guildevents.GuildConfigCreatedPayloadV1{
-				GuildID: sharedtypes.GuildID("g1"),
-				Config: guildtypes.GuildConfig{
-					GuildID:              sharedtypes.GuildID("g1"),
-					SignupChannelID:      "signup",
-					EventChannelID:       "events",
-					LeaderboardChannelID: "leaderboard",
-				},
-			}
-
-			var wg sync.WaitGroup
-			wg.Add(2)
-			go func() {
-				defer wg.Done()
-				_, _ = handler.HandleGuildConfigCreated(context.WithValue(context.Background(), "correlation_id", "corr-1"), payload)
-			}()
-			go func() {
-				defer wg.Done()
-				_, _ = handler.HandleGuildConfigCreated(context.WithValue(context.Background(), "correlation_id", "corr-2"), payload)
-			}()
-			wg.Wait()
-
-			mu.Lock()
-			defer mu.Unlock()
-			if editedID["interaction-1"] != 1 || editedID["interaction-2"] != 1 {
-				t.Fatalf("expected each interaction to be edited once, got %#v", editedID)
-			}
-		})
+	mu.Lock()
+	defer mu.Unlock()
+	if editedID["interaction-1"] != 1 || editedID["interaction-2"] != 1 {
+		t.Fatalf("expected each interaction to be edited once, got %#v", editedID)
 	}
 }
 
 func TestGuildHandlers_InteractionLookupFallbacksToGuildKey(t *testing.T) {
-	__codexTDCases := []struct {
-		name string
-	}{
-		{name: "default"},
+	session := discord.NewFakeSession()
+
+	editedInteractionID := ""
+	session.InteractionResponseEditFunc = func(interaction *discordgo.Interaction, _ *discordgo.WebhookEdit, _ ...discordgo.RequestOption) (*discordgo.Message, error) {
+		editedInteractionID = interaction.ID
+		return &discordgo.Message{ID: "ok"}, nil
 	}
 
-	for _, __codexTDCase := range __codexTDCases {
-		t.Run(__codexTDCase.name, func(t *testing.T) {
-			session := discord.NewFakeSession()
+	store := testutils.NewFakeStorage[any]()
+	if err := store.Set(context.Background(), "g1", &discordgo.Interaction{ID: "legacy-interaction", GuildID: "g1"}); err != nil {
+		t.Fatalf("failed to seed legacy key: %v", err)
+	}
 
-			editedInteractionID := ""
-			session.InteractionResponseEditFunc = func(interaction *discordgo.Interaction, _ *discordgo.WebhookEdit, _ ...discordgo.RequestOption) (*discordgo.Message, error) {
-				editedInteractionID = interaction.ID
-				return &discordgo.Message{ID: "ok"}, nil
-			}
+	handler := NewGuildHandlers(
+		loggerfrolfbot.NoOpLogger,
+		&config.Config{},
+		&FakeGuildDiscord{},
+		nil,
+		nil,
+		store,
+		session,
+	)
 
-			store := testutils.NewFakeStorage[any]()
-			if err := store.Set(context.Background(), "g1", &discordgo.Interaction{ID: "legacy-interaction", GuildID: "g1"}); err != nil {
-				t.Fatalf("failed to seed legacy key: %v", err)
-			}
+	_, err := handler.HandleGuildConfigCreationFailed(
+		context.WithValue(context.Background(), "correlation_id", "missing-correlation"),
+		&guildevents.GuildConfigCreationFailedPayloadV1{
+			GuildID: sharedtypes.GuildID("g1"),
+			Reason:  "forced failure",
+		},
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
-			handler := NewGuildHandlers(
-				loggerfrolfbot.NoOpLogger,
-				&config.Config{},
-				&FakeGuildDiscord{},
-				nil,
-				nil,
-				store,
-				session,
-			)
-
-			_, err := handler.HandleGuildConfigCreationFailed(
-				context.WithValue(context.Background(), "correlation_id", "missing-correlation"),
-				&guildevents.GuildConfigCreationFailedPayloadV1{
-					GuildID: sharedtypes.GuildID("g1"),
-					Reason:  "forced failure",
-				},
-			)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			if editedInteractionID != "legacy-interaction" {
-				t.Fatalf("expected legacy interaction to be used, got %q", editedInteractionID)
-			}
-		})
+	if editedInteractionID != "legacy-interaction" {
+		t.Fatalf("expected legacy interaction to be used, got %q", editedInteractionID)
 	}
 }

@@ -20,62 +20,52 @@ import (
 )
 
 func TestNewLeaderboardUpdateManager(t *testing.T) {
-	__codexTDCases := []struct {
-		name string
-	}{
-		{name: "default"},
+	// Use FakeSession instead of gomock
+	fakeSession := discord.NewFakeSession()
+
+	// Use nil for dependencies since no methods are called during construction
+	var publisher eventbus.EventBus = nil
+	testHandler := loggerfrolfbot.NewTestHandler()
+	logger := slog.New(testHandler)
+	var helper utils.Helpers = nil
+	mockConfig := &config.Config{}
+	var interactionStore storage.ISInterface[any] = nil
+	var metrics discordmetrics.DiscordMetrics = nil
+	tracer := noop.NewTracerProvider().Tracer("test")
+	var guildConfigResolver guildconfig.GuildConfigResolver = nil
+
+	manager := NewLeaderboardUpdateManager(fakeSession, publisher, logger, helper, mockConfig, guildConfigResolver, interactionStore, nil, tracer, metrics)
+	impl, ok := manager.(*leaderboardUpdateManager)
+	if !ok {
+		t.Fatalf("Expected *leaderboardUpdateManager, got %T", manager)
 	}
 
-	for _, __codexTDCase := range __codexTDCases {
-		t.Run(__codexTDCase.name, func(t *testing.T) {
-			// Use FakeSession instead of gomock
-			fakeSession := discord.NewFakeSession()
-
-			// Use nil for dependencies since no methods are called during construction
-			var publisher eventbus.EventBus = nil
-			testHandler := loggerfrolfbot.NewTestHandler()
-			logger := slog.New(testHandler)
-			var helper utils.Helpers = nil
-			mockConfig := &config.Config{}
-			var interactionStore storage.ISInterface[any] = nil
-			var metrics discordmetrics.DiscordMetrics = nil
-			tracer := noop.NewTracerProvider().Tracer("test")
-			var guildConfigResolver guildconfig.GuildConfigResolver = nil
-
-			manager := NewLeaderboardUpdateManager(fakeSession, publisher, logger, helper, mockConfig, guildConfigResolver, interactionStore, nil, tracer, metrics)
-			impl, ok := manager.(*leaderboardUpdateManager)
-			if !ok {
-				t.Fatalf("Expected *leaderboardUpdateManager, got %T", manager)
-			}
-
-			if impl.session != fakeSession {
-				t.Error("Expected session to be assigned")
-			}
-			if impl.publisher != publisher {
-				t.Error("Expected publisher to be assigned")
-			}
-			if impl.logger != logger {
-				t.Error("Expected logger to be assigned")
-			}
-			if impl.helper != helper {
-				t.Error("Expected helper to be assigned")
-			}
-			if impl.config != mockConfig {
-				t.Error("Expected config to be assigned")
-			}
-			if impl.interactionStore != interactionStore {
-				t.Error("Expected interactionStore to be assigned")
-			}
-			if impl.tracer != tracer {
-				t.Error("Expected tracer to be assigned")
-			}
-			if impl.metrics != metrics {
-				t.Error("Expected metrics to be assigned")
-			}
-			if impl.operationWrapper == nil {
-				t.Error("Expected operationWrapper to be set")
-			}
-		})
+	if impl.session != fakeSession {
+		t.Error("Expected session to be assigned")
+	}
+	if impl.publisher != publisher {
+		t.Error("Expected publisher to be assigned")
+	}
+	if impl.logger != logger {
+		t.Error("Expected logger to be assigned")
+	}
+	if impl.helper != helper {
+		t.Error("Expected helper to be assigned")
+	}
+	if impl.config != mockConfig {
+		t.Error("Expected config to be assigned")
+	}
+	if impl.interactionStore != interactionStore {
+		t.Error("Expected interactionStore to be assigned")
+	}
+	if impl.tracer != tracer {
+		t.Error("Expected tracer to be assigned")
+	}
+	if impl.metrics != metrics {
+		t.Error("Expected metrics to be assigned")
+	}
+	if impl.operationWrapper == nil {
+		t.Error("Expected operationWrapper to be set")
 	}
 }
 

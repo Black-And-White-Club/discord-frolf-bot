@@ -12,56 +12,46 @@ import (
 )
 
 func Test_wrapClaimTagOperation_Variants(t *testing.T) {
-	__codexTDCases := []struct {
-		name string
-	}{
-		{name: "default"},
+	logger := slogDiscard()
+	tracer := otel.Tracer("test")
+	var metrics noMetrics
+	ctx := context.Background()
+
+	// nil function
+	if res, err := wrapClaimTagOperation(ctx, "nil_fn", nil, logger, tracer, metrics); err != nil || res.Error == nil {
+		t.Fatalf("expected result.Error for nil fn, got err=%v res=%v", err, res)
 	}
 
-	for _, __codexTDCase := range __codexTDCases {
-		t.Run(__codexTDCase.name, func(t *testing.T) {
-			logger := slogDiscard()
-			tracer := otel.Tracer("test")
-			var metrics noMetrics
-			ctx := context.Background()
+	// fn returns error
+	_, err := wrapClaimTagOperation(ctx, "fn_error", func(ctx context.Context) (ClaimTagOperationResult, error) {
+		return ClaimTagOperationResult{}, errors.New("boom")
+	}, logger, tracer, metrics)
+	if err == nil {
+		t.Fatalf("expected wrapped error from fn")
+	}
 
-			// nil function
-			if res, err := wrapClaimTagOperation(ctx, "nil_fn", nil, logger, tracer, metrics); err != nil || res.Error == nil {
-				t.Fatalf("expected result.Error for nil fn, got err=%v res=%v", err, res)
-			}
+	// result has error
+	res, err := wrapClaimTagOperation(ctx, "result_error", func(ctx context.Context) (ClaimTagOperationResult, error) {
+		return ClaimTagOperationResult{Error: errors.New("bad")}, nil
+	}, logger, tracer, metrics)
+	if err != nil || res.Error == nil {
+		t.Fatalf("expected result.Error without outer error")
+	}
 
-			// fn returns error
-			_, err := wrapClaimTagOperation(ctx, "fn_error", func(ctx context.Context) (ClaimTagOperationResult, error) {
-				return ClaimTagOperationResult{}, errors.New("boom")
-			}, logger, tracer, metrics)
-			if err == nil {
-				t.Fatalf("expected wrapped error from fn")
-			}
+	// panic recovery
+	_, err = wrapClaimTagOperation(ctx, "panic", func(ctx context.Context) (ClaimTagOperationResult, error) {
+		panic("kaboom")
+	}, logger, tracer, metrics)
+	if err == nil {
+		t.Fatalf("expected panic to be recovered with error")
+	}
 
-			// result has error
-			res, err := wrapClaimTagOperation(ctx, "result_error", func(ctx context.Context) (ClaimTagOperationResult, error) {
-				return ClaimTagOperationResult{Error: errors.New("bad")}, nil
-			}, logger, tracer, metrics)
-			if err != nil || res.Error == nil {
-				t.Fatalf("expected result.Error without outer error")
-			}
-
-			// panic recovery
-			_, err = wrapClaimTagOperation(ctx, "panic", func(ctx context.Context) (ClaimTagOperationResult, error) {
-				panic("kaboom")
-			}, logger, tracer, metrics)
-			if err == nil {
-				t.Fatalf("expected panic to be recovered with error")
-			}
-
-			// success
-			res, err = wrapClaimTagOperation(ctx, "success", func(ctx context.Context) (ClaimTagOperationResult, error) {
-				return ClaimTagOperationResult{Success: true}, nil
-			}, logger, tracer, metrics)
-			if err != nil || res.Error != nil || res.Success != true {
-				t.Fatalf("expected success path, got res=%v err=%v", res, err)
-			}
-		})
+	// success
+	res, err = wrapClaimTagOperation(ctx, "success", func(ctx context.Context) (ClaimTagOperationResult, error) {
+		return ClaimTagOperationResult{Success: true}, nil
+	}, logger, tracer, metrics)
+	if err != nil || res.Error != nil || res.Success != true {
+		t.Fatalf("expected success path, got res=%v err=%v", res, err)
 	}
 }
 

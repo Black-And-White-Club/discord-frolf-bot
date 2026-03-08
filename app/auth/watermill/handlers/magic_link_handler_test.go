@@ -240,33 +240,23 @@ func TestAuthHandlers_HandleMagicLinkGenerated_Success(t *testing.T) {
 }
 
 func TestAuthHandlers_HandleMagicLinkGenerated_NilPayload(t *testing.T) {
-	__codexTDCases := []struct {
-		name string
-	}{
-		{name: "default"},
+	fakeSession := discordpkg.NewFakeSession()
+	fakeStore := NewFakeInteractionStore()
+
+	logger := loggerfrolfbot.NoOpLogger
+	cfg := &config.Config{}
+
+	h := NewAuthHandlers(logger, cfg, fakeSession, fakeStore)
+
+	// nil payload should not panic
+	results, err := h.HandleMagicLinkGenerated(context.Background(), nil)
+
+	// Handler should handle nil gracefully
+	if err != nil {
+		t.Logf("handler returned error for nil payload (acceptable): %v", err)
 	}
-
-	for _, __codexTDCase := range __codexTDCases {
-		t.Run(__codexTDCase.name, func(t *testing.T) {
-			fakeSession := discordpkg.NewFakeSession()
-			fakeStore := NewFakeInteractionStore()
-
-			logger := loggerfrolfbot.NoOpLogger
-			cfg := &config.Config{}
-
-			h := NewAuthHandlers(logger, cfg, fakeSession, fakeStore)
-
-			// nil payload should not panic
-			results, err := h.HandleMagicLinkGenerated(context.Background(), nil)
-
-			// Handler should handle nil gracefully
-			if err != nil {
-				t.Logf("handler returned error for nil payload (acceptable): %v", err)
-			}
-			if len(results) != 0 {
-				t.Errorf("expected no results for nil payload, got %d", len(results))
-			}
-		})
+	if len(results) != 0 {
+		t.Errorf("expected no results for nil payload, got %d", len(results))
 	}
 }
 

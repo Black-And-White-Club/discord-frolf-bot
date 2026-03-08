@@ -165,262 +165,242 @@ func (f *fakeGuildConfigResolver) ClearInflightRequest(ctx context.Context, guil
 }
 
 func TestHandleClaimTagCommand_Variants(t *testing.T) {
-	__codexTDCases := []struct {
-		name string
-	}{
-		{name: "default"},
+	ctx := context.Background()
+	tracer := otel.Tracer("test")
+	metrics := noMetrics{}
+	logger := discard()
+	cfg := &config.Config{}
+
+	// Common interaction skeleton
+	base := func(options []*discordgo.ApplicationCommandInteractionDataOption) *discordgo.InteractionCreate {
+		return &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
+			Type:      discordgo.InteractionApplicationCommand,
+			GuildID:   "g1",
+			ChannelID: "c1",
+			Member:    &discordgo.Member{User: &discordgo.User{ID: "u1"}},
+			Data:      discordgo.ApplicationCommandInteractionData{Name: "claimtag", Options: options},
+		}}
 	}
 
-	for _, __codexTDCase := range __codexTDCases {
-		t.Run(__codexTDCase.name, func(t *testing.T) {
-			ctx := context.Background()
-			tracer := otel.Tracer("test")
-			metrics := noMetrics{}
-			logger := discard()
-			cfg := &config.Config{}
+	t.Run("success", func(t *testing.T) {
+		sess := discord.NewFakeSession()
+		sess.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
+			return nil
+		}
 
-			// Common interaction skeleton
-			base := func(options []*discordgo.ApplicationCommandInteractionDataOption) *discordgo.InteractionCreate {
-				return &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
-					Type:      discordgo.InteractionApplicationCommand,
-					GuildID:   "g1",
-					ChannelID: "c1",
-					Member:    &discordgo.Member{User: &discordgo.User{ID: "u1"}},
-					Data:      discordgo.ApplicationCommandInteractionData{Name: "claimtag", Options: options},
-				}}
-			}
+		helper := &fakeHelpers{
+			CreateNewMessageFunc: func(payload any, topic string) (*message.Message, error) {
+				return &message.Message{}, nil
+			},
+		}
 
-			t.Run("success", func(t *testing.T) {
-				sess := discord.NewFakeSession()
-				sess.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
-					return nil
-				}
+		resolver := &fakeGuildConfigResolver{
+			GetGuildConfigWithContextFunc: func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
+				return &storage.GuildConfig{}, nil
+			},
+		}
 
-				helper := &fakeHelpers{
-					CreateNewMessageFunc: func(payload any, topic string) (*message.Message, error) {
-						return &message.Message{}, nil
-					},
-				}
+		eb := &fakeEventBus{}
+		store := &memStore{}
 
-				resolver := &fakeGuildConfigResolver{
-					GetGuildConfigWithContextFunc: func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
-						return &storage.GuildConfig{}, nil
-					},
-				}
+		mgr := NewClaimTagManager(sess, eb, logger, helper, cfg, resolver, store, nil, tracer, metrics)
+		// valid tag option 5
+		opt := &discordgo.ApplicationCommandInteractionDataOption{Type: discordgo.ApplicationCommandOptionInteger, Value: float64(5)}
+		res, err := mgr.HandleClaimTagCommand(ctx, base([]*discordgo.ApplicationCommandInteractionDataOption{opt}))
+		if err != nil || res.Error != nil {
+			t.Fatalf("expected success, got res=%v err=%v", res, err)
+		}
+		if len(eb.Topics()) == 0 {
+			t.Fatalf("expected publish to be called")
+		}
+	})
 
-				eb := &fakeEventBus{}
-				store := &memStore{}
+	t.Run("resolver error", func(t *testing.T) {
+		sess := discord.NewFakeSession()
+		helper := &fakeHelpers{}
+		resolver := &fakeGuildConfigResolver{
+			GetGuildConfigWithContextFunc: func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
+				return nil, errors.New("boom")
+			},
+		}
+		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, &memStore{}, nil, tracer, metrics)
+		res, err := mgr.HandleClaimTagCommand(ctx, base(nil))
+		if err == nil || res.Error == nil {
+			t.Fatalf("expected resolver error path")
+		}
+	})
 
-				mgr := NewClaimTagManager(sess, eb, logger, helper, cfg, resolver, store, nil, tracer, metrics)
-				// valid tag option 5
-				opt := &discordgo.ApplicationCommandInteractionDataOption{Type: discordgo.ApplicationCommandOptionInteger, Value: float64(5)}
-				res, err := mgr.HandleClaimTagCommand(ctx, base([]*discordgo.ApplicationCommandInteractionDataOption{opt}))
-				if err != nil || res.Error != nil {
-					t.Fatalf("expected success, got res=%v err=%v", res, err)
-				}
-				if len(eb.Topics()) == 0 {
-					t.Fatalf("expected publish to be called")
-				}
-			})
+	t.Run("no option provided", func(t *testing.T) {
+		sess := discord.NewFakeSession()
+		helper := &fakeHelpers{}
+		resolver := &fakeGuildConfigResolver{
+			GetGuildConfigWithContextFunc: func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
+				return &storage.GuildConfig{}, nil
+			},
+		}
+		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, &memStore{}, nil, tracer, metrics)
+		res, err := mgr.HandleClaimTagCommand(ctx, base(nil))
+		if err != nil || res.Error == nil {
+			t.Fatalf("expected validation error for missing option")
+		}
+	})
 
-			t.Run("resolver error", func(t *testing.T) {
-				sess := discord.NewFakeSession()
-				helper := &fakeHelpers{}
-				resolver := &fakeGuildConfigResolver{
-					GetGuildConfigWithContextFunc: func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
-						return nil, errors.New("boom")
-					},
-				}
-				mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, &memStore{}, nil, tracer, metrics)
-				res, err := mgr.HandleClaimTagCommand(ctx, base(nil))
-				if err == nil || res.Error == nil {
-					t.Fatalf("expected resolver error path")
-				}
-			})
+	t.Run("invalid range option", func(t *testing.T) {
+		sess := discord.NewFakeSession()
+		helper := &fakeHelpers{}
+		resolver := &fakeGuildConfigResolver{
+			GetGuildConfigWithContextFunc: func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
+				return &storage.GuildConfig{}, nil
+			},
+		}
+		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, &memStore{}, nil, tracer, metrics)
+		opt := &discordgo.ApplicationCommandInteractionDataOption{Type: discordgo.ApplicationCommandOptionInteger, Value: float64(0)}
+		res, err := mgr.HandleClaimTagCommand(ctx, base([]*discordgo.ApplicationCommandInteractionDataOption{opt}))
+		if err != nil || res.Error == nil {
+			t.Fatalf("expected validation error for out-of-range tag")
+		}
+	})
 
-			t.Run("no option provided", func(t *testing.T) {
-				sess := discord.NewFakeSession()
-				helper := &fakeHelpers{}
-				resolver := &fakeGuildConfigResolver{
-					GetGuildConfigWithContextFunc: func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
-						return &storage.GuildConfig{}, nil
-					},
-				}
-				mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, &memStore{}, nil, tracer, metrics)
-				res, err := mgr.HandleClaimTagCommand(ctx, base(nil))
-				if err != nil || res.Error == nil {
-					t.Fatalf("expected validation error for missing option")
-				}
-			})
+	t.Run("interaction respond error", func(t *testing.T) {
+		sess := discord.NewFakeSession()
+		sess.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
+			return errors.New("resp err")
+		}
+		helper := &fakeHelpers{}
+		resolver := &fakeGuildConfigResolver{
+			GetGuildConfigWithContextFunc: func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
+				return &storage.GuildConfig{}, nil
+			},
+		}
+		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, &memStore{}, nil, tracer, metrics)
+		opt := &discordgo.ApplicationCommandInteractionDataOption{Type: discordgo.ApplicationCommandOptionInteger, Value: float64(5)}
+		res, err := mgr.HandleClaimTagCommand(ctx, base([]*discordgo.ApplicationCommandInteractionDataOption{opt}))
+		if err == nil || res.Error == nil {
+			t.Fatalf("expected error from InteractionRespond")
+		}
+	})
 
-			t.Run("invalid range option", func(t *testing.T) {
-				sess := discord.NewFakeSession()
-				helper := &fakeHelpers{}
-				resolver := &fakeGuildConfigResolver{
-					GetGuildConfigWithContextFunc: func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
-						return &storage.GuildConfig{}, nil
-					},
-				}
-				mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, &memStore{}, nil, tracer, metrics)
-				opt := &discordgo.ApplicationCommandInteractionDataOption{Type: discordgo.ApplicationCommandOptionInteger, Value: float64(0)}
-				res, err := mgr.HandleClaimTagCommand(ctx, base([]*discordgo.ApplicationCommandInteractionDataOption{opt}))
-				if err != nil || res.Error == nil {
-					t.Fatalf("expected validation error for out-of-range tag")
-				}
-			})
+	t.Run("store set error", func(t *testing.T) {
+		sess := discord.NewFakeSession()
+		// Respond succeeds so we reach Set
+		sess.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
+			return nil
+		}
+		helper := &fakeHelpers{}
+		resolver := &fakeGuildConfigResolver{
+			GetGuildConfigWithContextFunc: func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
+				return &storage.GuildConfig{}, nil
+			},
+		}
+		store := &errStore{}
+		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, store, nil, tracer, metrics)
+		opt := &discordgo.ApplicationCommandInteractionDataOption{Type: discordgo.ApplicationCommandOptionInteger, Value: float64(5)}
+		res, err := mgr.HandleClaimTagCommand(ctx, base([]*discordgo.ApplicationCommandInteractionDataOption{opt}))
+		if err == nil || res.Error == nil {
+			t.Fatalf("expected error from interaction store Set")
+		}
+	})
 
-			t.Run("interaction respond error", func(t *testing.T) {
-				sess := discord.NewFakeSession()
-				sess.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
-					return errors.New("resp err")
-				}
-				helper := &fakeHelpers{}
-				resolver := &fakeGuildConfigResolver{
-					GetGuildConfigWithContextFunc: func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
-						return &storage.GuildConfig{}, nil
-					},
-				}
-				mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, &memStore{}, nil, tracer, metrics)
-				opt := &discordgo.ApplicationCommandInteractionDataOption{Type: discordgo.ApplicationCommandOptionInteger, Value: float64(5)}
-				res, err := mgr.HandleClaimTagCommand(ctx, base([]*discordgo.ApplicationCommandInteractionDataOption{opt}))
-				if err == nil || res.Error == nil {
-					t.Fatalf("expected error from InteractionRespond")
-				}
-			})
+	t.Run("create message error", func(t *testing.T) {
+		sess := discord.NewFakeSession()
+		sess.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
+			return nil
+		}
+		helper := &fakeHelpers{
+			CreateNewMessageFunc: func(payload any, topic string) (*message.Message, error) {
+				return nil, errors.New("create err")
+			},
+		}
+		resolver := &fakeGuildConfigResolver{
+			GetGuildConfigWithContextFunc: func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
+				return &storage.GuildConfig{}, nil
+			},
+		}
+		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, &memStore{}, nil, tracer, metrics)
+		opt := &discordgo.ApplicationCommandInteractionDataOption{Type: discordgo.ApplicationCommandOptionInteger, Value: float64(5)}
+		res, err := mgr.HandleClaimTagCommand(ctx, base([]*discordgo.ApplicationCommandInteractionDataOption{opt}))
+		if err == nil || res.Error == nil {
+			t.Fatalf("expected error from CreateNewMessage")
+		}
+	})
 
-			t.Run("store set error", func(t *testing.T) {
-				sess := discord.NewFakeSession()
-				// Respond succeeds so we reach Set
-				sess.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
-					return nil
-				}
-				helper := &fakeHelpers{}
-				resolver := &fakeGuildConfigResolver{
-					GetGuildConfigWithContextFunc: func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
-						return &storage.GuildConfig{}, nil
-					},
-				}
-				store := &errStore{}
-				mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, store, nil, tracer, metrics)
-				opt := &discordgo.ApplicationCommandInteractionDataOption{Type: discordgo.ApplicationCommandOptionInteger, Value: float64(5)}
-				res, err := mgr.HandleClaimTagCommand(ctx, base([]*discordgo.ApplicationCommandInteractionDataOption{opt}))
-				if err == nil || res.Error == nil {
-					t.Fatalf("expected error from interaction store Set")
-				}
-			})
-
-			t.Run("create message error", func(t *testing.T) {
-				sess := discord.NewFakeSession()
-				sess.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
-					return nil
-				}
-				helper := &fakeHelpers{
-					CreateNewMessageFunc: func(payload any, topic string) (*message.Message, error) {
-						return nil, errors.New("create err")
-					},
-				}
-				resolver := &fakeGuildConfigResolver{
-					GetGuildConfigWithContextFunc: func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
-						return &storage.GuildConfig{}, nil
-					},
-				}
-				mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, helper, cfg, resolver, &memStore{}, nil, tracer, metrics)
-				opt := &discordgo.ApplicationCommandInteractionDataOption{Type: discordgo.ApplicationCommandOptionInteger, Value: float64(5)}
-				res, err := mgr.HandleClaimTagCommand(ctx, base([]*discordgo.ApplicationCommandInteractionDataOption{opt}))
-				if err == nil || res.Error == nil {
-					t.Fatalf("expected error from CreateNewMessage")
-				}
-			})
-
-			t.Run("publish error", func(t *testing.T) {
-				sess := discord.NewFakeSession()
-				sess.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
-					return nil
-				}
-				helper := &fakeHelpers{
-					CreateNewMessageFunc: func(payload any, topic string) (*message.Message, error) {
-						return &message.Message{}, nil
-					},
-				}
-				resolver := &fakeGuildConfigResolver{
-					GetGuildConfigWithContextFunc: func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
-						return &storage.GuildConfig{}, nil
-					},
-				}
-				eb := &fakeEventBus{err: errors.New("pub err")}
-				mgr := NewClaimTagManager(sess, eb, logger, helper, cfg, resolver, &memStore{}, nil, tracer, metrics)
-				opt := &discordgo.ApplicationCommandInteractionDataOption{Type: discordgo.ApplicationCommandOptionInteger, Value: float64(5)}
-				res, err := mgr.HandleClaimTagCommand(ctx, base([]*discordgo.ApplicationCommandInteractionDataOption{opt}))
-				if err == nil || res.Error == nil {
-					t.Fatalf("expected error from Publish")
-				}
-			})
-		})
-	}
+	t.Run("publish error", func(t *testing.T) {
+		sess := discord.NewFakeSession()
+		sess.InteractionRespondFunc = func(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error {
+			return nil
+		}
+		helper := &fakeHelpers{
+			CreateNewMessageFunc: func(payload any, topic string) (*message.Message, error) {
+				return &message.Message{}, nil
+			},
+		}
+		resolver := &fakeGuildConfigResolver{
+			GetGuildConfigWithContextFunc: func(ctx context.Context, guildID string) (*storage.GuildConfig, error) {
+				return &storage.GuildConfig{}, nil
+			},
+		}
+		eb := &fakeEventBus{err: errors.New("pub err")}
+		mgr := NewClaimTagManager(sess, eb, logger, helper, cfg, resolver, &memStore{}, nil, tracer, metrics)
+		opt := &discordgo.ApplicationCommandInteractionDataOption{Type: discordgo.ApplicationCommandOptionInteger, Value: float64(5)}
+		res, err := mgr.HandleClaimTagCommand(ctx, base([]*discordgo.ApplicationCommandInteractionDataOption{opt}))
+		if err == nil || res.Error == nil {
+			t.Fatalf("expected error from Publish")
+		}
+	})
 }
 
 func TestUpdateInteractionResponse_Variants(t *testing.T) {
-	__codexTDCases := []struct {
-		name string
-	}{
-		{name: "default"},
-	}
+	ctx := context.Background()
+	tracer := otel.Tracer("test")
+	metrics := noMetrics{}
+	logger := discard()
+	cfg := &config.Config{}
 
-	for _, __codexTDCase := range __codexTDCases {
-		t.Run(__codexTDCase.name, func(t *testing.T) {
-			ctx := context.Background()
-			tracer := otel.Tracer("test")
-			metrics := noMetrics{}
-			logger := discard()
-			cfg := &config.Config{}
+	t.Run("not found", func(t *testing.T) {
+		mgr := NewClaimTagManager(nil, &fakeEventBus{}, logger, nil, cfg, nil, &memStore{}, nil, tracer, metrics)
+		res, err := mgr.UpdateInteractionResponse(ctx, "missing", "msg")
+		if err != nil || res.Error == nil {
+			t.Fatalf("expected error for missing correlation id")
+		}
+	})
 
-			t.Run("not found", func(t *testing.T) {
-				mgr := NewClaimTagManager(nil, &fakeEventBus{}, logger, nil, cfg, nil, &memStore{}, nil, tracer, metrics)
-				res, err := mgr.UpdateInteractionResponse(ctx, "missing", "msg")
-				if err != nil || res.Error == nil {
-					t.Fatalf("expected error for missing correlation id")
-				}
-			})
+	t.Run("bad stored type", func(t *testing.T) {
+		store := &memStore{m: map[string]any{"cid": 42}}
+		mgr := NewClaimTagManager(nil, &fakeEventBus{}, logger, nil, cfg, nil, store, nil, tracer, metrics)
+		res, err := mgr.UpdateInteractionResponse(ctx, "cid", "msg")
+		if err != nil || res.Error == nil {
+			t.Fatalf("expected error for wrong stored type")
+		}
+	})
 
-			t.Run("bad stored type", func(t *testing.T) {
-				store := &memStore{m: map[string]any{"cid": 42}}
-				mgr := NewClaimTagManager(nil, &fakeEventBus{}, logger, nil, cfg, nil, store, nil, tracer, metrics)
-				res, err := mgr.UpdateInteractionResponse(ctx, "cid", "msg")
-				if err != nil || res.Error == nil {
-					t.Fatalf("expected error for wrong stored type")
-				}
-			})
+	t.Run("edit error", func(t *testing.T) {
+		sess := discord.NewFakeSession()
+		sess.InteractionResponseEditFunc = func(interaction *discordgo.Interaction, edit *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+			return nil, errors.New("edit err")
+		}
+		store := &memStore{m: map[string]any{"cid": &discordgo.Interaction{}}}
+		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, nil, cfg, nil, store, nil, tracer, metrics)
+		res, err := mgr.UpdateInteractionResponse(ctx, "cid", "done")
+		if err != nil || res.Error == nil {
+			t.Fatalf("expected error from InteractionResponseEdit")
+		}
+	})
 
-			t.Run("edit error", func(t *testing.T) {
-				sess := discord.NewFakeSession()
-				sess.InteractionResponseEditFunc = func(interaction *discordgo.Interaction, edit *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
-					return nil, errors.New("edit err")
-				}
-				store := &memStore{m: map[string]any{"cid": &discordgo.Interaction{}}}
-				mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, nil, cfg, nil, store, nil, tracer, metrics)
-				res, err := mgr.UpdateInteractionResponse(ctx, "cid", "done")
-				if err != nil || res.Error == nil {
-					t.Fatalf("expected error from InteractionResponseEdit")
-				}
-			})
-
-			t.Run("success", func(t *testing.T) {
-				sess := discord.NewFakeSession()
-				sess.InteractionResponseEditFunc = func(interaction *discordgo.Interaction, edit *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
-					return &discordgo.Message{}, nil
-				}
-				store := &memStore{m: map[string]any{"cid": &discordgo.Interaction{}}}
-				mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, nil, cfg, nil, store, nil, tracer, metrics)
-				res, err := mgr.UpdateInteractionResponse(ctx, "cid", "updated")
-				if err != nil || res.Error != nil || res.Success == nil {
-					t.Fatalf("expected success, got res=%v err=%v", res, err)
-				}
-				if _, err := store.Get(ctx, "cid"); err == nil {
-					t.Fatalf("expected store to delete correlation id after success")
-				}
-			})
-		})
-	}
+	t.Run("success", func(t *testing.T) {
+		sess := discord.NewFakeSession()
+		sess.InteractionResponseEditFunc = func(interaction *discordgo.Interaction, edit *discordgo.WebhookEdit, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+			return &discordgo.Message{}, nil
+		}
+		store := &memStore{m: map[string]any{"cid": &discordgo.Interaction{}}}
+		mgr := NewClaimTagManager(sess, &fakeEventBus{}, logger, nil, cfg, nil, store, nil, tracer, metrics)
+		res, err := mgr.UpdateInteractionResponse(ctx, "cid", "updated")
+		if err != nil || res.Error != nil || res.Success == nil {
+			t.Fatalf("expected success, got res=%v err=%v", res, err)
+		}
+		if _, err := store.Get(ctx, "cid"); err == nil {
+			t.Fatalf("expected store to delete correlation id after success")
+		}
+	})
 }
 
 // errStore forces Set error

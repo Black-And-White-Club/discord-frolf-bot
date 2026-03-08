@@ -142,66 +142,36 @@ func TestIsConfigTemporaryError(t *testing.T) {
 }
 
 func TestNewConfigNotFoundError(t *testing.T) {
-	__codexTDCases := []struct {
-		name string
-	}{
-		{name: "default"},
+	got := NewConfigNotFoundError("g", "missing")
+	if got == nil {
+		t.Fatalf("expected non-nil error struct")
 	}
-
-	for _, __codexTDCase := range __codexTDCases {
-		t.Run(__codexTDCase.name, func(t *testing.T) {
-			got := NewConfigNotFoundError("g", "missing")
-			if got == nil {
-				t.Fatalf("expected non-nil error struct")
-			}
-			if got.GuildID != "g" || got.Reason != "missing" {
-				t.Fatalf("unexpected fields: %+v", got)
-			}
-		})
+	if got.GuildID != "g" || got.Reason != "missing" {
+		t.Fatalf("unexpected fields: %+v", got)
 	}
 }
 
 func TestNewConfigTemporaryError(t *testing.T) {
-	__codexTDCases := []struct {
-		name string
-	}{
-		{name: "default"},
+	cause := errors.New("boom")
+	got := NewConfigTemporaryError("g", "temporary", cause)
+	if got == nil {
+		t.Fatalf("expected non-nil struct")
 	}
-
-	for _, __codexTDCase := range __codexTDCases {
-		t.Run(__codexTDCase.name, func(t *testing.T) {
-			cause := errors.New("boom")
-			got := NewConfigTemporaryError("g", "temporary", cause)
-			if got == nil {
-				t.Fatalf("expected non-nil struct")
-			}
-			if got.GuildID != "g" || got.Reason != "temporary" {
-				t.Fatalf("unexpected fields: %+v", got)
-			}
-			if !errors.Is(got.Cause, cause) {
-				t.Fatalf("cause mismatch: %v", got.Cause)
-			}
-		})
+	if got.GuildID != "g" || got.Reason != "temporary" {
+		t.Fatalf("unexpected fields: %+v", got)
+	}
+	if !errors.Is(got.Cause, cause) {
+		t.Fatalf("cause mismatch: %v", got.Cause)
 	}
 }
 
 func TestNewConfigLoadingError(t *testing.T) {
-	__codexTDCases := []struct {
-		name string
-	}{
-		{name: "default"},
+	got := NewConfigLoadingError("g")
+	if got == nil {
+		t.Fatalf("expected non-nil struct")
 	}
-
-	for _, __codexTDCase := range __codexTDCases {
-		t.Run(__codexTDCase.name, func(t *testing.T) {
-			got := NewConfigLoadingError("g")
-			if got == nil {
-				t.Fatalf("expected non-nil struct")
-			}
-			if got.GuildID != "g" {
-				t.Fatalf("unexpected GuildID: %+v", got)
-			}
-		})
+	if got.GuildID != "g" {
+		t.Fatalf("unexpected GuildID: %+v", got)
 	}
 }
 

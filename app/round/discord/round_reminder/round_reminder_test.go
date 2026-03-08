@@ -20,85 +20,65 @@ import (
 )
 
 func TestNewRoundReminderManager(t *testing.T) {
-	__codexTDCases := []struct {
-		name string
-	}{
-		{name: "default"},
+	fakeSession := discord.NewFakeSession()
+	fakeEventBus := &testutils.FakeEventBus{}
+	testHandler := loggerfrolfbot.NewTestHandler()
+	logger := slog.New(testHandler)
+	fakeHelper := &testutils.FakeHelpers{}
+	fakeConfig := &config.Config{}
+	fakeTracer := noop.NewTracerProvider().Tracer("test")
+	fakeMetrics := &testutils.FakeDiscordMetrics{}
+	fakeGuildConfigResolver := &testutils.FakeGuildConfigResolver{}
+
+	var nilStoreAny storage.ISInterface[any] = nil
+	var nilStoreGuild storage.ISInterface[storage.GuildConfig] = nil
+	manager := NewRoundReminderManager(fakeSession, fakeEventBus, logger, fakeHelper, fakeConfig, nilStoreAny, nilStoreGuild, fakeTracer, fakeMetrics, fakeGuildConfigResolver)
+	impl, ok := manager.(*roundReminderManager)
+	if !ok {
+		t.Fatalf("Expected *roundReminderManager, got %T", manager)
 	}
 
-	for _, __codexTDCase := range __codexTDCases {
-		t.Run(__codexTDCase.name, func(t *testing.T) {
-			fakeSession := discord.NewFakeSession()
-			fakeEventBus := &testutils.FakeEventBus{}
-			testHandler := loggerfrolfbot.NewTestHandler()
-			logger := slog.New(testHandler)
-			fakeHelper := &testutils.FakeHelpers{}
-			fakeConfig := &config.Config{}
-			fakeTracer := noop.NewTracerProvider().Tracer("test")
-			fakeMetrics := &testutils.FakeDiscordMetrics{}
-			fakeGuildConfigResolver := &testutils.FakeGuildConfigResolver{}
-
-			var nilStoreAny storage.ISInterface[any] = nil
-			var nilStoreGuild storage.ISInterface[storage.GuildConfig] = nil
-			manager := NewRoundReminderManager(fakeSession, fakeEventBus, logger, fakeHelper, fakeConfig, nilStoreAny, nilStoreGuild, fakeTracer, fakeMetrics, fakeGuildConfigResolver)
-			impl, ok := manager.(*roundReminderManager)
-			if !ok {
-				t.Fatalf("Expected *roundReminderManager, got %T", manager)
-			}
-
-			if impl.session != fakeSession {
-				t.Error("Expected session to be assigned")
-			}
-			if impl.publisher != fakeEventBus {
-				t.Error("Expected publisher to be assigned")
-			}
-			if impl.logger != logger {
-				t.Error("Expected logger to be assigned")
-			}
-			if impl.helper != fakeHelper {
-				t.Error("Expected helper to be assigned")
-			}
-			if impl.config != fakeConfig {
-				t.Error("Expected config to be assigned")
-			}
-			if impl.tracer != fakeTracer {
-				t.Error("Expected tracer to be assigned")
-			}
-			if impl.metrics != fakeMetrics {
-				t.Error("Expected metrics to be assigned")
-			}
-			if impl.operationWrapper == nil {
-				t.Error("Expected operationWrapper to be set")
-			}
-		})
+	if impl.session != fakeSession {
+		t.Error("Expected session to be assigned")
+	}
+	if impl.publisher != fakeEventBus {
+		t.Error("Expected publisher to be assigned")
+	}
+	if impl.logger != logger {
+		t.Error("Expected logger to be assigned")
+	}
+	if impl.helper != fakeHelper {
+		t.Error("Expected helper to be assigned")
+	}
+	if impl.config != fakeConfig {
+		t.Error("Expected config to be assigned")
+	}
+	if impl.tracer != fakeTracer {
+		t.Error("Expected tracer to be assigned")
+	}
+	if impl.metrics != fakeMetrics {
+		t.Error("Expected metrics to be assigned")
+	}
+	if impl.operationWrapper == nil {
+		t.Error("Expected operationWrapper to be set")
 	}
 }
 
 func TestNewRoundReminderManager_WithNilLogger(t *testing.T) {
-	__codexTDCases := []struct {
-		name string
-	}{
-		{name: "default"},
-	}
+	fakeSession := discord.NewFakeSession()
+	fakeEventBus := &testutils.FakeEventBus{}
+	fakeHelper := &testutils.FakeHelpers{}
+	fakeConfig := &config.Config{}
+	fakeTracer := noop.NewTracerProvider().Tracer("test")
+	fakeMetrics := &testutils.FakeDiscordMetrics{}
+	fakeGuildConfigResolver := &testutils.FakeGuildConfigResolver{}
 
-	for _, __codexTDCase := range __codexTDCases {
-		t.Run(__codexTDCase.name, func(t *testing.T) {
-			fakeSession := discord.NewFakeSession()
-			fakeEventBus := &testutils.FakeEventBus{}
-			fakeHelper := &testutils.FakeHelpers{}
-			fakeConfig := &config.Config{}
-			fakeTracer := noop.NewTracerProvider().Tracer("test")
-			fakeMetrics := &testutils.FakeDiscordMetrics{}
-			fakeGuildConfigResolver := &testutils.FakeGuildConfigResolver{}
-
-			// Test with nil logger
-			var nilStoreAny storage.ISInterface[any] = nil
-			var nilStoreGuild storage.ISInterface[storage.GuildConfig] = nil
-			manager := NewRoundReminderManager(fakeSession, fakeEventBus, nil, fakeHelper, fakeConfig, nilStoreAny, nilStoreGuild, fakeTracer, fakeMetrics, fakeGuildConfigResolver)
-			if manager == nil {
-				t.Fatal("Expected manager to be created even with nil logger")
-			}
-		})
+	// Test with nil logger
+	var nilStoreAny storage.ISInterface[any] = nil
+	var nilStoreGuild storage.ISInterface[storage.GuildConfig] = nil
+	manager := NewRoundReminderManager(fakeSession, fakeEventBus, nil, fakeHelper, fakeConfig, nilStoreAny, nilStoreGuild, fakeTracer, fakeMetrics, fakeGuildConfigResolver)
+	if manager == nil {
+		t.Fatal("Expected manager to be created even with nil logger")
 	}
 }
 
