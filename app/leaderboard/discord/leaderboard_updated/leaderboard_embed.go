@@ -80,10 +80,10 @@ func formatLeaderboardUser(entry LeaderboardEntry) string {
 	normalizedID := normalizeDiscordUserID(rawUserID)
 
 	switch {
-	case displayName != "":
-		return formatRawLeaderboardUserLabel(displayName)
 	case normalizedID != "":
 		return fmt.Sprintf("<@%s>", normalizedID)
+	case displayName != "":
+		return formatRawLeaderboardUserLabel(displayName)
 	case rawUserID != "":
 		return formatRawLeaderboardUserLabel(rawUserID)
 	default:
