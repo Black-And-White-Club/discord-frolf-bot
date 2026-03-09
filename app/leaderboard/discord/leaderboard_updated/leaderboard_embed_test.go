@@ -31,7 +31,7 @@ func Test_buildLeaderboardDescription(t *testing.T) {
 		if !strings.Contains(got, "🥇") {
 			t.Errorf("expected gold medal, got: %q", got)
 		}
-		if !strings.Contains(got, "user1") {
+		if !strings.Contains(got, "@user1") {
 			t.Errorf("expected user label, got: %q", got)
 		}
 	})
@@ -39,7 +39,7 @@ func Test_buildLeaderboardDescription(t *testing.T) {
 	t.Run("valid discord id prefers display name over mention", func(t *testing.T) {
 		entries := []LeaderboardEntry{{Rank: 1, UserID: "839877196898238526", DisplayName: "Alice"}}
 		got := buildLeaderboardDescription(entries)
-		if !strings.Contains(got, "Alice") {
+		if !strings.Contains(got, "@Alice") {
 			t.Errorf("expected display name for valid ID, got: %q", got)
 		}
 		if strings.Contains(got, "<@839877196898238526>") {
@@ -61,7 +61,7 @@ func Test_buildLeaderboardDescription(t *testing.T) {
 	t.Run("short numeric pseudo-id falls back to plain label", func(t *testing.T) {
 		entries := []LeaderboardEntry{{Rank: 1, UserID: "23"}}
 		got := buildLeaderboardDescription(entries)
-		if !strings.Contains(got, "23") {
+		if !strings.Contains(got, "@23") {
 			t.Errorf("expected plain pseudo-id label, got: %q", got)
 		}
 		if strings.Contains(got, "<@23>") {
@@ -72,10 +72,10 @@ func Test_buildLeaderboardDescription(t *testing.T) {
 	t.Run("short numeric pseudo-id prefers display name when available", func(t *testing.T) {
 		entries := []LeaderboardEntry{{Rank: 1, UserID: "23", DisplayName: "muffinmaster123"}}
 		got := buildLeaderboardDescription(entries)
-		if !strings.Contains(got, "muffinmaster123") {
+		if !strings.Contains(got, "@muffinmaster123") {
 			t.Errorf("expected display-name fallback label, got: %q", got)
 		}
-		if strings.Contains(got, "Tag #1   23") {
+		if strings.Contains(got, "@23") {
 			t.Errorf("expected numeric pseudo-id to be replaced by display name, got: %q", got)
 		}
 	})
@@ -83,10 +83,10 @@ func Test_buildLeaderboardDescription(t *testing.T) {
 	t.Run("placeholder user labels prefer display name when available", func(t *testing.T) {
 		entries := []LeaderboardEntry{{Rank: 1, UserID: "Tag 23 Placeholder", DisplayName: "muffinmaster123"}}
 		got := buildLeaderboardDescription(entries)
-		if !strings.Contains(got, "muffinmaster123") {
+		if !strings.Contains(got, "@muffinmaster123") {
 			t.Errorf("expected display-name fallback label, got: %q", got)
 		}
-		if strings.Contains(got, "Tag 23 Placeholder") {
+		if strings.Contains(got, "@Tag 23 Placeholder") {
 			t.Errorf("expected placeholder label to be replaced, got: %q", got)
 		}
 	})
@@ -102,14 +102,11 @@ func Test_buildLeaderboardDescription(t *testing.T) {
 		}
 	})
 
-	t.Run("plain names are not forced into @handles", func(t *testing.T) {
+	t.Run("plain names still render with @ prefix", func(t *testing.T) {
 		entries := []LeaderboardEntry{{Rank: 1, UserID: "Bobby Waldron"}}
 		got := buildLeaderboardDescription(entries)
-		if !strings.Contains(got, "Bobby Waldron") {
+		if !strings.Contains(got, "@Bobby Waldron") {
 			t.Errorf("expected plain display label, got: %q", got)
-		}
-		if strings.Contains(got, "@Bobby Waldron") {
-			t.Errorf("expected no invented @handle prefix, got: %q", got)
 		}
 	})
 
@@ -192,7 +189,7 @@ func Test_leaderboardUpdateManager_SendLeaderboardEmbed(t *testing.T) {
 					if !strings.Contains(embed.Description, "🥇") {
 						t.Errorf("Expected gold medal in description, got: %q", embed.Description)
 					}
-					if !strings.Contains(embed.Description, "user1") {
+					if !strings.Contains(embed.Description, "@user1") {
 						t.Errorf("Expected user1 in description, got: %q", embed.Description)
 					}
 					if len(embed.Fields) != 0 {

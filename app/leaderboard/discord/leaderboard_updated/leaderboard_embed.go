@@ -81,7 +81,7 @@ func formatLeaderboardUser(entry LeaderboardEntry) string {
 
 	switch {
 	case displayName != "":
-		return displayName
+		return formatRawLeaderboardUserLabel(displayName)
 	case normalizedID != "":
 		return fmt.Sprintf("<@%s>", normalizedID)
 	case rawUserID != "":
@@ -126,14 +126,19 @@ func isLikelyDiscordSnowflake(candidate string) bool {
 func formatRawLeaderboardUserLabel(raw string) string {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
-		return "unknown-user"
+		return "@unknown-user"
 	}
 
 	if strings.HasPrefix(trimmed, "<@") && strings.HasSuffix(trimmed, ">") {
 		return sanitizeDisplayName(trimmed)
 	}
 
-	return sanitizeDisplayName(trimmed)
+	sanitized := sanitizeDisplayName(trimmed)
+	if strings.HasPrefix(sanitized, "@") {
+		return sanitized
+	}
+
+	return fmt.Sprintf("@%s", sanitized)
 }
 
 func sanitizeDisplayName(raw string) string {

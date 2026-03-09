@@ -259,6 +259,9 @@ func preferredProfileDisplayName(profile *usertypes.UserProfile) string {
 	}
 
 	displayName := strings.TrimSpace(profile.DisplayName)
+	if isSyntheticDefaultProfileDisplayName(profile, displayName) {
+		displayName = ""
+	}
 	if profile.UDiscUsername != nil {
 		if username := strings.TrimSpace(*profile.UDiscUsername); username != "" {
 			if displayName == "" || strings.Contains(strings.ToLower(displayName), "placeholder") {
@@ -276,4 +279,20 @@ func preferredProfileDisplayName(profile *usertypes.UserProfile) string {
 	}
 
 	return ""
+}
+
+func isSyntheticDefaultProfileDisplayName(profile *usertypes.UserProfile, displayName string) bool {
+	if profile == nil || displayName == "" {
+		return false
+	}
+
+	userID := strings.TrimSpace(string(profile.UserID))
+	if userID == "" {
+		return false
+	}
+	if len(userID) > 6 {
+		return displayName == "User ..."+userID[len(userID)-6:]
+	}
+
+	return displayName == "User"
 }
