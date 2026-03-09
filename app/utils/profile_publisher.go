@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"strings"
 
 	"github.com/Black-And-White-Club/frolf-bot-shared/eventbus"
 	userevents "github.com/Black-And-White-Club/frolf-bot-shared/events/user"
@@ -27,10 +28,16 @@ func PublishUserProfile(
 		return
 	}
 
-	// Determine display name: prefer guild nickname, fall back to username
-	displayName := user.Username
-	if member != nil && member.Nick != "" {
-		displayName = member.Nick
+	// Determine display name: prefer guild nickname, then Discord global name, then username.
+	displayName := strings.TrimSpace(user.Username)
+	if member != nil {
+		if nickname := strings.TrimSpace(member.Nick); nickname != "" {
+			displayName = nickname
+		} else if globalName := strings.TrimSpace(user.GlobalName); globalName != "" {
+			displayName = globalName
+		}
+	} else if globalName := strings.TrimSpace(user.GlobalName); globalName != "" {
+		displayName = globalName
 	}
 
 	// Avatar hash (empty string if using default)

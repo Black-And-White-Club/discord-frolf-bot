@@ -71,6 +71,7 @@ func TestSignupManager_SyncMember(t *testing.T) {
 		guildID      string
 		userID       string
 		setupSession func(*discord.FakeSession)
+		wantDisplay  string
 		wantErr      bool
 		wantErrMsg   string
 	}{
@@ -90,10 +91,11 @@ func TestSignupManager_SyncMember(t *testing.T) {
 					}, nil
 				}
 			},
-			wantErr: false,
+			wantDisplay: "ServerNickname",
+			wantErr:     false,
 		},
 		{
-			name:    "success without nickname",
+			name:    "success falls back to global name",
 			guildID: "guild-123",
 			userID:  "user-456",
 			setupSession: func(s *discord.FakeSession) {
@@ -101,14 +103,36 @@ func TestSignupManager_SyncMember(t *testing.T) {
 					return &discordgo.Member{
 						Nick: "", // No server nickname
 						User: &discordgo.User{
-							ID:       "user-456",
-							Username: "testuser",
-							Avatar:   "",
+							ID:         "user-456",
+							Username:   "testuser",
+							GlobalName: "Global Display",
+							Avatar:     "",
 						},
 					}, nil
 				}
 			},
-			wantErr: false,
+			wantDisplay: "Global Display",
+			wantErr:     false,
+		},
+		{
+			name:    "success falls back to username",
+			guildID: "guild-123",
+			userID:  "user-456",
+			setupSession: func(s *discord.FakeSession) {
+				s.GuildMemberFunc = func(guildID, userID string, options ...discordgo.RequestOption) (*discordgo.Member, error) {
+					return &discordgo.Member{
+						Nick: "",
+						User: &discordgo.User{
+							ID:         "user-456",
+							Username:   "testuser",
+							GlobalName: "",
+							Avatar:     "",
+						},
+					}, nil
+				}
+			},
+			wantDisplay: "testuser",
+			wantErr:     false,
 		},
 		{
 			name:    "discord API error",
@@ -187,15 +211,26 @@ func TestSignupManager_SyncMember(t *testing.T) {
 					t.Errorf("SyncMember() unexpected error: %v", err)
 				}
 				// Verify event was published on success
-				if len(fakeEventBus.PublishedMessages()) == 0 {
+				messages := fakeEventBus.PublishedMessages()
+				if len(messages) == 0 {
 					t.Error("expected event to be published but none were")
+					return
+				}
+				if tt.wantDisplay != "" {
+					var payload userevents.UserProfileUpdatedPayloadV1
+					if err := json.Unmarshal(messages[0].Payload, &payload); err != nil {
+						t.Fatalf("failed to decode published payload: %v", err)
+					}
+					if payload.DisplayName != tt.wantDisplay {
+						t.Errorf("published display name = %q, want %q", payload.DisplayName, tt.wantDisplay)
+					}
 				}
 			}
 		})
 	}
 }
 
-func TestGuildNickname(t *testing.T) {
+func TestPreferredDiscordDisplayName(t *testing.T) {
 	tests := []struct {
 		name   string
 		member *discordgo.Member
@@ -206,30 +241,44 @@ func TestGuildNickname(t *testing.T) {
 			member: &discordgo.Member{
 				Nick: "ServerNickname",
 				User: &discordgo.User{
-					ID:       "user-123",
-					Username: "originalname",
+					ID:         "user-123",
+					Username:   "originalname",
+					GlobalName: "global-name",
 				},
 			},
 			want: "ServerNickname",
 		},
 		{
-			name: "no nickname returns empty",
+			name: "falls back to global name",
 			member: &discordgo.Member{
 				Nick: "",
 				User: &discordgo.User{
-					ID:       "user-123",
-					Username: "originalname",
+					ID:         "user-123",
+					Username:   "originalname",
+					GlobalName: "global-name",
 				},
 			},
-			want: "",
+			want: "global-name",
+		},
+		{
+			name: "falls back to username",
+			member: &discordgo.Member{
+				Nick: "",
+				User: &discordgo.User{
+					ID:         "user-123",
+					Username:   "originalname",
+					GlobalName: "",
+				},
+			},
+			want: "originalname",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := guildNickname(tt.member)
+			got := preferredDiscordDisplayName(tt.member)
 			if got != tt.want {
-				t.Errorf("guildNickname() = %q, want %q", got, tt.want)
+				t.Errorf("preferredDiscordDisplayName() = %q, want %q", got, tt.want)
 			}
 		})
 	}
@@ -240,6 +289,7 @@ func TestPublishUserProfile(t *testing.T) {
 		name        string
 		member      *discordgo.Member
 		guildID     string
+		wantDisplay string
 		wantPublish bool
 	}{
 		{
@@ -253,6 +303,37 @@ func TestPublishUserProfile(t *testing.T) {
 				},
 			},
 			guildID:     "guild-456",
+			wantDisplay: "TestNick",
+			wantPublish: true,
+		},
+		{
+			name: "falls back to global name",
+			member: &discordgo.Member{
+				Nick: "",
+				User: &discordgo.User{
+					ID:         "user-123",
+					Username:   "testuser",
+					GlobalName: "Global Display",
+					Avatar:     "avatar-hash",
+				},
+			},
+			guildID:     "guild-456",
+			wantDisplay: "Global Display",
+			wantPublish: true,
+		},
+		{
+			name: "falls back to username",
+			member: &discordgo.Member{
+				Nick: "",
+				User: &discordgo.User{
+					ID:         "user-123",
+					Username:   "testuser",
+					GlobalName: "",
+					Avatar:     "avatar-hash",
+				},
+			},
+			guildID:     "guild-456",
+			wantDisplay: "testuser",
 			wantPublish: true,
 		},
 		{
@@ -293,6 +374,15 @@ func TestPublishUserProfile(t *testing.T) {
 			}
 			if !tt.wantPublish && published {
 				t.Error("expected no event to be published but one was")
+			}
+			if tt.wantPublish && tt.wantDisplay != "" {
+				var payload userevents.UserProfileUpdatedPayloadV1
+				if err := json.Unmarshal(eventBus.PublishedMessages()[0].Payload, &payload); err != nil {
+					t.Fatalf("failed to decode published payload: %v", err)
+				}
+				if payload.DisplayName != tt.wantDisplay {
+					t.Errorf("published display name = %q, want %q", payload.DisplayName, tt.wantDisplay)
+				}
 			}
 		})
 	}

@@ -80,30 +80,15 @@ func formatLeaderboardUser(entry LeaderboardEntry) string {
 	normalizedID := normalizeDiscordUserID(rawUserID)
 
 	switch {
+	case displayName != "":
+		return displayName
 	case normalizedID != "":
-		// Real Discord IDs should always render as mentions so Discord resolves
-		// to the current server-visible @name.
 		return fmt.Sprintf("<@%s>", normalizedID)
 	case rawUserID != "":
-		// For human-readable handles (non-Discord IDs), keep the original @label.
-		// But prefer enriched display names for legacy placeholder/numeric IDs.
-		if displayName != "" && (isNumericLeaderboardID(rawUserID) || isPlaceholderLeaderboardLabel(rawUserID)) {
-			return formatRawLeaderboardUserLabel(displayName)
-		}
 		return formatRawLeaderboardUserLabel(rawUserID)
-	case displayName != "":
-		return formatRawLeaderboardUserLabel(displayName)
 	default:
 		return formatRawLeaderboardUserLabel(rawUserID)
 	}
-}
-
-func formatUserMention(userID sharedtypes.DiscordID) string {
-	normalizedID := normalizeDiscordUserID(string(userID))
-	if normalizedID == "" {
-		return ""
-	}
-	return fmt.Sprintf("<@%s>", normalizedID)
 }
 
 func normalizeDiscordUserID(raw string) string {
@@ -138,38 +123,17 @@ func isLikelyDiscordSnowflake(candidate string) bool {
 	return length >= minSnowflakeLen && length <= maxSnowflakeLen
 }
 
-func isNumericLeaderboardID(raw string) bool {
-	if raw == "" {
-		return false
-	}
-	for _, ch := range raw {
-		if ch < '0' || ch > '9' {
-			return false
-		}
-	}
-	return true
-}
-
-func isPlaceholderLeaderboardLabel(raw string) bool {
-	return strings.Contains(strings.ToLower(raw), "placeholder")
-}
-
 func formatRawLeaderboardUserLabel(raw string) string {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
-		return "@unknown-user"
+		return "unknown-user"
 	}
 
 	if strings.HasPrefix(trimmed, "<@") && strings.HasSuffix(trimmed, ">") {
 		return sanitizeDisplayName(trimmed)
 	}
 
-	sanitized := sanitizeDisplayName(trimmed)
-	if strings.HasPrefix(sanitized, "@") {
-		return sanitized
-	}
-
-	return fmt.Sprintf("@%s", sanitized)
+	return sanitizeDisplayName(trimmed)
 }
 
 func sanitizeDisplayName(raw string) string {

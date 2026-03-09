@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -238,7 +239,7 @@ func (sm *signupManager) SyncMember(ctx context.Context, guildID, userID string)
 	sm.logger.InfoContext(ctx, "Profile sync completed",
 		attr.String("guild_id", guildID),
 		attr.String("user_id", userID),
-		attr.String("display_name", guildNickname(member)),
+		attr.String("display_name", preferredDiscordDisplayName(member)),
 	)
 
 	return nil
@@ -256,7 +257,7 @@ func (sm *signupManager) publishUserProfile(ctx context.Context, member *discord
 		UserID:      sharedtypes.DiscordID(user.ID),
 		GuildID:     sharedtypes.GuildID(guildID),
 		Username:    user.Username,
-		DisplayName: guildNickname(member),
+		DisplayName: preferredDiscordDisplayName(member),
 		AvatarHash:  user.Avatar,
 	}
 
@@ -278,9 +279,18 @@ func (sm *signupManager) publishUserProfile(ctx context.Context, member *discord
 	}
 }
 
-// guildNickname returns the member's server-specific nickname, or empty string if none is set.
-func guildNickname(member *discordgo.Member) string {
-	return member.Nick
+// preferredDiscordDisplayName resolves the best user-facing name from Discord profile data.
+func preferredDiscordDisplayName(member *discordgo.Member) string {
+	if member == nil || member.User == nil {
+		return ""
+	}
+	if displayName := strings.TrimSpace(member.Nick); displayName != "" {
+		return displayName
+	}
+	if displayName := strings.TrimSpace(member.User.GlobalName); displayName != "" {
+		return displayName
+	}
+	return strings.TrimSpace(member.User.Username)
 }
 
 // publishRoleSync derives a user's role from their Discord guild roles and publishes
