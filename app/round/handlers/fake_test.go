@@ -414,6 +414,7 @@ func (f *FakeScoreRoundManager) AddLateParticipantToScorecard(ctx context.Contex
 type FakeFinalizeRoundManager struct {
 	TransformRoundToFinalizedScorecardFunc func(payload roundevents.RoundFinalizedEmbedUpdatePayloadV1) (*discordgo.MessageEmbed, []discordgo.MessageComponent, error)
 	FinalizeScorecardEmbedFunc             func(ctx context.Context, eventMessageID string, channelID string, embedPayload roundevents.RoundFinalizedEmbedUpdatePayloadV1) (finalizeround.FinalizeRoundOperationResult, error)
+	PostFinalizedEmbedFunc                 func(ctx context.Context, channelID string, embedPayload roundevents.RoundFinalizedEmbedUpdatePayloadV1) (finalizeround.FinalizeRoundOperationResult, error)
 }
 
 func (f *FakeFinalizeRoundManager) TransformRoundToFinalizedScorecard(payload roundevents.RoundFinalizedEmbedUpdatePayloadV1) (*discordgo.MessageEmbed, []discordgo.MessageComponent, error) {
@@ -426,6 +427,13 @@ func (f *FakeFinalizeRoundManager) TransformRoundToFinalizedScorecard(payload ro
 func (f *FakeFinalizeRoundManager) FinalizeScorecardEmbed(ctx context.Context, eventMessageID string, channelID string, embedPayload roundevents.RoundFinalizedEmbedUpdatePayloadV1) (finalizeround.FinalizeRoundOperationResult, error) {
 	if f.FinalizeScorecardEmbedFunc != nil {
 		return f.FinalizeScorecardEmbedFunc(ctx, eventMessageID, channelID, embedPayload)
+	}
+	return finalizeround.FinalizeRoundOperationResult{}, nil
+}
+
+func (f *FakeFinalizeRoundManager) PostFinalizedEmbed(ctx context.Context, channelID string, embedPayload roundevents.RoundFinalizedEmbedUpdatePayloadV1) (finalizeround.FinalizeRoundOperationResult, error) {
+	if f.PostFinalizedEmbedFunc != nil {
+		return f.PostFinalizedEmbedFunc(ctx, channelID, embedPayload)
 	}
 	return finalizeround.FinalizeRoundOperationResult{}, nil
 }

@@ -65,16 +65,35 @@ func TestRoundHandlers_HandleRoundFinalized(t *testing.T) {
 			},
 		},
 		{
-			name: "missing_discord_message_id_in_context",
+			name: "backfill_round_no_discord_message_id",
+			payload: &roundevents.RoundFinalizedDiscordPayloadV1{
+				RoundID:          testRoundID,
+				DiscordChannelID: "1234",
+				Participants:     []roundtypes.Participant{},
+				Teams:            []roundtypes.NormalizedTeam{},
+			},
+			ctx:     context.Background(), // No discord_message_id → backfill path
+			wantErr: false,
+			wantLen: 0,
+			setup: func(f *FakeRoundDiscord) {
+				f.FinalizeRoundManager.PostFinalizedEmbedFunc = func(ctx context.Context, channelID string, embedPayload roundevents.RoundFinalizedEmbedUpdatePayloadV1) (finalizeround.FinalizeRoundOperationResult, error) {
+					return finalizeround.FinalizeRoundOperationResult{}, nil
+				}
+			},
+		},
+		{
+			name: "post_finalized_embed_fails",
 			payload: &roundevents.RoundFinalizedDiscordPayloadV1{
 				RoundID:          testRoundID,
 				DiscordChannelID: "1234",
 			},
-			ctx:     context.Background(), // Missing discord_message_id
+			ctx:     context.Background(), // No discord_message_id → backfill path
 			wantErr: true,
 			wantLen: 0,
 			setup: func(f *FakeRoundDiscord) {
-				// No setup needed
+				f.FinalizeRoundManager.PostFinalizedEmbedFunc = func(ctx context.Context, channelID string, embedPayload roundevents.RoundFinalizedEmbedUpdatePayloadV1) (finalizeround.FinalizeRoundOperationResult, error) {
+					return finalizeround.FinalizeRoundOperationResult{}, errors.New("failed to post embed")
+				}
 			},
 		},
 	}
