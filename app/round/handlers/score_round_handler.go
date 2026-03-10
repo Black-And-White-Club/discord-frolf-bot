@@ -38,6 +38,11 @@ func (h *RoundHandlers) HandleParticipantScoreUpdated(ctx context.Context, paylo
 		}
 	}
 
+	// Backfill rounds have no pre-existing Discord message; nothing to update.
+	if messageID == "" {
+		return nil, nil
+	}
+
 	// Get the ScoreRoundManager
 	scoreRoundManager := h.service.GetScoreRoundManager()
 
