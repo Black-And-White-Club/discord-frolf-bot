@@ -150,6 +150,60 @@ func (frm *finalizeRoundManager) FinalizeScorecardEmbed(
 	})
 }
 
+// PostFinalizedEmbed posts a new finalized scorecard embed as a new Discord message.
+// Used for backfill rounds that have no pre-existing Discord message.
+func (frm *finalizeRoundManager) PostFinalizedEmbed(
+	ctx context.Context,
+	channelID string,
+	embedPayload roundevents.RoundFinalizedEmbedUpdatePayloadV1,
+) (FinalizeRoundOperationResult, error) {
+	return frm.operationWrapper(ctx, "PostFinalizedEmbed", func(ctx context.Context) (FinalizeRoundOperationResult, error) {
+		if frm.session == nil {
+			return FinalizeRoundOperationResult{}, fmt.Errorf("discord session is nil")
+		}
+
+		resolvedChannelID := channelID
+		if resolvedChannelID == "" && frm.guildConfigResolver != nil && embedPayload.GuildID != "" {
+			if cfg, err := frm.guildConfigResolver.GetGuildConfigWithContext(ctx, string(embedPayload.GuildID)); err == nil && cfg != nil && cfg.EventChannelID != "" {
+				resolvedChannelID = cfg.EventChannelID
+			}
+		}
+
+		if resolvedChannelID == "" {
+			return FinalizeRoundOperationResult{}, fmt.Errorf("channel ID could not be resolved")
+		}
+
+		embed, components, err := frm.TransformRoundToFinalizedScorecard(embedPayload)
+		if err != nil {
+			return FinalizeRoundOperationResult{}, fmt.Errorf("failed to transform finalized scorecard: %w", err)
+		}
+
+		if embed == nil {
+			return FinalizeRoundOperationResult{}, fmt.Errorf("transformed embed is nil")
+		}
+
+		msgSend := &discordgo.MessageSend{
+			Embeds: []*discordgo.MessageEmbed{embed},
+		}
+		if len(components) > 0 {
+			msgSend.Components = components
+		}
+
+		sentMsg, err := frm.session.ChannelMessageSendComplex(resolvedChannelID, msgSend)
+		if err != nil {
+			return FinalizeRoundOperationResult{}, fmt.Errorf("failed to post finalized embed: %w", err)
+		}
+
+		frm.logger.InfoContext(ctx, "Successfully posted backfill finalized embed on Discord",
+			attr.String("discord_message_id", sentMsg.ID),
+			attr.String("channel_id", resolvedChannelID),
+			attr.RoundID("round_id", embedPayload.RoundID),
+		)
+
+		return FinalizeRoundOperationResult{Success: sentMsg}, nil
+	})
+}
+
 func extractLocationFromMessage(msg *discordgo.Message) string {
 	if msg == nil || len(msg.Embeds) == 0 {
 		return ""

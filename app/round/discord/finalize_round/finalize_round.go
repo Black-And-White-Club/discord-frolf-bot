@@ -26,6 +26,7 @@ import (
 type FinalizeRoundManager interface {
 	TransformRoundToFinalizedScorecard(payload roundevents.RoundFinalizedEmbedUpdatePayloadV1) (*discordgo.MessageEmbed, []discordgo.MessageComponent, error)
 	FinalizeScorecardEmbed(ctx context.Context, eventMessageID string, channelID string, embedPayload roundevents.RoundFinalizedEmbedUpdatePayloadV1) (FinalizeRoundOperationResult, error)
+	PostFinalizedEmbed(ctx context.Context, channelID string, embedPayload roundevents.RoundFinalizedEmbedUpdatePayloadV1) (FinalizeRoundOperationResult, error)
 }
 
 type finalizeRoundManager struct {
