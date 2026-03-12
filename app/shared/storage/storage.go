@@ -10,6 +10,8 @@ import (
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
 )
 
+var ErrNotFound = errors.New("item not found or expired")
+
 // ISInterface defines the behavior for the interaction store using Generics [T]
 type ISInterface[T any] interface {
 	Set(ctx context.Context, correlationID string, interaction T) error // Removed TTL from here if you prefer a fixed default, or keep it if you want dynamic
@@ -76,7 +78,7 @@ func (a *guildConfigStoreAdapter) Delete(_ context.Context, correlationID string
 func (a *guildConfigStoreAdapter) Get(_ context.Context, correlationID string) (GuildConfig, error) {
 	config, ok := a.cache.Get(correlationID)
 	if !ok || config == nil {
-		return GuildConfig{}, errors.New("item not found or expired")
+		return GuildConfig{}, ErrNotFound
 	}
 	return *config, nil
 }
@@ -117,7 +119,7 @@ func (ts *InteractionStore[T]) Get(ctx context.Context, correlationID string) (T
 	item, exists := ts.store[correlationID]
 	if !exists || time.Now().UnixNano() > item.expiryTime {
 		var zero T
-		return zero, errors.New("item not found or expired")
+		return zero, ErrNotFound
 	}
 
 	return item.value, nil

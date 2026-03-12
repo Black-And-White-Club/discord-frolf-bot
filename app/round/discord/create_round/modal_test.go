@@ -2,6 +2,7 @@ package createround
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/testutils"
 	"github.com/Black-And-White-Club/discord-frolf-bot/config"
+	discordroundevents "github.com/Black-And-White-Club/frolf-bot-shared/events/discord/round"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/bwmarrin/discordgo"
 	"go.opentelemetry.io/otel/trace/noop"
@@ -134,6 +136,51 @@ func Test_createRoundManager_SendCreateRoundModal(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func Test_createRoundManager_SendCreateRoundModal_UsesContextModalConfig(t *testing.T) {
+	fakeSession := discord.NewFakeSession()
+	fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+		if r.Type != discordgo.InteractionResponseModal {
+			t.Fatalf("expected modal response, got %v", r.Type)
+		}
+		if r.Data.Title != "Schedule Challenge Round" {
+			t.Fatalf("expected custom title, got %q", r.Data.Title)
+		}
+		if r.Data.CustomID != ChallengeScheduleModalCustomID("challenge-1") {
+			t.Fatalf("expected challenge custom ID, got %q", r.Data.CustomID)
+		}
+		return nil
+	}
+
+	crm := &createRoundManager{
+		session:          fakeSession,
+		logger:           testutils.NoOpLogger(),
+		interactionStore: testutils.NewFakeStorage[any](),
+		tracer:           noop.NewTracerProvider().Tracer("test"),
+		metrics:          &testutils.FakeDiscordMetrics{},
+		operationWrapper: testOperationWrapper,
+	}
+
+	_, err := crm.SendCreateRoundModal(
+		WithModalConfig(context.Background(), ModalConfig{
+			CustomID: ChallengeScheduleModalCustomID("challenge-1"),
+			Title:    "Schedule Challenge Round",
+		}),
+		&discordgo.InteractionCreate{
+			Interaction: &discordgo.Interaction{
+				ID:   "interaction-id",
+				Type: discordgo.InteractionApplicationCommand,
+				User: &discordgo.User{ID: "user-123"},
+				Member: &discordgo.Member{
+					User: &discordgo.User{ID: "user-123"},
+				},
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("SendCreateRoundModal() error = %v", err)
 	}
 }
 
@@ -301,7 +348,133 @@ func Test_createRoundManager_HandleCreateRoundModalCancel(t *testing.T) {
 	}
 }
 
+func Test_createRoundManager_HandleCreateRoundModalSubmit_PublishesChallengeIDInPayload(t *testing.T) {
+	fakeSession := discord.NewFakeSession()
+	fakePublisher := &testutils.FakeEventBus{}
+	fakeStorage := testutils.NewFakeStorage[any]()
+
+	fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+		return nil
+	}
+	fakeStorage.SetFunc = func(ctx context.Context, key string, value any) error {
+		return nil
+	}
+
+	var publishedPayload discordroundevents.CreateRoundModalPayloadV1
+	fakePublisher.PublishFunc = func(topic string, messages ...*message.Message) error {
+		if topic != discordroundevents.RoundCreateModalSubmittedV1 {
+			t.Fatalf("unexpected topic %q", topic)
+		}
+		if len(messages) != 1 {
+			t.Fatalf("expected 1 message, got %d", len(messages))
+		}
+		if err := json.Unmarshal(messages[0].Payload, &publishedPayload); err != nil {
+			t.Fatalf("failed to unmarshal payload: %v", err)
+		}
+		return nil
+	}
+
+	crm := &createRoundManager{
+		session:          fakeSession,
+		publisher:        fakePublisher,
+		logger:           testutils.NoOpLogger(),
+		helper:           &testutils.FakeHelpers{},
+		config:           &config.Config{},
+		interactionStore: fakeStorage,
+		operationWrapper: testOperationWrapper,
+		challengeValidator: func(ctx context.Context, i *discordgo.InteractionCreate, challengeID string) error {
+			return nil
+		},
+	}
+
+	interaction := createTestInteractionWithCustomID(
+		ChallengeScheduleModalCustomID("challenge-22"),
+		"Test Round",
+		"Fun round description",
+		"2025-04-01 14:00",
+		"America/Chicago",
+		"Disc Golf Park",
+	)
+	if got := interaction.ModalSubmitData().CustomID; got != ChallengeScheduleModalCustomID("challenge-22") {
+		t.Fatalf("expected modal custom ID %q, got %q", ChallengeScheduleModalCustomID("challenge-22"), got)
+	}
+	if got := challengeScheduleIDFromCustomID(interaction.ModalSubmitData().CustomID); got != "challenge-22" {
+		t.Fatalf("expected parsed challenge ID challenge-22, got %q", got)
+	}
+
+	if _, err := crm.HandleCreateRoundModalSubmit(context.Background(), interaction); err != nil {
+		t.Fatalf("HandleCreateRoundModalSubmit() error = %v", err)
+	}
+
+	if publishedPayload.ChallengeID == nil || *publishedPayload.ChallengeID != "challenge-22" {
+		t.Fatalf("expected challenge_id challenge-22, got %+v", publishedPayload.ChallengeID)
+	}
+}
+
+func Test_createRoundManager_HandleCreateRoundModalSubmit_RejectsInvalidChallengeScheduleAfterAck(t *testing.T) {
+	fakeSession := discord.NewFakeSession()
+	fakePublisher := &testutils.FakeEventBus{}
+	fakeStorage := testutils.NewFakeStorage[any]()
+
+	var ackContent string
+	var editedContent string
+	fakeSession.InteractionRespondFunc = func(i *discordgo.Interaction, r *discordgo.InteractionResponse, opts ...discordgo.RequestOption) error {
+		if r.Data != nil {
+			ackContent = r.Data.Content
+		}
+		return nil
+	}
+	fakeSession.InteractionResponseEditFunc = func(i *discordgo.Interaction, edit *discordgo.WebhookEdit, opts ...discordgo.RequestOption) (*discordgo.Message, error) {
+		if edit.Content != nil {
+			editedContent = *edit.Content
+		}
+		return &discordgo.Message{ID: "edited"}, nil
+	}
+	fakePublisher.PublishFunc = func(topic string, messages ...*message.Message) error {
+		t.Fatal("expected modal submit to stop before publishing round request")
+		return nil
+	}
+
+	crm := &createRoundManager{
+		session:          fakeSession,
+		publisher:        fakePublisher,
+		logger:           testutils.NoOpLogger(),
+		helper:           &testutils.FakeHelpers{},
+		config:           &config.Config{},
+		interactionStore: fakeStorage,
+		operationWrapper: testOperationWrapper,
+		challengeValidator: func(ctx context.Context, i *discordgo.InteractionCreate, challengeID string) error {
+			if challengeID != "challenge-44" {
+				t.Fatalf("expected challenge-44, got %q", challengeID)
+			}
+			return errors.New("Only accepted challenges can schedule a round.")
+		},
+	}
+
+	if _, err := crm.HandleCreateRoundModalSubmit(context.Background(), createTestInteractionWithCustomID(
+		ChallengeScheduleModalCustomID("challenge-44"),
+		"Test Round",
+		"Fun round description",
+		"2025-04-01 14:00",
+		"America/Chicago",
+		"Disc Golf Park",
+	)); err != nil {
+		t.Fatalf("HandleCreateRoundModalSubmit() error = %v", err)
+	}
+
+	if ackContent != "Round creation request received" {
+		t.Fatalf("expected immediate ack, got %q", ackContent)
+	}
+	if editedContent != "❌ Round creation failed: Only accepted challenges can schedule a round." {
+		t.Fatalf("unexpected edited content: %q", editedContent)
+	}
+}
+
 func createTestInteraction(title, description, startTime, timezone, location string) *discordgo.InteractionCreate {
+	return createTestInteractionWithCustomID(defaultCreateRoundModalID, title, description, startTime, timezone, location)
+}
+
+func createTestInteractionWithCustomID(customID, title, description, startTime, timezone, location string) *discordgo.InteractionCreate {
 	return &discordgo.InteractionCreate{
 		Interaction: &discordgo.Interaction{
 			ID:      "interaction-id",
@@ -312,7 +485,7 @@ func createTestInteraction(title, description, startTime, timezone, location str
 			},
 			Type: discordgo.InteractionModalSubmit,
 			Data: discordgo.ModalSubmitInteractionData{
-				CustomID: "create_round_modal",
+				CustomID: customID,
 				Components: []discordgo.MessageComponent{
 					&discordgo.ActionsRow{Components: []discordgo.MessageComponent{&discordgo.TextInput{CustomID: "title", Value: title}}},
 					&discordgo.ActionsRow{Components: []discordgo.MessageComponent{&discordgo.TextInput{CustomID: "description", Value: description}}},

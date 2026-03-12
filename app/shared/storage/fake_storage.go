@@ -68,12 +68,12 @@ func (f *FakeStorage[T]) Get(ctx context.Context, correlationID string) (T, erro
 	val, ok := f.data[correlationID]
 	if !ok {
 		var zero T
-		return zero, errors.New("item not found or expired")
+		return zero, ErrNotFound
 	}
 
 	if !val.expiresAt.IsZero() && time.Now().After(val.expiresAt) {
 		var zero T
-		return zero, errors.New("item not found or expired")
+		return zero, ErrNotFound
 	}
 
 	return val.value, nil

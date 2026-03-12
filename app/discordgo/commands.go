@@ -9,7 +9,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-const guildCommandManifestVersion = "2026-02-18.1"
+const guildCommandManifestVersion = "2026-03-11.2"
 
 // GuildCommandManifestVersion returns the current guild command manifest version.
 func GuildCommandManifestVersion() string {
@@ -188,6 +188,101 @@ func desiredCommands(targetGuildID string) []*discordgo.ApplicationCommand {
 		{
 			Name:        "dashboard",
 			Description: "Get a link to access the Frolf PWA dashboard",
+		},
+		{
+			Name:        "challenge",
+			Description: "Open, manage, and link club challenges",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionSubCommand,
+					Name:        "open",
+					Description: "Challenge another player",
+					Options: []*discordgo.ApplicationCommandOption{
+						{
+							Type:        discordgo.ApplicationCommandOptionUser,
+							Name:        "user",
+							Description: "The player to challenge",
+							Required:    true,
+						},
+					},
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionSubCommand,
+					Name:        "schedule",
+					Description: "Schedule a new round for an accepted challenge",
+					Options: []*discordgo.ApplicationCommandOption{
+						{
+							Type:        discordgo.ApplicationCommandOptionString,
+							Name:        "challenge_id",
+							Description: "The challenge ID",
+							Required:    true,
+						},
+					},
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionSubCommand,
+					Name:        "withdraw",
+					Description: "Withdraw one of your active challenges",
+					Options: []*discordgo.ApplicationCommandOption{
+						{
+							Type:        discordgo.ApplicationCommandOptionString,
+							Name:        "challenge_id",
+							Description: "The challenge ID",
+							Required:    true,
+						},
+					},
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionSubCommand,
+					Name:        "link",
+					Description: "Link an existing round to an accepted challenge",
+					Options: []*discordgo.ApplicationCommandOption{
+						{
+							Type:        discordgo.ApplicationCommandOptionString,
+							Name:        "challenge_id",
+							Description: "The challenge ID",
+							Required:    true,
+						},
+						{
+							Type:        discordgo.ApplicationCommandOptionString,
+							Name:        "round_id",
+							Description: "The round ID",
+							Required:    true,
+						},
+					},
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionSubCommand,
+					Name:        "unlink",
+					Description: "Remove the round currently linked to a challenge",
+					Options: []*discordgo.ApplicationCommandOption{
+						{
+							Type:        discordgo.ApplicationCommandOptionString,
+							Name:        "challenge_id",
+							Description: "The challenge ID",
+							Required:    true,
+						},
+					},
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionSubCommand,
+					Name:        "hide",
+					Description: "Hide a challenge from the board",
+					Options: []*discordgo.ApplicationCommandOption{
+						{
+							Type:        discordgo.ApplicationCommandOptionString,
+							Name:        "challenge_id",
+							Description: "The challenge ID",
+							Required:    true,
+						},
+					},
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionSubCommand,
+					Name:        "list",
+					Description: "See where active challenges are surfaced",
+				},
+			},
 		},
 		{
 			Name:        "invite",

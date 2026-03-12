@@ -71,7 +71,7 @@ func TestRegisterCommands_ReconcileGuildCommands_CreatesUpdatesDeletes(t *testin
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	for _, name := range []string{"createround", "claimtag", "set-udisc-name", "season"} {
+	for _, name := range []string{"createround", "claimtag", "set-udisc-name", "challenge", "season"} {
 		if !created[name] {
 			t.Fatalf("expected command %q to be created; created=%v", name, created)
 		}
@@ -153,44 +153,53 @@ func TestRegisterCommands_RetriesTransientCreateFailure(t *testing.T) {
 	}
 
 	fs.ApplicationCommandsFunc = func(appID, guildID string, options ...discordgo.RequestOption) ([]*discordgo.ApplicationCommand, error) {
-		desired := desiredCommands("g1")
+		desiredByName := map[string]*discordgo.ApplicationCommand{}
+		for _, cmd := range desiredCommands("g1") {
+			desiredByName[cmd.Name] = cmd
+		}
 		return []*discordgo.ApplicationCommand{
 			{
 				ID:          "cmd-updaterole",
-				Name:        desired[0].Name,
-				Description: desired[0].Description,
-				Options:     desired[0].Options,
+				Name:        desiredByName["updaterole"].Name,
+				Description: desiredByName["updaterole"].Description,
+				Options:     desiredByName["updaterole"].Options,
 			},
 			{
 				ID:          "cmd-createround",
-				Name:        desired[1].Name,
-				Description: desired[1].Description,
-				Options:     desired[1].Options,
+				Name:        desiredByName["createround"].Name,
+				Description: desiredByName["createround"].Description,
+				Options:     desiredByName["createround"].Options,
 			},
 			{
 				ID:          "cmd-claimtag",
-				Name:        desired[2].Name,
-				Description: desired[2].Description,
-				Options:     desired[2].Options,
+				Name:        desiredByName["claimtag"].Name,
+				Description: desiredByName["claimtag"].Description,
+				Options:     desiredByName["claimtag"].Options,
 			},
 			{
 				ID:          "cmd-set-udisc-name",
-				Name:        desired[3].Name,
-				Description: desired[3].Description,
-				Options:     desired[3].Options,
+				Name:        desiredByName["set-udisc-name"].Name,
+				Description: desiredByName["set-udisc-name"].Description,
+				Options:     desiredByName["set-udisc-name"].Options,
+			},
+			{
+				ID:          "cmd-dashboard",
+				Name:        desiredByName["dashboard"].Name,
+				Description: desiredByName["dashboard"].Description,
+				Options:     desiredByName["dashboard"].Options,
 			},
 			{
 				ID:          "cmd-invite",
-				Name:        desired[5].Name,
-				Description: desired[5].Description,
-				Options:     desired[5].Options,
+				Name:        desiredByName["invite"].Name,
+				Description: desiredByName["invite"].Description,
+				Options:     desiredByName["invite"].Options,
 			},
 			{
 				ID:                       "cmd-season",
-				Name:                     desired[6].Name,
-				Description:              desired[6].Description,
-				Options:                  desired[6].Options,
-				DefaultMemberPermissions: desired[6].DefaultMemberPermissions,
+				Name:                     desiredByName["season"].Name,
+				Description:              desiredByName["season"].Description,
+				Options:                  desiredByName["season"].Options,
+				DefaultMemberPermissions: desiredByName["season"].DefaultMemberPermissions,
 			},
 		}, nil
 	}
@@ -198,7 +207,7 @@ func TestRegisterCommands_RetriesTransientCreateFailure(t *testing.T) {
 	createCalls := 0
 	fs.ApplicationCommandCreateFunc = func(appID, guildID string, cmd *discordgo.ApplicationCommand, options ...discordgo.RequestOption) (*discordgo.ApplicationCommand, error) {
 		createCalls++
-		if cmd.Name == "dashboard" && createCalls < 3 {
+		if cmd.Name == "challenge" && createCalls < 3 {
 			return nil, &discordgo.RESTError{
 				Response: &http.Response{StatusCode: http.StatusInternalServerError},
 				Message:  &discordgo.APIErrorMessage{Code: 0, Message: "server error"},
@@ -212,5 +221,38 @@ func TestRegisterCommands_RetriesTransientCreateFailure(t *testing.T) {
 	}
 	if createCalls != 3 {
 		t.Fatalf("expected 3 create attempts for transient failures, got %d", createCalls)
+	}
+}
+
+func TestDesiredCommands_ChallengeIncludesScheduleSubcommand(t *testing.T) {
+	var challengeCommand *discordgo.ApplicationCommand
+	for _, cmd := range desiredCommands("g1") {
+		if cmd.Name == "challenge" {
+			challengeCommand = cmd
+			break
+		}
+	}
+	if challengeCommand == nil {
+		t.Fatal("expected challenge command in manifest")
+	}
+
+	var scheduleOption *discordgo.ApplicationCommandOption
+	for _, option := range challengeCommand.Options {
+		if option.Name == "schedule" {
+			scheduleOption = option
+			break
+		}
+	}
+	if scheduleOption == nil {
+		t.Fatal("expected schedule subcommand in challenge manifest")
+	}
+	if scheduleOption.Type != discordgo.ApplicationCommandOptionSubCommand {
+		t.Fatalf("expected schedule to be a subcommand, got %v", scheduleOption.Type)
+	}
+	if len(scheduleOption.Options) != 1 {
+		t.Fatalf("expected schedule to accept exactly one option, got %d", len(scheduleOption.Options))
+	}
+	if scheduleOption.Options[0].Name != "challenge_id" || !scheduleOption.Options[0].Required {
+		t.Fatalf("unexpected schedule option definition: %+v", scheduleOption.Options[0])
 	}
 }

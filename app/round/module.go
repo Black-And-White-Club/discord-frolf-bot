@@ -31,8 +31,9 @@ import (
 
 // RoundModuleResult contains the results of initializing the round module.
 type RoundModuleResult struct {
-	Router         *roundrouter.RoundRouter
-	NativeEventMap rounddiscord.NativeEventMap
+	Router             *roundrouter.RoundRouter
+	NativeEventMap     rounddiscord.NativeEventMap
+	CreateRoundManager createround.CreateRoundManager
 }
 
 // InitializeRoundModule initializes the Round domain module.
@@ -141,7 +142,8 @@ func InitializeRoundModule(
 
 	logger.InfoContext(ctx, "Round module initialized successfully")
 	return &RoundModuleResult{
-		Router:         rr,
-		NativeEventMap: roundDiscord.GetNativeEventMap(),
+		Router:             rr,
+		NativeEventMap:     roundDiscord.GetNativeEventMap(),
+		CreateRoundManager: roundDiscord.GetCreateRoundManager(),
 	}, nil
 }
