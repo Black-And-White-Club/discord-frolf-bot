@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
@@ -52,6 +53,7 @@ type createRoundManager struct {
 	metrics             discordmetrics.DiscordMetrics
 	operationWrapper    func(ctx context.Context, opName string, fn func(ctx context.Context) (CreateRoundOperationResult, error)) (CreateRoundOperationResult, error)
 	guildConfigResolver guildconfig.GuildConfigResolver
+	challengeValidator  ChallengeScheduleValidator
 }
 
 // NewCreateRoundManager creates a new CreateRoundManager instance.
@@ -161,6 +163,62 @@ type CreateRoundOperationResult struct {
 	Success interface{}
 	Failure interface{}
 	Error   error
+}
+
+type ChallengeScheduleValidator func(ctx context.Context, i *discordgo.InteractionCreate, challengeID string) error
+
+type ModalConfig struct {
+	CustomID string
+	Title    string
+}
+
+type modalConfigContextKey struct{}
+
+const (
+	defaultCreateRoundModalID    = "create_round_modal"
+	defaultCreateRoundModalTitle = "Create Round"
+	challengeScheduleModalPrefix = defaultCreateRoundModalID + "|challenge_id="
+)
+
+func WithModalConfig(ctx context.Context, cfg ModalConfig) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, modalConfigContextKey{}, cfg)
+}
+
+func ChallengeScheduleModalCustomID(challengeID string) string {
+	if challengeID == "" {
+		return defaultCreateRoundModalID
+	}
+	return challengeScheduleModalPrefix + challengeID
+}
+
+func modalConfigFromContext(ctx context.Context) ModalConfig {
+	cfg, _ := ctx.Value(modalConfigContextKey{}).(ModalConfig)
+	if cfg.CustomID == "" {
+		cfg.CustomID = defaultCreateRoundModalID
+	}
+	if cfg.Title == "" {
+		cfg.Title = defaultCreateRoundModalTitle
+	}
+	return cfg
+}
+
+func challengeScheduleIDFromCustomID(customID string) string {
+	if strings.HasPrefix(customID, challengeScheduleModalPrefix) {
+		if id := strings.TrimPrefix(customID, challengeScheduleModalPrefix); id != "" {
+			return id
+		}
+	}
+	return ""
+}
+
+func (crm *createRoundManager) SetChallengeScheduleValidator(validator ChallengeScheduleValidator) {
+	if crm == nil {
+		return
+	}
+	crm.challengeValidator = validator
 }
 
 // createEvent creates and marshals a Watermill message and assigns a correlation ID.

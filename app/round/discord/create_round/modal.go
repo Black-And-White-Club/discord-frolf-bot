@@ -42,6 +42,8 @@ func (crm *createRoundManager) SendCreateRoundModal(ctx context.Context, i *disc
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.CommandNameKey, "send_create_round_modal")
 	ctx = discordmetrics.WithValue(ctx, discordmetrics.InteractionType, "command")
 
+	modalConfig := modalConfigFromContext(ctx)
+
 	result, _ := crm.operationWrapper(ctx, "send_create_round_modal", func(ctx context.Context) (CreateRoundOperationResult, error) {
 		if err := ctx.Err(); err != nil {
 			return CreateRoundOperationResult{Error: err}, err
@@ -52,8 +54,8 @@ func (crm *createRoundManager) SendCreateRoundModal(ctx context.Context, i *disc
 		err := crm.session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseModal,
 			Data: &discordgo.InteractionResponseData{
-				Title:    "Create Round",
-				CustomID: "create_round_modal",
+				Title:    modalConfig.Title,
+				CustomID: modalConfig.CustomID,
 				Components: []discordgo.MessageComponent{
 					discordgo.ActionsRow{
 						Components: []discordgo.MessageComponent{
@@ -236,6 +238,16 @@ func (crm *createRoundManager) HandleCreateRoundModalSubmit(ctx context.Context,
 			return CreateRoundOperationResult{Error: acknowledgeErr}, acknowledgeErr
 		}
 
+		if challengeID := challengeScheduleIDFromCustomID(data.CustomID); challengeID != "" {
+			if validationErr := crm.validateChallengeScheduleSubmission(ctx, i, challengeID); validationErr != nil {
+				errorMessage := "❌ Round creation failed: " + validationErr.Error()
+				if editErr := crm.updateCurrentInteractionResponse(i, errorMessage); editErr != nil {
+					return CreateRoundOperationResult{Error: fmt.Errorf("failed to update challenge validation response: %w", editErr)}, fmt.Errorf("failed to update challenge validation response: %w", editErr)
+				}
+				return CreateRoundOperationResult{Error: validationErr}, nil
+			}
+		}
+
 		// Lookup the event channel ID from guildconfig
 		var eventChannelID string
 		if crm.guildConfigResolver != nil {
@@ -262,6 +274,10 @@ func (crm *createRoundManager) HandleCreateRoundModalSubmit(ctx context.Context,
 			GuildID:     sharedtypes.GuildID(i.GuildID),
 		}
 
+		if challengeID := challengeScheduleIDFromCustomID(data.CustomID); challengeID != "" {
+			payload.ChallengeID = &challengeID
+		}
+
 		crm.logger.InfoContext(ctx, "Publishing event for Modal validation", attr.Any("payload", payload))
 
 		msg, correlationID, err := crm.createEvent(ctx, discordroundevents.RoundCreateModalSubmittedV1, payload, i)
@@ -279,6 +295,11 @@ func (crm *createRoundManager) HandleCreateRoundModalSubmit(ctx context.Context,
 		msg.Metadata.Set("correlation_id", correlationID)
 		msg.Metadata.Set("user_id", userID)
 
+		if challengeID := challengeScheduleIDFromCustomID(data.CustomID); challengeID != "" {
+			msg.Metadata.Set("challenge_id", challengeID)
+			msg.Metadata.Set("challenge_actor_external_id", userID)
+		}
+
 		if err := crm.publisher.Publish(discordroundevents.RoundCreateModalSubmittedV1, msg); err != nil {
 			publishErr := fmt.Errorf("failed to publish event: %w", err)
 			return CreateRoundOperationResult{Error: publishErr}, publishErr
@@ -287,6 +308,24 @@ func (crm *createRoundManager) HandleCreateRoundModalSubmit(ctx context.Context,
 		crm.logger.InfoContext(ctx, "Round creation request published", attr.UserID(sharedtypes.DiscordID(userID)))
 		return CreateRoundOperationResult{Success: "round creation request published"}, nil
 	})
+}
+
+func (crm *createRoundManager) validateChallengeScheduleSubmission(ctx context.Context, i *discordgo.InteractionCreate, challengeID string) error {
+	if challengeID == "" {
+		return nil
+	}
+	if crm.challengeValidator == nil {
+		return fmt.Errorf("Challenge scheduling is unavailable right now.")
+	}
+	return crm.challengeValidator(ctx, i, challengeID)
+}
+
+func (crm *createRoundManager) updateCurrentInteractionResponse(i *discordgo.InteractionCreate, message string) error {
+	_, err := crm.session.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+		Content:    &message,
+		Components: &[]discordgo.MessageComponent{},
+	})
+	return err
 }
 
 // HandleCreateRoundModalCancel handles the cancellation of the create round modal.

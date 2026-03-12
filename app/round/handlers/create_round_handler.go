@@ -38,6 +38,7 @@ func (h *RoundHandlers) HandleRoundCreateRequested(ctx context.Context, payload 
 		ChannelID:     payload.ChannelID,
 		Timezone:      payload.Timezone,
 		RequestSource: stringPtr("discord"),
+		ChallengeID:   payload.ChallengeID,
 	}
 
 	return []handlerwrapper.Result{
@@ -143,6 +144,7 @@ func (h *RoundHandlers) HandleRoundCreated(ctx context.Context, payload *roundev
 			GuildID:            payload.GuildID,
 			RoundID:            roundID,
 			NativeEventPlanned: boolPtr(discordEventID != ""),
+			ChallengeID:        payload.ChallengeID,
 		},
 		Metadata: map[string]string{
 			"discord_message_id": discordMessageID,

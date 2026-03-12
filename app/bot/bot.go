@@ -12,6 +12,8 @@ import (
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/auth"
 	authrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/auth/watermill"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/club"
+	clubrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/club/router"
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/guild"
 	guildrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/guild/router"
@@ -60,6 +62,7 @@ type DiscordBot struct {
 	UserWatermillRouter        *message.Router
 	RoundWatermillRouter       *message.Router
 	ScoreWatermillRouter       *message.Router
+	ClubWatermillRouter        *message.Router
 	LeaderboardWatermillRouter *message.Router
 	GuildWatermillRouter       *message.Router
 	AuthWatermillRouter        *message.Router
@@ -69,6 +72,7 @@ type DiscordBot struct {
 	RoundRouter       *roundrouter.RoundRouter
 	NativeEventMap    rounddiscord.NativeEventMap
 	ScoreRouter       *scorerouter.ScoreRouter
+	ClubRouter        *clubrouter.ClubRouter
 	LeaderboardRouter *leaderboardrouter.LeaderboardRouter
 	GuildRouter       *guildrouter.GuildRouter
 	AuthRouter        *authrouter.AuthRouter
@@ -240,6 +244,11 @@ func NewDiscordBot(
 		return nil, fmt.Errorf("failed to create score router: %w", err)
 	}
 
+	clubRouter, err := message.NewRouter(message.RouterConfig{}, watermill.NopLogger{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create club router: %w", err)
+	}
+
 	leaderboardRouter, err := message.NewRouter(message.RouterConfig{}, watermill.NopLogger{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create leaderboard router: %w", err)
@@ -268,6 +277,7 @@ func NewDiscordBot(
 		UserWatermillRouter:        userRouter,
 		RoundWatermillRouter:       roundRouter,
 		ScoreWatermillRouter:       scoreRouter,
+		ClubWatermillRouter:        clubRouter,
 		LeaderboardWatermillRouter: leaderboardRouter,
 		GuildWatermillRouter:       guildRouter,
 		AuthWatermillRouter:        authRouter,
@@ -352,7 +362,7 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 	bot.Logger.Info("Starting Discord bot initialization")
 
 	var commandSyncOnce sync.Once
-	routerErrCh := make(chan error, 6)
+	routerErrCh := make(chan error, 7)
 	reportFatalRouterError := func(name string, err error) {
 		if err == nil || errors.Is(err, context.Canceled) {
 			return
@@ -443,6 +453,23 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 	)
 	if err != nil {
 		return fmt.Errorf("score module initialization failed: %w", err)
+	}
+
+	bot.ClubRouter, err = club.InitializeClubModule(
+		ctx,
+		bot.Session,
+		bot.ClubWatermillRouter,
+		registry,
+		bot.EventBus,
+		bot.Logger,
+		bot.Config,
+		bot.Helper,
+		bot.GuildConfigResolver,
+		bot.Metrics,
+		roundResult.CreateRoundManager,
+	)
+	if err != nil {
+		return fmt.Errorf("club module initialization failed: %w", err)
 	}
 
 	bot.LeaderboardRouter, err = leaderboard.InitializeLeaderboardModule(
@@ -606,6 +633,7 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 	startRouter("User", bot.UserWatermillRouter)
 	startRouter("Round", bot.RoundWatermillRouter)
 	startRouter("Score", bot.ScoreWatermillRouter)
+	startRouter("Club", bot.ClubWatermillRouter)
 	startRouter("Leaderboard", bot.LeaderboardWatermillRouter)
 	startRouter("Auth", bot.AuthWatermillRouter)
 
@@ -866,6 +894,16 @@ func (bot *DiscordBot) Shutdown(ctx context.Context) error {
 			}
 			bot.ScoreRouter = nil
 		}
+		if bot.ClubRouter != nil {
+			bot.Logger.Info("Closing club router...")
+			if err := bot.ClubRouter.Close(); err != nil {
+				bot.Logger.Warn("Error closing club router", attr.Error(err))
+				if shutdownErr == nil {
+					shutdownErr = err
+				}
+			}
+			bot.ClubRouter = nil
+		}
 		if bot.LeaderboardRouter != nil {
 			bot.Logger.Info("Closing leaderboard router...")
 			if err := bot.LeaderboardRouter.Close(); err != nil {
@@ -917,6 +955,16 @@ func (bot *DiscordBot) Shutdown(ctx context.Context) error {
 				}
 			}
 			bot.ScoreWatermillRouter = nil
+		}
+		if bot.ClubWatermillRouter != nil {
+			bot.Logger.Info("Closing club watermill router...")
+			if err := bot.ClubWatermillRouter.Close(); err != nil {
+				bot.Logger.Warn("Error closing club watermill router", attr.Error(err))
+				if shutdownErr == nil {
+					shutdownErr = err
+				}
+			}
+			bot.ClubWatermillRouter = nil
 		}
 		if bot.LeaderboardWatermillRouter != nil {
 			bot.Logger.Info("Closing leaderboard watermill router...")

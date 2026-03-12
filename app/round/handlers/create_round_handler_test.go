@@ -42,6 +42,7 @@ func TestRoundHandlers_HandleRoundCreateRequested(t *testing.T) {
 				UserID:      "user123",
 				ChannelID:   "channel123",
 				Timezone:    "America/New_York",
+				ChallengeID: func() *string { v := "challenge-7"; return &v }(),
 			},
 			ctx:     context.Background(),
 			want:    nil, // We'll check the length instead of deep equality
@@ -89,6 +90,9 @@ func TestRoundHandlers_HandleRoundCreateRequested(t *testing.T) {
 				}
 				if payload.RequestSource == nil || *payload.RequestSource != "discord" {
 					t.Fatalf("HandleRoundCreateRequested() request source = %+v, want discord", payload.RequestSource)
+				}
+				if payload.ChallengeID == nil || *payload.ChallengeID != "challenge-7" {
+					t.Fatalf("HandleRoundCreateRequested() challenge_id = %+v, want challenge-7", payload.ChallengeID)
 				}
 			}
 		})
@@ -321,6 +325,166 @@ func TestRoundHandlers_HandleRoundCreated(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestRoundHandlers_HandleRoundCreated_DoesNotPublishChallengeLinkRequestWithoutPayloadChallengeID(t *testing.T) {
+	testRoundID := sharedtypes.RoundID(uuid.New())
+	parsedTime, _ := time.Parse(time.RFC3339, "2024-01-01T12:00:00Z")
+	startTime := sharedtypes.StartTime(parsedTime)
+
+	fakeRoundDiscord := &FakeRoundDiscord{}
+	fakeRoundDiscord.CreateRoundManager.CreateNativeEventFunc = func(ctx context.Context, guildID string, roundID sharedtypes.RoundID, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, userID sharedtypes.DiscordID) (createround.CreateRoundOperationResult, error) {
+		return createround.CreateRoundOperationResult{
+			Success: &discordgo.GuildScheduledEvent{ID: "native-event-123"},
+		}, nil
+	}
+	fakeRoundDiscord.CreateRoundManager.SendRoundEventEmbedFunc = func(guildID string, channelID string, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, creatorID sharedtypes.DiscordID, roundID sharedtypes.RoundID) (createround.CreateRoundOperationResult, error) {
+		return createround.CreateRoundOperationResult{
+			Success: &discordgo.Message{ID: "discord-message-123", ChannelID: channelID},
+		}, nil
+	}
+	fakeRoundDiscord.CreateRoundManager.SendRoundEventURLFunc = func(guildID string, channelID string, eventID string) (createround.CreateRoundOperationResult, error) {
+		return createround.CreateRoundOperationResult{}, nil
+	}
+
+	h := NewRoundHandlers(
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		&config.Config{},
+		nil,
+		fakeRoundDiscord,
+		nil,
+	)
+
+	results, err := h.HandleRoundCreated(context.WithValue(context.Background(), "correlation_id", "corr-123"), &roundevents.RoundCreatedPayloadV1{
+		GuildID: "guild-1",
+		BaseRoundPayload: roundtypes.BaseRoundPayload{
+			RoundID:     testRoundID,
+			Title:       roundtypes.Title("Challenge Round"),
+			Description: roundtypes.Description("Challenge Description"),
+			Location:    roundtypes.Location("Challenge Location"),
+			StartTime:   &startTime,
+			UserID:      sharedtypes.DiscordID("scheduler-1"),
+		},
+		ChannelID: "channel-1",
+	})
+	if err != nil {
+		t.Fatalf("HandleRoundCreated() error = %v", err)
+	}
+	for _, result := range results {
+		if result.Topic == roundevents.RoundEventMessageIDUpdateV1 || result.Topic == roundevents.NativeEventCreatedV1 {
+			continue
+		}
+		t.Fatalf("unexpected result topic %q", result.Topic)
+	}
+}
+
+func TestRoundHandlers_HandleRoundCreated_DoesNotRequireChallengeScheduleLookup(t *testing.T) {
+	testRoundID := sharedtypes.RoundID(uuid.New())
+	parsedTime, _ := time.Parse(time.RFC3339, "2024-01-01T12:00:00Z")
+	startTime := sharedtypes.StartTime(parsedTime)
+
+	fakeRoundDiscord := &FakeRoundDiscord{}
+	var createNativeEventCalled bool
+	var sendRoundEventEmbedCalled bool
+
+	fakeRoundDiscord.CreateRoundManager.CreateNativeEventFunc = func(ctx context.Context, guildID string, roundID sharedtypes.RoundID, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, userID sharedtypes.DiscordID) (createround.CreateRoundOperationResult, error) {
+		createNativeEventCalled = true
+		return createround.CreateRoundOperationResult{}, nil
+	}
+	fakeRoundDiscord.CreateRoundManager.SendRoundEventEmbedFunc = func(guildID string, channelID string, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, creatorID sharedtypes.DiscordID, roundID sharedtypes.RoundID) (createround.CreateRoundOperationResult, error) {
+		sendRoundEventEmbedCalled = true
+		return createround.CreateRoundOperationResult{
+			Success: &discordgo.Message{ID: "discord-message-456", ChannelID: channelID},
+		}, nil
+	}
+
+	h := NewRoundHandlers(
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		&config.Config{},
+		nil,
+		fakeRoundDiscord,
+		nil,
+	)
+
+	results, err := h.HandleRoundCreated(context.WithValue(context.Background(), "correlation_id", "corr-123"), &roundevents.RoundCreatedPayloadV1{
+		GuildID: "guild-1",
+		BaseRoundPayload: roundtypes.BaseRoundPayload{
+			RoundID:     testRoundID,
+			Title:       roundtypes.Title("Challenge Round"),
+			Description: roundtypes.Description("Challenge Description"),
+			Location:    roundtypes.Location("Challenge Location"),
+			StartTime:   &startTime,
+			UserID:      sharedtypes.DiscordID("scheduler-1"),
+		},
+		ChannelID: "channel-1",
+	})
+
+	if err != nil {
+		t.Fatalf("HandleRoundCreated() error = %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatal("expected side-effect results to be returned")
+	}
+	if !createNativeEventCalled {
+		t.Fatal("expected native event creation to proceed")
+	}
+	if !sendRoundEventEmbedCalled {
+		t.Fatal("expected embed send to proceed")
+	}
+}
+
+func TestRoundHandlers_HandleRoundCreated_DoesNotPublishChallengeLinkRequestFromPayload(t *testing.T) {
+	testRoundID := sharedtypes.RoundID(uuid.New())
+	parsedTime, _ := time.Parse(time.RFC3339, "2024-01-01T12:00:00Z")
+	startTime := sharedtypes.StartTime(parsedTime)
+	challengeID := "challenge-11"
+
+	fakeRoundDiscord := &FakeRoundDiscord{}
+	fakeRoundDiscord.CreateRoundManager.CreateNativeEventFunc = func(ctx context.Context, guildID string, roundID sharedtypes.RoundID, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, userID sharedtypes.DiscordID) (createround.CreateRoundOperationResult, error) {
+		return createround.CreateRoundOperationResult{
+			Success: &discordgo.GuildScheduledEvent{ID: "native-event-123"},
+		}, nil
+	}
+	fakeRoundDiscord.CreateRoundManager.SendRoundEventEmbedFunc = func(guildID string, channelID string, title roundtypes.Title, description roundtypes.Description, startTime sharedtypes.StartTime, location roundtypes.Location, creatorID sharedtypes.DiscordID, roundID sharedtypes.RoundID) (createround.CreateRoundOperationResult, error) {
+		return createround.CreateRoundOperationResult{
+			Success: &discordgo.Message{ID: "discord-message-123", ChannelID: channelID},
+		}, nil
+	}
+	fakeRoundDiscord.CreateRoundManager.SendRoundEventURLFunc = func(guildID string, channelID string, eventID string) (createround.CreateRoundOperationResult, error) {
+		return createround.CreateRoundOperationResult{}, nil
+	}
+
+	h := NewRoundHandlers(
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		&config.Config{},
+		nil,
+		fakeRoundDiscord,
+		nil,
+	)
+
+	results, err := h.HandleRoundCreated(context.Background(), &roundevents.RoundCreatedPayloadV1{
+		GuildID: "guild-1",
+		BaseRoundPayload: roundtypes.BaseRoundPayload{
+			RoundID:     testRoundID,
+			Title:       roundtypes.Title("Challenge Round"),
+			Description: roundtypes.Description("Challenge Description"),
+			Location:    roundtypes.Location("Challenge Location"),
+			StartTime:   &startTime,
+			UserID:      sharedtypes.DiscordID("scheduler-2"),
+		},
+		ChannelID:   "channel-1",
+		ChallengeID: &challengeID,
+	})
+	if err != nil {
+		t.Fatalf("HandleRoundCreated() error = %v", err)
+	}
+
+	for _, result := range results {
+		if result.Topic == roundevents.RoundEventMessageIDUpdateV1 || result.Topic == roundevents.NativeEventCreatedV1 {
+			continue
+		}
+		t.Fatalf("unexpected result topic %q", result.Topic)
 	}
 }
 
