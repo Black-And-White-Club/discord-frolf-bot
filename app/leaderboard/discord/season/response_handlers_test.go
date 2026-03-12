@@ -144,8 +144,14 @@ func TestSeasonManager_HandleSeasonStandings(t *testing.T) {
 	messageSent := false
 	fakeSession.ChannelMessageSendFunc = func(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
 		messageSent = true
-		if !strings.Contains(content, "<@839877196898238526>") {
+		if !strings.Contains(content, "Farr") {
 			t.Errorf("expected message to contain formatted member label, got %s", content)
+		}
+		if strings.Contains(content, "<@839877196898238526>") {
+			t.Errorf("expected message to avoid discord mention formatting, got %s", content)
+		}
+		if strings.Contains(content, "@Farr") {
+			t.Errorf("expected message to avoid @ prefix formatting, got %s", content)
 		}
 		return &discordgo.Message{}, nil
 	}
@@ -191,11 +197,11 @@ func TestSeasonManager_HandleSeasonStandings_RawHandleFallback(t *testing.T) {
 	messageSent := false
 	fakeSession.ChannelMessageSendFunc = func(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
 		messageSent = true
-		if !strings.Contains(content, "@farrmich") {
+		if !strings.Contains(content, "farrmich") {
 			t.Errorf("expected message to contain raw handle, got %s", content)
 		}
-		if strings.Contains(content, "@@farrmich") {
-			t.Errorf("expected no duplicated @ prefix, got %s", content)
+		if strings.Contains(content, "@farrmich") {
+			t.Errorf("expected no @ prefix, got %s", content)
 		}
 		return &discordgo.Message{}, nil
 	}

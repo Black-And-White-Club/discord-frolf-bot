@@ -77,11 +77,8 @@ func buildLeaderboardDescription(leaderboard []LeaderboardEntry) string {
 func formatLeaderboardUser(entry LeaderboardEntry) string {
 	rawUserID := strings.TrimSpace(string(entry.UserID))
 	displayName := sanitizeDisplayName(entry.DisplayName)
-	normalizedID := normalizeDiscordUserID(rawUserID)
 
 	switch {
-	case normalizedID != "":
-		return fmt.Sprintf("<@%s>", normalizedID)
 	case displayName != "":
 		return formatRawLeaderboardUserLabel(displayName)
 	case rawUserID != "":
@@ -126,19 +123,19 @@ func isLikelyDiscordSnowflake(candidate string) bool {
 func formatRawLeaderboardUserLabel(raw string) string {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
-		return "@unknown-user"
+		return "unknown-user"
 	}
 
-	if strings.HasPrefix(trimmed, "<@") && strings.HasSuffix(trimmed, ">") {
-		return sanitizeDisplayName(trimmed)
+	if normalizedID := normalizeDiscordUserID(trimmed); normalizedID != "" {
+		return normalizedID
 	}
 
 	sanitized := sanitizeDisplayName(trimmed)
 	if strings.HasPrefix(sanitized, "@") {
-		return sanitized
+		return strings.TrimPrefix(sanitized, "@")
 	}
 
-	return fmt.Sprintf("@%s", sanitized)
+	return sanitized
 }
 
 func sanitizeDisplayName(raw string) string {
@@ -184,7 +181,8 @@ func buildLeaderboardEmbed(leaderboard []LeaderboardEntry, _ int32) (*discordgo.
 
 func (lum *leaderboardUpdateManager) SendLeaderboardEmbed(ctx context.Context, channelID string, leaderboard []LeaderboardEntry, page int32) (LeaderboardUpdateOperationResult, error) {
 	return lum.operationWrapper(ctx, "send_leaderboard_embed", func(ctx context.Context) (LeaderboardUpdateOperationResult, error) {
-		embed, _ := buildLeaderboardEmbed(leaderboard, page)
+		resolvedLeaderboard := lum.resolveLeaderboardDisplayNames(ctx, channelID, leaderboard)
+		embed, _ := buildLeaderboardEmbed(resolvedLeaderboard, page)
 
 		if existingMessageID := lum.getTrackedMessageID(channelID); existingMessageID != "" {
 			editedMessage, err := lum.session.ChannelMessageEditComplex(&discordgo.MessageEdit{

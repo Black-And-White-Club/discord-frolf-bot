@@ -223,9 +223,9 @@ func (hm *historyManager) HandleTagHistoryResponse(ctx context.Context, payload 
 	var sb strings.Builder
 	sb.WriteString("📊 **Tag History**\n\n")
 	for _, entry := range payload.Entries {
-		sb.WriteString(fmt.Sprintf("Tag **#%d**: <@%s>", entry.TagNumber, entry.NewMemberID))
+		sb.WriteString(fmt.Sprintf("Tag **#%d**: %s", entry.TagNumber, formatHistoryMemberLabel(entry.NewMemberID)))
 		if entry.OldMemberID != "" {
-			sb.WriteString(fmt.Sprintf(" (was <@%s>)", entry.OldMemberID))
+			sb.WriteString(fmt.Sprintf(" (was %s)", formatHistoryMemberLabel(entry.OldMemberID)))
 		}
 		sb.WriteString(fmt.Sprintf(" — %s (%s)\n", entry.Reason, entry.CreatedAt))
 	}
@@ -379,4 +379,40 @@ func correlationIDFromContext(ctx context.Context) string {
 		}
 	}
 	return ""
+}
+
+func formatHistoryMemberLabel(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "unknown-user"
+	}
+
+	if strings.HasPrefix(trimmed, "<@") && strings.HasSuffix(trimmed, ">") {
+		trimmed = strings.TrimSuffix(strings.TrimPrefix(trimmed, "<@"), ">")
+		trimmed = strings.TrimPrefix(trimmed, "!")
+	}
+
+	sanitized := sanitizeHistoryDisplayName(trimmed)
+	if strings.HasPrefix(sanitized, "@") {
+		return strings.TrimPrefix(sanitized, "@")
+	}
+	return sanitized
+}
+
+func sanitizeHistoryDisplayName(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+
+	normalizedWhitespace := strings.Join(strings.Fields(trimmed), " ")
+	replacer := strings.NewReplacer(
+		`\`, `\\`,
+		`*`, `\*`,
+		`_`, `\_`,
+		"`", "\\`",
+		`~`, `\~`,
+		`|`, `\|`,
+	)
+	return replacer.Replace(normalizedWhitespace)
 }

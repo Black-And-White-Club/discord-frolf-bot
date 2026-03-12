@@ -200,16 +200,12 @@ func (sm *seasonManager) formatSeasonStandingMemberLabel(
 ) string {
 	rawMemberID := strings.TrimSpace(string(memberID))
 	displayName := sm.lookupSeasonMemberDisplayName(ctx, string(guildID), memberID)
-	normalizedID := normalizeSeasonDiscordUserID(rawMemberID)
 
 	switch {
-	case normalizedID != "":
-		// Prefer mentions for real Discord IDs so Discord resolves to @name.
-		return fmt.Sprintf("<@%s>", normalizedID)
-	case rawMemberID != "":
-		return formatRawSeasonMemberLabel(rawMemberID)
 	case displayName != "":
 		return formatRawSeasonMemberLabel(displayName)
+	case rawMemberID != "":
+		return formatRawSeasonMemberLabel(rawMemberID)
 	default:
 		return formatRawSeasonMemberLabel(rawMemberID)
 	}
@@ -243,14 +239,6 @@ func (sm *seasonManager) lookupSeasonMemberDisplayName(
 		return sanitizeSeasonDisplayName(displayName)
 	}
 	return ""
-}
-
-func formatSeasonMemberMention(memberID sharedtypes.DiscordID) string {
-	normalizedID := normalizeSeasonDiscordUserID(string(memberID))
-	if normalizedID == "" {
-		return ""
-	}
-	return fmt.Sprintf("<@%s>", normalizedID)
 }
 
 func normalizeSeasonDiscordUserID(raw string) string {
@@ -287,17 +275,17 @@ func isLikelySeasonDiscordSnowflake(candidate string) bool {
 func formatRawSeasonMemberLabel(raw string) string {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
-		return "@unknown-user"
+		return "unknown-user"
 	}
-	if strings.HasPrefix(trimmed, "<@") && strings.HasSuffix(trimmed, ">") {
-		return sanitizeSeasonDisplayName(trimmed)
+	if normalizedID := normalizeSeasonDiscordUserID(trimmed); normalizedID != "" {
+		return normalizedID
 	}
 
 	sanitized := sanitizeSeasonDisplayName(trimmed)
 	if strings.HasPrefix(sanitized, "@") {
-		return sanitized
+		return strings.TrimPrefix(sanitized, "@")
 	}
-	return fmt.Sprintf("@%s", sanitized)
+	return sanitized
 }
 
 func sanitizeSeasonDisplayName(raw string) string {

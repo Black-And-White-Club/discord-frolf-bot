@@ -31,49 +31,61 @@ func Test_buildLeaderboardDescription(t *testing.T) {
 		if !strings.Contains(got, "🥇") {
 			t.Errorf("expected gold medal, got: %q", got)
 		}
-		if !strings.Contains(got, "@user1") {
+		if !strings.Contains(got, "user1") {
 			t.Errorf("expected user label, got: %q", got)
 		}
 	})
 
-	t.Run("valid discord id prefers mention over display name", func(t *testing.T) {
+	t.Run("valid discord id prefers plain-text display name over mention", func(t *testing.T) {
 		entries := []LeaderboardEntry{{Rank: 1, UserID: "839877196898238526", DisplayName: "Alice"}}
 		got := buildLeaderboardDescription(entries)
-		if !strings.Contains(got, "<@839877196898238526>") {
-			t.Errorf("expected discord mention for valid ID, got: %q", got)
+		if !strings.Contains(got, "Alice") {
+			t.Errorf("expected plain-text display name for valid ID, got: %q", got)
+		}
+		if strings.Contains(got, "<@839877196898238526>") {
+			t.Errorf("expected no discord mention when plain-text display name is available, got: %q", got)
 		}
 		if strings.Contains(got, "@Alice") {
-			t.Errorf("expected no plain-text display name when mention is available, got: %q", got)
+			t.Errorf("expected no @ prefix when plain-text display name is available, got: %q", got)
 		}
 	})
 
-	t.Run("mention-formatted IDs are normalized", func(t *testing.T) {
+	t.Run("mention-formatted IDs are normalized to plain text", func(t *testing.T) {
 		entries := []LeaderboardEntry{{Rank: 1, UserID: "<@!839877196898238526>"}}
 		got := buildLeaderboardDescription(entries)
-		if !strings.Contains(got, "<@839877196898238526>") {
-			t.Errorf("expected normalized mention id, got: %q", got)
+		if !strings.Contains(got, "839877196898238526") {
+			t.Errorf("expected normalized plain-text id, got: %q", got)
 		}
-		if strings.Contains(got, "<@<@!839877196898238526>>") {
-			t.Errorf("expected no nested mention format, got: %q", got)
+		if strings.Contains(got, "<@839877196898238526>") {
+			t.Errorf("expected no discord mention format, got: %q", got)
+		}
+		if strings.Contains(got, "@839877196898238526") {
+			t.Errorf("expected no @ prefix on normalized plain-text id, got: %q", got)
 		}
 	})
 
 	t.Run("short numeric pseudo-id falls back to plain label", func(t *testing.T) {
 		entries := []LeaderboardEntry{{Rank: 1, UserID: "23"}}
 		got := buildLeaderboardDescription(entries)
-		if !strings.Contains(got, "@23") {
+		if !strings.Contains(got, "23") {
 			t.Errorf("expected plain pseudo-id label, got: %q", got)
 		}
 		if strings.Contains(got, "<@23>") {
 			t.Errorf("expected no mention for short pseudo-id, got: %q", got)
+		}
+		if strings.Contains(got, "@23") {
+			t.Errorf("expected no @ prefix for short pseudo-id, got: %q", got)
 		}
 	})
 
 	t.Run("short numeric pseudo-id prefers display name when available", func(t *testing.T) {
 		entries := []LeaderboardEntry{{Rank: 1, UserID: "23", DisplayName: "muffinmaster123"}}
 		got := buildLeaderboardDescription(entries)
-		if !strings.Contains(got, "@muffinmaster123") {
+		if !strings.Contains(got, "muffinmaster123") {
 			t.Errorf("expected display-name fallback label, got: %q", got)
+		}
+		if strings.Contains(got, "@muffinmaster123") {
+			t.Errorf("expected no @ prefix on display-name fallback, got: %q", got)
 		}
 		if strings.Contains(got, "@23") {
 			t.Errorf("expected numeric pseudo-id to be replaced by display name, got: %q", got)
@@ -83,30 +95,36 @@ func Test_buildLeaderboardDescription(t *testing.T) {
 	t.Run("placeholder user labels prefer display name when available", func(t *testing.T) {
 		entries := []LeaderboardEntry{{Rank: 1, UserID: "Tag 23 Placeholder", DisplayName: "muffinmaster123"}}
 		got := buildLeaderboardDescription(entries)
-		if !strings.Contains(got, "@muffinmaster123") {
+		if !strings.Contains(got, "muffinmaster123") {
 			t.Errorf("expected display-name fallback label, got: %q", got)
+		}
+		if strings.Contains(got, "@muffinmaster123") {
+			t.Errorf("expected no @ prefix on display-name fallback, got: %q", got)
 		}
 		if strings.Contains(got, "@Tag 23 Placeholder") {
 			t.Errorf("expected placeholder label to be replaced, got: %q", got)
 		}
 	})
 
-	t.Run("raw @handle is preserved without double @", func(t *testing.T) {
+	t.Run("raw @handle is rendered without the @ prefix", func(t *testing.T) {
 		entries := []LeaderboardEntry{{Rank: 1, UserID: "@farrmich"}}
 		got := buildLeaderboardDescription(entries)
-		if !strings.Contains(got, "@farrmich") {
+		if !strings.Contains(got, "farrmich") {
 			t.Errorf("expected raw handle, got: %q", got)
 		}
-		if strings.Contains(got, "@@farrmich") {
-			t.Errorf("expected no duplicated @ prefix, got: %q", got)
+		if strings.Contains(got, "@farrmich") {
+			t.Errorf("expected no @ prefix, got: %q", got)
 		}
 	})
 
-	t.Run("plain names still render with @ prefix", func(t *testing.T) {
+	t.Run("plain names render without @ prefix", func(t *testing.T) {
 		entries := []LeaderboardEntry{{Rank: 1, UserID: "Bobby Waldron"}}
 		got := buildLeaderboardDescription(entries)
-		if !strings.Contains(got, "@Bobby Waldron") {
+		if !strings.Contains(got, "Bobby Waldron") {
 			t.Errorf("expected plain display label, got: %q", got)
+		}
+		if strings.Contains(got, "@Bobby Waldron") {
+			t.Errorf("expected no @ prefix on plain names, got: %q", got)
 		}
 	})
 
@@ -189,7 +207,7 @@ func Test_leaderboardUpdateManager_SendLeaderboardEmbed(t *testing.T) {
 					if !strings.Contains(embed.Description, "🥇") {
 						t.Errorf("Expected gold medal in description, got: %q", embed.Description)
 					}
-					if !strings.Contains(embed.Description, "@user1") {
+					if !strings.Contains(embed.Description, "user1") {
 						t.Errorf("Expected user1 in description, got: %q", embed.Description)
 					}
 					if len(embed.Fields) != 0 {
@@ -431,6 +449,114 @@ func TestSendLeaderboardEmbed_DiscoversExistingMessageAfterRestart(t *testing.T)
 	}
 	if tracked := lum.getTrackedMessageID(channelID); tracked != existingMessageID {
 		t.Fatalf("tracked message id not persisted after discovery: got %s want %s", tracked, existingMessageID)
+	}
+}
+
+func TestSendLeaderboardEmbed_ResolvesMissingDisplayNameFromDiscord(t *testing.T) {
+	channelID := "test-channel"
+	guildID := "guild-1"
+	userID := "839877196898238526"
+
+	fakeSession := discord.NewFakeSession()
+	fakeSession.GetChannelFunc = func(gotChannelID string, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+		if gotChannelID != channelID {
+			t.Fatalf("unexpected channel lookup: got %s want %s", gotChannelID, channelID)
+		}
+		return &discordgo.Channel{ID: channelID, GuildID: guildID}, nil
+	}
+	fakeSession.GuildMemberFunc = func(gotGuildID, gotUserID string, options ...discordgo.RequestOption) (*discordgo.Member, error) {
+		if gotGuildID != guildID {
+			t.Fatalf("unexpected guild lookup: got %s want %s", gotGuildID, guildID)
+		}
+		if gotUserID != userID {
+			t.Fatalf("unexpected user lookup: got %s want %s", gotUserID, userID)
+		}
+		return &discordgo.Member{
+			Nick: "Farr",
+			User: &discordgo.User{
+				ID:       userID,
+				Username: "fallback-user",
+			},
+		}, nil
+	}
+	fakeSession.ChannelMessageSendComplexFunc = func(gotChannelID string, data *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+		if gotChannelID != channelID {
+			t.Fatalf("unexpected send channel: got %s want %s", gotChannelID, channelID)
+		}
+		if len(data.Embeds) != 1 {
+			t.Fatalf("expected 1 embed, got %d", len(data.Embeds))
+		}
+		description := data.Embeds[0].Description
+		if !strings.Contains(description, "Farr") {
+			t.Fatalf("expected resolved display name in description, got %q", description)
+		}
+		if strings.Contains(description, userID) {
+			t.Fatalf("expected raw discord id to be replaced in description, got %q", description)
+		}
+		return &discordgo.Message{ID: "test-message-id", ChannelID: gotChannelID, Embeds: data.Embeds}, nil
+	}
+
+	lum := &leaderboardUpdateManager{
+		logger:             slog.New(slog.NewTextHandler(io.Discard, nil)),
+		session:            fakeSession,
+		messageByChannelID: make(map[string]string),
+		operationWrapper: func(ctx context.Context, name string, fn func(ctx context.Context) (LeaderboardUpdateOperationResult, error)) (LeaderboardUpdateOperationResult, error) {
+			return fn(ctx)
+		},
+	}
+
+	_, err := lum.SendLeaderboardEmbed(context.Background(), channelID, []LeaderboardEntry{
+		{Rank: 1, UserID: sharedtypes.DiscordID(userID)},
+	}, 1)
+	if err != nil {
+		t.Fatalf("SendLeaderboardEmbed() error = %v", err)
+	}
+}
+
+func TestSendLeaderboardEmbed_DoesNotLookupDiscordWhenDisplayNameExists(t *testing.T) {
+	channelID := "test-channel"
+	userID := "839877196898238526"
+
+	fakeSession := discord.NewFakeSession()
+	fakeSession.GetChannelFunc = func(channelID string, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+		t.Fatalf("unexpected channel lookup when display name already exists")
+		return nil, nil
+	}
+	fakeSession.GuildMemberFunc = func(guildID, userID string, options ...discordgo.RequestOption) (*discordgo.Member, error) {
+		t.Fatalf("unexpected guild member lookup when display name already exists")
+		return nil, nil
+	}
+	fakeSession.ChannelMessageSendComplexFunc = func(gotChannelID string, data *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error) {
+		if gotChannelID != channelID {
+			t.Fatalf("unexpected send channel: got %s want %s", gotChannelID, channelID)
+		}
+		if len(data.Embeds) != 1 {
+			t.Fatalf("expected 1 embed, got %d", len(data.Embeds))
+		}
+		description := data.Embeds[0].Description
+		if !strings.Contains(description, "Alice") {
+			t.Fatalf("expected existing display name in description, got %q", description)
+		}
+		if strings.Contains(description, userID) {
+			t.Fatalf("expected raw discord id to stay hidden when display name exists, got %q", description)
+		}
+		return &discordgo.Message{ID: "test-message-id", ChannelID: gotChannelID, Embeds: data.Embeds}, nil
+	}
+
+	lum := &leaderboardUpdateManager{
+		logger:             slog.New(slog.NewTextHandler(io.Discard, nil)),
+		session:            fakeSession,
+		messageByChannelID: make(map[string]string),
+		operationWrapper: func(ctx context.Context, name string, fn func(ctx context.Context) (LeaderboardUpdateOperationResult, error)) (LeaderboardUpdateOperationResult, error) {
+			return fn(ctx)
+		},
+	}
+
+	_, err := lum.SendLeaderboardEmbed(context.Background(), channelID, []LeaderboardEntry{
+		{Rank: 1, UserID: sharedtypes.DiscordID(userID), DisplayName: "Alice"},
+	}, 1)
+	if err != nil {
+		t.Fatalf("SendLeaderboardEmbed() error = %v", err)
 	}
 }
 
