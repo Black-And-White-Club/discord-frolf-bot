@@ -97,6 +97,9 @@ func (r *GuildRouter) RegisterHandlers(ctx context.Context, handlers guildhandle
 	registerHandler(deps, guildevents.GuildConfigRetrievedV1, handlers.HandleGuildConfigRetrieved)
 	registerHandler(deps, guildevents.GuildConfigRetrievalFailedV1, handlers.HandleGuildConfigRetrievalFailed)
 
+	// Feature access
+	registerHandler(deps, guildevents.GuildFeatureAccessUpdatedV1, handlers.HandleGuildFeatureAccessUpdated)
+
 	// Guild config deletion flow - affects command registration
 	registerHandler(deps, guildevents.GuildConfigDeletedV1, handlers.HandleGuildConfigDeleted)
 	registerHandler(deps, guildevents.GuildConfigDeletionFailedV1, handlers.HandleGuildConfigDeletionFailed)

@@ -189,12 +189,45 @@ func convertGuildConfigFromShared(src *guildtypes.GuildConfig) *storage.GuildCon
 		EventChannelID:       src.EventChannelID,
 		LeaderboardChannelID: src.LeaderboardChannelID,
 		RegisteredRoleID:     src.UserRoleID, // Map UserRoleID to RegisteredRoleID
+		EditorRoleID:         src.EditorRoleID,
 		AdminRoleID:          src.AdminRoleID,
 		RoleMappings:         roleMappings,
 		SignupEmoji:          src.SignupEmoji,
+		Entitlements:         src.Entitlements,
 		CachedAt:             time.Now(),
 		RefreshedAt:          time.Now(),
 		IsPlaceholder:        false,
 		IsRequestPending:     false,
 	}
+}
+
+func (h *GuildHandlers) HandleGuildFeatureAccessUpdated(ctx context.Context, payload *guildevents.GuildFeatureAccessUpdatedPayloadV1) ([]handlerwrapper.Result, error) {
+	if payload == nil {
+		h.logger.WarnContext(ctx, "HandleGuildFeatureAccessUpdated received nil payload")
+		return nil, nil
+	}
+
+	h.logger.InfoContext(ctx, "Processing guild feature access update",
+		attr.String("guild_id", string(payload.GuildID)),
+	)
+
+	// Fetch existing config, copy it, and merge in the new entitlements.
+	// We must not mutate the returned pointer directly — the cache may hand out
+	// the same pointer to concurrent callers, so mutating it in-place is a data race.
+	cachedConfig, err := h.guildConfigResolver.GetGuildConfigWithContext(ctx, string(payload.GuildID))
+	if err == nil && cachedConfig != nil {
+		updated := *cachedConfig // Shallow copy + full field replacement below is safe. Do NOT
+		// mutate updated.Entitlements.Features in-place — Features is a map (reference
+		// type) and would alias the cached value, causing a data race.
+		updated.Entitlements = payload.Entitlements
+		h.guildConfigResolver.HandleGuildConfigReceived(ctx, string(payload.GuildID), &updated)
+	} else {
+		// Config not cached yet. Invalidate so the next Get() fetches fresh data from
+		// the backend, which will include the updated entitlements.
+		h.guildConfigResolver.ClearInflightRequest(ctx, string(payload.GuildID))
+		h.logger.DebugContext(ctx, "Guild config not cached during feature access update; cache invalidated",
+			attr.String("guild_id", string(payload.GuildID)))
+	}
+
+	return nil, nil
 }

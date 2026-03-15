@@ -201,6 +201,12 @@ func TestRegisterCommands_RetriesTransientCreateFailure(t *testing.T) {
 				Options:                  desiredByName["season"].Options,
 				DefaultMemberPermissions: desiredByName["season"].DefaultMemberPermissions,
 			},
+			{
+				ID:          "cmd-bet",
+				Name:        desiredByName["bet"].Name,
+				Description: desiredByName["bet"].Description,
+				Options:     desiredByName["bet"].Options,
+			},
 		}, nil
 	}
 

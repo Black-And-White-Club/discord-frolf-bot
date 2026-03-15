@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Black-And-White-Club/frolf-bot-shared/observability/attr"
+	guildtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/guild"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -74,20 +75,21 @@ func (m *DefaultCacheMetrics) GetStats() CacheStats {
 
 // GuildConfig represents a cached guild configuration
 type GuildConfig struct {
-	GuildID              string            `json:"guild_id"`
-	SignupChannelID      string            `json:"signup_channel_id"`
-	SignupMessageID      string            `json:"signup_message_id"`
-	SignupEmoji          string            `json:"signup_emoji"`
-	EventChannelID       string            `json:"event_channel_id"`
-	LeaderboardChannelID string            `json:"leaderboard_channel_id"`
-	RegisteredRoleID     string            `json:"registered_role_id"`
-	EditorRoleID         string            `json:"editor_role_id"`
-	AdminRoleID          string            `json:"admin_role_id"`
-	RoleMappings         map[string]string `json:"role_mappings"`
-	CachedAt             time.Time         `json:"cached_at"`
-	RefreshedAt          time.Time         `json:"refreshed_at"`
-	IsPlaceholder        bool              `json:"is_placeholder"`
-	IsRequestPending     bool              `json:"is_request_pending"`
+	GuildID              string                              `json:"guild_id"`
+	SignupChannelID      string                              `json:"signup_channel_id"`
+	SignupMessageID      string                              `json:"signup_message_id"`
+	SignupEmoji          string                              `json:"signup_emoji"`
+	EventChannelID       string                              `json:"event_channel_id"`
+	LeaderboardChannelID string                              `json:"leaderboard_channel_id"`
+	RegisteredRoleID     string                              `json:"registered_role_id"`
+	EditorRoleID         string                              `json:"editor_role_id"`
+	AdminRoleID          string                              `json:"admin_role_id"`
+	RoleMappings         map[string]string                   `json:"role_mappings"`
+	Entitlements         guildtypes.ResolvedClubEntitlements `json:"entitlements,omitempty"`
+	CachedAt             time.Time                           `json:"cached_at"`
+	RefreshedAt          time.Time                           `json:"refreshed_at"`
+	IsPlaceholder        bool                                `json:"is_placeholder"`
+	IsRequestPending     bool                                `json:"is_request_pending"`
 }
 
 type GuildConfigCacheInterface interface {
@@ -156,14 +158,18 @@ func (gc *GuildConfigCache) Get(guildID string) (*GuildConfig, bool) {
 		return nil, false
 	}
 
-	// Update LRU position
+	// Update LRU position and capture snapshot fields before releasing the lock.
+	// Reading config fields after Unlock races with MarkRequestPending/ClearRequestPending
+	// which write those same fields under the lock.
 	gc.lruList.MoveToFront(element)
+	refreshedAt := config.RefreshedAt
+	isRequestPending := config.IsRequestPending
 	gc.mu.Unlock()
 
-	// Check if soft refresh is needed
-	if time.Since(config.RefreshedAt) > gc.refreshTTL && !config.IsRequestPending {
-		// Use singleflight to ensure only one refresh runs for this guildID
-		go gc.sfGroup.Do(guildID, func() (any, error) {
+	// Check if soft refresh is needed using the snapshot values captured under lock.
+	// DoChan returns immediately; the refresh runs in the background via singleflight deduplication.
+	if time.Since(refreshedAt) > gc.refreshTTL && !isRequestPending {
+		gc.sfGroup.DoChan(guildID, func() (any, error) {
 			slog.Debug("Triggering deduplicated background refresh", attr.String("guild_id", guildID))
 			gc.triggerAsyncRefresh(guildID)
 			return nil, nil
@@ -339,4 +345,33 @@ func (gc *GuildConfig) IsConfigured() bool {
 	}
 	return gc.GuildID != "" && gc.SignupChannelID != "" && gc.EventChannelID != "" &&
 		gc.LeaderboardChannelID != "" && gc.RegisteredRoleID != ""
+}
+
+func (gc *GuildConfig) FeatureAccess(featureKey guildtypes.ClubFeatureKey) guildtypes.ClubFeatureAccess {
+	if gc == nil || gc.Entitlements.Features == nil {
+		return guildtypes.ClubFeatureAccess{
+			Key:    featureKey,
+			State:  guildtypes.FeatureAccessStateDisabled,
+			Source: guildtypes.FeatureAccessSourceNone,
+		}
+	}
+
+	access, ok := gc.Entitlements.Features[featureKey]
+	if !ok {
+		return guildtypes.ClubFeatureAccess{
+			Key:    featureKey,
+			State:  guildtypes.FeatureAccessStateDisabled,
+			Source: guildtypes.FeatureAccessSourceNone,
+		}
+	}
+
+	return access
+}
+
+func (gc *GuildConfig) IsFeatureEnabled(featureKey guildtypes.ClubFeatureKey) bool {
+	return gc.FeatureAccess(featureKey).State == guildtypes.FeatureAccessStateEnabled
+}
+
+func (gc *GuildConfig) IsFeatureFrozen(featureKey guildtypes.ClubFeatureKey) bool {
+	return gc.FeatureAccess(featureKey).State == guildtypes.FeatureAccessStateFrozen
 }

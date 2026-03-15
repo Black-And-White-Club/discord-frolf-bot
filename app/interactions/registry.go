@@ -12,6 +12,7 @@ import (
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/guildconfig"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
+	guildtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/guild"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -30,6 +31,7 @@ type HandlerConfig struct {
 	Handler            func(ctx context.Context, i *discordgo.InteractionCreate)
 	RequiredPermission PermissionLevel
 	RequiresSetup      bool // Whether the guild must be configured to use this command
+	RequiredFeature    guildtypes.ClubFeatureKey
 	IsMutating         bool
 }
 
@@ -98,6 +100,17 @@ func (r *Registry) RegisterMutatingHandler(id string, handler func(ctx context.C
 		RequiredPermission: policy.RequiredPermission,
 		RequiresSetup:      policy.RequiresSetup,
 		IsMutating:         true,
+	})
+}
+
+// RegisterFeatureHandler registers a handler that requires a specific feature.
+func (r *Registry) RegisterFeatureHandler(id string, handler func(ctx context.Context, i *discordgo.InteractionCreate), permission PermissionLevel, feature guildtypes.ClubFeatureKey, isMutating bool) {
+	r.registerHandlerConfig(id, HandlerConfig{
+		Handler:            handler,
+		RequiredPermission: permission,
+		RequiresSetup:      true,
+		RequiredFeature:    feature,
+		IsMutating:         isMutating,
 	})
 }
 
@@ -212,7 +225,7 @@ func (r *Registry) checkPermissions(ctx context.Context, s *discordgo.Session, i
 		return false
 	}
 
-	needsGuildConfig := config.RequiresSetup || config.RequiredPermission != NoPermissionRequired
+	needsGuildConfig := config.RequiresSetup || config.RequiredPermission != NoPermissionRequired || config.RequiredFeature != ""
 	if !needsGuildConfig {
 		return true
 	}
@@ -253,6 +266,10 @@ func (r *Registry) checkPermissions(ctx context.Context, s *discordgo.Session, i
 		return false
 	}
 
+	if !r.checkFeatureAccess(s, i, guildConfig, config) {
+		return false
+	}
+
 	// No role check required once setup passes.
 	if config.RequiredPermission == NoPermissionRequired {
 		return true
@@ -273,6 +290,32 @@ func (r *Registry) checkPermissions(ctx context.Context, s *discordgo.Session, i
 	}
 
 	return true
+}
+
+func (r *Registry) checkFeatureAccess(
+	s *discordgo.Session,
+	i *discordgo.InteractionCreate,
+	guildConfig *storage.GuildConfig,
+	config HandlerConfig,
+) bool {
+	if config.RequiredFeature == "" || guildConfig == nil {
+		return true
+	}
+
+	access := guildConfig.FeatureAccess(config.RequiredFeature)
+	switch access.State {
+	case guildtypes.FeatureAccessStateEnabled:
+		return true
+	case guildtypes.FeatureAccessStateFrozen:
+		if !config.IsMutating {
+			return true
+		}
+		r.sendErrorResponse(s, i, "❌ This feature is currently read-only for this club while premium access is frozen.")
+		return false
+	default:
+		r.sendErrorResponse(s, i, "❌ This feature is not enabled for this club.")
+		return false
+	}
 }
 
 func (r *Registry) checkGuildPermission(member *discordgo.Member, guildConfig *storage.GuildConfig, required PermissionLevel) bool {

@@ -326,6 +326,10 @@ func desiredCommands(targetGuildID string) []*discordgo.ApplicationCommand {
 			},
 			DefaultMemberPermissions: int64Ptr(discordgo.PermissionAdministrator),
 		},
+		{
+			Name:        "bet",
+			Description: "Access the seasonal betting module for this club",
+		},
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/shared/storage"
+	guildtypes "github.com/Black-And-White-Club/frolf-bot-shared/types/guild"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -358,6 +359,96 @@ func TestRegisterMutatingHandler_BlockingPolicies(t *testing.T) {
 				t.Fatalf("executed=%v want=%v", executed, tt.wantRun)
 			}
 		})
+	}
+}
+
+func TestRequiredFeature_Disabled_BlocksHandler(t *testing.T) {
+	r := NewRegistry()
+	executed := false
+	r.registerHandlerConfig("betting-read", HandlerConfig{
+		Handler: func(ctx context.Context, i *discordgo.InteractionCreate) {
+			executed = true
+		},
+		RequiredFeature: guildtypes.ClubFeatureBetting,
+	})
+
+	r.SetGuildConfigResolver(&stubResolver{
+		cfg: &storage.GuildConfig{
+			GuildID: "g1",
+			Entitlements: guildtypes.ResolvedClubEntitlements{
+				Features: map[guildtypes.ClubFeatureKey]guildtypes.ClubFeatureAccess{
+					guildtypes.ClubFeatureBetting: {
+						Key:    guildtypes.ClubFeatureBetting,
+						State:  guildtypes.FeatureAccessStateDisabled,
+						Source: guildtypes.FeatureAccessSourceNone,
+					},
+				},
+			},
+		},
+	})
+
+	r.HandleInteraction(nil, &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
+		Type:    discordgo.InteractionApplicationCommand,
+		GuildID: "g1",
+		Data:    discordgo.ApplicationCommandInteractionData{Name: "betting-read"},
+	}})
+
+	if executed {
+		t.Fatalf("handler should not execute when required feature is disabled")
+	}
+}
+
+func TestRequiredFeature_Frozen_AllowsReadOnlyAndBlocksMutations(t *testing.T) {
+	r := NewRegistry()
+	readExecuted := false
+	writeExecuted := false
+
+	r.registerHandlerConfig("betting-read", HandlerConfig{
+		Handler: func(ctx context.Context, i *discordgo.InteractionCreate) {
+			readExecuted = true
+		},
+		RequiredFeature: guildtypes.ClubFeatureBetting,
+	})
+	r.registerHandlerConfig("betting-write", HandlerConfig{
+		Handler: func(ctx context.Context, i *discordgo.InteractionCreate) {
+			writeExecuted = true
+		},
+		RequiredFeature: guildtypes.ClubFeatureBetting,
+		IsMutating:      true,
+	})
+
+	resolver := &stubResolver{
+		cfg: &storage.GuildConfig{
+			GuildID: "g1",
+			Entitlements: guildtypes.ResolvedClubEntitlements{
+				Features: map[guildtypes.ClubFeatureKey]guildtypes.ClubFeatureAccess{
+					guildtypes.ClubFeatureBetting: {
+						Key:    guildtypes.ClubFeatureBetting,
+						State:  guildtypes.FeatureAccessStateFrozen,
+						Source: guildtypes.FeatureAccessSourceSubscription,
+					},
+				},
+			},
+		},
+	}
+	r.SetGuildConfigResolver(resolver)
+
+	r.HandleInteraction(nil, &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
+		Type:    discordgo.InteractionApplicationCommand,
+		GuildID: "g1",
+		Data:    discordgo.ApplicationCommandInteractionData{Name: "betting-read"},
+	}})
+	r.HandleInteraction(nil, &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
+		Type:    discordgo.InteractionApplicationCommand,
+		GuildID: "g1",
+		Data:    discordgo.ApplicationCommandInteractionData{Name: "betting-write"},
+	}})
+
+	if !readExecuted {
+		t.Fatalf("read-only handler should execute when feature is frozen")
+	}
+	if writeExecuted {
+		t.Fatalf("mutating handler should not execute when feature is frozen")
 	}
 }
 

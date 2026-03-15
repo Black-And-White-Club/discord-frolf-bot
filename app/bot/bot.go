@@ -12,6 +12,7 @@ import (
 
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/auth"
 	authrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/auth/watermill"
+	"github.com/Black-And-White-Club/discord-frolf-bot/app/betting"
 	"github.com/Black-And-White-Club/discord-frolf-bot/app/club"
 	clubrouter "github.com/Black-And-White-Club/discord-frolf-bot/app/club/router"
 	discord "github.com/Black-And-White-Club/discord-frolf-bot/app/discordgo"
@@ -79,6 +80,10 @@ type DiscordBot struct {
 
 	// Shutdown synchronization
 	shutdownOnce sync.Once
+
+	// handlerWg tracks in-flight Discord event handlers (GuildCreate, GuildDelete, etc.)
+	// that access bot fields. Shutdown drains this before nilling EventBus and friends.
+	handlerWg sync.WaitGroup
 
 	// Command reconciliation (startup)
 	commandRegistrar       func(discord.Session, *slog.Logger, string) error
@@ -526,6 +531,20 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 		return fmt.Errorf("auth module initialization failed: %w", err)
 	}
 
+	// Initialize Betting Module
+	err = betting.InitializeBettingModule(
+		ctx,
+		bot.Session,
+		registry,
+		bot.Logger,
+		bot.Config,
+		bot.Metrics,
+		bot.Tracer,
+	)
+	if err != nil {
+		return fmt.Errorf("betting module initialization failed: %w", err)
+	}
+
 	// Start guild router - MUST be running before Discord session opens
 	// to ensure we can receive guild config retrieval responses
 	startRouter("Guild", bot.GuildWatermillRouter)
@@ -591,7 +610,12 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 
 	// Handle guild lifecycle events for multi-tenant support
 	bot.Session.AddHandler(func(s *discordgo.Session, event *discordgo.GuildCreate) {
-		ctx := context.Background()
+		bot.handlerWg.Add(1)
+		defer bot.handlerWg.Done()
+
+		// Detach from Run's cancellation so the handler completes normally during
+		// shutdown, but preserve trace/logging context from the parent.
+		ctx := context.WithoutCancel(ctx)
 
 		bot.Logger.InfoContext(ctx, "Bot connected to guild",
 			attr.String("guild_id", event.Guild.ID),
@@ -608,7 +632,12 @@ func (bot *DiscordBot) Run(ctx context.Context) error {
 	})
 
 	bot.Session.AddHandler(func(s *discordgo.Session, event *discordgo.GuildDelete) {
-		ctx := context.Background()
+		bot.handlerWg.Add(1)
+		defer bot.handlerWg.Done()
+
+		// Detach from Run's cancellation so the handler completes normally during
+		// shutdown, but preserve trace/logging context from the parent.
+		ctx := context.WithoutCancel(ctx)
 
 		bot.Logger.InfoContext(ctx, "Bot removed from guild",
 			attr.String("guild_id", event.Guild.ID),
@@ -862,6 +891,11 @@ func (bot *DiscordBot) Shutdown(ctx context.Context) error {
 			}
 			bot.Session = nil
 		}
+
+		// Wait for any in-flight Discord event handlers (GuildCreate, GuildDelete, etc.)
+		// that may still be running and hold references to bot.EventBus.
+		// This must happen after Session.Close() (no new events) but before EventBus is nilled.
+		bot.handlerWg.Wait()
 
 		// Close module routers (these handle business logic)
 		if bot.UserRouter != nil {
