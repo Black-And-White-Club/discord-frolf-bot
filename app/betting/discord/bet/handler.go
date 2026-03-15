@@ -32,12 +32,12 @@ func (bm *betManager) HandleBetCommand(ctx context.Context, i *discordgo.Interac
 
 	baseURL := strings.TrimRight(bm.cfg.PWA.BaseURL, "/")
 	if baseURL == "" {
-		baseURL = "https://app.frolfbot.com"
+		baseURL = "https://frolf-bot.duckdns.org"
 	}
 	if parsed, err := url.Parse(baseURL); err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 		bm.logger.WarnContext(ctx, "invalid PWA base URL scheme, using default",
 			attr.String("configured_url", baseURL))
-		baseURL = "https://app.frolfbot.com"
+		baseURL = "https://frolf-bot.duckdns.org"
 	}
 	bettingURL := fmt.Sprintf("%s/betting", baseURL)
 

@@ -130,7 +130,7 @@ func LoadConfigFromEnvironment() (*Config, error) {
 	}
 
 	// PWA config
-	cfg.PWA.BaseURL = getEnvOrDefault("PWA_BASE_URL", "https://pwa.frolf-bot.com")
+	cfg.PWA.BaseURL = getEnvOrDefault("PWA_BASE_URL", "https://frolf-bot.duckdns.org")
 	cfg.PWA.RequestTimeout = getIntEnvOrDefault("PWA_REQUEST_TIMEOUT", 5)
 
 	// Role mappings from environment variables (JSON format)
@@ -171,7 +171,7 @@ func LoadBaseConfig() (*Config, error) {
 			URL: getEnvOrDefault("NATS_URL", "nats://localhost:4222"),
 		},
 		PWA: PWAConfig{
-			BaseURL:        getEnvOrDefault("PWA_BASE_URL", "https://pwa.frolf-bot.com"),
+			BaseURL:        getEnvOrDefault("PWA_BASE_URL", "https://frolf-bot.duckdns.org"),
 			RequestTimeout: getIntEnvOrDefault("PWA_REQUEST_TIMEOUT", 5),
 		},
 	}
