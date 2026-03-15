@@ -305,3 +305,64 @@ func Test_convertAttrsToAny(t *testing.T) {
 		t.Fatalf("expected second element to be slog.Attr, got %T", got[1])
 	}
 }
+
+// TestResolver_HandleGuildConfigReceived_RaceWithTimeout verifies that when the backend
+// responds concurrently with the response timeout, the valid config always wins and is
+// never silently discarded. This is the core of the configRequest mutex fix (D2).
+// Run this test with -race to confirm no data race is detected.
+func TestResolver_HandleGuildConfigReceived_RaceWithTimeout(t *testing.T) {
+	const iterations = 200
+	guildID := "race-guild"
+	gc := &storage.GuildConfig{
+		GuildID:              guildID,
+		SignupChannelID:      "c",
+		EventChannelID:       "e",
+		LeaderboardChannelID: "l",
+		RegisteredRoleID:     "r",
+	}
+
+	for i := 0; i < iterations; i++ {
+		// Use microsecond-scale timeouts so the timeout and response race closely.
+		// ResponseTimeout must be strictly greater than RequestTimeout per Validate(),
+		// but 1 ms vs 2 ms still creates the same tight race condition.
+		cfg := &ResolverConfig{
+			RequestTimeout:  1 * time.Millisecond,
+			ResponseTimeout: 2 * time.Millisecond,
+		}
+		fb := &fakeEventBus{}
+		r, err := NewResolver(context.Background(), fb, storage.NewInteractionStore[storage.GuildConfig](context.Background(), 1*time.Hour), cfg)
+		if err != nil {
+			t.Fatalf("unexpected constructor error: %v", err)
+		}
+
+		req := &configRequest{ready: make(chan struct{})}
+		r.inflightRequests.Store(guildID, req)
+
+		// Fire both the timeout path and the success response path simultaneously.
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		go func() {
+			defer wg.Done()
+			r.coordinateConfigRequest(context.Background(), guildID, req)
+		}()
+
+		go func() {
+			defer wg.Done()
+			// Slight delay so both goroutines start before either acts.
+			time.Sleep(500 * time.Microsecond)
+			r.HandleGuildConfigReceived(context.Background(), guildID, gc)
+		}()
+
+		wg.Wait()
+
+		// After both paths complete, if config arrived it must be returned — never discarded.
+		req.mu.Lock()
+		gotConfig, gotErr := req.config, req.err
+		req.mu.Unlock()
+
+		if gotConfig != nil && gotErr != nil {
+			t.Fatalf("iteration %d: valid config arrived but err is also set (%v) — response was discarded", i, gotErr)
+		}
+	}
+}

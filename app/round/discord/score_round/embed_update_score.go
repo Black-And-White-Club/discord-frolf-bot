@@ -252,53 +252,72 @@ func (srm *scoreRoundManager) AddLateParticipantToScorecard(ctx context.Context,
 			return ScoreRoundOperationResult{Success: "No embeds to update"}, nil
 		}
 
-		if messageHasPager(message.Components) {
-			if snapshot, found := embedpagination.Update(messageID, func(snapshot *embedpagination.Snapshot) bool {
-				if snapshot == nil || snapshot.Kind != embedpagination.SnapshotKindLines {
-					return false
-				}
-				snapshot.LineItems = appendMissingParticipantLines(snapshot.LineItems, participants)
-				return true
-			}); found {
-				embed, components, _, _, renderErr := embedpagination.RenderPage(messageID, snapshot.CurrentPage)
-				if renderErr != nil {
-					return ScoreRoundOperationResult{Error: renderErr}, renderErr
-				}
-
-				edit := &discordgo.MessageEdit{
-					Channel:    channelID,
-					ID:         messageID,
-					Embeds:     &[]*discordgo.MessageEmbed{embed},
-					Components: &components,
-				}
-
-				updatedMsg, err := srm.session.ChannelMessageEditComplex(edit)
-				if err != nil {
-					return ScoreRoundOperationResult{Error: err}, err
-				}
-
-				return ScoreRoundOperationResult{Success: updatedMsg}, nil
+		if snapshot, found := embedpagination.Update(messageID, func(snapshot *embedpagination.Snapshot) bool {
+			if snapshot == nil || snapshot.Kind != embedpagination.SnapshotKindLines {
+				return false
 			}
+			snapshot.LineItems = appendMissingParticipantLines(snapshot.LineItems, participants)
+			return true
+		}); found {
+			embed, components, _, _, renderErr := embedpagination.RenderPage(messageID, snapshot.CurrentPage)
+			if renderErr != nil {
+				return ScoreRoundOperationResult{Error: renderErr}, renderErr
+			}
+
+			edit := &discordgo.MessageEdit{
+				Channel:    channelID,
+				ID:         messageID,
+				Embeds:     &[]*discordgo.MessageEmbed{embed},
+				Components: &components,
+			}
+
+			updatedMsg, err := srm.session.ChannelMessageEditComplex(edit)
+			if err != nil {
+				return ScoreRoundOperationResult{Error: err}, err
+			}
+
+			return ScoreRoundOperationResult{Success: updatedMsg}, nil
 		}
 
 		embed := message.Embeds[0]
 
-		for _, p := range participants {
-			added := false
-			for i := range embed.Fields {
-				if strings.TrimSpace(embed.Fields[i].Value) == "" || embed.Fields[i].Value == placeholderNoParticipants {
-					embed.Fields[i].Value = strings.Join(participantsToEmbedLines([]roundtypes.Participant{p}), "\n")
-					added = true
-					break
+		// Consolidate all participant fields into one and append missing participants.
+		var newFields []*discordgo.MessageEmbedField
+		participantFieldIndex := -1
+		var existingLines []string
+
+		for _, f := range embed.Fields {
+			if isParticipantField(f.Name, f.Value) {
+				if participantFieldIndex == -1 {
+					participantFieldIndex = len(newFields)
+					newFields = append(newFields, f)
+					existingLines = append(existingLines, embedpagination.ParticipantLinesFromFieldValue(f.Value)...)
 				}
-			}
-			if !added {
-				embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-					Name:  "👥 Participants",
-					Value: strings.Join(participantsToEmbedLines([]roundtypes.Participant{p}), "\n"),
-				})
+				// Skip subsequent participant fields (consolidating them).
+			} else {
+				newFields = append(newFields, f)
 			}
 		}
+		embed.Fields = newFields
+
+		updatedLines := appendMissingParticipantLines(existingLines, participants)
+		newValue := strings.Join(updatedLines, "\n")
+		if len(updatedLines) == 0 {
+			newValue = placeholderNoParticipants
+		}
+
+		fieldName := "👥 Participants"
+		if participantFieldIndex != -1 {
+			embed.Fields[participantFieldIndex].Name = fieldName
+			embed.Fields[participantFieldIndex].Value = newValue
+		} else {
+			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+				Name:  fieldName,
+				Value: newValue,
+			})
+		}
+
+		storeLineSnapshotFromEmbed(messageID, embed, message.Components)
 
 		edit := &discordgo.MessageEdit{
 			Channel: channelID,

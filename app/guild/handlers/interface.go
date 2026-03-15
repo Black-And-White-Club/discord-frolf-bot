@@ -18,6 +18,7 @@ type Handlers interface {
 	HandleGuildConfigUpdateFailed(ctx context.Context, payload *guildevents.GuildConfigUpdateFailedPayloadV1) ([]handlerwrapper.Result, error)
 	HandleGuildConfigRetrieved(ctx context.Context, payload *guildevents.GuildConfigRetrievedPayloadV1) ([]handlerwrapper.Result, error)
 	HandleGuildConfigRetrievalFailed(ctx context.Context, payload *guildevents.GuildConfigRetrievalFailedPayloadV1) ([]handlerwrapper.Result, error)
+	HandleGuildFeatureAccessUpdated(ctx context.Context, payload *guildevents.GuildFeatureAccessUpdatedPayloadV1) ([]handlerwrapper.Result, error)
 
 	// Guild config deletion handlers
 	HandleGuildConfigDeleted(ctx context.Context, payload *guildevents.GuildConfigDeletedPayloadV1) ([]handlerwrapper.Result, error)

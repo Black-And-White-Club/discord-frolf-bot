@@ -25,9 +25,12 @@ type ConfigErrorMetrics struct {
 	TotalErrors   int64            `json:"total_errors"`
 }
 
-// configRequest represents an in-flight request for a guild config
+// configRequest represents an in-flight request for a guild config.
+// mu guards config and err: the timeout path and HandleGuildConfigReceived can race
+// to write these fields, and the caller reads them after the channel close.
 type configRequest struct {
 	ready  chan struct{}        // Closed when the request completes
+	mu     sync.Mutex           // Guards config and err
 	config *storage.GuildConfig // The resulting config (may be nil)
 	err    error                // Any error that occurred
 }
@@ -99,10 +102,13 @@ func (r *Resolver) GetGuildConfigWithContext(ctx context.Context, guildID string
 
 	select {
 	case <-actualReq.ready:
-		if actualReq.err != nil {
-			return nil, actualReq.err
+		actualReq.mu.Lock()
+		cfg, err := actualReq.config, actualReq.err
+		actualReq.mu.Unlock()
+		if err != nil {
+			return nil, err
 		}
-		return actualReq.config, nil
+		return cfg, nil
 
 	case <-ctx.Done():
 		return nil, &ConfigTemporaryError{GuildID: guildID, Reason: "request cancelled", Cause: ctx.Err()}
@@ -164,17 +170,25 @@ func (r *Resolver) coordinateConfigRequest(ctx context.Context, guildID string, 
 		return
 	}
 
-	// Wait for HandleGuildConfigReceived or Timeout
-	// Use independent context for response wait to get full ResponseTimeout
-	// (not limited by requestCtx's shorter deadline)
-	responseCtx, responseCancel := context.WithTimeout(context.Background(), r.config.ResponseTimeout)
+	// Wait for HandleGuildConfigReceived or Timeout.
+	// Detach from requestCtx so the response window gets its full ResponseTimeout
+	// duration regardless of requestCtx's shorter deadline, while still carrying
+	// trace/logging context from the caller for observability.
+	responseCtx, responseCancel := context.WithTimeout(context.WithoutCancel(ctx), r.config.ResponseTimeout)
 	defer responseCancel()
 
 	select {
 	case <-req.ready:
 		return
 	case <-responseCtx.Done():
-		req.err = &ConfigLoadingError{GuildID: guildID}
+		// Only record the timeout error if no valid config arrived concurrently.
+		// HandleGuildConfigReceived may have already written req.config and closed
+		// the channel — in that race the response wins and we discard the error.
+		req.mu.Lock()
+		if req.config == nil {
+			req.err = &ConfigLoadingError{GuildID: guildID}
+		}
+		req.mu.Unlock()
 		slog.WarnContext(responseCtx, "Backend response timeout", attr.String("guild_id", guildID))
 		r.scheduleRetry(responseCtx, guildID)
 	}
@@ -196,7 +210,12 @@ func (r *Resolver) HandleGuildConfigReceived(ctx context.Context, guildID string
 
 	if reqInterface, exists := r.inflightRequests.LoadAndDelete(guildID); exists {
 		if req, ok := reqInterface.(*configRequest); ok {
+			// Hold the mutex so the timeout path cannot observe a stale nil config.
+			// Clear any prior timeout error — the valid config arriving wins.
+			req.mu.Lock()
 			req.config = config
+			req.err = nil
+			req.mu.Unlock()
 			close(req.ready)
 		}
 	}
@@ -222,7 +241,9 @@ func (r *Resolver) HandleGuildConfigRetrievalFailed(ctx context.Context, guildID
 
 	if reqInterface, exists := r.inflightRequests.LoadAndDelete(guildID); exists {
 		if req, ok := reqInterface.(*configRequest); ok {
+			req.mu.Lock()
 			req.err = resultErr
+			req.mu.Unlock()
 			close(req.ready)
 		}
 	}
@@ -277,7 +298,9 @@ func (r *Resolver) ClearInflightRequest(ctx context.Context, guildID string) {
 			select {
 			case <-req.ready:
 			default:
+				req.mu.Lock()
 				req.err = &ConfigNotFoundError{GuildID: guildID, Reason: "config deleted/cleared"}
+				req.mu.Unlock()
 				close(req.ready)
 			}
 		}
