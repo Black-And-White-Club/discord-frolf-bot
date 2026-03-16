@@ -213,49 +213,6 @@ func (rrm *roundRsvpManager) InteractionJoinRoundLate(ctx context.Context, i *di
 			}
 		}
 
-		message := i.Message
-		if len(message.Embeds) == 0 {
-			latestMessage, err := rrm.session.ChannelMessage(resolvedChannelID, i.Message.ID)
-			if err != nil {
-				rrm.logger.WarnContext(ctx, "Failed to fetch latest message for late-join precheck; continuing optimistically",
-					attr.Error(err),
-					attr.String("guild_id", i.GuildID),
-					attr.String("message_id", i.Message.ID))
-			} else {
-				message = latestMessage
-			}
-		}
-
-		// Check if user is already in any embed field.
-		if len(message.Embeds) > 0 {
-			embed := message.Embeds[0]
-
-			userAlreadyJoined := false
-			for _, field := range embed.Fields {
-				if strings.Contains(field.Value, fmt.Sprintf("<@%s>", user.ID)) {
-					userAlreadyJoined = true
-					break
-				}
-			}
-
-			if userAlreadyJoined {
-				// A deferred interaction cannot receive a new initial response.
-				_, err := rrm.session.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
-					Content: "You have already joined this round!",
-					Flags:   discordgo.MessageFlagsEphemeral,
-				})
-				if err != nil {
-					return RoundRsvpOperationResult{Error: err}, nil
-				}
-
-				rrm.logger.InfoContext(ctx, "User attempted to join round they're already in",
-					attr.UserID(sharedtypes.DiscordID(user.ID)),
-					attr.String("round_id", roundUUID.String()))
-
-				return RoundRsvpOperationResult{Success: "User already joined"}, nil
-			}
-		}
-
 		joinedLate := true
 
 		payload := discordroundevents.RoundParticipantJoinRequestDiscordPayloadV1{

@@ -73,7 +73,7 @@ func TestHandleBetCommand_FallbackURL_WhenBaseURLEmpty(t *testing.T) {
 	mgr := newTestManager(fs, "")
 	mgr.HandleBetCommand(context.Background(), newInteraction("guild1", "user1"))
 
-	if !strings.Contains(respondedContent, "https://app.frolfbot.com/betting") {
+	if !strings.Contains(respondedContent, "https://frolf-bot.duckdns.org/betting") {
 		t.Errorf("expected hardcoded fallback URL, got: %q", respondedContent)
 	}
 }

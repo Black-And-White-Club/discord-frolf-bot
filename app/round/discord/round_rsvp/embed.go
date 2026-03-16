@@ -23,14 +23,12 @@ const (
 // PRESERVED: old signature was (ctx, channelID, messageID, acceptedParticipants, declinedParticipants, tentativeParticipants []Participant) — may be reused in PWA
 func (rrm *roundRsvpManager) UpdateRoundEventEmbed(ctx context.Context, channelID string, messageID string, participants []roundtypes.Participant) (RoundRsvpOperationResult, error) {
 	// Multi-tenant support: resolve channelID from guild config if not provided
+	guildID, _ := ctx.Value("guild_id").(string)
 	resolvedChannelID := channelID
-	if resolvedChannelID == "" {
-		guildID, _ := ctx.Value("guild_id").(string)
-		if guildID != "" {
-			cfg, err := rrm.guildConfigResolver.GetGuildConfigWithContext(ctx, guildID)
-			if err == nil && cfg != nil && cfg.EventChannelID != "" {
-				resolvedChannelID = cfg.EventChannelID
-			}
+	if resolvedChannelID == "" && guildID != "" {
+		cfg, err := rrm.guildConfigResolver.GetGuildConfigWithContext(ctx, guildID)
+		if err == nil && cfg != nil && cfg.EventChannelID != "" {
+			resolvedChannelID = cfg.EventChannelID
 		}
 	}
 
@@ -74,7 +72,7 @@ func (rrm *roundRsvpManager) UpdateRoundEventEmbed(ctx context.Context, channelI
 		}
 
 		// Update the single Participants field at index 2
-		embed.Fields[2].Value = rrm.formatParticipants(ctx, participants)
+		embed.Fields[2].Value = rrm.formatParticipants(ctx, guildID, participants)
 		participantLines := embedpagination.ParticipantLinesFromFieldValue(embed.Fields[2].Value)
 
 		// PRESERVED: old 3-field update — may be reused in PWA
@@ -151,8 +149,8 @@ func (rrm *roundRsvpManager) UpdateRoundEventEmbed(ctx context.Context, channelI
 }
 
 // formatParticipants formats the participant list for the embed field value in the RSVP embed.
-// It formats as "<@USER_ID> Tag: N" or just "<@USER_ID>" if no tag number.
-func (rrm *roundRsvpManager) formatParticipants(_ context.Context, participants []roundtypes.Participant) string {
+// It formats as "DisplayName Tag: N" or just "DisplayName" if no tag number.
+func (rrm *roundRsvpManager) formatParticipants(_ context.Context, guildID string, participants []roundtypes.Participant) string {
 	if len(participants) == 0 {
 		return placeholderNoParticipants // Use consistent placeholder
 	}
@@ -179,18 +177,42 @@ func (rrm *roundRsvpManager) formatParticipants(_ context.Context, participants 
 
 	var lines []string
 	for _, participant := range sortedParticipants {
-		line := ""
+		displayName := rrm.resolveParticipantDisplayName(guildID, participant)
+		var line string
 		if participant.TagNumber != nil && *participant.TagNumber > 0 {
-			// RSVP Format: <@USER_ID> Tag: N
-			line = fmt.Sprintf("<@%s> %s %d", participant.UserID, tagPrefix, *participant.TagNumber) // Excluded icon and display name text
+			line = fmt.Sprintf("%s %s %d", displayName, tagPrefix, *participant.TagNumber)
 		} else {
-			// RSVP Format: <@USER_ID> (for participants without a tag number)
-			line = fmt.Sprintf("<@%s>", participant.UserID) // Excluded icon and display name text
+			line = displayName
 		}
 		lines = append(lines, line)
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+// resolveParticipantDisplayName returns the best available display name for a participant.
+// Priority: guild nick → global display name → username → RawName → UserID string.
+func (rrm *roundRsvpManager) resolveParticipantDisplayName(guildID string, participant roundtypes.Participant) string {
+	if rrm.session != nil && guildID != "" {
+		member, err := rrm.session.GuildMember(guildID, string(participant.UserID))
+		if err == nil && member != nil {
+			if nick := strings.TrimSpace(member.Nick); nick != "" {
+				return nick
+			}
+			if member.User != nil {
+				if globalName := strings.TrimSpace(member.User.GlobalName); globalName != "" {
+					return globalName
+				}
+				if username := strings.TrimSpace(member.User.Username); username != "" {
+					return username
+				}
+			}
+		}
+	}
+	if participant.RawName != "" {
+		return participant.RawName
+	}
+	return string(participant.UserID)
 }
 
 func roundMessageHasPager(components []discordgo.MessageComponent) bool {
